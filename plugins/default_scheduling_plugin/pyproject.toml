@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "default_scheduling_plugin"
+version = "0.1.0"
+description = "Default scheduling plugin for Ananta AI Assistant"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+authors = [
+    {name = "Ananta AI Team"},
+]
+dependencies = [
+    "apscheduler>=3.10.0",
+]
+
+[project.entry-points."ananta.plugins"]
+default_scheduling_plugin = "default_scheduling_plugin.plugin:SchedulingPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.yaml", "*.yml"]

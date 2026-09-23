@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_scheduling_plugin::ensure_kb_retrieval_audit_schedule",
+  "display_name": "Ensure KB Retrieval-Audit Schedule",
+  "description": "Idempotently install the daily knowledge-base retrieval-drift audit cron, targeting the EDGE_SINK verb audit_retrieval_corpus_cron with system-owned session and flow identifiers. Creates the schedule if absent, returns it unchanged if already correct, and normalizes duplicates or a mis-targeted entry. The already-present check compares the action's target process key as well as the cron expression, because a schedule with the right cadence and the wrong target is the exact defect this verb repairs. Its default tag is deliberately distinct from the predecessor trigger's, so calling it creates the new schedule alongside the old one and never retires it; retiring the predecessor is a separate explicit step taken only after one real firing has been confirmed. Cron-only wiring (is_discoverable=False); not surfaced via process_search.",
+  "embedding_description": "Install or repair the daily knowledge base retrieval drift audit cron schedule. Idempotent ensure verb: creates when missing, normalizes duplicates, verifies the schedule targets the background audit process. Uses stable platform-owned session and flow identifiers so the trigger keeps working after the creating session ends.",
+  "result_processor_customizations": {
+    "action_label": "KB Retrieval-Audit Schedule Ensured",
+    "result_type": "kb_retrieval_audit_schedule_ensured",
+    "result_description": "Ensure status (created, already_present, or normalized) with the schedule identifier, tag, cron expression, the cron-target process key, and how many stale or duplicate schedules were cleared",
+    "presentation_guidance": "",
+    "output_action_guidance": "The KB retrieval-drift audit schedule is in place. It runs alongside any predecessor trigger rather than replacing it. Do not retire the predecessor until one real firing of this schedule has been confirmed by a new audit report whose discovered-fixture count equals its audited-article count."
+  },
+  "error_processor_customizations": {
+    "action_context": "Ensuring the daily knowledge-base retrieval-drift audit cron schedule exists and targets the background audit verb",
+    "error_interpretation": "ParameterError: the supplied cron expression failed validation. ScheduleCreateError: the schedule could not be persisted. ExecutionError: the scheduler was unavailable or the schedule store could not be read.",
+    "recovery_guidance": "For parameter errors, supply a valid five-field UTC cron expression or omit the argument to accept the daily default. For persistence or scheduler errors, verify the scheduling plugin is healthy and retry; the verb is idempotent, so a retry after a partial failure is safe and will normalize rather than duplicate."
+  }
+}

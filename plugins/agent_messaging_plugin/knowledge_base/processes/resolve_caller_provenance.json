@@ -1,0 +1,19 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::resolve_caller_provenance",
+  "display_name": "Resolve server-derived caller provenance",
+  "description": "Returns the calling bridge's managed-session provenance without accepting a caller identity, session key, or provenance blob. Use it when a platform application adapter must attest a downstream action to the current server-derived caller and must refuse rather than guess when the caller cannot be linked to a managed session.",
+  "embedding_description": "Resolve verified caller provenance for a platform adapter before a downstream write. Returns managed-session and stable agent-session identities plus a grammar-safe directing principal, and fails closed when the caller has no server-derived managed-session link.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "resolve caller provenance",
+    "result_type": "caller_provenance",
+    "result_description": "Managed-session provenance derived exclusively from server-built action state.",
+    "presentation_guidance": "Report only that caller provenance resolved or refused; do not expose an unredacted authenticated principal.",
+    "output_action_guidance": "Use the returned opaque identifiers only as adapter provenance fields, never as authority to act for another session."
+  },
+  "error_processor_customizations": {
+    "action_context": "Resolving a caller-managed-session link for a downstream platform adapter.",
+    "error_interpretation": "caller_provenance_unavailable means the caller had no server-derived registered or attributed managed-session identity; no partial provenance was returned.",
+    "recovery_guidance": "Invoke from a registered bridge or a correctly attributed one-shot route, then retry. Do not supply a session id or substitute operator provenance."
+  }
+}

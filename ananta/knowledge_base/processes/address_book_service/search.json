@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::search",
+  "display_name": "Search Addresses",
+  "description": "Search addresses by query, type, or tag. Returns list without entries - use resolve for full data.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Addresses found",
+    "result_type": "address_list_retrieved",
+    "result_description": "Search results with keys: addresses (list of address records without entries), count (number of results found)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Searches addresses by query text, type filter, or tag filter. Returns address metadata without entries.",
+    "error_interpretation": "ValidationError: invalid filter parameters. DatabaseError: search failed due to storage issues.",
+    "recovery_guidance": "For validation errors: check filter parameters are valid strings. For database errors: suggest retrying or using 'list_types' to verify available types."
+  }
+}

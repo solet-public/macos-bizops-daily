@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::vault_create_recovery",
+  "display_name": "Create Vault Recovery Key",
+  "description": "Wrap the master key under a separate recovery passphrase so the vault can be unlocked even if the primary passphrase is lost. Operator-only.",
+  "embedding_description": "Vault: recovery / backup passphrase / second unlock path. Wrap the existing master key under a second KEK derived from a recovery passphrase. After this verb runs, the vault can be unlocked with either the primary passphrase or the recovery passphrase. The two passphrases are independent; rotating one does not affect the other. Operator-only — requires operator or operator-equivalent principal.",
+  "result_processor_customizations": {
+    "action_label": "Recovery key created",
+    "result_type": "vault_recovery_created",
+    "result_description": "Recovery-key creation result. Contains message (status) and recovery_key_path (location of the persisted recovery-wrapped key).",
+    "presentation_guidance": "Remind the operator to record the recovery passphrase in a separate trust boundary from the primary passphrase.",
+    "output_action_guidance": "No follow-up action required; the recovery path is now live and usable on the next unlock attempt."
+  },
+  "error_processor_customizations": {
+    "action_context": "Creates a second wrapping of the master key so the vault remains recoverable when the primary passphrase is lost.",
+    "error_interpretation": "VaultNotInitialized: vault_init has not been run. VaultLocked: vault must be unlocked first so the master key is available for re-wrapping. RecoveryKeyAlreadyExists: a recovery key already exists. VaultAccessDeniedError: caller is not operator.",
+    "recovery_guidance": "For VaultNotInitialized: run vault_init first. For VaultLocked: unlock first. For RecoveryKeyAlreadyExists: re-creation is destructive — confirm intent and rotate explicitly. For VaultAccessDeniedError: re-invoke from operator-MCP context."
+  }
+}

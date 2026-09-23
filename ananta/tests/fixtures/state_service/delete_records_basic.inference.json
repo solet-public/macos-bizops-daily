@@ -1,0 +1,10 @@
+{
+  "query": "Delete old log entries",
+  "expected_process_key": "service_interface::state_service::delete_records",
+  "expected_arguments": {
+    "namespace": "core",
+    "query": {
+      "table": "logs"
+    }
+  }
+}

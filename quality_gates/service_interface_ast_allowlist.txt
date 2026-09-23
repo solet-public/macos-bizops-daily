@@ -1,0 +1,17 @@
+# Service-interface AST gate allowlist (tracked-debt register).
+#
+# One identifier per line; `#` comments and blank lines ignored.
+# Per design v1 §4.2 (workbench/2026-06-12_service_interface_ast_gate_design_v1.md):
+#
+#   (a) a::<file_posix_path>::<class_name>::<function_name>
+#   (b) b::<file_posix_path>::<class_name>::<function_name>
+#   (c) c::<provider>::<json_stem>
+#
+# Suffix-match on the file portion for (a)/(b); exact match for (c).
+#
+# Allowlisted findings are STILL PRINTED so the gate stays honest;
+# they just don't contribute to the exit-2 verdict. Removing an entry
+# is the unit of remediation progress. Adding a new entry is NOT a
+# scanner fix — investigate the underlying cause before allowlisting.
+#
+# Strict-by-default: 0 entries at landing (platform-state is clean).

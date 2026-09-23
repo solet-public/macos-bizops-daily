@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::read_file",
+  "display_name": "Read Knowledge Base File",
+  "description": "Read the full contents of a file from a knowledge base, including a content_sha256 hash of the returned text for use as an edit_file precondition.",
+  "embedding_description": "Open, read, view, or fetch the full text contents of a single named file — typically a markdown (.md) document — inside a knowledge base, together with its metadata and a content_sha256 hash of the exact returned text. Read-only; it does not list directories or modify anything. Use when you already know a file's path and want to see what that one file contains, or to obtain the content hash before a hash-preconditioned edit_file. This is the way to read a workbench planning document after discovering it: pass the Read path from the discovery chunk as the path, with name workbench. The returned content_sha256 is the value to pass back as edit_file's expected_content_hash.",
+  "result_processor_customizations": {
+    "action_label": "File read completed",
+    "result_type": "knowledge_base_file_read",
+    "result_description": "File contents with metadata",
+    "presentation_guidance": "Present the file content directly.",
+    "output_action_guidance": ""
+  },
+  "error_processor_customizations": {
+    "action_context": "Reading a knowledge base file",
+    "error_interpretation": "NotFoundError: file not found. PathTraversalError: path escapes KB root.",
+    "recovery_guidance": "Use browse to verify the file path."
+  }
+}

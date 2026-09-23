@@ -1,0 +1,44 @@
+# Retrieval-test companion for the fleet launcher session configuration article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+article_path: knowledge_bases/ananta_platform/24_operator_communication/06_fleet_launcher_session_configuration.md
+consumer_profile: both
+
+target_queries:
+  - "change model effort advisor for a fleet launcher role"
+  - "how do I disable the advisor tool for one session"
+  - "fleet launcher session configuration"
+  - "where does the multi-session launcher live"
+  - "turn off advisor for one claude code session"
+  - "per role model effort advisor claude code launcher"
+  - "CLAUDE_CODE_DISABLE_ADVISOR_TOOL"
+  - "why doesn't --settings advisorModel null disable the advisor"
+  - "how does a session clear its own context and keep working"
+  - "my session context is too long clear it without the operator"
+  - "delegate another session to type clear into my terminal"
+
+# forbidden_min_rank is 2, not the platform-conventional 4, for the same reason
+# as 24_operator_communication/04_session_start_orientation.retrieval_test.yaml:
+# "in-session reload ergonomics" is a genuinely adjacent config-knob reference
+# (session/platform config knobs, same as this article's model/effort/advisor
+# knobs) -- ranking 2nd behind its actual owner is the correct shape, not
+# overreach. The invariant this still enforces: this article must never
+# OUTRANK the owning article for that query (must not reach rank 1).
+forbidden_queries:
+  - "session start orientation standing governance documents"      # 04_session_start_orientation owns this
+  - "seed hydration runbook operator environment setup fleet coordination offer" # github_midwife_plugin/01_hydration_runbook owns this
+  - "in-session reload ergonomics platform config log level"       # ananta_service/in_session_reload_ergonomics owns this; adjacent-topic exception, see above
+
+# This article must rank #1 for its own target queries (operator requirement:
+# stop re-deriving the advisor-disable mechanism from the claude binary).
+#
+# MEASURED 2026-08-14 (cross-KB knowledge_service::search, post 06/09 self-clear
+# edits): all three self-clear targets rank the github_midwife_plugin hydration
+# runbook's "leave sessions running, use /clear" paragraph 1st and this article
+# 2nd; within ananta_platform this article is 1st on all three (ahead of the 09
+# seat self-rotation card, as designed). Whether min_rank is judged within-KB or
+# cross-KB is a semantics decision owned by the test_retrieval yaml-runner
+# canonicalization follow-up; this note records the measured state either way.
+min_rank: 1
+forbidden_min_rank: 2
+
+process_key_assertions: []

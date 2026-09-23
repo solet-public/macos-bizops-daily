@@ -1,0 +1,14 @@
+{
+  "name": "test_import_memories",
+  "description": "Verify importing memories from a JSON backup file",
+  "process_key": "plugin::actr_memory_plugin::import_memories_action",
+  "arguments": {
+    "params": {
+      "file_path": "/tmp/memory_backup_test.json"
+    },
+    "state": {
+      "session_id": "test-session-102"
+    }
+  },
+  "timeout_seconds": 120
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::lifecycle_management_service::start_service_via_interface",
+  "arguments": {
+    "service_name": "nonexistent_service_99999"
+  }
+}

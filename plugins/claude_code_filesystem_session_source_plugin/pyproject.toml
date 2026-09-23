@@ -1,0 +1,25 @@
+[project]
+name = "claude_code_filesystem_session_source_plugin"
+version = "1.0.0"
+description = "LLM session ledger source over the local Claude Code .claude/projects/ JSONL files."
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[project.entry-points."ananta.plugins"]
+claude_code_filesystem_session_source_plugin = "claude_code_filesystem_session_source_plugin.plugin:ClaudeCodeFilesystemSessionSourcePlugin"

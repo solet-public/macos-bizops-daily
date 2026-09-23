@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::knowledge_service::audit_retrieval_corpus_cron",
+  "display_name": "Audit Knowledge Retrieval Corpus (Cron Sibling)",
+  "description": "Scheduler-fired EDGE_SINK sibling of audit_retrieval_corpus. Submits the default-corpus retrieval-drift walk to a single-slot background executor and returns a started/already-running receipt immediately; the walk itself (several minutes at ~14s/article) runs on a daemon thread, off the action-queue dispatch path. Terminal action; no result-processor dispatch and no inference scaffold. Cron-only wiring (`is_discoverable=False`); not surfaced via process_search. The model-callable equivalent is service_interface::knowledge_service::audit_retrieval_corpus, which returns the full aggregated report synchronously.",
+  "embedding_description": "Scheduler cron sibling that fires the corpus-wide retrieval-drift audit as a fast-returning EDGE_SINK terminal action. Operator wiring used by the daily 'KB retrieval drift audit' schedule; returns a started/already-running receipt rather than the audit report itself, because the report takes several minutes to produce and must not park the action queue. The model-callable equivalent is service_interface::knowledge_service::audit_retrieval_corpus."
+}

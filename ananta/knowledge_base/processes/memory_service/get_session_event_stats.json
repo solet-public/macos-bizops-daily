@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::get_session_event_stats",
+  "display_name": "Get Session Event Statistics",
+  "description": "Get statistics about conversation events for a session (NOT long-term memories). Returns event counts by source namespace and timestamp ranges. For actual memory statistics, use memory_stats instead.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Get Session Event Statistics",
+    "result_type": "event_statistics",
+    "result_description": "Statistics about conversation events including counts by interface and timestamp ranges",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving event statistics for a conversation session",
+    "error_interpretation": "SessionNotFoundError: the specified session_id does not exist. DatabaseError: failed to query event statistics from storage.",
+    "recovery_guidance": "For session errors: verify the session_id is correct and exists. For database errors: verify state storage is accessible and running."
+  }
+}

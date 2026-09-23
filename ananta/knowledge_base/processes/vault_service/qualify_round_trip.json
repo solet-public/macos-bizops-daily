@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::qualify_round_trip",
+  "display_name": "Qualify Vault Round Trip",
+  "description": "Generate a private random canary, store it, retrieve and compare it internally, then delete only that canary before returning bounded boolean proof fields. The canary and its value are never returned.",
+  "embedding_description": "Vault qualification: private canary store, retrieve, compare, and cleanup. Returns stored, retrieved, matched, and deleted booleans only; never a canary identifier or value.",
+  "result_processor_customizations": {
+    "action_label": "Vault round trip qualified",
+    "result_type": "vault_round_trip_qualification",
+    "result_description": "Bounded private-canary proof: stored, retrieved, matched, and deleted.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Treat any false proof field as a failed vault qualification and diagnose the local Keychain."
+  },
+  "error_processor_customizations": {
+    "action_context": "Runs a private Keychain canary and deletes it before returning any result.",
+    "error_interpretation": "A false proof field identifies the failed stage without exposing the canary or its value.",
+    "recovery_guidance": "Verify Keychain availability and permissions, then retry the bounded qualification."
+  }
+}

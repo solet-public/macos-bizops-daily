@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::memory_service::learn",
+  "arguments": {
+    "path": "/tmp/example.py",
+    "pattern": "*.py",
+    "recursive": false,
+    "memorize": false,
+    "tags": ["code", "python"]
+  }
+}

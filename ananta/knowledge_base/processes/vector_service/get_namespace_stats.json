@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vector_service::get_namespace_stats",
+  "display_name": "Get Namespace Statistics",
+  "description": "Get statistics for a vector namespace (count, dimension, etc).",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Namespace statistics retrieved",
+    "result_type": "namespace_stats",
+    "result_description": "Statistics for the namespace including vector count, dimension, index type, storage size, and creation timestamp",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves statistics and metadata about a specific vector namespace",
+    "error_interpretation": "NamespaceError: namespace not found. ConnectionError: database unavailable.",
+    "recovery_guidance": "For namespace errors: verify namespace exists with list_namespaces. For connection errors: check database status and retry."
+  }
+}

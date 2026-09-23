@@ -1,0 +1,4 @@
+{
+  "type": "inference",
+  "input": "Give me the latest job ID from our internal job-tracking service"
+}

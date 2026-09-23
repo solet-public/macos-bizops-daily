@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::report_managed_dispatch",
+  "display_name": "Report a causal managed-dispatch worker event",
+  "description": "Worker-side append-only reporting surface for ack, milestone, blocked, and completion. Every event names dispatch_id, stable idempotency event_id, current attempt_agent_instance_id, prior_version, and a structured payload. Actor identity is not a parameter: the server derives the instance/session from authenticated call context, verifies it is the immutable current attempt, and verifies that session holds the dispatch role. ACK requires the exact brief digest, held role binding, scope-readback digest, and plan digest; it is the only transition from uptake_pending/uptake_uncertain to active. Milestone requires completed work, current evidence, next action, and a future next_report_deadline before TTL. Blocked requires class, exact owner, question, non-empty safe options/evidence, and for internal blockers a timezone-aware future decision deadline before TTL; operator blockers require owner=operator and authority_gap. Completion validates the exact expected path, current artifact SHA-256, completion-contract digest, allowed verdict, and every declared evidence obligation, including an explicit reason for skipped/not_applicable evidence, but reaches only completion_reported. Duplicate event_id calls are idempotent. Stale causal versions/attempts lose loudly and remain auditable; no worker event can produce completed.",
+  "embedding_description": "Have a managed worker prove uptake, report progress, surface a typed blocker, or report exact completion evidence under one causal event contract. ACK alone activates work; completion still waits for independent coordinator acceptance.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Managed worker event recorded",
+    "result_type": "managed_dispatch_worker_event_result",
+    "result_description": "The resulting managed_dispatch projection after the accepted or idempotently replayed event, including state, causal version, current attempt, deadlines, blocker/completion evidence, and next action/owner.",
+    "presentation_guidance": "Name the accepted event kind and resulting state. Distinguish active from uptake receipts, blocked_internal from blocked_operator, and completion_reported from completed. Surface the returned next_required_action and responsible_role."
+  },
+  "error_processor_customizations": {
+    "action_context": "Derives the caller from authenticated call context plus the live durable role binding, then checks idempotency, current causal version/current attempt, event payload, completion obligations, and legal source state before one CAS update and append-only event. Rejected stale-version events are appended with a rejection code for audit.",
+    "error_interpretation": "stale_dispatch_version/stale_attempt means a competing current transition or replacement attempt won. *_not_allowed means the event is illegal from the current dispatch state. Payload digest/path/hash/evidence errors mean the claimed ACK, milestone, blocker, or completion contract was not proven and state did not advance.",
+    "recovery_guidance": "Read managed_dispatch_status, preserve the original rejected event for audit, and send a new semantic event with a fresh event_id/current version only when it remains legal. Do not edit a stale event into the winning history."
+  }
+}

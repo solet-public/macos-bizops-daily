@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::review_blocked_intents",
+  "display_name": "Review Blocked Intents",
+  "description": "Review memories tagged as blocked intents (requests that couldn't be fulfilled). Identifies stale blocked-intent memories that may warrant retry via discovery. Use this for periodic maintenance to ensure blocked intents are still valid.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Review Blocked Intents",
+    "result_type": "blocked_intents_review",
+    "result_description": "Review of blocked intent memories with retry recommendations",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reviewing blocked intent memories for staleness",
+    "error_interpretation": "DatabaseError: failed to query memory records.",
+    "recovery_guidance": "Verify state storage is accessible."
+  }
+}

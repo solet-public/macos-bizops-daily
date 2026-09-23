@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "dry"
+  ],
+  "output_not_contains": [
+    "ERROR"
+  ]
+}

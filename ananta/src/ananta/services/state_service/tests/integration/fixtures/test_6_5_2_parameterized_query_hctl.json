@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::state_service::execute_sql",
+  "arguments": {
+    "sql_query": "SELECT process_key, provider FROM core__process_registry WHERE provider_type = ? LIMIT 5",
+    "sql_params": ["service"]
+  }
+}

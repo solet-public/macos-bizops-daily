@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::learn",
+  "arguments": {
+    "path": "/tmp/test_learn_memorize.md",
+    "memorize": true,
+    "tags": ["test", "memorize-test"]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "id",
+    "vector",
+    "metadata",
+    "Vector not found"
+  ],
+  "output_not_contains": [
+    "exception"
+  ]
+}

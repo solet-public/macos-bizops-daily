@@ -1,0 +1,24 @@
+{
+  "process_key": "plugin::pgvector_service_plugin::get_vector_action",
+  "display_name": "Get Vector",
+  "description": "Retrieve a specific vector by ID",
+  "embedding_description": "Retrieve a specific vector by id from a namespace, including embedding and metadata. Use to inspect stored vectors, debug indexing, or verify metadata fields and values. Helpful for audits and debugging vector stores.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Vector retrieved",
+    "result_type": "vector_retrieved",
+    "result_description": "Vector data with embedding and metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result.",
+    "field_sensitivities": {
+      "vector_id": 0.3,
+      "metadata": 0.4
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Fetches a single vector (embedding + metadata) by vector_id from a pgvector namespace.",
+    "error_interpretation": "ValidationError: namespace or vector_id is missing or empty. NotFoundError: no row in the namespace matches the given vector_id. DatabaseError: the underlying SELECT failed.",
+    "recovery_guidance": "Confirm namespace and vector_id are both populated. A NotFoundError means the vector either was never stored or has been deleted; use search_similar_action with appropriate filters to find candidate ids before retrying. Retry transient database errors once.",
+    "retryable": true
+  }
+}

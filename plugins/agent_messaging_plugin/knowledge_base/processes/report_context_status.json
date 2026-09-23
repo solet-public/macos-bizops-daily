@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::report_context_status",
+  "display_name": "Report a session's own context-window occupancy snapshot",
+  "description": "Overwrites the caller's single latest runtime-neutral context snapshot. Required identity is agent_instance_id plus the runtime's native runtime_session_id, provider, runtime, model, and effort. current_tokens is the model-visible input count reported for the most recent assistant call; ceiling is the live runtime's effective context capacity for that call, not the provider API maximum. The caller already measured the local transcript, so this verb performs only a StateManagementInterface upsert and never reads a transcript or spawns a process. Optional cache_read_tokens and cache_write_tokens carry native counters from the same call. Optional cache_cold and cache_overage_signature remain tri-state: omission means NOT REPORTED, never warm; one zero cache read is not by itself proof of expiry or overage. measured_at is the reporter clock and reading_at is the native transcript-row clock. reporter_surface and reporter_generation attribute concurrent installed/source copies, while agent_session_id preserves the stable routing join. One row per agent_instance_id is overwritten as latest; the separate bounded history retains the series.",
+  "embedding_description": "A Codex or Claude runtime reporting its own native session identity, provider, model, effort, current model-visible input tokens, live effective context ceiling, cache counters, clocks, and reporter attribution. Cache classifications are optional and never inferred from an unmeasured or single-call signal.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Context status reported",
+    "result_type": "report_context_status_result",
+    "result_description": "{\"status\": \"recorded\"} on success — the caller's latest snapshot row was overwritten.",
+    "presentation_guidance": "Routine and high-frequency (every un-throttled hook tick); do not narrate a normal success, only surface a failure."
+  },
+  "error_processor_customizations": {
+    "action_context": "A predicated upsert on session_context_status, conflicting on agent_instance_id alone (one row per session, always latest).",
+    "error_interpretation": "missing_argument: one of agent_instance_id/runtime_session_id/provider/runtime/model/effort/measured_at was empty. negative_tokens: current_tokens or an optional cache count was negative, or ceiling was not positive; this is a caller bug, not a transient fault. state_service_unavailable: the state service is not bound. unknown_reporter_surface: reporter_surface was not one of checkout/plugin_cache/vendored/release/unknown, so the write was refused before attribution could be poisoned.",
+    "recovery_guidance": "missing_argument and negative_tokens indicate the reporting hook computed or forwarded a bad value — fix the caller, do not retry the same call. state_service_unavailable is worth a retry once the platform is up. unknown_reporter_surface is likewise a caller bug: send 'unknown' when the hook cannot classify its own location — an admitted unknown is correct, an invented surface is not."
+  }
+}

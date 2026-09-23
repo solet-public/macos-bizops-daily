@@ -1,0 +1,7 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::recent_fleet_liveness_runs",
+  "display_name": "Read recent structured fleet-liveness passes",
+  "description": "Returns a bounded newest-first page of deployment-native Phase-A fleet_liveness_run records. The response exposes returned, truncated, and a tie-safe next_cursor. Use it for the latest Phase-A input or a limited history; it never reads or consumes an inbox and never edits markdown.",
+  "embedding_description": "Read the latest or a bounded history of structured Phase-A fleet-liveness observations from deployment-native state, preserving each pass's checked population, stuck findings, actions, coordinator inbox-drain result, host-sleep check, outcome, and escalations without reading a workbench markdown log.",
+  "processor_policy_category": "edge"
+}

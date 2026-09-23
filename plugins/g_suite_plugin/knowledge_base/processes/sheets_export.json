@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::g_suite_plugin::sheets_export",
+  "display_name": "Sheets: Export",
+  "description": "Export a Google Sheets spreadsheet to csv or xlsx into blob storage and return its sheet_blob_key. Requires a connected account.",
+  "embedding_description": "Export a Google Sheets spreadsheet through Drive into platform blob storage as CSV for the default tab or XLSX for the complete multi-tab workbook. Returns a sheet blob key for email attachments or downstream plugins. Use this when a Google-native spreadsheet must become a portable file.",
+  "result_processor_customizations": {
+    "action_label": "Spreadsheet exported to blob",
+    "result_type": "g_suite_sheets_export_result",
+    "result_description": "Dict with sheet_blob_key (a blob-storage reference to the exported bytes).",
+    "presentation_guidance": "Confirm the export and format used. The sheet_blob_key references potentially sensitive corporate content — surface it for downstream use but do not treat it as public."
+  },
+  "error_processor_customizations": {
+    "action_context": "Export a Google Sheets spreadsheet into blob storage.",
+    "error_interpretation": "gsuite.invalid_params: missing id, or format is not csv/xlsx. gsuite.not_found: the id does not exist. gsuite.not_connected: no account linked.",
+    "recovery_guidance": "gsuite.invalid_params: pass format as csv or xlsx. gsuite.not_found: the spreadsheet may have been deleted. gsuite.not_connected: run connect_account."
+  }
+}

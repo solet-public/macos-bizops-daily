@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::thinking_service::reconcile_joseki_runs",
+  "display_name": "Reconcile Joseki Runs",
+  "description": "One reconciliation sweep over every running joseki run, applying the ordered duties: surface recorded contract violations as typed run failures, surface runtime step failures, detect stalls. Every status transition is CAS-guarded — losing a race to the live execution path is a benign no-op. The canonical EDGE_SINK cron-sibling shape; scheduled or operator-fired, not model-discovered.",
+  "embedding_description": "Periodic reconciler sweep for platform-driven joseki runs: examine each running run's flow for recorded contract violations and failed step actions, fail the run with typed detail and release plan focus when found, and detect stalled runs with no in-flight action. The failure-surfacing backstop behind run_joseki's event-driven execution. Not a status read (list_joseki_runs) and not the kickoff (run_joseki)."
+}

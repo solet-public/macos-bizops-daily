@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::address_book_service::search",
+  "arguments": {
+    "address_type": "api_endpoint",
+    "limit": 20
+  }
+}

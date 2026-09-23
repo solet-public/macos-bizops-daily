@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::marketo_plugin::merge_leads",
+  "display_name": "Marketo: Merge Leads",
+  "description": "Merge up to 25 losing leads into one winning lead. Writable fields follow Marketo's general precedence: the winner's value wins when present, while a losing value may fill a null winner. Read-only fields are an observed exception: they keep the winning record's value, including an empty one, and are never populated from a losing record, although Adobe's general precedence documentation predicts otherwise. merge_in_crm additionally merges natively-synced CRM records, capping losing_lead_ids at 1. Destructive write action.",
+  "embedding_description": "Merge duplicate Marketo lead/person records so one winner absorbs losing records' history, memberships, and eligible field values. Read-only fields keep the winning record's value, including an empty one, and are never populated from a losing record; Adobe's documented general precedence rule predicts the opposite. Up to 25 losing leads are supported, or one with merge_in_crm.",
+  "result_processor_customizations": {
+    "action_label": "Marketo leads merged",
+    "result_type": "marketo_merge_leads_result",
+    "result_description": "Dict with success (bool) and request_id.",
+    "presentation_guidance": "Destructive, irreversible action — confirm success clearly and name the winning_lead_id and how many losing leads were absorbed; there is no undo."
+  },
+  "error_processor_customizations": {
+    "action_context": "Merge losing leads into a winning lead in the configured Marketo instance.",
+    "error_interpretation": "marketo.invalid_params: missing winning_lead_id/losing_lead_ids, more than 25 losing_lead_ids (or more than 1 when merge_in_crm=true), a non-boolean merge_in_crm, or Marketo's own over-cap code 1080. marketo.validation_failed: Marketo couldn't determine a default record type for the merge (code 714) or the winner/losers are otherwise incompatible. marketo.object_not_found: a lead id in the request doesn't exist. marketo.permission_denied: the API user's Role lacks Read-Write Person — this write permission is NOT checked by check_setup (unverifiable without performing a write), so this may be the FIRST signal of the gap.",
+    "recovery_guidance": "marketo.invalid_params: reduce losing_lead_ids to the applicable cap (25, or 1 with merge_in_crm). marketo.object_not_found: confirm every lead id via get_leads first. marketo.permission_denied: add 'Read-Write Person' under Admin > Users & Roles > Roles > <the API role> > Access API, then retry."
+  }
+}

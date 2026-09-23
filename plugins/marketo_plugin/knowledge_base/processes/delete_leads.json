@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::marketo_plugin::delete_leads",
+  "display_name": "Marketo: Delete Leads",
+  "description": "Delete up to 300 leads by id. Destructive write action — Marketo permanently removes the records.",
+  "embedding_description": "Permanently remove lead records from Marketo's Lead Database by id, up to 300 per batch — a destructive, irreversible verb. Distinct from merge_leads (combines records into a winner rather than discarding them) and remove_leads_from_list (only removes list membership while the underlying lead record survives).",
+  "result_processor_customizations": {
+    "action_label": "Marketo leads deleted",
+    "result_type": "marketo_delete_leads_result",
+    "result_description": "Dict with results (Marketo's per-record array: id, status [deleted/skipped], reasons on skip), row_count, and tallies (a status -> count summary).",
+    "presentation_guidance": "Destructive action — surface the tallies clearly (e.g. '5 deleted, 1 skipped: lead not found') so the caller can confirm the intended leads were removed."
+  },
+  "error_processor_customizations": {
+    "action_context": "Delete a batch of leads from the configured Marketo instance.",
+    "error_interpretation": "marketo.invalid_params: missing/empty lead_ids or more than 300 ids. marketo.auth_failed: OAuth credentials rejected. marketo.permission_denied: the API user's Role lacks Read-Write Person — this write permission is NOT checked by check_setup (unverifiable without performing a write), so this may be the FIRST signal of the gap.",
+    "recovery_guidance": "marketo.permission_denied: add 'Read-Write Person' under Admin > Users & Roles > Roles > <the API role> > Access API, then retry. Individual skipped records (e.g. lead not found) are in the results array, not an error."
+  }
+}

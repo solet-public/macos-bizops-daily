@@ -1,0 +1,7 @@
+{
+  "query": "Show me the most recent inference job",
+  "expected_process_key": "service_interface::job_service::get_latest_job",
+  "expected_arguments": {
+    "plugin_name": "default_inference_plugin"
+  }
+}

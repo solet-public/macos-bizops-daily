@@ -1,0 +1,44 @@
+[
+  {
+    "field": "operations.permission_refs",
+    "reader_to_be": "operation executor permission precondition",
+    "ruling": "coordinator ruling B-2, 2026-08-29",
+    "legacy": "2026-09-03 W2-1"
+  },
+  {
+    "field": "probes.failure_behavior",
+    "reader_to_be": "stage-boundary failure policy",
+    "ruling": "coordinator ruling B-2, 2026-08-29",
+    "legacy": "2026-09-03 W2-1"
+  },
+  {
+    "field": "stages.failure_behavior",
+    "reader_to_be": "stage activation failure policy",
+    "ruling": "coordinator ruling B-2, 2026-08-29",
+    "legacy": "2026-09-03 W2-1"
+  },
+  {
+    "field": "stages.restart_behavior",
+    "reader_to_be": "stage exit restart scheduler",
+    "ruling": "coordinator ruling B-2, 2026-08-29",
+    "legacy": "2026-09-03 W2-1"
+  },
+  {
+    "field": "inputs.prompt_timing",
+    "reader_to_be": "input collection scheduler",
+    "ruling": "coordinator ruling B-2, 2026-08-29",
+    "legacy": "2026-09-03 W2-1"
+  },
+  {
+    "field": "inputs.secret_handling",
+    "reader_to_be": "secret broker capture and storage boundary",
+    "ruling": "coordinator ruling B-2, 2026-08-29",
+    "legacy": "2026-09-03 W2-1"
+  },
+  {
+    "field": "inputs.storage",
+    "reader_to_be": "answer materialization destination router",
+    "ruling": "coordinator ruling B-2, 2026-08-29",
+    "legacy": "2026-09-03 W2-1"
+  }
+]

@@ -1,0 +1,6 @@
+{
+  "process_key": "plugin::actr_memory_plugin::unfocus_action",
+  "display_name": "Unfocus",
+  "description": "Remove a memory from the focus buffer",
+  "embedding_description": "WRITE/REMOVE: unpin one memory from the actr_memory focus buffer by memory_id so it stops being injected into every prompt. Returns memory_id + confirmation message. Use to free a focus slot when working-memory content is no longer load-bearing for the current task. EDGE verb. Sibling to focus (write/add) and get_focused_action (read enumeration)."
+}

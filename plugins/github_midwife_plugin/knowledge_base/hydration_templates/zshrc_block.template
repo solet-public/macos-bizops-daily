@@ -1,0 +1,1 @@
+[ -f {{SHELL_FILE_ZSH}} ] && source {{SHELL_FILE_ZSH}}

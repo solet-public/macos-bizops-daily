@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::generate_curation_report",
+  "display_name": "Rank the ambient memory head's demotion candidates (dispatch)",
+  "description": "maintenance-verbs M2.2, D0.3-ratified deferred-completion shape. Dispatches a generate_curation_report job (fetch this origin's memory records once, build a slug->{strength,pinned} index, rank the caller-supplied current head lines) and returns {job_id, status: 'queued'} in milliseconds — the fetch and ranking run in a background worker, never inline in this call. Poll check_choreography_job_status with the returned job_id for the outcome; this verb never blocks for the ranking to finish. head_lines must be the CALLER's own already-split current head (index_render.split_head's output, read locally) — this plugin cannot import that local Claude Code CLI module itself.",
+  "embedding_description": "Rank the MEMORY.md ambient index's current head lines by ACT-R activation to find bottom-N demotion candidates and report head-pressure stats (bytes/lines vs budget) — the measurement step behind seat-ratified head curation, never an auto-trim; a pinned fact never surfaces as a candidate regardless of its measured activation.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Curation report dispatched",
+    "result_type": "generate_curation_report_dispatch_result",
+    "result_description": "{job_id, status: 'queued'} — the dispatch's own outcome, NOT the report's content. The completed report (via check_choreography_job_status) carries {demotion_candidates: [{line, slugs, max_strength}], unresolved_lines, head_bytes, head_lines, byte_budget, line_budget, over_budget}.",
+    "presentation_guidance": "State plainly that this only confirms the report job was queued — poll check_choreography_job_status for the actual ranking. When presenting a completed report, lead with over_budget and the demotion_candidates list; call out unresolved_lines explicitly rather than silently omitting them (a dangling head-line reference is itself worth the seat's attention). Never present demotion_candidates as a decision already made — the verb recommends, the seat ratifies (per the M2 charter's own no-auto-trim rule)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Validates a non-empty head_lines list plus the caller's own flow/session context, then writes one AsyncJobManager job row. The background leg separately fetches memory records via the injected memory_service and can fail on its own preconditions.",
+    "error_interpretation": "missing_argument: head_lines was empty. missing_flow_context: the caller's session_id/flow_id were not resolvable — refused before a job with a hole in it could be created. job_creation_failed: AsyncJobManager.create_job itself failed. async_job_manager_unavailable: the platform's AsyncJobManager is not bound on this solet. memory_service_unavailable (background leg): memory_service is not bound on this solet. solet_name_unset (background leg): SOLET_NAME is required to scope the memory fetch to this origin. memory_fetch_failed (background leg): get_memories_by_tag returned no usable memories list.",
+    "recovery_guidance": "For missing_argument, run index_render.split_head on the current MEMORY.md locally and pass its lines, not the raw head text. memory_service_unavailable/solet_name_unset/memory_fetch_failed are platform-state issues, not caller mistakes — do not retry the same call unchanged; check via check_choreography_job_status for the exact terminal error before re-dispatching."
+  }
+}

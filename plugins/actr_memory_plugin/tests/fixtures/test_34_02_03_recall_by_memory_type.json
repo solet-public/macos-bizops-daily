@@ -1,0 +1,16 @@
+{
+  "name": "test_recall_by_memory_type",
+  "description": "Verify filtering recall results by memory type (episodic, semantic_l1, semantic_l2)",
+  "process_key": "plugin::actr_memory_plugin::recall_action",
+  "arguments": {
+    "params": {
+      "query": "memory storage",
+      "memory_type": "episodic",
+      "top_k": 5
+    },
+    "state": {
+      "session_id": "test-session-012"
+    }
+  },
+  "timeout_seconds": 30
+}

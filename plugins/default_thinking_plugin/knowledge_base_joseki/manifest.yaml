@@ -1,0 +1,28 @@
+name: authored_joseki
+description: >
+  Agent-authored joseki cards registered by value through
+  register_authored_joseki (Phase 3 Seam A). Each card is a reusable,
+  validated execution pattern; this knowledge base IS the joseki registry
+  (plan of record Q14/§4.3) and MUST stay semantically searchable —
+  joseki discovery is plain-English cosine retrieval. Do NOT add this
+  knowledge base to SEARCH_EXCLUDED_KB_NAMES: thinking_plans is excluded
+  there by design, which is exactly why authored joseki live here instead.
+
+category: live
+tags:
+  - joseki
+
+default_knowledge_layer: 2
+
+content:
+  patterns:
+    include:
+      - "*.md"
+      - "**/*.md"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 0

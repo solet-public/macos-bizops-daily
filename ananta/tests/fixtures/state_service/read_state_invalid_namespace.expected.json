@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"error\"",
+    "FrameworkError"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"completed\""
+  ],
+  "description": "Invalid namespace chars - should return FrameworkError"
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::state_service::describe_schema",
+  "arguments": {
+    "namespace": "nonexistent_namespace_xyz"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::repo_service::read_file",
+  "display_name": "Read Repository File",
+  "description": "Read the contents of a single repo-root-confined file, optionally a 1-based inclusive line range (start_line/end_line). The path is resolved (symlinks + '..' collapsed) and MUST be inside the worktree root; traversal, symlink-escape, absolute-outside, and denylisted paths (.git/, profile/ secrets, *.key/*.pem, .env*) are typed-rejected, never clamped or returned empty. Output is byte- and line-capped with an explicit truncated marker plus the true total_lines. If the returned content carries a credential shape (Anthropic/OpenAI key, AWS key, PEM header, bearer token, password=/api_key=), the whole read is REFUSED (Q2) — use search for a redacted view instead.",
+  "embedding_description": "Read one file's text from the platform repository worktree, optionally a specific line range. Repo-root confined and denylist-guarded; byte/line bounded with a truncation marker. Refuses the whole file if it contains a credential-shaped token. Use to view exact source of a known path.",
+  "result_processor_customizations": {
+    "action_label": "File read",
+    "result_type": "repo_read_file_result",
+    "result_description": "Object with 'path', 'content' (bounded), 'truncated', 'total_lines' (true count before any cap).",
+    "presentation_guidance": "Present the content; if 'truncated' is true, note the byte/line cap fired against total_lines and offer to read a specific range.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reading a repo-root-confined worktree file (optional line range) with byte/line bounding and a secret-shape refusal gate.",
+    "error_interpretation": "RepoPathError: the path escaped the repo root (traversal / symlink / absolute-outside) or is not a file. RepoDenylistError: the path targets a denylisted location (.git/, profile/ secrets, key material) — excluded, not absent. RepoSecretError: the requested content carries a credential shape and the file is refused whole (Q2).",
+    "recovery_guidance": "For RepoPathError: pass a repo-root-relative path to an actual file. For RepoDenylistError: that location is intentionally unreadable; it is excluded by policy. For RepoSecretError: use search (which redacts snippets), or narrow start_line/end_line to a range that excludes the credential."
+  }
+}

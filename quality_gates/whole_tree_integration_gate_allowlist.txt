@@ -1,0 +1,300 @@
+# Whole-tree integration gate tracked-debt register.
+#
+# Format: <check_id>::<scope_qualifier>::<specifier>
+#  - First two `::` separators are structural; specifier captures the rest.
+#  - `*` as the specifier wildcards all findings under (check_id, scope_qualifier).
+#  - `#` starts a comment line; blank lines ignored.
+#
+# Allowlisted findings are STILL printed in gate output (with `[allowlisted]`
+# suffix) so the gate stays honest. They do NOT contribute to the exit-1
+# verdict. Removing an entry is the unit of remediation progress.
+#
+# Per the KB "Gate Allowlist Conventions": adding entries without operator
+# approval defeats the gate's purpose. The initial population below was
+# generated from the first gate run on 2026-06-07 per D-W-INT-7(c).
+#
+# D-3-structural migration (2026-09-20, iss_23fa51b5/iss_9b0ad3d5): every
+# entry now also carries the mandatory owner/reason/expires schema (see
+# quality_gates/allowlist_schema.py; the trailing tag coexists with the
+# `<check_id>::<scope_qualifier>::<specifier>` key format above, key
+# parsing is unchanged). None of these 174 entries had per-entry
+# justification beyond the 2026-09-03 W2-1 sweep date, so owner/reason
+# record that honestly; expires (2027-03-20) is a uniform 180-day
+# migration default, not a reassessed per-entry date.
+#
+# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# C1.7 — orphan service-interface KB JSON
+# ===========================================================================
+# Single tracked-debt item: discovery_service has a get_service_health.json
+# but no @service_interface_process abstract method. Either the method needs
+# to be added to ananta/services/discovery_service/interfaces/public.py OR
+# the JSON should be deleted. Pending operator decision.
+C1.7::discovery_service::get_service_health  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# ===========================================================================
+# C2.2 — @platform_process method without companion KB JSON
+# ===========================================================================
+# All 19 prior findings remediated 2026-06-07 (aws_self_deployment_plugin,
+# macos_midwife_plugin, rds_pgvector_service_plugin, schwab_market_data_plugin,
+# secrets_manager_vault_plugin). The original vault `write_state` bug class
+# has no remaining instances under this check. Future findings should land
+# here with a per-entry remediation note rather than wildcard scopes.
+
+# ===========================================================================
+# C2.4 — orphan plugin KB JSON
+# ===========================================================================
+# audio_processing_plugin: 149 ffmpeg_* JSONs are programmatically registered
+# from FFmpeg's filter spec at startup — not via static @platform_process
+# decorators on plugin.py. The gate's structural model doesn't see them.
+# Wildcard the whole scope; refine if a non-ffmpeg orphan appears.
+# W2-1 (2026-09-03): formerly whole-plugin C2.4 exemptions,
+# enumerated from the current tree; empty local_restart_plugin entry dropped.
+C2.4::audio_processing_plugin::ffmpeg_a3dscope  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aap  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_abench  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_abitscope  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_acompressor  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_acontrast  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_acopy  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_acrossfade  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_acrossover  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_acrusher  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_acue  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_adeclick  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_adeclip  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_adecorrelate  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_adelay  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_adenorm  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aderivative  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_adrawgraph  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_adrc  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_adynamicequalizer  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_adynamicsmooth  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aecho  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aemphasis  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aeval  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aexciter  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_afade  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_afftdn  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_afftfilt  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_afir  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aformat  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_afreqshift  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_afwtdn  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_agate  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_agraphmonitor  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_ahistogram  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aiir  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aintegral  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_ainterleave  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_alatency  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_alimiter  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_allpass  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aloop  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_amerge  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_ametadata  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_amix  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_amultiply  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_anequalizer  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_anlmdn  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_anlmf  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_anlms  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_anull  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_apad  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aperms  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aphasemeter  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aphaser  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aphaseshift  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_apsnr  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_apsyclip  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_apulsator  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_arealtime  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aresample  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_areverse  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_arls  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_arnndn  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asdr  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asegment  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aselect  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asendcmd  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asetnsamples  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asetpts  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asetrate  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asettb  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_ashowinfo  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asidedata  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asisdr  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asoftclip  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_aspectralstats  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asplit  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_astats  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asubboost  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asubcut  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asupercut  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asuperpass  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_asuperstop  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_atempo  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_atilt  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_atrim  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_avectorscope  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_axcorrelate  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_bandpass  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_bandreject  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_bass  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_biquad  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_channelmap  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_channelsplit  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_chorus  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_compand  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_compensationdelay  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_crossfeed  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_crystalizer  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_dcshift  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_deesser  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_dialoguenhance  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_drmeter  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_dynaudnorm  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_earwax  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_ebur128  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_equalizer  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_extrastereo  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_firequalizer  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_flanger  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_haas  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_hdcd  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_headphone  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_highpass  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_highshelf  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_join  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_loudnorm  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_lowpass  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_lowshelf  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_mcompand  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_pan  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_replaygain  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_showcqt  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_showcwt  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_showfreqs  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_showspatial  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_showspectrum  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_showspectrumpic  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_showvolume  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_showwaves  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_showwavespic  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_sidechaincompress  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_sidechaingate  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_silencedetect  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_silenceremove  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_spectrumsynth  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_speechnorm  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_stereotools  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_stereowiden  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_superequalizer  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_surround  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_tiltshelf  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_treble  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_tremolo  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_vibrato  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_virtualbass  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_volume  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::audio_processing_plugin::ffmpeg_volumedetect  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::iterm2_coding_agent_management_plugin::list  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::iterm2_coding_agent_management_plugin::promote_primary  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::iterm2_coding_agent_management_plugin::restart_session  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::iterm2_coding_agent_management_plugin::retire_session  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::iterm2_coding_agent_management_plugin::spawn  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::iterm2_coding_agent_management_plugin::terminate_session  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C2.4::platform_health_plugin::execute_registry_sweep  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# iterm2_coding_agent_management_plugin: 6 orphan JSONs — likely operator-
+# tooling / migration leftovers. Pending audit.
+
+# local_restart_plugin: 1 orphan
+
+# platform_health_plugin: 1 orphan (likely a removed verb whose JSON survived)
+
+# ===========================================================================
+# C3.1 — call-site process_key references that don't resolve in the registry
+# ===========================================================================
+
+# Generic placeholders in docstrings / code-pattern examples. These are
+# template-syntax tokens, not real references. Allowlist by exact specifier.
+C3.1::ananta/src/ananta/core/actions/action_processor.py::plugin::plugin_name::method_name  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C3.1::ananta/src/ananta/core/actions/action_processor.py::service_interface::service_name::method_name  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C3.1::ananta/src/ananta/core/orchestration/action_processor.py::plugin::provider::function_name  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C3.1::ananta/src/ananta/services/discovery_service/service.py::plugin::provider::function_name  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C3.1::ananta/src/ananta/services/discovery_service/service.py::service_interface::provider::function_name  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# action_factory docstring example
+C3.1::ananta/src/ananta/core/actions/action_factory.py::service_interface::state_service::generate_unique_string  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# invocation_schema_generator references the deprecated jsonrpc plugin in a
+# constant — pending cleanup
+C3.1::ananta/src/ananta/core/process_registry/invocation_schema_generator.py::plugin::jsonrpc_plugin::post_message  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# MIGRATED 2026-07-02 to the ``# wint:negative-fixture`` inline marker (the
+# recognized negative-fixture convention): the two self-completing PATTERN
+# strings in queue_completion_is_dispatch_smoke.py now carry the marker in-file,
+# so these two per-key C3.1 entries were REMOVED (entry removal = the unit of
+# remediation progress). The keys MUST keep those exact substrings to exercise
+# ActionQueuePoller._handles_own_completion, so a rename to a sentinel was never
+# an option — the inline marker is what made removal possible. See the KB
+# negative-fixture-convention article.
+
+# memory_service domain_classifier references audio_processing for routing
+C3.1::ananta/src/ananta/services/memory_service/domain_classifier.py::plugin::audio_processing_plugin::generate_audio  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# Bridge sessions ledger ingestion verb — pending session_ledger_service
+# adding the `ingest_blob` verb (or removing the call-site)
+C3.1::plugins/agent_messaging_plugin/src/agent_messaging_plugin/bridge_sessions.py::service_interface::session_ledger_service::ingest_blob  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# Whole-file synthetic-registry smokes: these three test files are ENTIRELY
+# about synthetic/fixture registries (5–9+ varied fixture keys each, several
+# interleaved with real resolving keys), so they stay as whole-file ``*``
+# wildcards rather than the per-line ``# wint:negative-fixture`` marker. The
+# marker fits a file that mostly tests real things but has 1–2 deliberate
+# negative-fixture keys (queue_completion / authored_registration /
+# pull_execution — migrated above); a whole-file wildcard is the right shape
+# when the whole file IS fixtures. Evaluated for marker-migration 2026-07-02
+# (Reviewer-B) and left as wildcards per that distinction (Coordinator-Day's
+# "migrate the wildcards if cheap, else leave + note").
+# Process registry merge validator smoke uses synthetic fixture refs
+C3.1::ananta/tests/platform/process_registry_merge_validator_smoke.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# Bridge session allowlist smoke tests the security policy — needs fake plugin
+# names (`plugin::evil::ransomware`, etc.) to exercise denial paths
+C3.1::plugins/agent_messaging_plugin/tests/bridge_session_allowlist_smoke.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# Platform health sweep smoke uses fixture process_keys
+C3.1::plugins/platform_health_plugin/tests/sweep_smoke.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# embedding_description_summary_smoke uses fixture process_keys
+# (service_interface::a::foo, service_interface::b::bar, plugin::c::baz)
+C3.1::ananta/tests/core/process_registry/embedding_description_summary_smoke.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# MIGRATED 2026-07-02 to the ``# wint:negative-fixture`` marker: the UNKNOWN_KEY
+# negative fixture in authored_registration_smoke.py carries the marker in-file;
+# this per-key C3.1 entry was REMOVED.
+
+# MIGRATED 2026-07-02 to the ``# wint:negative-fixture`` marker: the
+# "plugin::nope::x" negative fixture in pull_execution_smoke.py carries the
+# marker in-file; this per-key C3.1 entry was REMOVED.
+
+# default_scheduling_plugin: 11 docstring/example process_keys + 4 real
+# refs to a deprecated `asynchronous_jobs` service. Wildcard pending audit.
+C3.1::plugins/default_scheduling_plugin/src/default_scheduling_plugin/plugin.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# default_thinking_plugin: pipeline_resolver + wbs_generation reference
+# programmatically-registered FFmpeg filters. Real references; targets are
+# registered at runtime, not statically.
+C3.1::plugins/default_thinking_plugin/src/default_thinking_plugin/pipeline_resolver.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+C3.1::plugins/default_thinking_plugin/src/default_thinking_plugin/wbs_generation.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# ===========================================================================
+# C3.2 — call-site to bound-plugin namespace (Task #21 surface)
+# ===========================================================================
+# action_factory's docstring example shows the bound-plugin namespace pattern
+# for explanatory purposes; not a real call-site. Allowlist precisely.
+C3.2::ananta/src/ananta/core/actions/action_factory.py::plugin::actr_memory_plugin::remember  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20

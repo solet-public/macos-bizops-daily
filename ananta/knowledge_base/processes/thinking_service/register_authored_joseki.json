@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::register_authored_joseki",
+  "display_name": "Register Authored Joseki",
+  "description": "persist a joseki knowledge-base card that the calling agent authored by value: validate it, write it into the knowledge base, and open its lifecycle row at state draft so it becomes searchable.",
+  "embedding_description": "Register an agent-authored joseki card so the reusable pattern becomes searchable in the knowledge base. Writes the card markdown plus a lifecycle row at initial state draft with authored-by-value provenance. The joseki key must be new; registration never overwrites an existing card.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Authored joseki registered",
+    "result_type": "authored_joseki_registration_result",
+    "result_description": "Registration result with keys: joseki_key, status, state, knowledge_base_path",
+    "presentation_guidance": "Confirm the registration with the joseki_key, its lifecycle state, and the knowledge_base_path so the caller can reference the stored card.",
+    "output_action_guidance": "The card is stored and searchable at lifecycle state draft. Continue with the next step of the current plan; state transitions beyond draft are a separate lifecycle concern."
+  },
+  "error_processor_customizations": {
+    "action_context": "Registering an agent-authored joseki knowledge-base card. register_authored_joseki accepts {content}; the card's JOSEKI_KEY line is its identity. Validation runs first; nothing is stored when it fails.",
+    "error_interpretation": "ValidationError: the card failed hard-fail validation — the message lists every finding — or the action arguments do not conform to the schema. AlreadyRegistered: a joseki with this JOSEKI_KEY already has a lifecycle row; registration never overwrites. StorageError: the knowledge base or state write failed after validation passed.",
+    "recovery_guidance": "Validation failures: repair the listed findings in the authored card (validate_authored_joseki gives the same report without side effects) and resubmit. Already-registered: pick a new JOSEKI_KEY for genuinely new patterns; replacing an existing card is a lifecycle supersession, not a re-registration. Storage failures: retry once the platform reports healthy."
+  }
+}

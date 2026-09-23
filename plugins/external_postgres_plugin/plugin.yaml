@@ -1,0 +1,44 @@
+name: external_postgres_plugin
+description: >
+  Read-only "super Datagrip" over FOREIGN Postgres databases the operator
+  registers as external_pg::<name> address-book entries. Every verb takes a
+  connection NAME (never a DSN); connections are built SOLELY from those
+  registered entries — a foreign-target invariant a gate reviewer can verify —
+  and the platform's OWN database instance (host+port+dbname) is refused
+  role-independently by the containment guard. READ-ONLY, HARD: the psycopg3
+  connection read-only characteristic is the developer-proof write-stopper and
+  no write verb exists. Per-connection passwords are chain-consumed through the
+  address book resolver, so this plugin owns no vault keys and needs no vault
+  binding.
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider
+
+config:
+  statement_timeout_ms:
+    type: integer
+    required: false
+    default: 30000
+    description: >
+      Server-side statement_timeout (milliseconds) applied at connection startup
+      to every foreign query (windowless — set by libpq startup options).
+  platform_pg_port:
+    type: integer
+    required: false
+    default: 5432
+    description: >
+      The platform's OWN Postgres port, used by the containment guard to refuse
+      the platform DB instance (host + port + dbname, role-independent). Keep in
+      sync if the platform ever runs Postgres off 5432.
+  export_allowed_roots:
+    type: list
+    required: false
+    default: []
+    description: >
+      Absolute workspace directories export_query may write TSV files under
+      (realpath + commonpath containment, mirroring ledger_allowed_roots).
+      Empty by default = REFUSE-ALL: every export is refused until the operator
+      opts workspace roots in here (operator ruling 2026-07-15 — bulk query
+      data lands in the operator's own workspace, never context or platform
+      blob storage). Prefer the exact export directories over broad parents.

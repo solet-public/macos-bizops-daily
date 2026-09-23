@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::focus",
+  "display_name": "Focus",
+  "description": "Pin a memory to the focus buffer for guaranteed context inclusion. Focused memories always appear in prompt context (max 3). Error if buffer is full — caller must unfocus something first.",
+  "embedding_description": "Pin a memory to the focus buffer for guaranteed context inclusion. Returns confirmation; errors on not-found, archived memory, already_focused, or buffer-full (safety valve MAX_FOCUSED=20; actual prompt-context budget is FOCUS_BUDGET_FRACTION at assembly time). Use to hold a key fact in working memory. Distinct from get_focused (read), unfocus (release).",
+  "result_processor_customizations": {
+    "action_label": "Focus Memory",
+    "result_type": "memory_focused",
+    "result_description": "Confirmation that the memory has been pinned to the focus buffer",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Pinning a memory to the focus buffer for guaranteed context inclusion",
+    "error_interpretation": "MemoryNotFoundError: the specified memory_id does not exist. FocusBufferFullError: focus buffer already has 3 memories — unfocus one first. AlreadyFocusedError: the memory is already in the focus buffer.",
+    "recovery_guidance": "For memory not found: verify the memory_id is correct. For buffer full: use unfocus to remove a memory before adding a new one. For already focused: the memory is already pinned."
+  }
+}

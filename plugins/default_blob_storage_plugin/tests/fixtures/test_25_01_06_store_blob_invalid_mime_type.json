@@ -1,0 +1,19 @@
+{
+  "name": "test_store_blob_invalid_mime_type",
+  "description": "Attempt to store blob with invalid mime_type format",
+  "process_key": "plugin::default_blob_storage_plugin::store_blob",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "content": "SGVsbG8gV29ybGQh",
+      "metadata": {
+        "original_name": "test.txt",
+        "mime_type": "invalid-mime-type"
+      }
+    },
+    "state": {
+      "current_session_id": "test-store-invalid-mime-001"
+    },
+    "timeout_seconds": 30
+  }
+}

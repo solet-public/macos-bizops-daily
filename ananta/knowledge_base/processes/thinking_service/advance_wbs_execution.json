@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::advance_wbs_execution",
+  "display_name": "Advance WBS Execution",
+  "description": "evaluate how pull-mode execution may proceed: an explicitly auto-safe, fully validated deterministic next step comes back as a ready-to-submit action definition; anything else returns control to the agent with the blocking reasons.",
+  "embedding_description": "Ask whether the next work breakdown structure step may run without agent review. Returns auto_safe with a validated closed-world action definition only when the author explicitly marked the step AUTO_SAFE and it is deterministic with fully resolved arguments; otherwise returns agent_review with the reasons, or complete when every step is executed.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "WBS advance evaluated",
+    "result_type": "wbs_pull_advance_evaluation",
+    "result_description": "Advance evaluation with keys: mode, wbs_id, step_number, reasons, action_definition, envelope",
+    "presentation_guidance": "Lead with mode. For auto_safe present the action_definition the driver may submit mechanically; for agent_review list the reasons; for complete state that the WBS is finished.",
+    "output_action_guidance": "mode='auto_safe': the driver may submit the action_definition without further review, then record the outcome via record_wbs_step_observation. mode='agent_review': read the envelope, decide, and execute manually. mode='complete': the run is closed; no further steps remain."
+  },
+  "error_processor_customizations": {
+    "action_context": "Evaluating pull-mode advancement under the Q15 rule (auto-submit only validated deterministic steps explicitly marked auto-safe). advance_wbs_execution accepts {wbs_id}.",
+    "error_interpretation": "NotFound: no WBS tracking row or document exists for this wbs_id. ValidationError: the arguments do not conform to the schema, or the stored WBS document fails to parse.",
+    "recovery_guidance": "NotFound: verify the wbs_id. Parse failures: repair the document via patch_work_breakdown_structure. To act on the evaluation, follow output_action_guidance — never submit an action_definition from a mode other than auto_safe without reviewing the envelope."
+  }
+}

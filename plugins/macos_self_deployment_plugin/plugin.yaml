@@ -1,0 +1,19 @@
+name: macos_self_deployment_plugin
+description: >
+  macOS self-deployment plugin. Implements two service
+  interfaces: SelfDeploymentServiceInterface — the generic single-verb
+  restart_with_manifest surface that apply_manifest delegates to,
+  orchestrating an L2-probe + spawn-green + activate + drain-blue
+  sequence via the standalone local router at
+  plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/blue_green_router/router.py — and
+  LocalSelfDeploymentServiceInterface — the local-blue-green-specific
+  3-verb operational surface (complete_swap / swap_status /
+  swap_rollback) for the durable finisher, status introspection, and
+  operator-triggered drain-window rollback. Local-profile only;
+  requires the router installed via plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/blue_green_router/install_router.py.
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider
+  - interface: SelfDeploymentServiceInterface
+  - interface: LocalSelfDeploymentServiceInterface

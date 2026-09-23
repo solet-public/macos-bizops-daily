@@ -1,0 +1,14 @@
+{
+  "name": "test_export_include_archived",
+  "description": "Verify exporting memories including archived ones",
+  "process_key": "plugin::actr_memory_plugin::export_memories_action",
+  "arguments": {
+    "params": {
+      "include_archived": true
+    },
+    "state": {
+      "session_id": "test-session-101"
+    }
+  },
+  "timeout_seconds": 60
+}

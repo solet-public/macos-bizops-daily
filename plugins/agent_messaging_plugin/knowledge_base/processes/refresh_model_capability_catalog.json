@@ -1,0 +1,19 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::refresh_model_capability_catalog",
+  "display_name": "Refresh the model capability catalog from live cross-checked sources",
+  "description": "iss_d136ae29 (2026-09-21, catalog_stale). Fetches live readings from two independently-rendered Artificial Analysis pages (the leaderboard and each roster model's own detail page) for every (runtime, model, effort) roster cell, reconciles the readings against an explicit tolerance (2.0 absolute Intelligence Index points; 5% relative on cost-per-task), and writes the outcome. This is the only verb that can move a cell to accepted -- seed_model_capability_catalog only ever writes pending_crosscheck. A cell moves to crosscheck_conflict when its two sources disagree beyond tolerance, or stays/returns to pending_crosscheck when fewer than two sources report it this run. A pending outcome never downgrades a cell a past run already accepted; a real conflict does overwrite a prior acceptance. A source that fails to fetch is named in sources_failed on both the return value and the written model_capability_refresh_run row, never silently dropped, and does not abort readings from the sources that did succeed.",
+  "embedding_description": "Fetching live AI model capability scores and per-task dollar costs from two real external pages, cross-checking them against each other, and writing accepted, conflicted, or still-pending rows so dispatch tier selection can stop refusing catalog_stale.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Capability catalog refreshed",
+    "result_type": "refresh_model_capability_catalog_result",
+    "result_description": "run_id, trigger, readings_gathered, sources_ok, sources_failed, cells_accepted, cells_conflicted, cells_unchanged.",
+    "presentation_guidance": "State which sources fetched cleanly and which failed (by name, not just a count), and how many cells moved to accepted vs. crosscheck_conflict vs. stayed unchanged. A run with zero cells_accepted is not itself an error -- say plainly whether dispatch selection is now unblocked.",
+    "output_action_guidance": "select_dispatch_tier can now serve any cell this run (or a prior run) moved to accepted. read_model_capability_catalog with include_unaccepted=true shows pending and conflicted cells too."
+  },
+  "error_processor_customizations": {
+    "action_context": "Two live HTTP fetches per roster cell (leaderboard once, shared; one detail page per model), then per-cell reconciliation and a state write per cell, all through the state interface. Not retryable: a retry after a transient fault whose write already landed would open a second refresh run for the same intent rather than resuming the first.",
+    "error_interpretation": "parameter_invalid: trigger is missing or not one of manual/cron/policy_change. refresh_fetch_failed: the fetch layer raised an exception the source-by-source failure handling could not absorb (e.g. the leaderboard fetch itself failed, not just one model's detail page). state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "For refresh_fetch_failed, check whether artificialanalysis.ai is reachable and whether the leaderboard page's structure still matches the parser; per-model detail-page failures alone do not raise this -- they are recorded in sources_failed and that cell is left pending_crosscheck. A state fault leaves the run row status=running; re-running the refresh opens a fresh run."
+  }
+}

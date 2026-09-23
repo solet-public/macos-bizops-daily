@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::oauth_client_revoke",
+  "display_name": "Revoke OAuth Client",
+  "description": "Remove a previously-registered OAuth client_credentials pair from the vault registry. Idempotent: returns removed=0 when the client_id is already absent.",
+  "embedding_description": "Revoke an OAuth client previously registered for the MCP transport. Args: public client_id. Returns client_id echo + count of registry rows removed (0 if absent / never registered). After revocation the (client_id, client_secret) pair cannot obtain access tokens at /oauth/token. Use to retire a leaked credential or clean up after a connector teardown.",
+  "result_processor_customizations": {
+    "action_label": "OAuth client revoked",
+    "result_type": "oauth_client_revoked",
+    "result_description": "Confirmation that the OAuth client was removed from the registry. Contains the client_id echoed back and the count of rows removed (0 if absent).",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Hard-deletes the row in the oauth_client store whose client_id matches. The delete is idempotent: a previously-revoked or never-registered client_id returns removed=0 without error.",
+    "error_interpretation": "OAuthClientInvalidName: client_id is empty or non-string. OAuthClientStoreUnavailable: the vault's oauth_client store has not been opened.",
+    "recovery_guidance": "For OAuthClientInvalidName: supply a non-empty client_id string. For OAuthClientStoreUnavailable: wait for vault startup to complete and retry."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::session_ledger_service::shipper_self_revoke",
+  "display_name": "shipper_self_revoke",
+  "description": "Allow a paired shipper to self-revoke its own deployment. Per spec §14.1 pin 2 the deployment_id is SERVER-DERIVED from state.authenticated_principal.client_id — the handler accepts NO caller-supplied deployment_id. Transitions deployment paired → revoked. Part of M5 shipper bootstrap pairing flow.",
+  "embedding_description": "Allow a paired shipper to self-revoke its own deployment. Per spec §14.1 pin 2 the deployment_id is SERVER-DERIVED from state.authenticated_principal.client_id — the handler accepts NO caller-supplied deployment_id. Transitions deployment paired → revoked. Part of M5 shipper bootstrap pairing flow."
+}

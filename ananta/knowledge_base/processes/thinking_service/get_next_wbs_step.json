@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::get_next_wbs_step",
+  "display_name": "Get Next WBS Step",
+  "description": "fetch the pull-mode envelope for the next unexecuted step of a Work Breakdown Structure: resolved arguments, support articles, the expected result contract, completion criteria, and the auto-safe flag.",
+  "embedding_description": "Fetch the next executable step of a work breakdown structure with everything needed to run it: sub-steps with bound and Composed-resolved arguments, support article filenames, the expected result contract, completion criteria, and whether the step is marked auto-safe. Read-only; repeatable; the envelope also signals await-user control steps and overall completion.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Next WBS step fetched",
+    "result_type": "wbs_pull_step_envelope",
+    "result_description": "Step envelope with keys: kind, wbs_id, step_number, title, process_keys, sub_steps, support_articles, result_processor_kind, auto_safe, expected_result_contract, completion_criteria, remaining_step_numbers",
+    "presentation_guidance": "Lead with kind and step_number/title, then the sub-steps with their resolved arguments and any unresolved Composed targets the driver must supply.",
+    "output_action_guidance": "Execute the sub-steps with your own tools, then submit the outcome via record_wbs_step_observation. Read the listed support_articles first when present. Stop for the operator on kind='await_user'."
+  },
+  "error_processor_customizations": {
+    "action_context": "Fetching the next unexecuted step of a Work Breakdown Structure in pull mode. get_next_wbs_step accepts {wbs_id}; it reads durable state and changes nothing.",
+    "error_interpretation": "NotFound: no WBS tracking row or document exists for this wbs_id. ValidationError: the arguments do not conform to the schema, or the stored WBS document fails to parse.",
+    "recovery_guidance": "NotFound: verify the wbs_id. Parse failures: the stored document is malformed — repair it via patch_work_breakdown_structure before pulling steps."
+  }
+}

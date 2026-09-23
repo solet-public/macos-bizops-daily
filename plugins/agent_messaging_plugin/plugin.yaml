@@ -1,0 +1,378 @@
+name: agent_messaging_plugin
+description: |
+  Consolidated bridge plugin.  Wears three hats:
+
+  1. IO interface (post_message / start_interface / stop_interface /
+     get_supported_capabilities) — the canonical "solet delivers prose
+     to Claude Code or other MCP-connected agents" surface.
+  2. Bridge service — FastAPI HTTP surface on a dynamically allocated
+     port, peer registry with multi-instance routing, bridge sessions
+     with long-poll event queues, native wake adapter, bridge-delivery
+     EDGE_SINK pair (deliver_result / deliver_error), promoted-process
+     MCP tool machinery.
+  3. Durable agent messaging — owns core__agent_thread /
+     core__agent_message schema, live peer messaging (peer_send /
+     peer_inbox), and the unscoped substrate reads the session-ledger
+     projection consumes.
+
+  Replaces the prior trio of claude_code_channel_plugin (deleted) +
+  agent_channel_plugin (deleted) + agent_messaging_plugin (this
+  plugin, expanded).  No JavaScript / Node runtime required — the
+  MCP stdio bridge ships as a Python entry point at
+  agent_messaging_plugin.mcp_bridge:main.
+
+optional: true
+
+# IO interface registration.  MessagingInterface is the yaml-side
+# binding for ananta.interfaces.io_interface_plugin.IOInterfacePlugin
+# (matches discord_plugin, signal_plugin).  Joins
+# AgentMessagingPlugin's existing AgentMessagingServiceInterface
+# implementation by structural typing — see plugin.py docstring for
+# why this plugin is intentionally NOT registered through
+# service_bindings (would hide its plugin::*::* EDGE processes from
+# submit_action_definition).
+implements:
+  - interface: MessagingInterface
+
+config:
+  enabled:
+    type: boolean
+    required: false
+    default: true
+    description: Master switch; when false every public method raises agent_messaging_disabled.
+  allowed_backends:
+    type: list
+    required: false
+    default:
+      - codex
+      - claude_code
+    description: Logical backend names a thread may target.
+  allowed_working_directory_roots:
+    type: list
+    required: false
+    default: []
+    description: |
+      Filesystem roots a backend may use as working_directory.  Empty list
+      disables the check (any path passes); non-empty list requires the
+      working_directory to be a descendant of one of the entries.
+  max_message_bytes:
+    type: integer
+    required: false
+    default: 65536
+    description: Reject inbound messages whose UTF-8 content exceeds this size.
+  max_thread_messages:
+    type: integer
+    required: false
+    default: 1000
+    description: Reject agent_send once the thread has reached this many messages.
+  default_timeout_seconds:
+    type: integer
+    required: false
+    default: 600
+    description: Per-turn execution timeout when caller does not specify.
+  max_timeout_seconds:
+    type: integer
+    required: false
+    default: 1800
+    description: Hard ceiling on per-turn execution timeout.
+
+  # --- Fleet session-management, Phase B, §6 L3 rule 1 ---------------
+  work_class_defaults:
+    type: object
+    required: false
+    default: {}
+    description: |
+      Per-work_class {model, effort} spawn_session defaults (fleet
+      session-management Phase B, §6 L3 rule 1: "right-size at dispatch").
+      Keyed by work_class (read_only / analysis_deliverable /
+      production_mutation); each entry is a {model, effort} mapping.
+      "Cheapest capable model per work_class" is an operator/governance
+      policy call, not this plugin's to invent (same posture as
+      FLEET_HEADLESS_PERMISSION_MODE for permission mode) -- shipped empty
+      on purpose. Only consulted when spawn_session's caller omits BOTH
+      model and effort; never overrides an explicit caller value. Example:
+        work_class_defaults:
+          read_only: {model: claude-haiku-4-5, effort: low}
+
+  work_class_tool_allowlists:
+    type: object
+    required: false
+    default: {}
+    description: |
+      Per-work_class pre-approved tool allowlist for a headless spawn's
+      PreToolUse gate (.claude/hooks/headless_tool_allowlist_gate.py) -- an
+      out-of-list tool call is DENIED WITH A CLEAN ERROR, never executed and
+      never a silent hang. Operator ruling, 2026-08-03 ("we don't have any
+      restrictions now"): the gate is UNARMED BY DEFAULT -- shipped empty
+      here means headless_adapter.py's _spawn_env does NOT set the hook's
+      env var at all, so spawned workers run unrestricted, same effective
+      access as any other fleet session. The mechanism stays landed as
+      shelf capability: populate a work_class here and the corresponding
+      spawns are gated again, whenever usage data argues for it. Keyed by
+      work_class; each entry is a list of exact tool names (e.g.
+      "mcp__<solet>__process_call" -- Claude Code's MCP tool-name pattern,
+      mcp__<server>__<tool>). Example:
+        work_class_tool_allowlists:
+          read_only: [mcp__<solet>__peer_register, mcp__<solet>__process_call]
+
+  headless_permission_mode:
+    type: string
+    required: false
+    default: bypassPermissions
+    description: |
+      The headless/tmux host drivers' --permission-mode value: declared
+      config, not a process env var -- a config value is as declared as an
+      env var, and it's the platform-native surface; no LaunchAgent/
+      supervisor-tree edit needed to change it, just a config edit + routine
+      blue-green swap.
+      Operator ruling, 2026-08-03 ("we don't have any restrictions now"): no
+      value here is rejected, including "bypassPermissions" -- spawned
+      workers currently run with the same effective access as any other
+      fleet session. Default FLIPPED to "bypassPermissions" (was "default",
+      Claude Code's own interactive-approval mode) after a live-measured D2
+      finding: "default" + --setting-sources project (which excludes both
+      this operator's user-scope bypassPermissions default and the local-
+      scope broad Bash allowlist, by design) leaves an unattended spawn with
+      EMPTY effective grants -- MCP/Write/most Bash are synchronously
+      denied with no human present to approve them. "bypassPermissions" is
+      the value that actually matches the "no restrictions now" ruling's
+      intent for a worker nobody is sitting in front of; an explicit
+      per-spawn override still wins over this default either way.
+      The knob being absent/unresolvable falls back to
+      FLEET_HEADLESS_PERMISSION_MODE (env, the pre-substrate mechanism) as a
+      floor for any caller that bypasses the platform_process shim; if
+      NEITHER resolves, spawn refuses host_cannot_spawn with a remedy --
+      that floor is operational sanity (some value is required to launch
+      the process at all), not a restriction on which value.
+
+  default_fleet_transport:
+    type: string
+    required: false
+    default: watch
+    description: |
+      The fleet's single declared default for FLEET_TRANSPORT ("mcp" or
+      "watch") -- the ONE configuration point the charter's "easy to change
+      later" requirement names. Same posture as headless_permission_mode: a
+      config value is as declared as an env var, no LaunchAgent/supervisor-
+      tree edit needed to flip it, just a config edit + routine blue-green
+      swap.
+      Operator charter (2026-08-06, verbatim in the fleet-watch-transport-
+      migration lane brief): corporate deployments disallow MCP, so non-MCP
+      (watch) must be the fleet's PRIMARY transport now, with MCP retained
+      as backup and for chat-class sessions; switchback must stay easy.
+      Default is therefore "watch", not "mcp".
+      This is the SOURCE the fleet-wide default is declared from, not a
+      per-session override -- per-session FLEET_TRANSPORT (env, read
+      directly by the rename skill, spawned workers' hook guards, and
+      wake_waiter.js, the Claude-side coordination-hooks Stop-hook reader --
+      stock Codex has no equivalent Stop reader; async command hooks do not
+      execute on it, so FLEET_TRANSPORT reaches a Codex worker only through
+      the Codex process and its managed host/launcher environment) remains
+      the declared-never-probed override and is never read through this
+      config. Platform-side spawn paths (the host adapters, spawn_session)
+      are the authoritative consumers of this value once they wire
+      FLEET_TRANSPORT into spawn env (fleet-watch-transport-migration
+      phase-2 slice 1); this value is a "shelf capability" landed ahead of
+      that consumer, matching the precedent
+      work_class_tool_allowlists set (declared before every consumer reads
+      it). Operator shell launchers that source a bare env var (not this
+      config) get their own documented one-line export, not a shell-parses-
+      yaml mechanism -- see the KB note this slice ships alongside it.
+
+  # --- Bridge / IO surface ------------------------------------------
+  # Port is intentionally NOT a config field.  Port allocation is owned
+  # by ananta.core.runtime.port_manager (dynamic, per-solet, lowest
+  # available 8100-8199).  Pinning a port here would break multi-
+  # solet operation.
+  host:
+    type: string
+    required: false
+    default: 127.0.0.1
+    description: Host address for the localhost bridge API.
+  long_poll_timeout_seconds:
+    type: integer
+    required: false
+    default: 25
+    description: Maximum duration for bridge event long-poll requests.
+  bridge_idle_timeout_seconds:
+    type: integer
+    required: false
+    default: 3600
+    description: Idle timeout before an unused bridge session is expired.
+  max_pending_events:
+    type: integer
+    required: false
+    default: 200
+    description: Maximum queued outbound events per bridge session.
+  max_message_chars:
+    type: integer
+    required: false
+    default: 120000
+    description: Maximum size of a single post_message text payload.
+
+  # --- Streamable HTTP MCP transport (phone-side Claude connectivity) -
+  # Opt-in.  When enabled, mounts /api/v1/mcp/streamable on the same
+  # FastAPI app and starts a SECOND uvicorn server bound to
+  # streamable_host:streamable_port so the bridge HTTP can stay on its
+  # internal 127.0.0.1:<dyn> listener while the streamable transport is
+  # externally reachable.  Spec: MCP 2025-03-26 Streamable HTTP.
+  streamable_enabled:
+    type: boolean
+    required: false
+    default: false
+    description: |
+      Enable the Streamable HTTP MCP transport.  Off by default;
+      container deployments override to true.  The phone-side Claude
+      client connects to this endpoint via Caddy / mkcert TLS.
+  streamable_host:
+    type: string
+    required: false
+    default: 0.0.0.0
+    description: |
+      Bind host for the streamable HTTP listener.  0.0.0.0 inside a
+      container exposes it to docker-compose port mapping; 127.0.0.1
+      for laptop development.  Only consulted when streamable_enabled
+      is true.
+  streamable_port:
+    type: integer
+    required: false
+    default: 9000
+    description: |
+      Bind port for the streamable HTTP listener.  Pinned (not
+      dynamic) so the docker-compose port mapping is stable.
+  streamable_allowed_origins:
+    type: list
+    required: false
+    default: []
+    description: |
+      CORS-style Origin allow-list for DNS-rebinding protection.
+      Empty list disables the check (right for native phone clients
+      that omit Origin); populate for browser-driven clients.
+  streamable_bearer_max_age_seconds:
+    type: integer
+    required: false
+    default: 300
+    description: |
+      Maximum permitted skew between bearer-token issued_at and
+      verification.  Tokens older or further in the future than this
+      window are rejected even if decrypt succeeded.
+  streamable_cors_origins:
+    type: list
+    required: false
+    default: []
+    description: |
+      Origin allow-list for CORS responses on the streamable
+      endpoint.  Required for browser-driven custom connectors
+      (e.g. claude.ai), which preflight with OPTIONS before POST.
+      Each allow-listed origin receives Access-Control-Allow-Origin
+      headers that echo the request's Origin verbatim.  Set
+      ['https://claude.ai'] in container deployments.
+
+  # --- OAuth 2.1 client_credentials wrapper -------------------------
+  # When enabled, mounts /.well-known/oauth-authorization-server,
+  # /.well-known/oauth-protected-resource, and /oauth/token on the
+  # FastAPI app.  Token issuance produces libsodium sealed-box bearer
+  # tokens that the existing BearerVerifier accepts unchanged.
+  # Required for claude.ai's custom-connector validator (it expects
+  # RFC 8414 metadata + an RFC 6749 §4.4 token endpoint even when the
+  # Advanced Settings OAuth fields are explicitly filled). See
+  # knowledge_base/07_claude_ai_custom_connector_setup.md.
+  oauth_enabled:
+    type: boolean
+    required: false
+    default: false
+    description: Master switch for the OAuth 2.1 surface.
+  oauth_issuer_url:
+    type: string
+    required: false
+    default: ""
+    description: |
+      Public issuer URL used in the well-known metadata documents.
+      Pin to the publicly-routable hostname (e.g.
+      https://abbey0011.acute-focus.com) — clients re-construct
+      derived URLs from this base.
+  oauth_resource_aliases:
+    type: list
+    required: false
+    default: []
+    description: |
+      Additional MCP resource URLs accepted by OAuth `resource`
+      validation. Use this when an outer tunnel presents a stable
+      public resource URL while the local FastAPI request origin is a
+      dynamic loopback URL.
+  oauth_management_client_ids:
+    type: list
+    required: false
+    default: []
+    description: |
+      OAuth client IDs that may act as operator management consoles
+      without receiving full operator-equivalent authority. These
+      sessions get a narrow direct-process allowlist for KB/session
+      search, OAuth client inventory, and role-routed peer dispatch.
+  oauth_token_ttl_seconds:
+    type: integer
+    required: false
+    default: 86400
+    description: |
+      Lifetime echoed in the access_token response's expires_in and
+      stamped into the JWT exp claim. Defaults to 24h so browser and
+      hosted clients can invoke tools after the account-link flow;
+      refresh-token rotation covers longer-lived reuse.
+  oauth_auth_code_ttl_seconds:
+    type: integer
+    required: false
+    default: 600
+    description: |
+      TTL on the in-process authorization-code cache.  Single-use;
+      RFC 6749 §4.1.2 recommends <=10 minutes.
+  oauth_require_audience:
+    type: boolean
+    required: false
+    default: true
+    description: |
+      When true, the streamable transport's BearerVerifier rejects
+      tokens whose `aud` claim does not match the canonical MCP URI
+      derived from oauth_issuer_url.  Disable in laptop dev mode
+      where no canonical URL is pinned.
+
+  # --- Promoted-process MCP tool machinery --------------------------
+  process_export_enabled:
+    type: boolean
+    required: false
+    default: true
+    description: Master switch for direct process exposure over the MCP bridge.
+  process_export_allow_patterns:
+    type: list
+    required: false
+    default:
+      - "plugin::*::*"
+      - "service_interface::*::*"
+    description: Process key patterns (fnmatchcase) allowed for direct exposure.
+  process_export_deny_patterns:
+    type: list
+    required: false
+    default: []
+    description: |
+      Process key patterns denied from direct exposure (deny wins over allow).
+      Empty by operator ruling (2026-07-15): the export-deny layer was
+      re-ruled as friction, not security, on this single-user substrate —
+      every MCP session (Claude Code, Codex, tunnel callers) IS the operator,
+      so every prior entry (the five RATIFY-3 connector denies and the
+      enumerated agent_messaging private surface) was retired. Connectors are
+      directly process_call-able; bulk business data flows to workspace TSV
+      exports instead of through context. Rationale + rollout:
+      workbench/2026-07-15_result_error_processing_architecture_deep_dive.md.
+      Caveat before adding any NEW pattern: scheduler-lane submissions are
+      not export-policy-evaluated at submission time (tracked backlog defect,
+      R0 ruling 2026-07-15), so a new deny must not be relied upon until
+      submission-time evaluation lands.
+  process_export_promote_patterns:
+    type: list
+    required: false
+    default: []
+    description: Process key patterns that get generated MCP convenience tools.
+  process_export_max_promoted_tools:
+    type: integer
+    required: false
+    default: 40
+    description: Maximum number of generated promoted MCP tools.

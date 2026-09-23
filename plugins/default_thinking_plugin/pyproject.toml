@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "default_thinking_plugin"
+version = "0.1.0"
+description = "Structured reasoning plugin using local LLM for planning, analysis, and deliberation"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.entry-points."ananta.plugins"]
+default_thinking_plugin = "default_thinking_plugin.plugin:DefaultThinkingPlugin"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_configs = true
+show_error_codes = true
+namespace_packages = true
+explicit_package_bases = true
+
+[tool.black]
+line-length = 100
+target-version = ['py313']

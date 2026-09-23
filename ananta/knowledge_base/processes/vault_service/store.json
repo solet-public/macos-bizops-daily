@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::store",
+  "display_name": "Store Secret",
+  "description": "Store a secret (encrypted at rest) in the vault. Returns key confirmation, NEVER the value. Use rotate() to update existing secrets.",
+  "embedding_description": "Vault: store a secret. Encrypt and persist a value (password, API key, credential, OAuth client_secret, refresh token, bearer token) under a named vault key using AES-256-GCM at rest. Returns the key and version; NEVER the secret value. Variants that keep the plaintext out of the agent's conversation context: store_from_env, store_from_file, store_from_keychain, store_from_kv_file, store_random.",
+  "result_processor_customizations": {
+    "action_label": "Secret stored",
+    "result_type": "secret_stored",
+    "result_description": "Confirmation that secret was encrypted and stored. Contains key (identifier) and message (status). NEVER contains the secret value.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Encrypts and stores a secret value in the vault. Uses AES-256-GCM encryption with unique salt and nonce per secret.",
+    "error_interpretation": "VaultLocked: Vault must be unlocked before storing secrets. KeyExists: Secret already exists - use rotate() to update. InvalidKey: Key contains invalid characters or format.",
+    "recovery_guidance": "For VaultLocked: Prompt user to unlock vault first. For KeyExists: Ask if user wants to rotate the existing secret. For InvalidKey: Suggest valid key format (alphanumeric, slashes, underscores)."
+  }
+}

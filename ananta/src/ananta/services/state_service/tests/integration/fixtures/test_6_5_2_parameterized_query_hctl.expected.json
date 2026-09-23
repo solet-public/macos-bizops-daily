@@ -1,0 +1,21 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "process",
+    "service",
+    "query",
+    "SQL",
+    "data",
+    "Available",
+    "discover",
+    "result",
+    "COMPLETED",
+    "status",
+    "table",
+    "row",
+    "column",
+    "state",
+    "core",
+    "provider"
+  ]
+}

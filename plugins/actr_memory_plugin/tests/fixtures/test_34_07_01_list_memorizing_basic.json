@@ -1,0 +1,12 @@
+{
+  "name": "test_list_memorizing_basic",
+  "description": "Verify listing all memories currently in the spaced repetition queue",
+  "process_key": "plugin::actr_memory_plugin::list_memorizing_action",
+  "arguments": {
+    "params": {},
+    "state": {
+      "session_id": "test-session-060"
+    }
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "Found",
+    "addresses",
+    "matching",
+    "results"
+  ],
+  "output_not_contains": [
+    "ERROR"
+  ]
+}

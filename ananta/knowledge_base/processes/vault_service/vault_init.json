@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::vault_init",
+  "display_name": "Initialize Vault",
+  "description": "Initialize the vault with a passphrase. Generates the random master encryption key and wraps it under a KEK derived from the passphrase. Operator-only.",
+  "embedding_description": "Vault: initialize / bootstrap / first-time setup. Generate the random Data Encryption Key (DEK / master key), derive a Key Encryption Key (KEK) from the operator's passphrase via PBKDF2, wrap the DEK under the KEK, and persist the wrapped key. One-time per vault. Required before any store / retrieve / unlock call. Operator-only — requires operator or operator-equivalent principal.",
+  "result_processor_customizations": {
+    "action_label": "Vault initialized",
+    "result_type": "vault_initialized",
+    "result_description": "Vault initialization result. Contains message (status) and wrapped_key_path (location of the persisted wrapped master key).",
+    "presentation_guidance": "Confirm initialization succeeded and remind the operator that the passphrase cannot be recovered without a separately created recovery key.",
+    "output_action_guidance": "After initialization, the next typical step is vault_create_recovery, then unlock + store the operator's first secrets."
+  },
+  "error_processor_customizations": {
+    "action_context": "Initializes vault key management by generating and wrapping a fresh master key under a passphrase-derived KEK.",
+    "error_interpretation": "VaultAlreadyInitialized: vault has been initialized before; use vault_rotate_passphrase instead. EncryptionFailed: KDF or key-wrap operation failed. VaultAccessDeniedError: caller is not operator or operator-equivalent.",
+    "recovery_guidance": "For VaultAlreadyInitialized: do not re-initialize (would orphan all existing secrets) — use vault_rotate_passphrase. For EncryptionFailed: verify entropy + crypto library availability. For VaultAccessDeniedError: re-invoke from operator-MCP context."
+  }
+}

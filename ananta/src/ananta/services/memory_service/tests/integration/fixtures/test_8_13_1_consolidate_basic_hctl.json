@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::consolidate",
+  "arguments": {
+    "dry_run": true
+  }
+}

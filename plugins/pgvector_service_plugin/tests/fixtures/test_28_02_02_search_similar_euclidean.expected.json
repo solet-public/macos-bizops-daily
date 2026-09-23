@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "results",
+    "count",
+    "namespaces_searched"
+  ],
+  "output_not_contains": [
+    "ERROR",
+    "exception"
+  ],
+  "action_status": "completed"
+}

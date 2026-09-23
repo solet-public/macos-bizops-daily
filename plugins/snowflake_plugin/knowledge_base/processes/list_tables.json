@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::snowflake_plugin::list_tables",
+  "display_name": "Snowflake: List Tables",
+  "description": "List tables and views in a database.schema of the configured Snowflake account. Requires database and schema. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; the table list itself is delivered when the job completes.",
+  "embedding_description": "Enumerate the tables and views inside a specific database and schema in Snowflake -- the SECOND drill-down step, after a schema is already chosen -- before writing a query or calling describe_table. Requires database and schema. Dispatches asynchronously; results land on job completion.",
+  "result_processor_customizations": {
+    "action_label": "Snowflake table listing queued",
+    "result_type": "snowflake_list_tables_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the table list -- that arrives separately when the job completes and is delivered as its own message: tables, a list of {name, kind} objects.",
+    "presentation_guidance": "This call only confirms the job was queued -- do not present job_id/status as the answer to 'what tables exist'. Acknowledge the request is in flight; the table list itself lands in a follow-up message when the job completes. Once delivered, list the table names and kinds plainly (low sensitivity, data_sensitivity 0.1) and suggest describe_table on one to go deeper."
+  },
+  "error_processor_customizations": {
+    "action_context": "List tables in a Snowflake database.schema.",
+    "error_interpretation": "snowflake.invalid_params: missing database or schema. snowflake.api_error: the schema does not exist or another warehouse error occurred.",
+    "recovery_guidance": "snowflake.invalid_params: supply both database and schema, from list_databases/list_schemas."
+  }
+}

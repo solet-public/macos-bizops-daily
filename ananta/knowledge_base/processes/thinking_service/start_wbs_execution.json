@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::start_wbs_execution",
+  "display_name": "Start WBS Execution",
+  "description": "start — or resume after a disconnect — a pull-mode execution session on a Work Breakdown Structure: mark it in progress, ensure its work-product register exists, and report which steps are already durably executed.",
+  "embedding_description": "Begin or resume driving a work breakdown structure in pull mode. Marks the WBS in progress, initializes the work-product register, and reports already-executed steps plus the next step so an agent session can pick up execution from wherever the previous driver stopped. Idempotent: calling again after a bridge death is the resume path.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "WBS pull execution started",
+    "result_type": "wbs_pull_session_state",
+    "result_description": "Session state with keys: wbs_id, status, resumed, executed_step_numbers, next",
+    "presentation_guidance": "State whether this is a fresh start or a resume (resumed flag + executed_step_numbers), then present the next envelope's kind and step.",
+    "output_action_guidance": "Execute the step described in next (kind='execute'), stop for the operator on kind='await_user', or close out on kind='complete'. Use get_next_wbs_step to re-fetch the envelope at any time."
+  },
+  "error_processor_customizations": {
+    "action_context": "Starting or resuming pull-mode execution of a Work Breakdown Structure. start_wbs_execution accepts {wbs_id}.",
+    "error_interpretation": "NotFound: no WBS tracking row or document exists for this wbs_id. ValidationError: the WBS status does not permit execution (e.g. superseded or already completed), or the arguments do not conform to the schema.",
+    "recovery_guidance": "NotFound: verify the wbs_id against the registered WBS documents. Status conflicts: a completed or superseded WBS is not executable — author or register a new WBS instead of re-running the old one."
+  }
+}

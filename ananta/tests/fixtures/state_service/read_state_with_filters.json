@@ -1,0 +1,12 @@
+{
+  "process_key": "service_interface::state_service::read_state",
+  "arguments": {
+    "namespace": "core",
+    "query": {
+      "table": "flows",
+      "filters": {
+        "status": "pending"
+      }
+    }
+  }
+}

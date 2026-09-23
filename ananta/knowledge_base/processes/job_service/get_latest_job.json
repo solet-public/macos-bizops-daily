@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::job_service::get_latest_job",
+  "display_name": "Get Latest Job",
+  "description": "Retrieve the most recently created asynchronous job (optionally filtered by plugin, action, or status). Useful for polling/monitoring long-running async work when you need to provide a user-visible status update (for example, in scheduled check-ins) and no explicit completion signal is available. This is also THE retrieval path for born-async connector verbs (Google Workspace, Snowflake, external Postgres writes and exports) when the calling session holds no live listener: those dispatches return {job_id, status: queued} immediately and deliver the finished result as a message to a listening session, so a plain CLI call session fetches the completed job's result field here instead. Latest-match only: when the dispatch's job_id is still in hand, get_job fetches that exact job instead and cannot be displaced by a later dispatch of the same verb.",
+  "embedding_description": "Get the MOST RECENT async job for a plugin and action when its job id is unknown. Search the job queue by plugin name, action name, or status to find which background job ran last, and read that finished job's result payload — a created Google Sheet's URL, or a connector export's destination. Reaches background-job output from a session with no live listener.",
+  "result_processor_customizations": {
+    "action_label": "Job retrieved",
+    "result_type": "job_retrieved",
+    "result_description": "Asynchronous job record containing: id (unique identifier), provider_name (the originating plugin.action pair), status (queued/processing/completed/cancelled/error), created_at/updated_at timestamps, metadata, plus result (success payload) and error (failure details). The stored ledger row carries no result or error column (measured 2026-08-14); both are read from the separate job-payload store and attached to the returned row, so the outcome comes back with the status rather than needing a second lookup.",
+    "presentation_guidance": "A null job is a normal empty answer (nothing matched the filters, measured 2026-08-14), not an error — say no matching job exists and suggest checking plugin_name/action_name spelling. For a completed job, surface the result field's payload (for connector verbs this carries the user-visible outcome, e.g. a created sheet's URL or an export destination); for a failed job surface the error field.",
+    "output_action_guidance": "If status is pending or processing, poll again after a short wait rather than re-dispatching the originating verb. If completed, act on the result payload. If failed, act on the error. If job is null, verify the filters before concluding no job ran."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves the most recent asynchronous job record, optionally filtered by plugin name, action name, or status",
+    "error_interpretation": "Any error from this verb is the underlying job-table query failing, surfaced as the stringified exception (measured 2026-08-14: the implementation catches all exceptions and returns an error envelope; there is no typed NotFoundError or ValidationError surface). A no-match is NOT an error — the verb succeeds with job: null. An unrecognized status value is not rejected either; it simply matches nothing and returns job: null.",
+    "recovery_guidance": "On an error envelope: check database connectivity and job-service health, then re-invoke. On a successful call with job: null: verify plugin_name/action_name spelling and the status value (pending, processing, completed, failed, cancelled) rather than treating the empty answer as a failure, or drop filters to see the latest job overall."
+  }
+}

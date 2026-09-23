@@ -1,0 +1,10 @@
+{
+  "action_status": "COMPLETED",
+  "data_contains": {
+    "cleared_count": 0,
+    "cleared_ids": true,
+    "tag": "nonexistent_tag_xyz"
+  },
+  "error": null,
+  "timeout_seconds": 30
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vector_service::delete_vectors",
+  "display_name": "Delete Vectors",
+  "description": "Delete vectors by IDs or filter criteria.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Vectors deleted",
+    "result_type": "vectors_deleted",
+    "result_description": "Deletion confirmation with count of vectors removed, namespace affected, and list of deleted vector IDs if applicable",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Permanently removes vectors from a namespace by ID list or metadata filter criteria",
+    "error_interpretation": "NotFoundError: some or all vector IDs don't exist. NamespaceError: namespace not found. FilterError: invalid filter syntax. PermissionError: deletion not allowed on protected namespace.",
+    "recovery_guidance": "For not found errors: verify vector IDs exist before deletion. For filter errors: check filter syntax matches supported operators. For permission errors: check if namespace allows deletion."
+  }
+}

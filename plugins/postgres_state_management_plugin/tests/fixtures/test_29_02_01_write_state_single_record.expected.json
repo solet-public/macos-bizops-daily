@@ -1,0 +1,14 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "action_status",
+    "completed",
+    "generated_id",
+    "inserted"
+  ],
+  "output_not_contains": [
+    "error",
+    "failed"
+  ],
+  "timeout_seconds": 60
+}

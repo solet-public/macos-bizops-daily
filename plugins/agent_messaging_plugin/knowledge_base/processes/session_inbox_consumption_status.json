@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::session_inbox_consumption_status",
+  "display_name": "Read whether a session's inbox-consumer hook has ever run",
+  "description": "Reads the latest snapshot written by report_inbox_consumption for one agent_instance_id: runtime, checked_at (when the consumer hook last performed its existence check), pending_found_at/pending_reason (the last time it found a pending delivery and forced a Stop-hook continuation), reporter_surface, and agent_session_id. resolved=false is the stable, expected shape when no report has ever landed for this session — a fresh session, a host=operator seat, or a runtime (Claude) that uses its own separate honest wake mechanism this table does not cover — and it is never a raised error and never silently defaulted to true. This is the CDX-06 part C honesty field: 'a session that has not actually consumed its inbox must be distinguishable from one that has; no surface may report consumed-by-assumption.' v1 reads by the exact agent_instance_id passed only, a disclosed simplification versus session_context_status's later GAU-07 ledger/watch-id join — report_inbox_consumption already captures agent_session_id on write so that join can be added without a backfill.",
+  "embedding_description": "Read whether and when a session's Codex Stop-hook peer-inbox consumer last actually executed its check, distinguishing a session that has genuinely consumed its inbox from one whose consumption is merely assumed from a queued delivery status.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Inbox consumption status read",
+    "result_type": "session_inbox_consumption_status_result",
+    "result_description": "resolved, resolution_error, agent_instance_id, runtime, checked_at, pending_found_at, pending_reason, reporter_surface, agent_session_id.",
+    "presentation_guidance": "Lead with resolved; if false, report resolution_error verbatim and never estimate or assume the session has consumed its inbox. A stale checked_at (old relative to the session's recent activity) is itself informative — surface it rather than only the boolean shape."
+  },
+  "error_processor_customizations": {
+    "action_context": "A single filtered read on agent_instance_id against the inbox_consumption_status cache table.",
+    "error_interpretation": "missing_argument: agent_instance_id was empty. state_service_unavailable: the state service is not bound. Absence of a cached row is not an error; it returns resolved=false.",
+    "recovery_guidance": "Supply the target session's agent_instance_id (the ledger id for a managed worker). resolved=false with no prior report is not itself a defect — confirm whether this runtime is expected to have the consumer hook installed before treating it as one."
+  }
+}

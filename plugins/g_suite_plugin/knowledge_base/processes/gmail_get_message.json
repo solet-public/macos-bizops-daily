@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::gmail_get_message",
+  "display_name": "Gmail: Get Message",
+  "description": "Fetch one Gmail message by id: the key headers (from/to/cc/subject/date), the plain-text body, a short snippet, and attachment metadata (attachment_id/name/mime/size — not the attachment bytes). Runs as a background job: dispatch returns a job_id immediately, and the message content arrives via a follow-up message once the fetch completes. Requires a connected account.",
+  "embedding_description": "Read a single Gmail message's content by its message id as a background job. Completion delivers parsed headers, the decoded plain-text body, a preview snippet, and attachment descriptors (id, filename, mime type, size) without downloading attachment bytes. Use after gmail_list_messages. The body is sensitive content. Fails gsuite.not_found if the id does not exist.",
+  "result_processor_customizations": {
+    "action_label": "Gmail message fetch started",
+    "result_type": "g_suite_gmail_message_result",
+    "result_description": "Job queued for the message fetch; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to fetch one Gmail message by id.",
+    "error_interpretation": "gsuite.invalid_params: no message id supplied, or missing session_id/flow_id context. gsuite.not_found: the id does not exist. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.invalid_params: pass a valid 'id' from gmail_list_messages. gsuite.not_found: the message may have been deleted. gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "query": "What's the status of my latest job?",
+  "expected_process_key": "service_interface::job_service::get_latest_job",
+  "expected_arguments": {}
+}

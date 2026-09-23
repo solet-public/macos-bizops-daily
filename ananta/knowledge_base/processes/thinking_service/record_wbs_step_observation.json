@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::record_wbs_step_observation",
+  "display_name": "Record WBS Step Observation",
+  "description": "submit an executed step's result for validation: only a valid observation is durably recorded and advances pull-mode execution — an invalid one changes nothing and returns the full error list.",
+  "embedding_description": "Report back what happened when an agent executed a work breakdown structure step externally. The platform validates the observation — right step order, declared process key, success-status result envelope — and only then records it durably and advances. Rejected observations change no state and return every validation error.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "WBS step observation processed",
+    "result_type": "wbs_pull_observation_outcome",
+    "result_description": "Observation outcome with keys: wbs_id, step_number, accepted, errors, next",
+    "presentation_guidance": "Lead with accepted. When false, list every entry of errors verbatim — the driver repairs and re-submits. Then present the next envelope.",
+    "output_action_guidance": "If accepted, continue with the step described in next. If rejected, fix the listed problems (usually: wrong step order, undeclared process key, or a non-success result) and re-execute or re-submit; state did not advance."
+  },
+  "error_processor_customizations": {
+    "action_context": "Recording an executed step's outcome in pull mode. record_wbs_step_observation accepts {wbs_id, step_number, process_key, result, state_summary?, output_artifacts?}. Validation failures come back in the RESULT's errors list with accepted=false, not as raised errors.",
+    "error_interpretation": "NotFound: no WBS tracking row or document exists for this wbs_id. ValidationError: the action arguments do not conform to the schema (note: observation-content findings are returned in the result, not raised).",
+    "recovery_guidance": "Argument-shape failures: fix the action arguments and resubmit. Observation rejections (accepted=false): follow the errors list — re-fetch the envelope with get_next_wbs_step if unsure where execution stands."
+  }
+}

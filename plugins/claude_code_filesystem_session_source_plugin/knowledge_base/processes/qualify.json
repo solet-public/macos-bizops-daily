@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::claude_code_filesystem_session_source_plugin::qualify",
+  "display_name": "Qualify Claude Code filesystem session source",
+  "description": "Run a bounded source-local proof for the already-consented Claude Code filesystem session source. The qualifier verifies an enabled source row exists, runs exactly one synchronous poll of that row, then reads one source-filtered session timeline. It returns no transcript, event payload, path, credential, or third-party content: only {source_registered, source_kind, backfill_count, sample_content_retrieved}. A failed precondition or empty backfill is a failed qualification, not a successful empty result.",
+  "embedding_description": "Qualify the already-consented local Claude Code transcript filesystem source after setup or repair. Verify that an enabled source row exists, one bounded source-specific poll persists events, and a source-filtered session timeline has retrievable content. Return only boolean proof fields and an event count, never transcript text, filesystem paths, credentials, or third-party payloads.",
+  "result_processor_customizations": {
+    "action_label": "Claude Code filesystem source qualification",
+    "result_type": "claude_code_filesystem_session_source_qualification",
+    "result_description": "Bounded source-local proof with registration, persisted-event count, and content-retrieval boolean.",
+    "presentation_guidance": "Report the four proof fields exactly. Do not request, quote, or display the sampled timeline content."
+  },
+  "error_processor_customizations": {
+    "action_context": "Claude Code filesystem session-source qualification.",
+    "error_interpretation": "Qualification fails if no enabled source row is registered, its synchronous poll fails or persists zero events, or no source-filtered timeline event has retrievable content.",
+    "recovery_guidance": "Use the operator-approved session-source registration/hydration path, then retry. Do not bypass filesystem-root authorization or substitute a ledger-wide search for this source-local proof."
+  }
+}

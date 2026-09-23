@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::state_service::execute_sql",
+  "arguments": {
+    "sql_query": "SELECT * FROM state.core__flows WHERE status = %s LIMIT 5",
+    "sql_params": ["pending"]
+  }
+}

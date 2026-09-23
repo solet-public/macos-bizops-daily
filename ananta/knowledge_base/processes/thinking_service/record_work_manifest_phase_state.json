@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::thinking_service::record_work_manifest_phase_state",
+  "display_name": "Record Manifest Phase State",
+  "description": "record phase-level outcome and next-phase handoff in an existing Work Manifest without rewriting the whole document.",
+  "embedding_description": "Record phase state in work manifest. Update a single manifest phase with outcomes, approved decisions, approved artifacts, or handoff instructions for the next phase. Narrow mutation that preserves the rest of the document.",
+  "error_processor_customizations": {
+    "action_context": "Recording execution state for a manifest phase. record_work_manifest_phase_state accepts {manifest_id, phase_number, status, outcome_summary, approved_artifacts?, next_phase_instruction?}.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. NotFoundError: manifest with this ID does not exist."
+  }
+}

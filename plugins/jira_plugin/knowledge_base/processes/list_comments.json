@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::list_comments",
+  "display_name": "Jira: List Comments",
+  "description": "List a Jira issue's comments (id/author/body/created), most recent last. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the list finishing. When the job completes, comment rows are delivered INLINE, one complete result, up to 500 comments by default -- jira carries no PII risk (operator ruling: company-internal accounts only), so this never exports to a file. Atlassian caps a single HTTP call at 100 comments; within the effective row limit the background job pages internally by offset across that ceiling and hands back one result -- no caller-visible offset or continuation token. At the 500-row default that is up to 5 sequential internal HTTP calls; at the 5,000-row override cap it is up to 50 -- each a real round-trip, so a large row_limit has real latency cost, paid by the background job rather than the dispatch call (a defense-in-depth circuit breaker caps the loop at 100 calls regardless). Pass acknowledge_default_limit_override=true with row_limit to raise the limit above 500, up to 5,000 (above that is refused, never clamped). If more comments exist than the effective limit, truncated is true -- there is no resume token. Read action.",
+  "embedding_description": "Read the comment thread on a Jira issue. Dispatches asynchronously, returning a job_id immediately; each comment's id, author, plain-text body, and created timestamp arrive via job completion, one complete result, paging internally past Atlassian's 100/call ceiling up to a 500-row default. Distinct from add_comment (post) and jql_search (find issues).",
+  "result_processor_customizations": {
+    "action_label": "Jira comment listing queued",
+    "result_type": "jira_list_comments_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the comment rows -- those arrive separately when the job completes and are delivered as their own message.",
+    "presentation_guidance": "This call only confirms the listing was queued -- do not present job_id/status as the comment thread. Acknowledge the request is in flight; the comment rows land in a follow-up message when the job completes. Once delivered, present the comment rows and row_count. If truncated is true, more comments may exist beyond the effective row limit -- say so and suggest raising row_limit (with acknowledge_default_limit_override) rather than implying the thread is fully shown. Comment bodies are free-text corporate content (sensitivity 0.6) -- prefer requesting only what's needed for the task."
+  },
+  "error_processor_customizations": {
+    "action_context": "List a Jira issue's comments and return them inline.",
+    "error_interpretation": "jira.not_found: the issue key does not exist. jira.permission_denied: the account cannot view this issue's comments. jira.invalid_params: the key was missing, or acknowledge_default_limit_override and row_limit were not both given, or row_limit is not a positive integer, or row_limit exceeds the 5,000 hard cap.",
+    "recovery_guidance": "jira.not_found: verify the issue key. jira.permission_denied: grant the service account browse permission. jira.invalid_params: supply the issue key, and pass acknowledge_default_limit_override=true together with a row_limit at or below 5,000 (or omit both for the 500-row default)."
+  }
+}

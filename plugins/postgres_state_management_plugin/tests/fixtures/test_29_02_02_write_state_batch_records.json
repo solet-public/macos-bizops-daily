@@ -1,0 +1,31 @@
+{
+  "name": "test_write_state_batch_records",
+  "description": "Verify write_state can insert multiple records in a batch",
+  "process_key": "plugin::postgres_state_management_plugin::write_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "data": {
+        "table": "key_value_store",
+        "records": [
+          {
+            "id": "test_kv_batch_01",
+            "namespace": "test_batch",
+            "key": "batch_key_01",
+            "value": "batch_value_01",
+            "scope": "SESSION"
+          },
+          {
+            "id": "test_kv_batch_02",
+            "namespace": "test_batch",
+            "key": "batch_key_02",
+            "value": "batch_value_02",
+            "scope": "SESSION"
+          }
+        ]
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

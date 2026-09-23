@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_self_deployment_plugin::swap_status",
+  "display_name": "Read local blue-green swap status",
+  "description": "Read-only introspection of the local-blue-green router's current state. Plugin-namespace registration backing the service-interface verb service_interface::local_self_deployment_service::swap_status. Returns the router's status() payload (active_color, known colors, color → bridge_port mappings, drain entries with timestamps) plus the plugin's own swap-in-progress state. No side effects. Operator-invocable for diagnostic / pre-restart checks.",
+  "embedding_description": "Read local blue-green router state — which color is active, registered colors + bridge ports, drain entries (color → drain_until_timestamp) for colors winding down, plugin's swap_in_progress flag. Read-only diagnostic; used by operators before restart_with_manifest, by complete_swap to confirm registration, by swap_rollback to determine rollback window. No side effects.",
+  "result_processor_customizations": {
+    "action_label": "blue-green swap status snapshot",
+    "result_type": "local_blue_green_swap_status",
+    "result_description": "active_color, known colors, color → bridge_port map, drain entries, swap_in_progress flag.",
+    "presentation_guidance": "Lead with active_color. Surface drain entries if any (operator may be in a swap window). Surface swap_in_progress=true if mid-cycle. Otherwise terse: just the active_color + registered colors."
+  },
+  "error_processor_customizations": {
+    "action_context": "Read local blue-green swap status.",
+    "error_interpretation": "router_unavailable: ~/.ananta/runtime/<name>.router.sock not present or unreachable. router_status_unparseable: router responded but the payload was malformed (platform bug).",
+    "recovery_guidance": "If router is unavailable, install via plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/blue_green_router/install_router.py and retry. Read-only verb: safe to retry."
+  }
+}

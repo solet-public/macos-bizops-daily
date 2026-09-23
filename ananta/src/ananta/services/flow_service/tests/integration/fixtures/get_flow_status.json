@@ -1,0 +1,8 @@
+{
+  "name": "test_get_flow_status",
+  "description": "Retrieve flow execution status including trigger info, completion status, and timestamps",
+  "process_key": "service_interface::flow_service::get_flow_status",
+  "arguments": {
+    "flow_id": "test_value"
+  }
+}

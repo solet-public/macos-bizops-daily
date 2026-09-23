@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_coding_agent_session_plugin::terminate_bridge",
+  "display_name": "Terminate a tracked MCP bridge subprocess (macOS plugin)",
+  "description": "macOS implementation of terminate_bridge: SIGTERM the tracked subprocess, wait up to the grace window, SIGKILL on overrun, drop the tracking entry. Bound-provider skip semantics mean callers should route through service_interface::coding_agent_session_service::terminate_bridge instead of this plugin::* key.",
+  "embedding_description": "macOS-side terminate of a tracked MCP bridge subprocess with SIGTERM-then-SIGKILL semantics. Mirrors the canonical service_interface::coding_agent_session_service::terminate_bridge contract. Returns BridgeTerminateResult.",
+  "result_processor_customizations": {
+    "action_label": "MCP bridge terminated",
+    "result_type": "coding_agent_session_bridge_terminate_result",
+    "result_description": "BridgeTerminateResult frozen dataclass mirroring the canonical service interface return.",
+    "presentation_guidance": "See the canonical service_interface entry."
+  },
+  "error_processor_customizations": {
+    "action_context": "macOS-side terminate of an MCP bridge subprocess.",
+    "error_interpretation": "See the canonical service_interface entry.",
+    "recovery_guidance": "See the canonical service_interface entry."
+  }
+}

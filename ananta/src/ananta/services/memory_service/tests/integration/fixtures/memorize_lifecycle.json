@@ -1,0 +1,40 @@
+{
+  "name": "test_memorize_lifecycle",
+  "description": "Test spaced repetition: memorize content, list queue, stop memorizing",
+  "sequence": [
+    {
+      "step": "memorize_content",
+      "process_key": "service_interface::memory_service::memorize",
+      "arguments": {
+        "content": "The mitochondria is the powerhouse of the cell - critical for ATP production."
+      },
+      "capture": {
+        "memory_id": {
+          "source": "output",
+          "output_key": "Memory ID"
+        }
+      }
+    },
+    {
+      "step": "list_memorizing",
+      "process_key": "service_interface::memory_service::list_memorizing",
+      "arguments": {
+        "include_completed": false
+      }
+    },
+    {
+      "step": "stop_memorizing",
+      "process_key": "service_interface::memory_service::stop_memorizing",
+      "arguments": {
+        "memory_id": "${memory_id}"
+      }
+    },
+    {
+      "step": "cleanup_forget",
+      "process_key": "service_interface::memory_service::forget",
+      "arguments": {
+        "memory_id": "${memory_id}"
+      }
+    }
+  ]
+}

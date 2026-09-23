@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"completed\""
+  ],
+  "description": "Invalid SQL syntax - should return error response"
+}

@@ -1,0 +1,14 @@
+{
+  "process_key": "service_interface::session_ledger_service::event_embedding_coverage",
+  "display_name": "event_embedding_coverage",
+  "description": "Read-only LED-01 event-embedding coverage: is the event-content backfill caught up, and how much is embedded — a deterministic one-call read with NO full-corpus scan. Returns {caught_up, cursor_imported_at, newest_in_scope_imported_at, embedded_chunk_count}. `caught_up` compares the durable arrival-order drain cursor against the newest in-scope event's `imported_at` (the SQL scope legs: MESSAGE + user/assistant + non-null content); True means the arrival frontier has reached the newest in-scope event. It is a FRONTIER signal, not a per-row completeness proof — a straggler that committed below the advanced cursor is caught by the drain's periodic reconciliation sweep, which is the completeness backstop. `cursor_imported_at` is the drain frontier (None when the drain never advanced); `newest_in_scope_imported_at` is the newest embeddable event's arrival time (None when nothing is in scope); `embedded_chunk_count` is the live vector count in the session_ledger_event namespace (CHUNKS, not distinct events — an event spans 1..N chunks; 0 when nothing is embedded yet). Complements drain_event_embeddings (which ADVANCES the frontier) — this verb only READS where the frontier currently sits.",
+  "embedding_description": "Check how far along the session-ledger event-embedding backfill is and whether it has finished catching up. Reports whether the autonomous embedding drain has reached the newest conversation event, where its progress cursor currently sits, and how many message chunks are already embedded — a fast status read that answers 'are we done embedding yet?' without scanning the whole corpus.",
+  "result_processor_customizations": {
+    "action_label": "Ledger Event-Embedding Coverage",
+    "result_type": "ledger_event_embedding_coverage",
+    "result_description": "Deterministic LED-01 backfill-coverage read: drain frontier plus embedded-chunk count, no full-corpus scan."
+  },
+  "error_processor_customizations": {
+    "retryable": true
+  }
+}

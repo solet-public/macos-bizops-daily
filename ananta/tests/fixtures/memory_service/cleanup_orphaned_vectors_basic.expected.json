@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "orphaned_found",
+    "deleted"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Clean up orphaned vectors with no memory records"
+}

@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::embedding_service::generate_embeddings",
+  "arguments": {
+    "texts": ["Semantic search enables finding similar documents based on meaning"],
+    "model": "text-embedding-3-small"
+  }
+}

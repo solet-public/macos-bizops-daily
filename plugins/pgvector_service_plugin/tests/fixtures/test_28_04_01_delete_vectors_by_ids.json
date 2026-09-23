@@ -1,0 +1,15 @@
+{
+  "name": "test_delete_vectors_by_ids",
+  "description": "Delete vectors by providing a list of vector IDs",
+  "process_key": "plugin::pgvector_service_plugin::delete_vectors_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vector_ids": ["test-vector-id-001", "test-vector-id-002"]
+    },
+    "state": {
+      "current_session_id": "test-delete-byids-001"
+    },
+    "timeout_seconds": 30
+  }
+}

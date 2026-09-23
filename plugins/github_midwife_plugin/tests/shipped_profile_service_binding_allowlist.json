@@ -1,0 +1,88 @@
+[
+  {
+    "profile_fragments": ["macos-", "b", "izops.yaml"],
+    "service": "coding_agent_session_service",
+    "providing_plugin": "macos_coding_agent_session_plugin",
+    "configured_plugin": null,
+    "stranded_process_keys": [
+      "service_interface::coding_agent_session_service::list_bridges",
+      "service_interface::coding_agent_session_service::restart_bridge",
+      "service_interface::coding_agent_session_service::spawn_bridge",
+      "service_interface::coding_agent_session_service::terminate_bridge"
+    ],
+    "reason": "Provider is enabled but exposing its coding-agent session service in this shipped profile remains a product decision."
+  },
+  {
+    "profile_fragments": ["macos-", "b", "izops.yaml"],
+    "service": "quality_service",
+    "providing_plugin": "platform_dev_surface_plugin",
+    "configured_plugin": null,
+    "stranded_process_keys": [
+      "service_interface::quality_service::detect_scope_regex_gaps",
+      "service_interface::quality_service::list_gates",
+      "service_interface::quality_service::predict_gate_smokes_merge",
+      "service_interface::quality_service::run_gate",
+      "service_interface::quality_service::run_test",
+      "service_interface::quality_service::verify_hash_manifest"
+    ],
+    "reason": "Provider is enabled but exposing its quality service in this shipped profile remains a product decision."
+  },
+  {
+    "profile_fragments": ["macos-", "b", "izops.yaml"],
+    "service": "repo_service",
+    "providing_plugin": "platform_dev_surface_plugin",
+    "configured_plugin": null,
+    "stranded_process_keys": [
+      "service_interface::repo_service::git_diff",
+      "service_interface::repo_service::git_status",
+      "service_interface::repo_service::list_files",
+      "service_interface::repo_service::propose_patch",
+      "service_interface::repo_service::read_file",
+      "service_interface::repo_service::search"
+    ],
+    "reason": "Provider is enabled but exposing its repository service in this shipped profile remains a product decision."
+  },
+  {
+    "profile_fragments": ["macos-samantha-solet.yaml"],
+    "service": "coding_agent_session_service",
+    "providing_plugin": "macos_coding_agent_session_plugin",
+    "configured_plugin": null,
+    "stranded_process_keys": [
+      "service_interface::coding_agent_session_service::list_bridges",
+      "service_interface::coding_agent_session_service::restart_bridge",
+      "service_interface::coding_agent_session_service::spawn_bridge",
+      "service_interface::coding_agent_session_service::terminate_bridge"
+    ],
+    "reason": "Provider is enabled but exposing its coding-agent session service in this shipped profile remains a product decision."
+  },
+  {
+    "profile_fragments": ["macos-samantha-solet.yaml"],
+    "service": "quality_service",
+    "providing_plugin": "platform_dev_surface_plugin",
+    "configured_plugin": null,
+    "stranded_process_keys": [
+      "service_interface::quality_service::detect_scope_regex_gaps",
+      "service_interface::quality_service::list_gates",
+      "service_interface::quality_service::predict_gate_smokes_merge",
+      "service_interface::quality_service::run_gate",
+      "service_interface::quality_service::run_test",
+      "service_interface::quality_service::verify_hash_manifest"
+    ],
+    "reason": "Provider is enabled but exposing its quality service in this shipped profile remains a product decision."
+  },
+  {
+    "profile_fragments": ["macos-samantha-solet.yaml"],
+    "service": "repo_service",
+    "providing_plugin": "platform_dev_surface_plugin",
+    "configured_plugin": null,
+    "stranded_process_keys": [
+      "service_interface::repo_service::git_diff",
+      "service_interface::repo_service::git_status",
+      "service_interface::repo_service::list_files",
+      "service_interface::repo_service::propose_patch",
+      "service_interface::repo_service::read_file",
+      "service_interface::repo_service::search"
+    ],
+    "reason": "Provider is enabled but exposing its repository service in this shipped profile remains a product decision."
+  }
+]

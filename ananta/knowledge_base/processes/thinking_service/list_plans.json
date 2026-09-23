@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::thinking_service::list_plans",
+  "display_name": "List Plans",
+  "description": "List all plans with their status, memory ID, focus state, and step count. Optionally filter by status (active, paused, completed, abandoned).",
+  "embedding_description": "List all plans. Show my plans. What plans do I have. Show active plans. Show paused plans. Show completed plans. Give me a plan overview. What tasks are in progress. Check plan status. How many plans are there. Review all plans.",
+  "result_processor_customizations": {
+    "action_label": "Plans listed",
+    "result_type": "plan_list",
+    "result_description": "Plans with status, focus state, and step counts",
+    "presentation_guidance": "Present plans in a table or list format.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing plans",
+    "error_interpretation": "InvalidStatus: unrecognized status filter value.",
+    "recovery_guidance": "Valid statuses: active, paused, completed, abandoned."
+  }
+}

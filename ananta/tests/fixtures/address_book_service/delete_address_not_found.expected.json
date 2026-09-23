@@ -1,0 +1,10 @@
+{
+  "exit_code": 1,
+  "output_contains": [
+    "not found",
+    "address"
+  ],
+  "output_not_contains": [
+    "deleted successfully"
+  ]
+}

@@ -1,0 +1,24 @@
+# Retrieval-test companion for the operator decision-brief convention article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+
+article_path: knowledge_bases/ananta_platform/24_operator_communication/01_operator_decision_briefs.md
+consumer_profile: both
+
+target_queries:
+  - "how do I ask the operator for a decision"
+  - "operator decision brief format"
+  - "what format does a ruling request to the operator follow"
+  - "convention for operator-facing decision requests"
+  - "when should a question be escalated to the operator"
+  - "why was my decision request bounced back for rewrite"
+
+forbidden_queries:
+  - "coordinator dispatch discipline for agent-to-agent briefs"   # ananta_service coordinator_dispatch_discipline owns this
+  - "how do I write a good knowledge base article"                # the authoring rubric owns this
+  - "first days onboarding a new owner"                           # the first-days runbook owns this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions:
+  - service_interface::knowledge_service::search

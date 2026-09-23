@@ -1,0 +1,140 @@
+{
+  "title": "Action Definition Schema",
+  "description": "Schema for action definitions in AI Apps",
+  "type": "object",
+  "required": ["description", "executor"],
+  "properties": {
+    "description": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Description of what this action does"
+    },
+    "executor": {
+      "type": "string",
+      "pattern": "^[a-z_]+::[a-z_]+::[a-z_]+$",
+      "description": "Process key that executes this action (format: provider_type::provider::function)"
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Simple parameter name (assumes string type, required)"
+          },
+          {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*[a-z0-9]$",
+                "description": "Parameter name (snake_case)"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["string", "integer", "number", "boolean", "array", "object"],
+                "description": "Parameter data type"
+              },
+              "required": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether this parameter is required"
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 100,
+                "description": "Description of this parameter"
+              },
+              "default": {
+                "description": "Default value if parameter not provided"
+              },
+              "enum": {
+                "type": "array",
+                "description": "Allowed values for this parameter"
+              },
+              "validation": {
+                "type": "string",
+                "description": "Validation rule for this parameter"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "description": "Parameters required by this action"
+    },
+    "return_value": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean", "array", "object", "void"],
+          "description": "Type of value returned by this action"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Description of the returned value"
+        },
+        "schema": {
+          "type": "object",
+          "description": "JSON schema for the returned value (if complex type)"
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "description": "Example return values"
+          },
+          "description": "Example return values for this action"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Description of the value returned by this action"
+    },
+    "examples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of this example"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what this example demonstrates"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Example parameter values"
+          },
+          "expected_result": {
+            "description": "Expected result for this example"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Usage examples for this action"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Version of this action definition"
+    },
+    "deprecated": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this action is deprecated"
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Alternative actions if this one is deprecated"
+    }
+  },
+  "additionalProperties": false
+}

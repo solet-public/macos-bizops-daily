@@ -1,0 +1,11 @@
+{
+  "process_key": "service_interface::thinking_service::patch_work_breakdown_structure",
+  "display_name": "Patch Work Breakdown Structure",
+  "description": "revise a specific Work Breakdown Structure document via a full-document rewrite. Use only when a narrow state-recording or graft process is not sufficient.",
+  "embedding_description": "Patch work breakdown structure document. Update phase execution document with expanded work items, steps, and sub-steps. Record durable execution progress against the phase. Revise work breakdown structure content. Write updated phase plan.",
+  "processor_policy_category": "edge_sink",
+  "error_processor_customizations": {
+    "action_context": "Updating a Work Breakdown Structure document. patch_work_breakdown_structure accepts {wbs_id, content}.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. NotFound: wbs_id does not exist. StorageError: knowledge base write failed."
+  }
+}

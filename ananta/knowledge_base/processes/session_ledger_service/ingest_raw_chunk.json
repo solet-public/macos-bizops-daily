@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::session_ledger_service::ingest_raw_chunk",
+  "display_name": "ingest_raw_chunk",
+  "description": "STUB: session_ledger_service::ingest_raw_chunk — implementation deferred post-AWS-solet per coordinator_plan.md P2. Stub JSON allows the process registry to start; the method is registered but the service is not wired.",
+  "embedding_description": "Push one raw session chunk into the LLM session ledger for a specified IngestSourceKind. Dispatches to importer.dispatch_pushed, which routes the chunk through the source-kind's parser, persists events to __event, returns {events_persisted: N}. Used by paired shippers + cross-solet session ingestion. Distinct from trigger_poll (pulling-source bulk poll)."
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::postgres_state_management_plugin::write_state",
+  "display_name": "Write State (Postgres)",
+  "description": "Write data to PostgreSQL state database. Supports single record or batch record insertion.",
+  "embedding_description": "Write data to the PostgreSQL state store using a namespace and data object with table plus record or records. Supports single or batch inserts. Returns generated IDs and insert count for persisted state.",
+  "result_processor_customizations": {
+    "action_label": "Write State",
+    "result_type": "write_result",
+    "result_description": "Record insertion result with generated ID(s) and count of records inserted",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Writing data to PostgreSQL state database",
+    "error_interpretation": "WriteError with 'table': missing or invalid table name in data. WriteError with 'record': missing or invalid record in data. WriteError: data must contain either 'record' or 'records'. ConnectionError: PostgreSQL connection failed.",
+    "recovery_guidance": "For table errors: ensure data includes a valid 'table' key. For record errors: provide either a 'record' dict or 'records' list. For connection errors: verify PostgreSQL is running and accessible."
+  }
+}

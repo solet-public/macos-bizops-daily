@@ -1,0 +1,7 @@
+{
+  "natural_language_query": "Start the REST interface",
+  "expected_process_key": "service_interface::lifecycle_management_service::start_service_via_interface",
+  "expected_arguments_structure": {
+    "service_name": "string"
+  }
+}

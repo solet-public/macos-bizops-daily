@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::lifecycle_management_service::set_plugin_priority",
+  "display_name": "Set Plugin Priority",
+  "description": "Persist a plugin's load-priority integer to profile/config/plugins/<plugin_name>.json. Lower priority values load earlier; foundational service plugins (state, blob storage, address book) conventionally live below 50 and ordinary plugins at 100. The plugin manager re-reads the per-plugin config when it discovers entry-points, so the new priority controls the load order on the next solet start. v1 does not perform an in-session reorder: the orchestrator's plugin manager and service bindings are stable once startup completes, so the response always carries takes_effect='next_restart'. Use this verb when you need a deterministic load order on the next boot — for example, ensuring a custom address book plugin loads before plugins that depend on it. The verb refuses if priority is not an integer (booleans are explicitly rejected even though Python treats them as a subclass of int). The persisted value is the single source of truth; the plugin manager's _get_plugin_priority helper falls back to a hardcoded default only when no config value is set.",
+  "embedding_description": "Set a plugin's load-priority integer. Persist plugin load order. Change boot-time priority so a plugin loads earlier or later on the next restart. Reorder plugin loading by writing a priority field. Promote or demote a plugin in the load sequence. Adjust which plugin wins service binding by changing its priority. Configure deterministic load ordering across restarts.",
+  "result_processor_customizations": {
+    "action_label": "Plugin priority persisted",
+    "result_type": "plugin_priority_result",
+    "result_description": "Persist result with keys: applied (bool, true when the file write succeeded), takes_effect (str, always 'next_restart' in v1), plugin_name (str), message (str status detail).",
+    "presentation_guidance": "Confirm the new priority value alongside the plugin name and remind the caller that the reorder takes effect on the next solet start, not immediately. If the caller seems to expect an in-session reorder, surface that limitation explicitly.",
+    "output_action_guidance": "Do not call list_plugins to verify the change in the current session — the live priority field reflects the cached load order, not the new persisted value. Verify the new priority is honoured by restarting the solet and re-running list_plugins."
+  },
+  "error_processor_customizations": {
+    "action_context": "Persist a plugin's boot-time load priority to its per-plugin config",
+    "error_interpretation": "ValidationError: plugin_name was empty or priority was not a non-bool integer. ConfigManagerUnavailable: the orchestrator's config manager attribute is missing. PluginManagerUnavailable: the orchestrator's plugin_manager attribute is missing. ConfigWriteFailure: writing profile/config/plugins/<plugin_name>.json failed (typically permission or disk full).",
+    "recovery_guidance": "For missing plugin_name or non-integer priority: re-call with correct types. For unavailable manager errors: do not retry; restart the solet once the underlying issue is resolved. For ConfigWriteFailure: check disk permissions and free space, then retry."
+  }
+}

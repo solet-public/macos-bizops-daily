@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::store_from_keychain",
+  "display_name": "Store Secret From OS Keychain",
+  "description": "Read a secret from the OS keychain and store it (encrypted at rest) in the solet's vault. On macOS this reaches the local login keychain only (entries from Keychain Access.app or `security add-generic-password`); Apple Passwords entries on Sequoia 15+/Tahoe 26+ are NOT reachable because they live in a separate passd-managed container that requires Apple-private entitlements. On Linux uses libsecret via the keyring library; on Windows uses Credential Manager. Account defaults to the current login user when omitted.",
+  "embedding_description": "Store secret from OS keychain. Agent supplies service name (entry title in Keychain Access) and optional account; the solet reads the login-keychain entry via Security.framework SecItemCopyMatching, encrypts, persists under a vault key. macOS login keychain only — Apple Passwords entries are NOT accessible (passd container, Sequoia 15+/Tahoe 26+). Linux libsecret. Windows Credential Manager.",
+  "result_processor_customizations": {
+    "action_label": "Secret stored from keychain",
+    "result_type": "secret_stored",
+    "result_description": "Confirmation that the keychain entry was read, encrypted, and stored in the solet's vault. Contains key (vault identifier), version, and message. NEVER contains the secret value.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads a generic-password entry from the OS keychain and stores it in the solet's vault. The agent never sees the keychain contents. On macOS the lookup goes through Apple's Security framework via PyObjC and reaches the login keychain only — NOT the Apple Passwords app's passd container.",
+    "error_interpretation": "keychain_unavailable: no real OS keychain reachable from this process (e.g. headless Linux with no libsecret, or — on macOS — the Security framework failed to load). keychain_entry_not_found: no entry matches the supplied service/account in the searched keychain. On macOS this almost always means either (a) the entry was created in the Apple Passwords app on Sequoia 15+/Tahoe 26+ (which is invisible to the platform) or (b) the service/account text does not exactly match the Keychain Access entry. keychain_entry_empty: entry exists but its password field is empty. keychain_selection_unsupported: a non-null keychain argument was supplied (parameter is reserved for future use). VaultLocked: vault must be unlocked first.",
+    "recovery_guidance": "For keychain_unavailable: confirm the host has an OS keychain (or use store_from_env / store_from_file instead). For keychain_entry_not_found on macOS: open Keychain Access.app and confirm the Name/Account fields exactly match the supplied service/account; if the entry is in the Apple Passwords app (a Sequoia 15+/Tahoe 26+ entry), re-create it as a generic password in the login keychain (File → New Password Item) so the Security framework can see it. On Linux/Windows: confirm the entry under the active keyring backend. For keychain_entry_empty: ask the user to confirm the entry actually has a password set. For keychain_selection_unsupported: omit the keychain argument. For VaultLocked: prompt the user to unlock the vault first."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "action_status": "completed",
+  "data_contains": {
+    "blob_id": "gen-"
+  },
+  "data_keys": ["blob_id", "file_path", "metadata"],
+  "timeout_seconds": 30
+}

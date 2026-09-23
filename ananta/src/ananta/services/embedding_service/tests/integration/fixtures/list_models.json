@@ -1,0 +1,6 @@
+{
+  "name": "test_list_models",
+  "description": "List available embedding models and their capabilities.",
+  "process_key": "service_interface::embedding_service::list_models",
+  "arguments": {}
+}

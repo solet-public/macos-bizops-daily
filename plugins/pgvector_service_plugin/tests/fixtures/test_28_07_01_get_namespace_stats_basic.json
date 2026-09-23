@@ -1,0 +1,14 @@
+{
+  "name": "test_get_namespace_stats_basic",
+  "description": "Get statistics for a specific vector namespace",
+  "process_key": "plugin::pgvector_service_plugin::get_namespace_stats_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin"
+    },
+    "state": {
+      "current_session_id": "test-stats-basic-001"
+    },
+    "timeout_seconds": 30
+  }
+}

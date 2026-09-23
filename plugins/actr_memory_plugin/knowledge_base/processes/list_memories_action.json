@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::list_memories_action",
+  "display_name": "List Memories",
+  "description": "List memories with filters",
+  "embedding_description": "List memories with filters for type, status, tag, sorting, and limit. Returns list, total, and showing counts. Use to browse the memory store, audit entries, and debug. Supports pagination and UI listings.",
+  "result_processor_customizations": {
+    "action_label": "Memory list",
+    "result_type": "memories_listed",
+    "result_description": "Filtered list of memories with content, strength, and metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

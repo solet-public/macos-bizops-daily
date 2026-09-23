@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "\"is_healthy\":",
+    "\"total_processes\":",
+    "\"total_usage_records\":"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Get health status - should return health metrics including is_healthy, total_processes, and total_usage_records"
+}

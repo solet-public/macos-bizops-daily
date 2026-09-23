@@ -1,0 +1,26 @@
+name: claude_code_history_session_source_plugin
+description: |
+  LLM session ledger source that tails Claude Code's per-user
+  `~/.claude/history.jsonl` file. One JSONL line per user prompt with
+  shape `{display, pastedContents, project, sessionId?, timestamp}`.
+  Each line emits one MESSAGE event (role=USER, content_text=display,
+  event_at=timestamp/1000). External-session keying is hybrid (M7 path
+  (ii) per architect v2 §6.1): ~93% of lines carry a `sessionId` and key
+  by it; ~7% are orphan-keyed via
+  `f"history_orphan_{timestamp_ms}_{hash(project)}"` so they still land
+  somewhere. Single file, append-only, byte_offset cursor at the source
+  level.
+
+implements:
+  - interface: LLMSessionSourceInterface
+  - interface: PullingSourceMixin
+
+optional: true
+
+config:
+  root_uri:
+    description: >-
+      Filesystem path of the Claude Code per-user history file. Default
+      matches the CLI convention. Override per-deployment via the profile
+      config bridge.
+    default: "~/.claude/history.jsonl"

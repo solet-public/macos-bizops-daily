@@ -1,0 +1,74 @@
+{
+  "name": "test_get_vector",
+  "description": "Store a vector and retrieve it by ID.",
+  "sequence": [
+    {
+      "step": "precleanup_vector_get_target",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_get_target"
+          },
+          "soft_delete": false
+        }
+      }
+    },
+    {
+      "step": "store_vector",
+      "process_key": "service_interface::vector_service::store_vectors",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vectors": [
+          {
+            "id": "vector_get_target",
+            "vector": [
+              0.34,
+              0.11,
+              -0.27
+            ],
+            "dimension": 3,
+            "metadata": {
+              "label": "get_vector",
+              "category": "retrieval"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step": "get_vector",
+      "process_key": "service_interface::vector_service::get_vector",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vector_id": "vector_get_target"
+      }
+    },
+    {
+      "step": "cleanup_delete_vector",
+      "process_key": "service_interface::vector_service::delete_vectors",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vector_ids": [
+          "vector_get_target"
+        ]
+      }
+    },
+    {
+      "step": "cleanup_vector_get_target",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_get_target"
+          },
+          "soft_delete": false
+        }
+      }
+    }
+  ]
+}

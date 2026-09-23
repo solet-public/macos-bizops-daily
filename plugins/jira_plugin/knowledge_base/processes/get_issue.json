@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::get_issue",
+  "display_name": "Jira: Get Issue",
+  "description": "Fetch one Jira issue by key: summary, plain-text description, status, assignee, reporter, labels, and attachment metadata (not the attachment bytes). Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the fetch finishing; the issue detail is delivered when the job completes. Single-record reads like this stay inline (2026-08-02 operator ruling: validation-shaped single-item reads are not the mass-exposure risk the business-data limits migration targets). When the goal is only confirming an issue exists or checking its status, jql_search's trimmed rows (key/status) may already answer that without fetching the full description and people fields. Read action.",
+  "embedding_description": "Retrieve the full detail of one known Jira issue by its key, such as PROJ-123 -- summary, description body, status, assignee/reporter, labels, and attachment metadata. Returns a job_id right away and delivers that detail once the background fetch completes. The single-ticket lookup for when you already hold the issue key.",
+  "result_processor_customizations": {
+    "action_label": "Jira issue fetch queued",
+    "result_type": "jira_get_issue_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the issue detail -- that arrives separately when the job completes and is delivered as its own message.",
+    "presentation_guidance": "This call only confirms the fetch was queued -- do not present job_id/status as the issue detail. Acknowledge the request is in flight; the issue detail lands in a follow-up message when the job completes. Once delivered, summarize the issue's status and key fields. The description body is free-text corporate content (sensitivity 0.6) and assignee/reporter are names (0.3) -- surface for the caller but not as public content."
+  },
+  "error_processor_customizations": {
+    "action_context": "Fetch one Jira issue by key.",
+    "error_interpretation": "jira.not_found: no issue with that key exists (or the account cannot see it). jira.permission_denied: the service account lacks browse permission. jira.auth_failed: invalid/expired token. jira.invalid_params: the key argument was missing or empty.",
+    "recovery_guidance": "jira.not_found: verify the issue key (jql_search can locate it). jira.permission_denied: grant the service account project access. jira.auth_failed: rotate the API token per the overview runbook."
+  }
+}

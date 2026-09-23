@@ -1,0 +1,8 @@
+{
+  "action_status": "completed",
+  "data_keys": ["blob_id", "metadata"],
+  "metadata_contains": {
+    "description": "Updated description"
+  },
+  "timeout_seconds": 30
+}

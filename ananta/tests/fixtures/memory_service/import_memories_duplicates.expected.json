@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "skipped"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Handle duplicate IDs by skipping them"
+}

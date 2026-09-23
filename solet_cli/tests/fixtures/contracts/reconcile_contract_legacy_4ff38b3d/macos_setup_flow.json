@@ -1,0 +1,4329 @@
+{
+  "schema_version": 1,
+  "flow_id": "macos.repository_setup",
+  "title": "macOS solet setup",
+  "description": "Reference setup contract derived from the current bootstrap, genesis, hydration profiles, plugin guidance, and verification surfaces. It is a design input for the wizard engine; entries marked adapter_required, proposed, or planned are not claims that the current setup path can execute them yet.",
+  "executor_contracts": {
+    "answers_schema": "setup_answers.schema.json",
+    "journal_schema": "setup_journal.schema.json",
+    "adapter_envelope_schema": "setup_adapter_envelope.schema.json",
+    "transaction_rollup": "verified_then_failed_then_blocked_then_awaiting_user_then_applying_then_pending",
+    "stop_command": "deferred",
+    "start_command": {
+      "operation_ref": "lifecycle::start",
+      "runner": "hydration",
+      "timeout_seconds": 120,
+      "startup_readiness": {
+        "contract_version": 1,
+        "budget_source": "executor_contracts.start_command.timeout_seconds",
+        "budget_unit": "seconds",
+        "semantic_scope": "target_start_through_target_cli_health_status_healthy",
+        "release_signal": "target_cli_health_top_level_status_healthy",
+        "consumer_probe_purposes": [
+          "stage_exit",
+          "completion"
+        ],
+        "consumer_probe_refs": [
+          "embedding_request_succeeds"
+        ],
+        "downstream_reservations": {
+          "governed_process_call_seconds": 5
+        }
+      },
+      "postcondition_probe_refs": [
+        "router_ready",
+        "peer_identity_valid"
+      ]
+    }
+  },
+  "target": {
+    "operating_systems": [
+      {
+        "name": "macos",
+        "minimum_version": "13.0"
+      }
+    ],
+    "architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "installation_scope": "per_user"
+  },
+  "distribution": {
+    "source_kind": "git_repository",
+    "release_channel": "tag",
+    "repository_ref_input": "repository_ref",
+    "update_strategy": "remint_and_migrate",
+    "native_application_required": false,
+    "supported_frontends": [
+      "local_web_wizard",
+      "terminal_wizard",
+      "headless_answer_file"
+    ]
+  },
+  "policies": {
+    "authorization_actor": "user",
+    "model_role": {
+      "may_explain": true,
+      "may_recommend": true,
+      "may_authorize": false,
+      "may_handle_plaintext_secrets": false
+    },
+    "secret_policy": {
+      "plaintext_in_contract": false,
+      "plaintext_in_journal": false,
+      "plaintext_in_logs": false,
+      "brokered_capture_required": true
+    },
+    "failure_policy": "fail_loud_checkpoint",
+    "history_policy": {
+      "local_session_artifacts": "preserve",
+      "ingestion_requires_consent": true,
+      "context_rotation_requires_handoff": true
+    }
+  },
+  "requirements": {
+    "repository_checkout": {
+      "title": "Repository checkout",
+      "description": "The selected release must be present as a normal Git checkout so updates, provenance, and source inspection remain available.",
+      "necessity": "required",
+      "satisfaction": {
+        "mode": "dependency",
+        "dependency_ref": "git_checkout",
+        "probe_refs": [
+          "git_checkout_valid"
+        ]
+      }
+    },
+    "python_runtime": {
+      "title": "Python runtime",
+      "description": "Bootstrap and every generated hook must execute with Python 3.13 or newer, including fresh non-interactive shells.",
+      "necessity": "required",
+      "satisfaction": {
+        "mode": "dependency",
+        "dependency_ref": "python_313",
+        "probe_refs": [
+          "python_version_valid",
+          "instance_environment_dependency_closure_valid",
+          "fresh_shell_python_valid"
+        ]
+      }
+    },
+    "durable_state": {
+      "title": "Durable state and vector search",
+      "description": "The installation needs PostgreSQL 17, a per-solet non-superuser role and database, SCRAM authentication, and pgvector.",
+      "necessity": "required",
+      "satisfaction": {
+        "mode": "fixed_component",
+        "component_ref": "postgresql_17",
+        "probe_refs": [
+          "postgres_ready",
+          "postgres_role_policy_valid",
+          "pgvector_ready"
+        ]
+      }
+    },
+    "embeddings": {
+      "title": "Embeddings",
+      "description": "Knowledge installation and retrieval require a selected embeddings implementation and a qualified model.",
+      "necessity": "required",
+      "satisfaction": {
+        "mode": "decision",
+        "decision_ref": "embeddings_implementation",
+        "probe_refs": [
+          "embedding_request_succeeds",
+          "knowledge_retrieval_succeeds"
+        ]
+      }
+    },
+    "local_inference": {
+      "title": "Local inference",
+      "description": "Profiles that bind inference_service require a selected implementation and a model that passes structured-action qualification. The free profile may leave inference declared vacant.",
+      "necessity": "optional",
+      "required_when": {
+        "decision_ref": "setup_profile",
+        "operator": "not_equals",
+        "value": "free"
+      },
+      "satisfaction": {
+        "mode": "decision",
+        "decision_ref": "inference_implementation",
+        "probe_refs": [
+          "inference_request_succeeds",
+          "structured_action_qualification"
+        ]
+      }
+    },
+    "coding_agent_integration": {
+      "title": "Coding-agent integration",
+      "description": "Every selected coding agent must be installed, authenticated independently, receive the repository plugin, and pass a fresh-session hook and PATH proof.",
+      "necessity": "required",
+      "satisfaction": {
+        "mode": "decision",
+        "decision_ref": "coding_agents",
+        "probe_refs": [
+          "coding_agent_plugins_visible",
+          "fresh_session_hooks_active"
+        ]
+      }
+    },
+    "connector_configuration": {
+      "title": "Connector configuration timing",
+      "description": "Shipped plugins may be installed immediately while account credentials are configured now, on first use, or left dormant by explicit choice.",
+      "necessity": "recommended",
+      "satisfaction": {
+        "mode": "decision",
+        "decision_ref": "connector_configuration_timing",
+        "probe_refs": [
+          "plugin_roster_matches_plan"
+        ]
+      }
+    },
+    "session_ingestion": {
+      "title": "Session-history ingestion",
+      "description": "Codex and Claude session sources are configured only after separate, explicit consent for their roots and must prove backfill plus retrieval.",
+      "necessity": "optional",
+      "satisfaction": {
+        "mode": "decision",
+        "decision_ref": "session_sources",
+        "probe_refs": [
+          "session_sources_retrievable"
+        ]
+      }
+    },
+    "resumability": {
+      "title": "Resumable execution",
+      "description": "Every stage must checkpoint durable, non-secret progress and re-probe state before reapplying work.",
+      "necessity": "required",
+      "satisfaction": {
+        "mode": "manual_assertion",
+        "probe_refs": [
+          "install_state_projection_matches"
+        ]
+      }
+    }
+  },
+  "decisions": {
+    "setup_profile": {
+      "title": "Setup profile",
+      "prompt": "Which starting capability set should this solet use?",
+      "description": "Profiles provide reviewed defaults, but the final plan is the resolved set of requirements and options rather than a hidden preset.",
+      "selection_mode": "single",
+      "required": true,
+      "resolution_stage_ref": "decision_review",
+      "recommended_option_refs": [
+        "free"
+      ],
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "free": {
+            "label": "Free local core",
+            "description": "Local embeddings, no bound local inference service, and connectors left opt-in.",
+            "availability": "supported",
+            "implications": {
+              "cost": "No required metered model service.",
+              "privacy": "Knowledge embeddings remain on the selected local implementation.",
+              "security": "Smallest default account and permission surface.",
+              "operator_effort": "Lowest setup burden.",
+              "performance": "Coding-agent sessions provide frontier reasoning; the platform inference slot remains vacant."
+            },
+            "activates": {
+              "plugin_refs": [
+                "openai_embeddings_plugin"
+              ]
+            },
+            "followup_decision_refs": [
+              "embeddings_implementation",
+              "embedding_model",
+              "coding_agents",
+              "session_sources"
+            ]
+          },
+          "macos-bizops": {
+            "label": "Business operations",
+            "description": "Adds local inference, fleet and deployment tooling, and business connectors while leaving account authorization selectable.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Local model execution has no per-call fee but requires more hardware and operator time.",
+              "privacy": "Local inference is available; selected external connectors transmit data to their vendors.",
+              "security": "Broader connector and deployment permission surface that must be reviewed explicitly.",
+              "operator_effort": "Higher because external accounts and RBAC must be prepared.",
+              "performance": "Supports platform inference and parallel fleet work."
+            },
+            "activates": {
+              "plugin_refs": [
+                "openai_embeddings_plugin",
+                "default_inference_plugin",
+                "macos_self_deployment_plugin",
+                "platform_dev_surface_plugin",
+                "g_suite_plugin",
+                "jira_plugin",
+                "marketo_plugin",
+                "salesforce_plugin",
+                "snowflake_plugin",
+                "zuora_plugin",
+                "external_postgres_plugin"
+              ]
+            },
+            "followup_decision_refs": [
+              "embeddings_implementation",
+              "embedding_model",
+              "inference_implementation",
+              "inference_model",
+              "coding_agents",
+              "execution_topology",
+              "connector_configuration_timing",
+              "session_sources"
+            ]
+          },
+          "custom": {
+            "label": "Custom",
+            "description": "Select every optional capability and implementation explicitly.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Depends on selected components and accounts.",
+              "privacy": "Depends on selected local and external services.",
+              "security": "The review page becomes the authoritative effective permission surface.",
+              "operator_effort": "Highest because fewer defaults are applied.",
+              "performance": "Can be tuned to the host and workload."
+            },
+            "activates": {},
+            "followup_decision_refs": [
+              "embeddings_implementation",
+              "embedding_model",
+              "inference_implementation",
+              "inference_model",
+              "coding_agents",
+              "execution_topology",
+              "autostart",
+              "connector_configuration_timing",
+              "session_sources"
+            ]
+          }
+        }
+      },
+      "review_required": true
+    },
+    "embeddings_implementation": {
+      "title": "Embeddings implementation",
+      "prompt": "Which implementation should provide embeddings?",
+      "description": "An option may reuse the current OpenAI-compatible plugin or activate a different plugin entirely.",
+      "selection_mode": "single",
+      "required": true,
+      "resolution_stage_ref": "decision_review",
+      "recommended_option_refs": [
+        "lm_studio"
+      ],
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "lm_studio": {
+            "label": "LM Studio",
+            "description": "Current recommended local OpenAI-compatible endpoint.",
+            "availability": "supported",
+            "implications": {
+              "cost": "No per-call fee; consumes local compute.",
+              "privacy": "Embedding text remains local.",
+              "security": "Local HTTP service should remain bound to a trusted interface.",
+              "operator_effort": "Install the app, start its server, and load an embedding model.",
+              "performance": "Depends on selected model and hardware."
+            },
+            "activates": {
+              "component_refs": [
+                "lm_studio"
+              ],
+              "plugin_refs": [
+                "openai_embeddings_plugin"
+              ],
+              "operation_refs": [
+                "configure_lm_studio_embeddings"
+              ],
+              "probe_refs": [
+                "lm_studio_models_discoverable"
+              ]
+            },
+            "verification_probe_refs": [
+              "embedding_request_succeeds"
+            ],
+            "followup_decision_refs": [
+              "embedding_model"
+            ]
+          },
+          "ollama_plugin": {
+            "label": "Ollama plugin",
+            "description": "Example alternative that may activate a dedicated plugin instead of sharing the current implementation.",
+            "availability": "planned",
+            "implications": {
+              "cost": "No per-call fee; consumes local compute.",
+              "privacy": "Embedding text remains local.",
+              "security": "Local service exposure must be reviewed.",
+              "operator_effort": "Requires the future plugin and its own install/configuration flow.",
+              "performance": "Depends on selected model and hardware."
+            },
+            "activates": {
+              "component_refs": [
+                "ollama"
+              ],
+              "plugin_refs": [
+                "ollama_embeddings_plugin"
+              ]
+            },
+            "verification_probe_refs": [
+              "embedding_request_succeeds"
+            ],
+            "followup_decision_refs": [
+              "embedding_model"
+            ]
+          }
+        }
+      },
+      "review_required": true
+    },
+    "embedding_model": {
+      "title": "Embedding model",
+      "prompt": "Which discovered embedding model should be used?",
+      "description": "The wizard discovers models from the selected implementation, displays metadata and recommendations, then qualifies the chosen model with a real embedding request.",
+      "selection_mode": "single",
+      "required": true,
+      "resolution_stage_ref": "models",
+      "option_source": {
+        "mode": "discovered",
+        "discovery_probe_ref": "selected_embedding_models_discoverable",
+        "candidate_contract": {
+          "required_metadata": [
+            "provider",
+            "embedding_capable",
+            "dimensions",
+            "local_disk_bytes"
+          ],
+          "qualification_probe_refs": [
+            "embedding_model_qualification"
+          ],
+          "sort_by": "recommended_first"
+        },
+        "empty_result_behavior": "block"
+      },
+      "review_required": true
+    },
+    "inference_implementation": {
+      "title": "Inference implementation",
+      "prompt": "Should the platform bind a local inference service, and which implementation should own it?",
+      "description": "Selecting none is valid for the free profile. Other options may activate different plugins and model qualification rules.",
+      "selection_mode": "single",
+      "required": true,
+      "resolution_stage_ref": "decision_review",
+      "recommended_option_refs": [
+        "none",
+        "lm_studio"
+      ],
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "none": {
+            "label": "Leave inference vacant",
+            "description": "Use selected coding-agent sessions as the frontier driver and do not load a platform inference plugin.",
+            "availability": "supported",
+            "implications": {
+              "cost": "No local inference setup or metered platform model cost.",
+              "privacy": "Platform does not send autonomous inference requests.",
+              "security": "Smallest inference attack surface.",
+              "operator_effort": "No inference model to install.",
+              "performance": "Autonomous flows requiring inference_service remain unavailable."
+            },
+            "activates": {}
+          },
+          "lm_studio": {
+            "label": "LM Studio",
+            "description": "Current supported local inference implementation.",
+            "availability": "supported",
+            "implications": {
+              "cost": "No per-call fee; significant local compute and memory may be required.",
+              "privacy": "Prompts remain local.",
+              "security": "Local HTTP service and model downloads must be trusted.",
+              "operator_effort": "Load and keep a compatible model available.",
+              "performance": "Depends heavily on model, context size, and hardware."
+            },
+            "activates": {
+              "component_refs": [
+                "lm_studio"
+              ],
+              "plugin_refs": [
+                "default_inference_plugin"
+              ],
+              "operation_refs": [
+                "configure_lm_studio_inference"
+              ]
+            },
+            "verification_probe_refs": [
+              "structured_action_qualification"
+            ],
+            "followup_decision_refs": [
+              "inference_model"
+            ]
+          },
+          "alternative_plugin": {
+            "label": "Alternative inference plugin",
+            "description": "Extension point for an implementation with its own plugin, dependencies, auth, and qualification probes.",
+            "availability": "planned",
+            "implications": {
+              "cost": "Implementation-specific.",
+              "privacy": "Implementation-specific.",
+              "security": "Implementation-specific and must be reviewed before activation.",
+              "operator_effort": "Requires a shipped plugin contract.",
+              "performance": "Must pass structured-action qualification."
+            },
+            "activates": {
+              "plugin_refs": [
+                "alternative_inference_plugin"
+              ]
+            },
+            "verification_probe_refs": [
+              "structured_action_qualification"
+            ],
+            "followup_decision_refs": [
+              "inference_model"
+            ]
+          }
+        }
+      },
+      "review_required": true
+    },
+    "inference_model": {
+      "title": "Inference model",
+      "prompt": "Which discovered inference model should the platform use?",
+      "description": "Model choice is not a free-text afterthought: the wizard discovers candidates, shows context and resource facts, then tests structured output and representative actions.",
+      "selection_mode": "single",
+      "required": true,
+      "resolution_stage_ref": "models",
+      "required_when": {
+        "decision_ref": "inference_implementation",
+        "operator": "not_equals",
+        "value": "none"
+      },
+      "option_source": {
+        "mode": "discovered",
+        "discovery_probe_ref": "selected_inference_models_discoverable",
+        "candidate_contract": {
+          "required_metadata": [
+            "provider",
+            "context_tokens",
+            "structured_output_support",
+            "estimated_memory_bytes"
+          ],
+          "qualification_probe_refs": [
+            "structured_action_qualification",
+            "representative_inference_probe"
+          ],
+          "sort_by": "recommended_first"
+        },
+        "empty_result_behavior": "block"
+      },
+      "review_required": true
+    },
+    "coding_agents": {
+      "title": "Coding agents",
+      "prompt": "Which coding-agent clients should be integrated?",
+      "description": "Claude Code and Codex are independent integrations with independent authentication, plugin installation, hook behavior, and fresh-session verification.",
+      "selection_mode": "multiple",
+      "required": true,
+      "resolution_stage_ref": "decision_review",
+      "minimum_selections": 1,
+      "maximum_selections": 2,
+      "recommended_option_refs": [
+        "codex",
+        "claude_code"
+      ],
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "codex": {
+            "label": "Codex",
+            "description": "Install and verify the Codex repository plugin, hooks, launcher, auth session, and receive path.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Uses the operator's Codex plan or API entitlement.",
+              "privacy": "Repository context and prompts follow the selected Codex account policy.",
+              "security": "Existing Codex auth remains owned by the Codex client; the setup journal stores no token.",
+              "operator_effort": "Requires an authenticated Codex CLI and a fresh-session proof.",
+              "performance": "Model and effort can be selected per fleet dispatch."
+            },
+            "activates": {
+              "component_refs": [
+                "codex_cli"
+              ],
+              "plugin_refs": [
+                "github_midwife_plugin",
+                "agent_messaging_plugin"
+              ],
+              "auth_flow_refs": [
+                "codex_cli_session"
+              ],
+              "operation_refs": [
+                "install_codex_plugin"
+              ]
+            },
+            "verification_probe_refs": [
+              "codex_plugin_visible",
+              "codex_fresh_session_hook_active"
+            ]
+          },
+          "claude_code": {
+            "label": "Claude Code",
+            "description": "Install and verify the Claude marketplace plugin, hooks, launcher, auth session, and receive path.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Uses the operator's Claude plan or API entitlement.",
+              "privacy": "Repository context and prompts follow the selected Claude account policy.",
+              "security": "Existing Claude auth remains owned by the Claude client; the setup journal stores no token.",
+              "operator_effort": "Requires an authenticated Claude CLI and a fresh-session proof.",
+              "performance": "Model and effort can be selected per fleet dispatch."
+            },
+            "activates": {
+              "component_refs": [
+                "claude_cli"
+              ],
+              "plugin_refs": [
+                "github_midwife_plugin",
+                "agent_messaging_plugin"
+              ],
+              "auth_flow_refs": [
+                "claude_cli_session"
+              ],
+              "operation_refs": [
+                "install_claude_plugin"
+              ]
+            },
+            "verification_probe_refs": [
+              "claude_plugin_visible",
+              "claude_fresh_session_hook_active"
+            ]
+          }
+        }
+      },
+      "review_required": true
+    },
+    "execution_topology": {
+      "title": "Execution topology",
+      "prompt": "Should this setup support a single driving session or a managed fleet?",
+      "description": "Fleet mode adds tmux, messaging identity, model/effort/TTL dispatch controls, and durable role verification.",
+      "selection_mode": "single",
+      "required": true,
+      "resolution_stage_ref": "decision_review",
+      "recommended_option_refs": [
+        "solo"
+      ],
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "solo": {
+            "label": "Solo",
+            "description": "One driving coding-agent session with no managed worker requirement.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Lowest concurrent model usage.",
+              "privacy": "No additional worker sessions.",
+              "security": "Smallest messaging and role surface.",
+              "operator_effort": "Simplest operating model.",
+              "performance": "Parallel work must be done sequentially."
+            },
+            "followup_decision_refs": [
+              "git_mutation_control"
+            ],
+            "activates": {}
+          },
+          "fleet": {
+            "label": "Managed fleet",
+            "description": "Enable explicit model, effort, work class, TTL, role, and lifecycle controls for additional sessions.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Concurrent sessions can spend more tokens; model, effort, and TTL must be explicit per dispatch.",
+              "privacy": "Task briefs and peer messages are persisted in fleet state.",
+              "security": "Role ownership and Git-Controller boundaries become load-bearing.",
+              "operator_effort": "Requires tmux and lifecycle monitoring.",
+              "performance": "Parallel review and implementation lanes reduce elapsed time."
+            },
+            "followup_decision_refs": [
+              "git_mutation_control"
+            ],
+            "activates": {
+              "component_refs": [
+                "tmux"
+              ],
+              "dependency_refs": [
+                "tmux_command"
+              ],
+              "plugin_refs": [
+                "agent_messaging_plugin"
+              ],
+              "probe_refs": [
+                "fleet_spawn_and_receive_valid"
+              ]
+            }
+          }
+        }
+      },
+      "review_required": true
+    },
+    "git_mutation_control": {
+      "title": "Git mutation control",
+      "prompt": "How should Git mutations be controlled in this deployment?",
+      "description": "Choose a single-session exemption or designate one controller role; ask explicitly in both topologies.",
+      "selection_mode": "single",
+      "required": true,
+      "resolution_stage_ref": "decision_review",
+      "recommended_option_refs": ["single_session", "designated_controller"],
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "single_session": {
+            "label": "Single session",
+            "description": "Do not export a controller name; the Git-mutation gate remains unarmed.",
+            "availability": "supported",
+            "implications": {
+              "cost": "No additional controller session is required.",
+              "privacy": "No additional Git-controller identity is exported to workers.",
+              "security": "The narrow single-session exemption leaves the mutation gate unarmed.",
+              "operator_effort": "Git work stays in the one operator-controlled session.",
+              "performance": "Git-mutating work cannot be delegated safely to a fleet worker."
+            },
+            "activates": {}
+          },
+          "designated_controller": {
+            "label": "Designated controller",
+            "description": "Export one named Git controller to arm the shared-checkout mutation gate.",
+            "availability": "supported",
+            "implications": {
+              "cost": "A dedicated controller session is needed for Git mutations.",
+              "privacy": "The controller role name is propagated to managed workers.",
+              "security": "The mutation gate blocks non-controller workers in the shared checkout.",
+              "operator_effort": "The controller must be provisioned before it can land work.",
+              "performance": "Implementation can proceed in parallel while Git mutation remains serialized."
+            },
+            "activates": {"input_refs": ["git_controller_name"]}
+          }
+        }
+      },
+      "review_required": true
+    },
+    "autostart": {
+      "title": "Background startup",
+      "prompt": "Should the solet run as a per-user LaunchAgent after login?",
+      "description": "Autostart is a separate system-change decision and requires explicit review of the generated service definition.",
+      "selection_mode": "single",
+      "required": true,
+      "resolution_stage_ref": "decision_review",
+      "recommended_option_refs": [
+        "enabled"
+      ],
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "enabled": {
+            "label": "Enable autostart",
+            "description": "Install the per-user LaunchAgent and verify a post-login service start.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Background resource use while the service is running.",
+              "privacy": "No additional data access by itself.",
+              "security": "Creates a persistent background item with an explicit executable and PATH.",
+              "operator_effort": "Least manual startup work after setup.",
+              "performance": "Service is ready after login."
+            },
+            "activates": {
+              "consent_refs": [
+                "background_service_consent"
+              ],
+              "permission_refs": [
+                "background_items_permission"
+              ],
+              "operation_refs": [
+                "install_launchagent"
+              ]
+            }
+          },
+          "disabled": {
+            "label": "Manual start",
+            "description": "Do not install a background item; provide the foreground start command in the completion report.",
+            "availability": "supported",
+            "implications": {
+              "cost": "No background resource use until manually started.",
+              "privacy": "No additional data access.",
+              "security": "No persistent background item.",
+              "operator_effort": "Requires manual start and restart.",
+              "performance": "Unavailable until started."
+            },
+            "activates": {}
+          }
+        }
+      },
+      "review_required": true
+    },
+    "connector_configuration_timing": {
+      "title": "Connector configuration",
+      "prompt": "When should optional external connectors request account access?",
+      "description": "Installation and authorization are separate. The current recommendation installs shipped plugin code now and requests credentials only when the user chooses to configure or first uses a connector.",
+      "selection_mode": "single",
+      "required": true,
+      "resolution_stage_ref": "decision_review",
+      "recommended_option_refs": [
+        "first_use"
+      ],
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "first_use": {
+            "label": "Configure on first use",
+            "description": "Install shipped plugin code now; leave connectors visibly dormant until selected.",
+            "availability": "supported",
+            "implications": {
+              "cost": "No account setup time for unused connectors.",
+              "privacy": "No external account access until chosen.",
+              "security": "Minimizes standing credentials.",
+              "operator_effort": "Defers work and may interrupt the first connector task.",
+              "performance": "Core setup completes sooner."
+            },
+            "activates": {}
+          },
+          "configure_now": {
+            "label": "Configure selected connectors now",
+            "description": "Choose connectors in the next page and complete their account-specific flows during setup.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Longer initial setup and possible vendor costs.",
+              "privacy": "Selected accounts become accessible immediately.",
+              "security": "Credentials and RBAC must be reviewed now.",
+              "operator_effort": "More work now, less interruption later.",
+              "performance": "Selected connectors are ready at completion."
+            },
+            "activates": {},
+            "followup_decision_refs": [
+              "connectors_to_configure"
+            ]
+          }
+        }
+      },
+      "review_required": true
+    },
+    "connectors_to_configure": {
+      "title": "Connectors to configure",
+      "prompt": "Which external connectors should be authorized now?",
+      "description": "Every selection activates its own plugin-specific input, authentication, consent, RBAC, and live verification flow.",
+      "selection_mode": "multiple",
+      "required": false,
+      "resolution_stage_ref": "decision_review",
+      "required_when": {
+        "decision_ref": "connector_configuration_timing",
+        "operator": "equals",
+        "value": "configure_now"
+      },
+      "minimum_selections": 0,
+      "maximum_selections": 8,
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "google_workspace": {
+            "label": "Google Workspace",
+            "description": "OAuth access to Gmail, Drive, Docs, Sheets, and Slides.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Uses the selected Google account and project quotas.",
+              "privacy": "Broad workspace content may be read and modified within granted scopes.",
+              "security": "Five OAuth scopes and the redirect mode require explicit review.",
+              "operator_effort": "Create an OAuth app and complete browser authorization."
+            },
+            "activates": {
+              "plugin_refs": [
+                "g_suite_plugin"
+              ],
+              "auth_flow_refs": [
+                "google_workspace_oauth"
+              ],
+              "consent_refs": [
+                "google_workspace_account_consent"
+              ],
+              "operation_refs": [
+                "configure_google_workspace"
+              ]
+            },
+            "verification_probe_refs": [
+              "google_workspace_connection_valid"
+            ]
+          },
+          "jira": {
+            "label": "Jira",
+            "description": "API-token access to Jira with read, write, and permanent-delete capability.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Uses the selected Jira account and plan.",
+              "privacy": "Project, issue, and user data become readable.",
+              "security": "The token inherits the user's permissions and destructive delete exists.",
+              "operator_effort": "Create and rotate an API token."
+            },
+            "activates": {
+              "plugin_refs": [
+                "jira_plugin"
+              ],
+              "auth_flow_refs": [
+                "jira_api_token"
+              ],
+              "consent_refs": [
+                "jira_destructive_access_consent"
+              ]
+            },
+            "verification_probe_refs": [
+              "jira_connection_valid"
+            ]
+          },
+          "marketo": {
+            "label": "Marketo",
+            "description": "OAuth client-credentials access from a LaunchPoint service.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Uses Marketo API quota.",
+              "privacy": "Marketing assets and person data may be accessible.",
+              "security": "Delete and merge capabilities require a least-privilege API role.",
+              "operator_effort": "Create API Role, API User, and LaunchPoint service."
+            },
+            "activates": {
+              "plugin_refs": [
+                "marketo_plugin"
+              ],
+              "auth_flow_refs": [
+                "marketo_client_credentials"
+              ],
+              "consent_refs": [
+                "marketo_destructive_access_consent"
+              ],
+              "operation_refs": [
+                "configure_marketo"
+              ]
+            },
+            "verification_probe_refs": [
+              "marketo_connection_valid"
+            ]
+          },
+          "salesforce": {
+            "label": "Salesforce",
+            "description": "Browser login owned by the Salesforce CLI and macOS Keychain.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Uses Salesforce account and API limits.",
+              "privacy": "Org data within the authenticated user's permissions becomes available.",
+              "security": "The Salesforce CLI owns the credential; setup records only alias and instance host.",
+              "operator_effort": "Install the standalone sf CLI and complete browser login."
+            },
+            "activates": {
+              "plugin_refs": [
+                "salesforce_plugin"
+              ],
+              "dependency_refs": [
+                "salesforce_cli"
+              ],
+              "auth_flow_refs": [
+                "salesforce_cli_login"
+              ],
+              "operation_refs": [
+                "configure_salesforce"
+              ]
+            },
+            "verification_probe_refs": [
+              "salesforce_connection_valid"
+            ]
+          },
+          "schwab": {
+            "label": "Schwab market data",
+            "description": "Browser OAuth with a registered HTTPS callback replayed to a local listener.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Uses a Schwab developer application.",
+              "privacy": "Market-data account context participates in authorization.",
+              "security": "Callback handling and client-secret storage require special care.",
+              "operator_effort": "Create the app and reauthorize approximately weekly."
+            },
+            "activates": {
+              "plugin_refs": [
+                "schwab_market_data_plugin"
+              ],
+              "auth_flow_refs": [
+                "schwab_oauth"
+              ],
+              "operation_refs": [
+                "configure_schwab"
+              ]
+            },
+            "verification_probe_refs": [
+              "schwab_connection_valid"
+            ]
+          },
+          "snowflake": {
+            "label": "Snowflake",
+            "description": "RSA key-pair authentication with an operator-selected user and role.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Queries consume Snowflake credits.",
+              "privacy": "Data visible to the configured role becomes readable.",
+              "security": "The selected role is the write boundary; run_statement can mutate data.",
+              "operator_effort": "Generate and attach a 4096-bit RSA key and configure least privilege."
+            },
+            "activates": {
+              "plugin_refs": [
+                "snowflake_plugin"
+              ],
+              "auth_flow_refs": [
+                "snowflake_rsa"
+              ],
+              "consent_refs": [
+                "snowflake_write_access_consent"
+              ],
+              "operation_refs": [
+                "configure_snowflake"
+              ]
+            },
+            "verification_probe_refs": [
+              "snowflake_connection_valid"
+            ]
+          },
+          "zuora": {
+            "label": "Zuora",
+            "description": "OAuth client-credentials access to a selected environment.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Uses the selected Zuora tenant and API quota.",
+              "privacy": "Billing and subscription data become accessible.",
+              "security": "Client secret is vaulted; environment selection must be verified.",
+              "operator_effort": "Create an OAuth client and select the correct tenant."
+            },
+            "activates": {
+              "plugin_refs": [
+                "zuora_plugin"
+              ],
+              "auth_flow_refs": [
+                "zuora_client_credentials"
+              ],
+              "operation_refs": [
+                "configure_zuora"
+              ]
+            },
+            "verification_probe_refs": [
+              "zuora_connection_valid"
+            ]
+          },
+          "external_postgres": {
+            "label": "External PostgreSQL",
+            "description": "Add zero or more on-demand database connections with separate least-privilege credentials.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Uses the external database service.",
+              "privacy": "Rows visible to each configured database role become accessible.",
+              "security": "Each database role and grants are the write boundary.",
+              "operator_effort": "Prepare one credential set per connection."
+            },
+            "activates": {
+              "plugin_refs": [
+                "external_postgres_plugin"
+              ],
+              "auth_flow_refs": [
+                "external_postgres_credentials"
+              ],
+              "operation_refs": [
+                "configure_external_postgres"
+              ]
+            },
+            "verification_probe_refs": [
+              "external_postgres_connection_valid"
+            ]
+          }
+        }
+      },
+      "review_required": true
+    },
+    "session_sources": {
+      "title": "Session sources",
+      "prompt": "Which local coding-agent histories may this solet index?",
+      "description": "Each selected source asks separately for its exact roots and proves registration, backfill, and retrieval. Declining leaves local history untouched and unindexed.",
+      "selection_mode": "multiple",
+      "required": false,
+      "resolution_stage_ref": "decision_review",
+      "minimum_selections": 0,
+      "maximum_selections": 2,
+      "option_source": {
+        "mode": "static",
+        "options": {
+          "codex_local": {
+            "label": "Codex local sessions",
+            "description": "Index the approved Codex sessions and archived-sessions roots without moving or deleting them.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Embedding the initial backfill consumes local model time.",
+              "privacy": "Full local Codex session content becomes searchable inside the solet.",
+              "security": "Access is limited to user-approved roots and requires Files and Folders permission where macOS enforces it.",
+              "operator_effort": "Approve roots, restart once, backfill, and verify retrieval."
+            },
+            "activates": {
+              "plugin_refs": [
+                "codex_filesystem_session_source_plugin"
+              ],
+              "consent_refs": [
+                "codex_session_ingestion_consent"
+              ],
+              "permission_refs": [
+                "codex_session_files_permission"
+              ],
+              "operation_refs": [
+                "register_codex_session_source"
+              ]
+            },
+            "verification_probe_refs": [
+              "codex_session_retrieval_valid"
+            ]
+          },
+          "claude_local": {
+            "label": "Claude Code local sessions",
+            "description": "Index the approved Claude projects, history, and tasks roots without moving or deleting them.",
+            "availability": "supported",
+            "implications": {
+              "cost": "Embedding the initial backfill consumes local model time.",
+              "privacy": "Full local Claude session content becomes searchable inside the solet.",
+              "security": "Access is limited to user-approved roots and requires Files and Folders permission where macOS enforces it.",
+              "operator_effort": "Approve roots, restart once, backfill, and verify retrieval."
+            },
+            "activates": {
+              "plugin_refs": [
+                "claude_code_filesystem_session_source_plugin"
+              ],
+              "consent_refs": [
+                "claude_session_ingestion_consent"
+              ],
+              "permission_refs": [
+                "claude_session_files_permission"
+              ],
+              "operation_refs": [
+                "register_claude_session_source"
+              ]
+            },
+            "verification_probe_refs": [
+              "claude_session_retrieval_valid"
+            ]
+          }
+        }
+      },
+      "review_required": true
+    }
+  },
+  "components": {
+    "homebrew": {
+      "name": "Homebrew",
+      "kind": "package_manager",
+      "description": "Recommended macOS package manager for PostgreSQL, pgvector, tmux, and supporting tools.",
+      "source": "vendor_download",
+      "lifecycle": "verified_only",
+      "dependency_refs": [
+        "homebrew_command"
+      ],
+      "install_operation_refs": [
+        "request_homebrew_install"
+      ],
+      "probe_refs": [
+        "homebrew_available"
+      ]
+    },
+    "postgresql_17": {
+      "name": "PostgreSQL 17",
+      "kind": "database",
+      "description": "Local state store with per-solet role, database, schema, SCRAM policy, and pgvector.",
+      "source": "package_manager",
+      "lifecycle": "managed_by_setup",
+      "dependency_refs": [
+        "homebrew_command",
+        "postgresql_17_package",
+        "pgvector_package"
+      ],
+      "install_operation_refs": [
+        "install_postgresql",
+        "configure_postgresql"
+      ],
+      "probe_refs": [
+        "postgres_ready",
+        "postgres_role_policy_valid",
+        "pgvector_ready"
+      ]
+    },
+    "lm_studio": {
+      "name": "LM Studio",
+      "kind": "model_host",
+      "description": "Current recommended local host for OpenAI-compatible embeddings and platform inference. User-managed: the wizard discovers models already loaded in LM Studio and blocks if none are found — it does not download or load models. The model name in the profile config is the SERVE-TIME key, which LM Studio derives from the download source and which cannot be used to find it: fetch with `lms get \"https://huggingface.co/<owner>/<repo>\" --yes` (the bare owner/repo shorthand fails) and the config's key follows automatically. The per-model map is in profile_templates/lm_studio_models.yaml.",
+      "source": "vendor_download",
+      "lifecycle": "user_managed",
+      "input_refs": [
+        "lm_studio_base_url"
+      ],
+      "configure_operation_refs": [
+        "configure_lm_studio_embeddings",
+        "configure_lm_studio_inference"
+      ],
+      "probe_refs": [
+        "lm_studio_models_discoverable"
+      ]
+    },
+    "ollama": {
+      "name": "Ollama",
+      "kind": "model_host",
+      "description": "Example alternative model host. The flow may activate dedicated future plugins rather than assuming shared implementation.",
+      "source": "vendor_download",
+      "lifecycle": "user_managed",
+      "input_refs": [
+        "ollama_base_url"
+      ],
+      "probe_refs": [
+        "ollama_models_discoverable"
+      ]
+    },
+    "codex_cli": {
+      "name": "Codex CLI",
+      "kind": "coding_agent",
+      "description": "Operator-authenticated Codex client with repository plugin support.",
+      "source": "vendor_download",
+      "lifecycle": "user_managed",
+      "auth_flow_refs": [
+        "codex_cli_session"
+      ],
+      "probe_refs": [
+        "codex_cli_authenticated"
+      ]
+    },
+    "claude_cli": {
+      "name": "Claude Code CLI",
+      "kind": "coding_agent",
+      "description": "Operator-authenticated Claude Code client with repository marketplace plugin support.",
+      "source": "vendor_download",
+      "lifecycle": "user_managed",
+      "auth_flow_refs": [
+        "claude_cli_session"
+      ],
+      "probe_refs": [
+        "claude_cli_authenticated"
+      ]
+    },
+    "tmux": {
+      "name": "tmux",
+      "kind": "application",
+      "description": "Swap-durable host for managed fleet sessions.",
+      "source": "package_manager",
+      "lifecycle": "managed_by_setup",
+      "dependency_refs": [
+        "tmux_command"
+      ],
+      "probe_refs": [
+        "tmux_available"
+      ]
+    },
+    "macos_keychain": {
+      "name": "macOS Keychain",
+      "kind": "service",
+      "description": "Local credential store and auth-session owner for secrets that must remain outside the repository and journal.",
+      "source": "operating_system",
+      "lifecycle": "verified_only",
+      "probe_refs": [
+        "keychain_available"
+      ]
+    }
+  },
+  "dependencies": {
+    "git_checkout": {
+      "name": "Git checkout",
+      "kind": "filesystem",
+      "description": "A checkout containing the selected repository revision and its tracked setup artifacts.",
+      "necessity": "required",
+      "probe_refs": [
+        "git_checkout_valid"
+      ]
+    },
+    "python_313": {
+      "name": "Python 3.13 or newer",
+      "kind": "runtime",
+      "description": "Required by bootstrap, platform code, and generated hooks.",
+      "necessity": "required",
+      "version_constraint": ">=3.13,<3.14",
+      "probe_refs": [
+        "python_version_valid",
+        "fresh_shell_python_valid"
+      ],
+      "install_operation_refs": [
+        "install_python_runtime",
+        "build_instance_environment"
+      ]
+    },
+    "homebrew_command": {
+      "name": "Homebrew command",
+      "kind": "command",
+      "description": "Homebrew must exist before package-managed dependencies can be installed.",
+      "necessity": "recommended",
+      "probe_refs": [
+        "homebrew_available"
+      ],
+      "install_operation_refs": [
+        "request_homebrew_install"
+      ]
+    },
+    "postgresql_17_package": {
+      "name": "postgresql@17",
+      "kind": "package",
+      "description": "Supported local PostgreSQL major version.",
+      "necessity": "required",
+      "version_constraint": "17.x",
+      "probe_refs": [
+        "postgres_binary_version_valid"
+      ],
+      "install_operation_refs": [
+        "install_postgresql"
+      ]
+    },
+    "pgvector_package": {
+      "name": "pgvector",
+      "kind": "package",
+      "description": "Vector extension for the local PostgreSQL installation.",
+      "necessity": "required",
+      "probe_refs": [
+        "pgvector_ready"
+      ],
+      "install_operation_refs": [
+        "install_postgresql"
+      ]
+    },
+    "tmux_command": {
+      "name": "tmux",
+      "kind": "command",
+      "description": "Required only when the managed fleet topology is selected.",
+      "necessity": "optional",
+      "required_when": {
+        "decision_ref": "execution_topology",
+        "operator": "equals",
+        "value": "fleet"
+      },
+      "probe_refs": [
+        "tmux_available"
+      ],
+      "install_operation_refs": [
+        "install_tmux"
+      ]
+    },
+    "salesforce_cli": {
+      "name": "Salesforce sf CLI",
+      "kind": "command",
+      "description": "Standalone Salesforce CLI with its own Node runtime; the absolute executable path is recorded as non-secret configuration.",
+      "necessity": "optional",
+      "required_when": {
+        "decision_ref": "connectors_to_configure",
+        "operator": "contains",
+        "value": "salesforce"
+      },
+      "probe_refs": [
+        "salesforce_cli_available"
+      ]
+    }
+  },
+  "inputs": {
+    "repository_ref": {
+      "label": "Repository release",
+      "description": "Git tag, branch, or immutable revision selected for installation.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "initial_review",
+      "default": "latest-reviewed-release",
+      "storage": "answer_file"
+    },
+    "solet_name": {
+      "label": "Solet name",
+      "description": "Lowercase installation name used for profile, database, launcher, and runtime paths.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "initial_review",
+      "validation": {
+        "pattern": "^[a-z][a-z0-9_-]{1,31}$"
+      },
+      "storage": "answer_file"
+    },
+    "clone_directory": {
+      "label": "Checkout directory",
+      "description": "Absolute path to the repository checkout.",
+      "value_type": "path",
+      "sensitive": false,
+      "prompt_timing": "initial_review",
+      "storage": "answer_file"
+    },
+    "setup_journal_path": {
+      "label": "Setup journal path",
+      "description": "Per-installation durable progress record outside the repository and protected session-history paths.",
+      "value_type": "path",
+      "sensitive": false,
+      "prompt_timing": "initial_review",
+      "storage": "answer_file"
+    },
+    "git_controller_name": {
+      "label": "Git controller role name",
+      "description": "The one role allowed to mutate Git in this deployment when designated-controller mode is chosen.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "before_stage",
+      "default": "Git-Controller",
+      "storage": "answer_file"
+    },
+    "lm_studio_base_url": {
+      "label": "LM Studio base URL",
+      "description": "OpenAI-compatible local endpoint for the selected LM Studio services.",
+      "value_type": "url",
+      "sensitive": false,
+      "prompt_timing": "before_stage",
+      "default": "http://localhost:1234/v1",
+      "storage": "generated_config"
+    },
+    "ollama_base_url": {
+      "label": "Ollama base URL",
+      "description": "Endpoint used by the future Ollama plugin option.",
+      "value_type": "url",
+      "sensitive": false,
+      "prompt_timing": "before_stage",
+      "default": "http://localhost:11434/v1",
+      "storage": "generated_config"
+    },
+    "google_oauth_client_id": {
+      "label": "Google OAuth client ID",
+      "description": "Public client identifier for the selected Google OAuth application.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "google_oauth_client_secret": {
+      "label": "Google OAuth client secret",
+      "description": "Secret for the selected Google OAuth application.",
+      "value_type": "client_secret",
+      "sensitive": true,
+      "prompt_timing": "first_use",
+      "secret_handling": {
+        "capture_mode": "masked_local_ui",
+        "agent_visibility": "blind",
+        "transport": "out_of_band",
+        "store": "platform_vault",
+        "protections": [
+          "no_argv",
+          "no_logs",
+          "no_journal",
+          "redact_error_messages"
+        ]
+      }
+    },
+    "jira_base_url": {
+      "label": "Jira base URL",
+      "description": "Base URL of the Jira Cloud or Server instance.",
+      "value_type": "url",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "jira_email": {
+      "label": "Jira account email",
+      "description": "Account identity paired with the API token.",
+      "value_type": "email",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "jira_api_token": {
+      "label": "Jira API token",
+      "description": "Token inheriting the selected Jira user's permissions.",
+      "value_type": "api_token",
+      "sensitive": true,
+      "prompt_timing": "first_use",
+      "secret_handling": {
+        "capture_mode": "clipboard_ephemeral",
+        "agent_visibility": "blind",
+        "transport": "out_of_band",
+        "store": "platform_vault",
+        "protections": [
+          "no_argv",
+          "no_logs",
+          "no_journal",
+          "clear_clipboard",
+          "delete_temporary_file",
+          "redact_error_messages"
+        ]
+      }
+    },
+    "marketo_client_id": {
+      "label": "Marketo client ID",
+      "description": "LaunchPoint service client identifier.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "marketo_client_secret": {
+      "label": "Marketo client secret",
+      "description": "LaunchPoint service client secret.",
+      "value_type": "client_secret",
+      "sensitive": true,
+      "prompt_timing": "first_use",
+      "secret_handling": {
+        "capture_mode": "clipboard_ephemeral",
+        "agent_visibility": "blind",
+        "transport": "out_of_band",
+        "store": "platform_vault",
+        "protections": [
+          "no_argv",
+          "no_logs",
+          "no_journal",
+          "clear_clipboard",
+          "redact_error_messages"
+        ]
+      }
+    },
+    "salesforce_alias": {
+      "label": "Salesforce org alias",
+      "description": "Local alias owned by the Salesforce CLI.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "salesforce_instance_url": {
+      "label": "Salesforce instance URL",
+      "description": "Login or My Domain URL for the target org.",
+      "value_type": "url",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "schwab_client_id": {
+      "label": "Schwab client ID",
+      "description": "Developer application client identifier.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "schwab_client_secret": {
+      "label": "Schwab client secret",
+      "description": "Developer application secret.",
+      "value_type": "client_secret",
+      "sensitive": true,
+      "prompt_timing": "first_use",
+      "secret_handling": {
+        "capture_mode": "operator_terminal",
+        "agent_visibility": "blind",
+        "transport": "out_of_band",
+        "store": "platform_vault",
+        "protections": [
+          "no_argv",
+          "no_logs",
+          "no_journal",
+          "redact_error_messages"
+        ]
+      }
+    },
+    "schwab_callback_url": {
+      "label": "Schwab registered callback URL",
+      "description": "HTTPS callback registered with Schwab and replayed to the local listener by the auth flow.",
+      "value_type": "url",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "snowflake_account": {
+      "label": "Snowflake account",
+      "description": "Snowflake account identifier.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "snowflake_user": {
+      "label": "Snowflake user",
+      "description": "User to which the public key is attached.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "snowflake_role": {
+      "label": "Snowflake role",
+      "description": "Least-privilege role that defines the plugin's read/write boundary.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "snowflake_private_key": {
+      "label": "Snowflake RSA private key",
+      "description": "4096-bit private key whose public counterpart is attached to the Snowflake user.",
+      "value_type": "private_key",
+      "sensitive": true,
+      "prompt_timing": "first_use",
+      "secret_handling": {
+        "capture_mode": "operator_terminal",
+        "agent_visibility": "blind",
+        "transport": "out_of_band",
+        "store": "platform_vault",
+        "protections": [
+          "no_argv",
+          "no_logs",
+          "no_journal",
+          "restrict_file_mode",
+          "redact_error_messages"
+        ]
+      }
+    },
+    "zuora_base_url": {
+      "label": "Zuora environment URL",
+      "description": "Base URL that identifies the target tenant environment.",
+      "value_type": "url",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "zuora_client_id": {
+      "label": "Zuora client ID",
+      "description": "OAuth client identifier.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "first_use",
+      "storage": "generated_config"
+    },
+    "zuora_client_secret": {
+      "label": "Zuora client secret",
+      "description": "OAuth client secret.",
+      "value_type": "client_secret",
+      "sensitive": true,
+      "prompt_timing": "first_use",
+      "secret_handling": {
+        "capture_mode": "masked_local_ui",
+        "agent_visibility": "blind",
+        "transport": "out_of_band",
+        "store": "platform_vault",
+        "protections": [
+          "no_argv",
+          "no_logs",
+          "no_journal",
+          "redact_error_messages"
+        ]
+      }
+    },
+    "external_postgres_name": {
+      "label": "Connection name",
+      "description": "Unique local name for an external PostgreSQL connection.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "on_demand",
+      "storage": "generated_config"
+    },
+    "external_postgres_host": {
+      "label": "Database host",
+      "description": "External PostgreSQL host name.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "on_demand",
+      "storage": "generated_config"
+    },
+    "external_postgres_user": {
+      "label": "Database user",
+      "description": "Least-privilege external PostgreSQL role.",
+      "value_type": "string",
+      "sensitive": false,
+      "prompt_timing": "on_demand",
+      "storage": "generated_config"
+    },
+    "external_postgres_password": {
+      "label": "Database password",
+      "description": "Password for the least-privilege external PostgreSQL role.",
+      "value_type": "password",
+      "sensitive": true,
+      "prompt_timing": "on_demand",
+      "secret_handling": {
+        "capture_mode": "masked_local_ui",
+        "agent_visibility": "blind",
+        "transport": "out_of_band",
+        "store": "platform_vault",
+        "protections": [
+          "no_argv",
+          "no_logs",
+          "no_journal",
+          "redact_error_messages"
+        ]
+      }
+    }
+  },
+  "auth_flows": {
+    "codex_cli_session": {
+      "name": "Codex CLI session",
+      "description": "Existing Codex client authentication owned by the Codex CLI or its keychain-backed auth store.",
+      "mode": "existing_keychain_session",
+      "operator_presence": "required_once",
+      "credential_owner": "provider_cli",
+      "verification_probe_refs": [
+        "codex_cli_authenticated"
+      ],
+      "renewal": {
+        "mode": "provider_managed"
+      }
+    },
+    "claude_cli_session": {
+      "name": "Claude Code CLI session",
+      "description": "Existing Claude client authentication owned by the Claude CLI and macOS Keychain.",
+      "mode": "existing_keychain_session",
+      "operator_presence": "required_once",
+      "credential_owner": "provider_cli",
+      "verification_probe_refs": [
+        "claude_cli_authenticated"
+      ],
+      "renewal": {
+        "mode": "provider_managed"
+      }
+    },
+    "google_workspace_oauth": {
+      "name": "Google Workspace OAuth",
+      "description": "Browser OAuth for Gmail, Drive, Docs, Sheets, and Slides using a local loopback or web callback selected by deployment topology.",
+      "mode": "oauth_browser",
+      "operator_presence": "required_once",
+      "credential_owner": "platform_vault",
+      "public_input_refs": [
+        "google_oauth_client_id"
+      ],
+      "secret_input_refs": [
+        "google_oauth_client_secret"
+      ],
+      "external_prerequisites": [
+        "Google Cloud project",
+        "OAuth consent screen",
+        "Desktop or web OAuth client"
+      ],
+      "scopes": [
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/documents",
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/presentations"
+      ],
+      "callback": {
+        "mode": "loopback_http"
+      },
+      "start_operation_refs": [
+        "configure_google_workspace"
+      ],
+      "verification_probe_refs": [
+        "google_workspace_connection_valid"
+      ],
+      "renewal": {
+        "mode": "refresh_token"
+      }
+    },
+    "jira_api_token": {
+      "name": "Jira API token",
+      "description": "Jira account email plus API token; no OAuth callback.",
+      "mode": "api_token",
+      "operator_presence": "required_once",
+      "credential_owner": "platform_vault",
+      "public_input_refs": [
+        "jira_base_url",
+        "jira_email"
+      ],
+      "secret_input_refs": [
+        "jira_api_token"
+      ],
+      "verification_probe_refs": [
+        "jira_connection_valid"
+      ],
+      "renewal": {
+        "mode": "manual_rotation",
+        "interval_days": 365
+      },
+      "security_notes": [
+        "The token inherits the user's Jira permissions.",
+        "Permanent issue deletion is available and requires separate destructive-action consent."
+      ]
+    },
+    "marketo_client_credentials": {
+      "name": "Marketo LaunchPoint credentials",
+      "description": "OAuth client-credentials flow backed by a Marketo API Role, API User, and LaunchPoint service.",
+      "mode": "oauth_client_credentials",
+      "operator_presence": "required_once",
+      "credential_owner": "platform_vault",
+      "public_input_refs": [
+        "marketo_client_id"
+      ],
+      "secret_input_refs": [
+        "marketo_client_secret"
+      ],
+      "external_prerequisites": [
+        "Least-privilege API Role",
+        "API-only User",
+        "LaunchPoint custom service"
+      ],
+      "start_operation_refs": [
+        "configure_marketo"
+      ],
+      "verification_probe_refs": [
+        "marketo_connection_valid"
+      ],
+      "renewal": {
+        "mode": "manual_rotation"
+      }
+    },
+    "salesforce_cli_login": {
+      "name": "Salesforce CLI browser login",
+      "description": "The standalone sf CLI performs browser login and owns the resulting credential in its auth store or macOS Keychain.",
+      "mode": "cli_session",
+      "operator_presence": "required_once",
+      "credential_owner": "provider_cli",
+      "public_input_refs": [
+        "salesforce_alias",
+        "salesforce_instance_url"
+      ],
+      "external_prerequisites": [
+        "Standalone sf CLI"
+      ],
+      "callback": {
+        "mode": "loopback_http"
+      },
+      "start_operation_refs": [
+        "configure_salesforce"
+      ],
+      "verification_probe_refs": [
+        "salesforce_connection_valid"
+      ],
+      "renewal": {
+        "mode": "provider_managed"
+      }
+    },
+    "schwab_oauth": {
+      "name": "Schwab browser OAuth",
+      "description": "Browser OAuth using a registered HTTPS callback whose final redirect is replayed to the local HTTP listener.",
+      "mode": "oauth_browser",
+      "operator_presence": "required_each_renewal",
+      "credential_owner": "platform_vault",
+      "public_input_refs": [
+        "schwab_client_id",
+        "schwab_callback_url"
+      ],
+      "secret_input_refs": [
+        "schwab_client_secret"
+      ],
+      "external_prerequisites": [
+        "Approved Schwab developer application"
+      ],
+      "callback": {
+        "mode": "registered_https_replay",
+        "input_ref": "schwab_callback_url"
+      },
+      "start_operation_refs": [
+        "configure_schwab"
+      ],
+      "verification_probe_refs": [
+        "schwab_connection_valid"
+      ],
+      "renewal": {
+        "mode": "scheduled_reauth",
+        "interval_days": 7
+      }
+    },
+    "snowflake_rsa": {
+      "name": "Snowflake RSA key pair",
+      "description": "4096-bit RSA key-pair authentication; the selected user and role define the effective authorization boundary.",
+      "mode": "rsa_key_pair",
+      "operator_presence": "required_once",
+      "credential_owner": "platform_vault",
+      "public_input_refs": [
+        "snowflake_account",
+        "snowflake_user",
+        "snowflake_role"
+      ],
+      "secret_input_refs": [
+        "snowflake_private_key"
+      ],
+      "external_prerequisites": [
+        "Snowflake user with RSA public key",
+        "Least-privilege Snowflake role"
+      ],
+      "start_operation_refs": [
+        "configure_snowflake"
+      ],
+      "verification_probe_refs": [
+        "snowflake_connection_valid"
+      ],
+      "renewal": {
+        "mode": "manual_rotation"
+      }
+    },
+    "zuora_client_credentials": {
+      "name": "Zuora OAuth client credentials",
+      "description": "OAuth client-credentials flow scoped to the tenant selected by base URL.",
+      "mode": "oauth_client_credentials",
+      "operator_presence": "required_once",
+      "credential_owner": "platform_vault",
+      "public_input_refs": [
+        "zuora_base_url",
+        "zuora_client_id"
+      ],
+      "secret_input_refs": [
+        "zuora_client_secret"
+      ],
+      "start_operation_refs": [
+        "configure_zuora"
+      ],
+      "verification_probe_refs": [
+        "zuora_connection_valid"
+      ],
+      "renewal": {
+        "mode": "before_expiry"
+      }
+    },
+    "external_postgres_credentials": {
+      "name": "External PostgreSQL credentials",
+      "description": "Repeatable on-demand connection credentials; zero configured connections is a normal steady state.",
+      "mode": "database_credentials",
+      "operator_presence": "required_once",
+      "credential_owner": "platform_vault",
+      "public_input_refs": [
+        "external_postgres_name",
+        "external_postgres_host",
+        "external_postgres_user"
+      ],
+      "secret_input_refs": [
+        "external_postgres_password"
+      ],
+      "start_operation_refs": [
+        "configure_external_postgres"
+      ],
+      "verification_probe_refs": [
+        "external_postgres_connection_valid"
+      ],
+      "renewal": {
+        "mode": "manual_rotation"
+      }
+    }
+  },
+  "consents": {
+    "system_change_consent": {
+      "title": "Install system dependencies",
+      "prompt": "Review and authorize the exact package, service, database-role, and filesystem changes in the generated plan.",
+      "category": "system_change",
+      "scope": [
+        "Homebrew packages selected by the plan",
+        "PostgreSQL service",
+        "Per-solet database, role, schema, and SCRAM policy",
+        "Project virtual environment"
+      ],
+      "required": true,
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "blocked",
+        "consequence": "Setup remains at the reviewed-plan checkpoint and performs no system mutation.",
+        "reoffer": "settings_only"
+      }
+    },
+    "shell_modification_consent": {
+      "title": "Install shell integration",
+      "prompt": "Authorize the reviewed PATH and launcher block in the selected shell startup file.",
+      "category": "shell_modification",
+      "scope": [
+        "Managed marker block in .zshrc",
+        "Per-solet launcher directory"
+      ],
+      "required": true,
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "blocked",
+        "consequence": "The installation cannot claim fresh-shell command or hook readiness.",
+        "reoffer": "settings_only"
+      }
+    },
+    "background_service_consent": {
+      "title": "Run after login",
+      "prompt": "Authorize the reviewed per-user LaunchAgent and background item.",
+      "category": "background_service",
+      "scope": [
+        "Per-user LaunchAgent",
+        "Generated service PATH and executable"
+      ],
+      "required": false,
+      "required_when": {
+        "decision_ref": "autostart",
+        "operator": "equals",
+        "value": "enabled"
+      },
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "declined",
+        "consequence": "The solet remains manual-start only.",
+        "reoffer": "settings_only"
+      }
+    },
+    "codex_session_ingestion_consent": {
+      "title": "Index Codex session history",
+      "prompt": "Authorize read-only ingestion of the displayed Codex session and archived-session roots. No source files will be moved, deleted, or modified.",
+      "category": "session_history_ingestion",
+      "scope": [
+        "Approved Codex sessions root",
+        "Approved Codex archived_sessions root"
+      ],
+      "required": false,
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Codex history remains local and unindexed.",
+        "reoffer": "settings_only"
+      }
+    },
+    "claude_session_ingestion_consent": {
+      "title": "Index Claude Code session history",
+      "prompt": "Authorize read-only ingestion of the displayed Claude projects, history, and tasks roots. No source files will be moved, deleted, or modified.",
+      "category": "session_history_ingestion",
+      "scope": [
+        "Approved Claude projects root",
+        "Approved Claude history root",
+        "Approved Claude tasks root"
+      ],
+      "required": false,
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Claude history remains local and unindexed.",
+        "reoffer": "settings_only"
+      }
+    },
+    "google_workspace_account_consent": {
+      "title": "Authorize Google Workspace account",
+      "prompt": "Review the five requested Google scopes and authorize the selected account.",
+      "category": "account_access",
+      "scope": [
+        "Gmail modify",
+        "Drive",
+        "Docs",
+        "Sheets",
+        "Slides"
+      ],
+      "required": false,
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Google Workspace remains not connected.",
+        "reoffer": "first_use"
+      }
+    },
+    "jira_destructive_access_consent": {
+      "title": "Authorize Jira write and delete capability",
+      "prompt": "Acknowledge that the Jira token inherits user permissions and the plugin includes permanent deletion.",
+      "category": "destructive_write",
+      "scope": [
+        "Create and update Jira content",
+        "Permanent issue deletion"
+      ],
+      "required": false,
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Jira remains not connected.",
+        "reoffer": "first_use"
+      }
+    },
+    "marketo_destructive_access_consent": {
+      "title": "Authorize Marketo write, delete, and merge capability",
+      "prompt": "Review the selected Marketo API Role and acknowledge delete and merge capabilities.",
+      "category": "destructive_write",
+      "scope": [
+        "Marketing asset changes",
+        "Delete operations",
+        "Person merge"
+      ],
+      "required": false,
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Marketo remains not connected.",
+        "reoffer": "first_use"
+      }
+    },
+    "snowflake_write_access_consent": {
+      "title": "Authorize Snowflake role",
+      "prompt": "Review the selected Snowflake role and acknowledge that run_statement can write wherever that role permits.",
+      "category": "destructive_write",
+      "scope": [
+        "All objects visible to the configured role",
+        "Statement execution permitted by the role"
+      ],
+      "required": false,
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Snowflake remains not connected.",
+        "reoffer": "first_use"
+      }
+    }
+  },
+  "permissions": {
+    "background_items_permission": {
+      "name": "Background items",
+      "platform": "macos",
+      "kind": "background_items",
+      "purpose": "Allow the reviewed per-user LaunchAgent to run after login.",
+      "grant_actor": "user",
+      "system_settings_path": "General > Login Items & Extensions",
+      "grant_operation_ref": "open_background_items_settings",
+      "probe_ref": "launchagent_running",
+      "denial_behavior": "disable_capability"
+    },
+    "codex_session_files_permission": {
+      "name": "Codex session files",
+      "platform": "macos",
+      "kind": "files_and_folders",
+      "purpose": "Read only the user-approved Codex session roots for ingestion.",
+      "required_when": {
+        "decision_ref": "session_sources",
+        "operator": "contains",
+        "value": "codex_local"
+      },
+      "grant_actor": "user",
+      "system_settings_path": "Privacy & Security > Files and Folders",
+      "grant_operation_ref": "open_files_permissions_settings",
+      "probe_ref": "codex_session_roots_readable",
+      "denial_behavior": "disable_capability"
+    },
+    "claude_session_files_permission": {
+      "name": "Claude Code session files",
+      "platform": "macos",
+      "kind": "files_and_folders",
+      "purpose": "Read only the user-approved Claude projects, history, and tasks roots for ingestion.",
+      "required_when": {
+        "decision_ref": "session_sources",
+        "operator": "contains",
+        "value": "claude_local"
+      },
+      "grant_actor": "user",
+      "system_settings_path": "Privacy & Security > Files and Folders",
+      "grant_operation_ref": "open_files_permissions_settings",
+      "probe_ref": "claude_session_roots_readable",
+      "denial_behavior": "disable_capability"
+    },
+    "keychain_permission": {
+      "name": "macOS Keychain",
+      "platform": "macos",
+      "kind": "keychain",
+      "purpose": "Store the platform vault passphrase and provider-owned client sessions without placing secrets in the repository.",
+      "grant_actor": "user",
+      "probe_ref": "keychain_available",
+      "denial_behavior": "block"
+    }
+  },
+  "plugins": {
+    "github_midwife_plugin": {
+      "name": "GitHub midwife",
+      "description": "Birth-spine owner of bootstrap handoff, genesis, profile materialization, launchers, and hydration guidance.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "initial_setup",
+      "documentation_status": "complete",
+      "cardinality": "exactly_one",
+      "setup_operation_refs": [
+        "run_genesis",
+        "install_shell_integration"
+      ],
+      "verification_probe_refs": [
+        "genesis_artifacts_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Local user account and explicit setup consents."
+      },
+      "decline": {
+        "allowed": false,
+        "state": "blocked",
+        "consequence": "The repository cannot complete genesis without its birth spine."
+      }
+    },
+    "macos_vault_plugin": {
+      "name": "macOS vault",
+      "description": "Agent-blind credential broker backed by macOS Keychain.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "initial_setup",
+      "documentation_status": "partial",
+      "cardinality": "exactly_one",
+      "component_refs": [
+        "macos_keychain"
+      ],
+      "permission_refs": [
+        "keychain_permission"
+      ],
+      "verification_probe_refs": [
+        "vault_round_trip_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "The logged-in user's Keychain access controls."
+      },
+      "decline": {
+        "allowed": false,
+        "state": "blocked",
+        "consequence": "Secret-bearing plugins cannot be configured safely."
+      }
+    },
+    "postgres_state_management_plugin": {
+      "name": "PostgreSQL state management",
+      "description": "Durable platform state through the StateManagementInterface.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "initial_setup",
+      "documentation_status": "complete",
+      "cardinality": "exactly_one",
+      "component_refs": [
+        "postgresql_17"
+      ],
+      "verification_probe_refs": [
+        "postgres_ready",
+        "postgres_role_policy_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Per-solet non-superuser PostgreSQL role and schema."
+      },
+      "decline": {
+        "allowed": false,
+        "state": "blocked",
+        "consequence": "Core platform state is unavailable."
+      }
+    },
+    "pgvector_service_plugin": {
+      "name": "pgvector service",
+      "description": "Vector indexing and search over the local PostgreSQL database.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "initial_setup",
+      "documentation_status": "complete",
+      "cardinality": "exactly_one",
+      "component_refs": [
+        "postgresql_17"
+      ],
+      "verification_probe_refs": [
+        "pgvector_ready"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Per-solet PostgreSQL schema."
+      },
+      "decline": {
+        "allowed": false,
+        "state": "blocked",
+        "consequence": "Knowledge retrieval cannot meet the current profile contract."
+      }
+    },
+    "openai_embeddings_plugin": {
+      "name": "OpenAI-compatible embeddings",
+      "description": "Current embeddings plugin used by the shipped profiles.",
+      "installation_policy": "install_when_selected",
+      "configuration_timing": "user_choice",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "enabled_when": {
+        "decision_ref": "embeddings_implementation",
+        "operator": "equals",
+        "value": "lm_studio"
+      },
+      "input_refs": [
+        "lm_studio_base_url"
+      ],
+      "verification_probe_refs": [
+        "embedding_request_succeeds"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Configured embedding endpoint."
+      },
+      "decline": {
+        "allowed": false,
+        "state": "blocked",
+        "consequence": "A different embeddings implementation must be selected."
+      }
+    },
+    "ollama_embeddings_plugin": {
+      "name": "Ollama embeddings",
+      "description": "Planned example of an alternative embeddings implementation with its own plugin contract.",
+      "installation_policy": "not_shipped",
+      "configuration_timing": "user_choice",
+      "documentation_status": "missing",
+      "cardinality": "zero_or_one",
+      "enabled_when": {
+        "decision_ref": "embeddings_implementation",
+        "operator": "equals",
+        "value": "ollama_plugin"
+      },
+      "input_refs": [
+        "ollama_base_url"
+      ],
+      "verification_probe_refs": [
+        "embedding_request_succeeds"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Future plugin contract."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "not_applicable",
+        "consequence": "Choose a supported implementation."
+      }
+    },
+    "default_inference_plugin": {
+      "name": "Default local inference",
+      "description": "Current LM Studio-oriented inference implementation.",
+      "installation_policy": "install_when_selected",
+      "configuration_timing": "user_choice",
+      "documentation_status": "partial",
+      "cardinality": "zero_or_one",
+      "enabled_when": {
+        "decision_ref": "inference_implementation",
+        "operator": "equals",
+        "value": "lm_studio"
+      },
+      "input_refs": [
+        "lm_studio_base_url"
+      ],
+      "verification_probe_refs": [
+        "structured_action_qualification",
+        "representative_inference_probe"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Configured local inference endpoint."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "not_applicable",
+        "consequence": "inference_service remains declared vacant."
+      }
+    },
+    "alternative_inference_plugin": {
+      "name": "Alternative inference",
+      "description": "Planned extension point for another inference implementation.",
+      "installation_policy": "not_shipped",
+      "configuration_timing": "user_choice",
+      "documentation_status": "missing",
+      "cardinality": "zero_or_one",
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Future plugin contract."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "not_applicable",
+        "consequence": "Choose a supported implementation or leave inference vacant."
+      }
+    },
+    "agent_messaging_plugin": {
+      "name": "Agent messaging",
+      "description": "Identity, peer delivery, durable roles, managed fleet lifecycle, and session telemetry.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "initial_setup",
+      "documentation_status": "complete",
+      "cardinality": "exactly_one",
+      "verification_probe_refs": [
+        "peer_identity_valid",
+        "fresh_session_hooks_active"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Durable role bindings and explicit fleet dispatch."
+      },
+      "decline": {
+        "allowed": false,
+        "state": "blocked",
+        "consequence": "The selected coding-agent integration cannot meet the coordination contract."
+      }
+    },
+    "macos_self_deployment_plugin": {
+      "name": "macOS self deployment",
+      "description": "Router-mediated blue-green release management for selected profiles.",
+      "installation_policy": "install_when_selected",
+      "configuration_timing": "initial_setup",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "verification_probe_refs": [
+        "router_ready"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Local release directories and router socket."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "not_applicable",
+        "consequence": "Updates require a non-blue-green operating procedure."
+      }
+    },
+    "platform_dev_surface_plugin": {
+      "name": "Platform development surface",
+      "description": "Read-only repository and quality-gate operations for selected development profiles.",
+      "installation_policy": "install_when_selected",
+      "configuration_timing": "none",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Confined read-only repository root."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "not_applicable",
+        "consequence": "Live repository and gate verbs are unavailable."
+      }
+    },
+    "codex_filesystem_session_source_plugin": {
+      "name": "Codex filesystem session source",
+      "description": "Read-only ingestion from user-approved local Codex session roots.",
+      "installation_policy": "install_when_selected",
+      "configuration_timing": "user_choice",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "consent_refs": [
+        "codex_session_ingestion_consent"
+      ],
+      "permission_refs": [
+        "codex_session_files_permission"
+      ],
+      "setup_operation_refs": [
+        "register_codex_session_source"
+      ],
+      "verification_probe_refs": [
+        "codex_session_retrieval_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Exact user-approved local roots."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Local Codex history remains untouched and unindexed."
+      }
+    },
+    "claude_code_filesystem_session_source_plugin": {
+      "name": "Claude Code filesystem session source",
+      "description": "Read-only ingestion from user-approved local Claude projects, history, and tasks roots.",
+      "installation_policy": "install_when_selected",
+      "configuration_timing": "user_choice",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "consent_refs": [
+        "claude_session_ingestion_consent"
+      ],
+      "permission_refs": [
+        "claude_session_files_permission"
+      ],
+      "setup_operation_refs": [
+        "register_claude_session_source"
+      ],
+      "verification_probe_refs": [
+        "claude_session_retrieval_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Exact user-approved local roots."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Local Claude history remains untouched and unindexed."
+      }
+    },
+    "g_suite_plugin": {
+      "name": "Google Workspace",
+      "description": "Gmail, Drive, Docs, Sheets, and Slides connector.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "first_use",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "auth_flow_refs": [
+        "google_workspace_oauth"
+      ],
+      "consent_refs": [
+        "google_workspace_account_consent"
+      ],
+      "verification_probe_refs": [
+        "google_workspace_connection_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": true,
+        "writes_external_data": true,
+        "destructive_actions": false,
+        "rbac_boundary": "Selected Google account and five OAuth scopes."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "gsuite.not_connected until first use or Settings configuration."
+      }
+    },
+    "jira_plugin": {
+      "name": "Jira",
+      "description": "Jira read/write connector with permanent-delete capability.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "first_use",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "auth_flow_refs": [
+        "jira_api_token"
+      ],
+      "consent_refs": [
+        "jira_destructive_access_consent"
+      ],
+      "verification_probe_refs": [
+        "jira_connection_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": true,
+        "writes_external_data": true,
+        "destructive_actions": true,
+        "rbac_boundary": "The Jira user's permissions inherited by the API token."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Jira remains not connected."
+      },
+      "recurring_maintenance": [
+        {
+          "event": "Annual token rotation or earlier revocation",
+          "action": "Replace the vaulted API token and re-run the connection probe.",
+          "operator_required": true
+        }
+      ]
+    },
+    "marketo_plugin": {
+      "name": "Marketo",
+      "description": "Marketo connector using LaunchPoint OAuth client credentials.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "first_use",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "auth_flow_refs": [
+        "marketo_client_credentials"
+      ],
+      "consent_refs": [
+        "marketo_destructive_access_consent"
+      ],
+      "verification_probe_refs": [
+        "marketo_connection_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": true,
+        "writes_external_data": true,
+        "destructive_actions": true,
+        "rbac_boundary": "The LaunchPoint API Role and asset entitlements."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Marketo remains not connected."
+      }
+    },
+    "salesforce_plugin": {
+      "name": "Salesforce",
+      "description": "Salesforce connector whose browser session is owned by the sf CLI.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "first_use",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "dependency_refs": [
+        "salesforce_cli"
+      ],
+      "auth_flow_refs": [
+        "salesforce_cli_login"
+      ],
+      "verification_probe_refs": [
+        "salesforce_connection_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": true,
+        "writes_external_data": true,
+        "destructive_actions": false,
+        "rbac_boundary": "Authenticated Salesforce user and org permissions."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Salesforce remains not connected."
+      }
+    },
+    "schwab_market_data_plugin": {
+      "name": "Schwab market data",
+      "description": "Schwab market-data connector with browser OAuth and short reauthorization cadence.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "first_use",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "auth_flow_refs": [
+        "schwab_oauth"
+      ],
+      "verification_probe_refs": [
+        "schwab_connection_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": true,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Approved Schwab developer application and account authorization."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Schwab market data remains not connected."
+      },
+      "recurring_maintenance": [
+        {
+          "event": "Approximately weekly refresh expiry",
+          "action": "Repeat the operator-present browser OAuth flow.",
+          "operator_required": true,
+          "operation_ref": "configure_schwab"
+        }
+      ]
+    },
+    "snowflake_plugin": {
+      "name": "Snowflake",
+      "description": "Snowflake connector using RSA key-pair authentication.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "first_use",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "auth_flow_refs": [
+        "snowflake_rsa"
+      ],
+      "consent_refs": [
+        "snowflake_write_access_consent"
+      ],
+      "verification_probe_refs": [
+        "snowflake_connection_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": true,
+        "writes_external_data": true,
+        "destructive_actions": false,
+        "rbac_boundary": "Configured Snowflake role; run_statement can perform any mutation allowed by that role."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Snowflake remains not connected."
+      }
+    },
+    "zuora_plugin": {
+      "name": "Zuora",
+      "description": "Zuora connector using OAuth client credentials and explicit environment selection.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "first_use",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_one",
+      "auth_flow_refs": [
+        "zuora_client_credentials"
+      ],
+      "verification_probe_refs": [
+        "zuora_connection_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": true,
+        "writes_external_data": true,
+        "destructive_actions": false,
+        "rbac_boundary": "Configured Zuora OAuth client and tenant."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "dormant",
+        "consequence": "Zuora remains not connected."
+      }
+    },
+    "external_postgres_plugin": {
+      "name": "External PostgreSQL",
+      "description": "Repeatable on-demand external database connections; an empty registry is normal.",
+      "installation_policy": "bundled_install_now",
+      "configuration_timing": "on_demand",
+      "documentation_status": "complete",
+      "cardinality": "zero_or_more",
+      "auth_flow_refs": [
+        "external_postgres_credentials"
+      ],
+      "verification_probe_refs": [
+        "external_postgres_connection_valid"
+      ],
+      "access_posture": {
+        "reads_external_data": true,
+        "writes_external_data": true,
+        "destructive_actions": false,
+        "rbac_boundary": "Each configured PostgreSQL role and its vendor-managed grants."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "not_applicable",
+        "consequence": "Zero external connections is a normal ready state."
+      }
+    }
+  },
+  "operations": {
+    "request_homebrew_install": {
+      "name": "Request Homebrew installation",
+      "description": "Stop and present the official operator action when Homebrew is absent; do not execute a fetched shell installer automatically.",
+      "operation_ref": "setup::homebrew.request_install",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "idempotency": {
+        "mode": "manual_confirm",
+        "precondition_probe_refs": [
+          "homebrew_available"
+        ],
+        "postcondition_probe_refs": [
+          "homebrew_available"
+        ]
+      }
+    },
+    "install_python_runtime": {
+      "name": "Install Python runtime",
+      "description": "Select an eligible existing Python 3.13 outside the manager formula keg, or install Homebrew's python@3.13 with the reviewed fixed command and bind generated hook paths to the selected runtime.",
+      "operation_ref": "setup::python.install_313",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "system_change_consent"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "python_version_valid"
+        ],
+        "postcondition_probe_refs": [
+          "python_version_valid",
+          "fresh_shell_python_valid"
+        ]
+      }
+    },
+    "build_instance_environment": {
+      "name": "Build the instance dependency closure",
+      "description": "Create or repair the instance-private virtual environment, install the locked seed package metadata and build backend, and expose its private solet bridge under Python 3.13.",
+      "operation_ref": "bootstrap::environment.ensure_dependency_closure",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "system_change_consent"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "instance_environment_dependency_closure_valid"
+        ],
+        "postcondition_probe_refs": [
+          "instance_environment_dependency_closure_valid"
+        ]
+      }
+    },
+    "install_postgresql": {
+      "name": "Install PostgreSQL and pgvector",
+      "description": "Install the supported PostgreSQL major and vector extension through the selected package manager.",
+      "operation_ref": "bootstrap::postgres.install",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "system_change_consent"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "postgres_binary_version_valid",
+          "pgvector_ready"
+        ],
+        "postcondition_probe_refs": [
+          "postgres_binary_version_valid",
+          "pgvector_ready"
+        ]
+      }
+    },
+    "configure_postgresql": {
+      "name": "Configure per-solet PostgreSQL state",
+      "description": "Start the service and upsert the non-superuser role, database, schema, vector extension, SCRAM policy, and public-connect revocation.",
+      "operation_ref": "bootstrap::postgres.configure_solet",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "risk": "high",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "system_change_consent"
+      ],
+      "input_refs": [
+        "solet_name"
+      ],
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": [
+          "postgres_role_policy_valid"
+        ],
+        "postcondition_probe_refs": [
+          "postgres_ready",
+          "postgres_role_policy_valid",
+          "pgvector_ready"
+        ]
+      }
+    },
+    "install_tmux": {
+      "name": "Install tmux",
+      "description": "Install the managed fleet host when fleet topology is selected.",
+      "operation_ref": "setup::tmux.install",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "system_change_consent"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "tmux_available"
+        ],
+        "postcondition_probe_refs": [
+          "tmux_available"
+        ]
+      }
+    },
+    "run_genesis": {
+      "name": "Run genesis",
+      "description": "Install allowlisted plugins, materialize configuration and vault entries, create launchers, initialize the Git repository if required, and install the selected service topology.",
+      "operation_ref": "genesis::solet.run",
+      "runner": "genesis",
+      "implementation_status": "implemented",
+      "risk": "high",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "system_change_consent"
+      ],
+      "input_refs": [
+        "solet_name",
+        "clone_directory"
+      ],
+      "parameters": {
+        "setup_profile": {
+          "decision_ref": "setup_profile"
+        },
+        "autostart": {
+          "decision_ref": "autostart"
+        }
+      },
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "genesis_artifacts_valid"
+        ],
+        "postcondition_probe_refs": [
+          "genesis_artifacts_valid"
+        ]
+      }
+    },
+    "install_shell_integration": {
+      "name": "Install shell integration",
+      "description": "Write the managed shell block and per-solet launchers, preserving operator-owned content outside the markers.",
+      "operation_ref": "hydration::shell.install",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "shell_modification_consent"
+      ],
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": [
+          "fresh_shell_path_valid"
+        ],
+        "postcondition_probe_refs": [
+          "fresh_shell_path_valid",
+          "fresh_shell_python_valid"
+        ]
+      }
+    },
+    "install_launchagent": {
+      "name": "Install per-user LaunchAgent",
+      "description": "Render, install, and load the reviewed background-service definition.",
+      "operation_ref": "genesis::autostart.install",
+      "runner": "genesis",
+      "implementation_status": "implemented",
+      "risk": "high",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "background_service_consent"
+      ],
+      "permission_refs": [
+        "background_items_permission"
+      ],
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": [
+          "launchagent_running"
+        ],
+        "postcondition_probe_refs": [
+          "launchagent_running"
+        ]
+      }
+    },
+    "open_background_items_settings": {
+      "name": "Open Background Items settings",
+      "description": "Navigate the user to the relevant macOS System Settings page; the wizard cannot grant the permission.",
+      "operation_ref": "macos::settings.background_items",
+      "runner": "system_settings",
+      "implementation_status": "adapter_required",
+      "risk": "none",
+      "requires_confirmation": false,
+      "idempotency": {
+        "mode": "manual_confirm",
+        "precondition_probe_refs": [],
+        "postcondition_probe_refs": [
+          "launchagent_running"
+        ]
+      }
+    },
+    "open_files_permissions_settings": {
+      "name": "Open Files and Folders settings",
+      "description": "Navigate the user to the relevant macOS privacy settings page; the wizard cannot grant the permission.",
+      "operation_ref": "macos::settings.files_and_folders",
+      "runner": "system_settings",
+      "implementation_status": "adapter_required",
+      "risk": "none",
+      "requires_confirmation": false,
+      "idempotency": {
+        "mode": "manual_confirm",
+        "precondition_probe_refs": [],
+        "postcondition_probe_refs": []
+      }
+    },
+    "configure_lm_studio_embeddings": {
+      "name": "Configure LM Studio embeddings",
+      "description": "Write the selected base URL and qualified embedding model into the active profile.",
+      "operation_ref": "setup::models.configure_lm_studio_embeddings",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "low",
+      "requires_confirmation": false,
+      "input_refs": [
+        "lm_studio_base_url"
+      ],
+      "parameters": {
+        "model": {
+          "decision_ref": "embedding_model"
+        }
+      },
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": [],
+        "postcondition_probe_refs": [
+          "embedding_request_succeeds"
+        ]
+      }
+    },
+    "configure_lm_studio_inference": {
+      "name": "Configure LM Studio inference",
+      "description": "Write the selected base URL and qualified inference model into the active profile.",
+      "operation_ref": "setup::models.configure_lm_studio_inference",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "low",
+      "requires_confirmation": false,
+      "input_refs": [
+        "lm_studio_base_url"
+      ],
+      "parameters": {
+        "model": {
+          "decision_ref": "inference_model"
+        }
+      },
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": [],
+        "postcondition_probe_refs": [
+          "structured_action_qualification"
+        ]
+      }
+    },
+    "install_codex_plugin": {
+      "name": "Install Codex repository plugin",
+      "description": "Add the repository marketplace and install the generated plugin for the selected solet.",
+      "operation_ref": "hydration::codex.install_plugin",
+      "runner": "external_cli",
+      "implementation_status": "adapter_required",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "input_refs": [
+        "solet_name",
+        "clone_directory"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "codex_plugin_visible"
+        ],
+        "postcondition_probe_refs": [
+          "codex_plugin_visible",
+          "codex_fresh_session_hook_active"
+        ]
+      }
+    },
+    "install_claude_plugin": {
+      "name": "Install Claude repository plugin",
+      "description": "Add the repository marketplace and install the generated plugin for the selected solet.",
+      "operation_ref": "hydration::claude.install_plugin",
+      "runner": "external_cli",
+      "implementation_status": "adapter_required",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "input_refs": [
+        "solet_name",
+        "clone_directory"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "claude_plugin_visible"
+        ],
+        "postcondition_probe_refs": [
+          "claude_plugin_visible",
+          "claude_fresh_session_hook_active"
+        ]
+      }
+    },
+    "register_codex_session_source": {
+      "name": "Register Codex session source",
+      "description": "Write approved ledger roots, restart the solet, register sources idempotently, backfill, and verify retrieval.",
+      "operation_ref": "hydration::sessions.register_codex_filesystem",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "high",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "codex_session_ingestion_consent"
+      ],
+      "permission_refs": [
+        "codex_session_files_permission"
+      ],
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": [
+          "codex_session_retrieval_valid"
+        ],
+        "postcondition_probe_refs": [
+          "codex_session_retrieval_valid"
+        ]
+      }
+    },
+    "register_claude_session_source": {
+      "name": "Register Claude session source",
+      "description": "Write approved ledger roots, restart the solet, register sources idempotently, backfill, and verify retrieval.",
+      "operation_ref": "hydration::sessions.register_claude_filesystem",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "high",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "claude_session_ingestion_consent"
+      ],
+      "permission_refs": [
+        "claude_session_files_permission"
+      ],
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": [
+          "claude_session_retrieval_valid"
+        ],
+        "postcondition_probe_refs": [
+          "claude_session_retrieval_valid"
+        ]
+      }
+    },
+    "configure_google_workspace": {
+      "name": "Configure Google Workspace",
+      "description": "Capture OAuth app details through the secret broker, complete browser authorization, and verify the selected account.",
+      "operation_ref": "plugin::g_suite_plugin.configure",
+      "runner": "platform_process",
+      "implementation_status": "manual",
+      "risk": "high",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "google_workspace_account_consent"
+      ],
+      "input_refs": [
+        "google_oauth_client_id"
+      ],
+      "secret_input_refs": [
+        "google_oauth_client_secret"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "google_workspace_connection_valid"
+        ],
+        "postcondition_probe_refs": [
+          "google_workspace_connection_valid"
+        ]
+      }
+    },
+    "configure_marketo": {
+      "name": "Configure Marketo",
+      "description": "Capture LaunchPoint credentials, store the secret through the vault broker, and run connection and setup checks.",
+      "operation_ref": "plugin::marketo_plugin.configure",
+      "runner": "platform_process",
+      "implementation_status": "manual",
+      "risk": "high",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "marketo_destructive_access_consent"
+      ],
+      "input_refs": [
+        "marketo_client_id"
+      ],
+      "secret_input_refs": [
+        "marketo_client_secret"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "marketo_connection_valid"
+        ],
+        "postcondition_probe_refs": [
+          "marketo_connection_valid"
+        ]
+      }
+    },
+    "configure_salesforce": {
+      "name": "Configure Salesforce",
+      "description": "Run sf browser login, record the non-secret alias and instance host, and verify the org through the plugin.",
+      "operation_ref": "plugin::salesforce_plugin.configure",
+      "runner": "external_cli",
+      "implementation_status": "manual",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "input_refs": [
+        "salesforce_alias",
+        "salesforce_instance_url"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "salesforce_connection_valid"
+        ],
+        "postcondition_probe_refs": [
+          "salesforce_connection_valid"
+        ]
+      }
+    },
+    "configure_schwab": {
+      "name": "Configure Schwab",
+      "description": "Capture app details, complete the special callback-replay browser flow, and verify an options-chain request.",
+      "operation_ref": "plugin::schwab_market_data_plugin.configure",
+      "runner": "platform_process",
+      "implementation_status": "manual",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "input_refs": [
+        "schwab_client_id",
+        "schwab_callback_url"
+      ],
+      "secret_input_refs": [
+        "schwab_client_secret"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "schwab_connection_valid"
+        ],
+        "postcondition_probe_refs": [
+          "schwab_connection_valid"
+        ]
+      }
+    },
+    "configure_snowflake": {
+      "name": "Configure Snowflake",
+      "description": "Capture account, user, role, and private key through the vault broker and verify the effective role.",
+      "operation_ref": "plugin::snowflake_plugin.configure",
+      "runner": "platform_process",
+      "implementation_status": "manual",
+      "risk": "high",
+      "requires_confirmation": true,
+      "consent_refs": [
+        "snowflake_write_access_consent"
+      ],
+      "input_refs": [
+        "snowflake_account",
+        "snowflake_user",
+        "snowflake_role"
+      ],
+      "secret_input_refs": [
+        "snowflake_private_key"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "snowflake_connection_valid"
+        ],
+        "postcondition_probe_refs": [
+          "snowflake_connection_valid"
+        ]
+      }
+    },
+    "configure_zuora": {
+      "name": "Configure Zuora",
+      "description": "Capture client credentials, verify the tenant environment, and store the secret through the vault broker.",
+      "operation_ref": "plugin::zuora_plugin.configure",
+      "runner": "platform_process",
+      "implementation_status": "manual",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "input_refs": [
+        "zuora_base_url",
+        "zuora_client_id"
+      ],
+      "secret_input_refs": [
+        "zuora_client_secret"
+      ],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "zuora_connection_valid"
+        ],
+        "postcondition_probe_refs": [
+          "zuora_connection_valid"
+        ]
+      }
+    },
+    "configure_external_postgres": {
+      "name": "Add external PostgreSQL connection",
+      "description": "Create one named connection, vault its password, and verify the actual database role and connectivity.",
+      "operation_ref": "plugin::external_postgres_plugin.configure_connection",
+      "runner": "platform_process",
+      "implementation_status": "manual",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "input_refs": [
+        "external_postgres_name",
+        "external_postgres_host",
+        "external_postgres_user"
+      ],
+      "secret_input_refs": [
+        "external_postgres_password"
+      ],
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": [
+          "external_postgres_connection_valid"
+        ],
+        "postcondition_probe_refs": [
+          "external_postgres_connection_valid"
+        ]
+      }
+    }
+  },
+  "probes": {
+    "git_checkout_valid": {
+      "name": "Git checkout is valid",
+      "description": "Confirms repository identity, selected revision, tracked setup artifacts, and no reliance on an opaque native executable.",
+      "probe_ref": "setup::git.verify_checkout",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "python_version_valid": {
+      "name": "Python version is supported",
+      "description": "Confirms the selected interpreter is Python 3.13.x.",
+      "probe_ref": "bootstrap::python.probe_version",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "level": "precondition",
+      "expectation": {
+        "operator": "matches",
+        "value": "^3\\.13\\."
+      },
+      "remediation_operation_refs": [
+        "install_python_runtime"
+      ]
+    },
+    "instance_environment_dependency_closure_valid": {
+      "name": "Instance dependency closure is valid",
+      "description": "Executes the target interpreter and verifies Python 3.13, the build backend, installed seed package metadata, and the instance-private .venv/bin/solet-bridge bridge command.",
+      "probe_ref": "bootstrap::environment.probe_dependency_closure",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "level": "readiness",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "build_instance_environment"
+      ]
+    },
+    "fresh_shell_python_valid": {
+      "name": "Fresh-shell Python is supported",
+      "description": "Runs a fresh non-interactive zsh and proves generated launchers and hooks resolve Python 3.13.",
+      "probe_ref": "hydration::shell.probe_python",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "matches",
+        "value": "^3\\.13\\."
+      },
+      "remediation_operation_refs": [
+        "install_python_runtime",
+        "install_shell_integration"
+      ]
+    },
+    "homebrew_available": {
+      "name": "Homebrew is available",
+      "description": "Confirms brew resolves in the intended user environment.",
+      "probe_ref": "bootstrap::homebrew.probe",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "request_homebrew_install"
+      ]
+    },
+    "postgres_binary_version_valid": {
+      "name": "PostgreSQL major is supported",
+      "description": "Distinguishes absent, wrong-major, stopped, and healthy PostgreSQL states.",
+      "probe_ref": "bootstrap::postgres.probe_version",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "level": "precondition",
+      "expectation": {
+        "operator": "equals",
+        "value": 17
+      },
+      "remediation_operation_refs": [
+        "install_postgresql"
+      ]
+    },
+    "postgres_ready": {
+      "name": "PostgreSQL is ready",
+      "description": "Confirms the selected service accepts connections.",
+      "probe_ref": "bootstrap::postgres.probe_ready",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "level": "readiness",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "configure_postgresql"
+      ]
+    },
+    "postgres_role_policy_valid": {
+      "name": "PostgreSQL role policy is valid",
+      "description": "Confirms the per-solet role is non-superuser, uses SCRAM, owns the intended database/schema, and public connect is revoked.",
+      "probe_ref": "bootstrap::postgres.probe_role_policy",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "configure_postgresql"
+      ]
+    },
+    "pgvector_ready": {
+      "name": "pgvector is ready",
+      "description": "Confirms the vector extension exists in the target database and can execute a representative vector operation.",
+      "probe_ref": "bootstrap::postgres.probe_pgvector",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "install_postgresql",
+        "configure_postgresql"
+      ]
+    },
+    "tmux_available": {
+      "name": "tmux is available",
+      "description": "Confirms a supported tmux command is available for fleet topology.",
+      "probe_ref": "setup::tmux.probe",
+      "runner": "system",
+      "implementation_status": "adapter_required",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "install_tmux"
+      ]
+    },
+    "fresh_shell_path_valid": {
+      "name": "Fresh-shell PATH is valid",
+      "description": "Confirms a fresh zsh resolves the per-solet launcher, solet command, Homebrew paths, and selected coding agents.",
+      "probe_ref": "hydration::shell.probe_path",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "install_shell_integration"
+      ]
+    },
+    "lm_studio_models_discoverable": {
+      "name": "LM Studio models are discoverable",
+      "description": "Queries the configured model-list endpoint and returns normalized candidate metadata.",
+      "probe_ref": "setup::models.discover_lm_studio",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "discovery",
+      "expectation": {
+        "operator": "non_empty"
+      }
+    },
+    "ollama_models_discoverable": {
+      "name": "Ollama models are discoverable",
+      "description": "Future plugin discovery surface for normalized model candidates.",
+      "probe_ref": "setup::models.discover_ollama",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "discovery",
+      "expectation": {
+        "operator": "non_empty"
+      }
+    },
+    "selected_embedding_models_discoverable": {
+      "name": "Selected implementation exposes embedding candidates",
+      "description": "Dispatches discovery through the selected embeddings option and normalizes candidates for the wizard.",
+      "probe_ref": "setup::models.discover_embeddings",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "discovery",
+      "expectation": {
+        "operator": "non_empty"
+      }
+    },
+    "embedding_model_qualification": {
+      "name": "Embedding model qualifies",
+      "description": "Runs a real embedding request and validates shape, dimensions, finite values, and deterministic repeatability within tolerance.",
+      "probe_ref": "setup::models.qualify_embedding",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "embedding_request_succeeds": {
+      "name": "Embedding request succeeds",
+      "description": "Confirms the materialized platform configuration reaches the selected implementation and model.",
+      "probe_ref": "service_interface::embedding_service.get_embedding_dimension",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "selected_inference_models_discoverable": {
+      "name": "Selected implementation exposes inference candidates",
+      "description": "Dispatches discovery through the selected inference option and normalizes candidates for the wizard.",
+      "probe_ref": "setup::models.discover_inference",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "discovery",
+      "expectation": {
+        "operator": "non_empty"
+      }
+    },
+    "structured_action_qualification": {
+      "name": "Structured action qualification",
+      "description": "Confirms the selected model and implementation can return the platform's constrained structured-action shape.",
+      "probe_ref": "setup::models.qualify_structured_actions",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "representative_inference_probe": {
+      "name": "Representative inference behavior",
+      "description": "Runs representative classification, planning, and process-selection requests rather than accepting a model-list response as readiness.",
+      "probe_ref": "setup::models.qualify_representative_inference",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "inference_request_succeeds": {
+      "name": "Inference request succeeds",
+      "description": "Confirms inference_service is bound to the selected plugin and completes a live request.",
+      "probe_ref": "service_interface::inference_service.qualify",
+      "runner": "platform_process",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "genesis_artifacts_valid": {
+      "name": "Genesis artifacts are valid",
+      "description": "Confirms the virtual environment is complete, config is materialized, vault is initialized, launchers resolve, and generated artifacts parse.",
+      "probe_ref": "genesis::solet.verify",
+      "runner": "genesis",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "run_genesis"
+      ]
+    },
+    "launchagent_running": {
+      "name": "LaunchAgent is running",
+      "description": "Confirms the installed per-user background item is loaded and the newest startup log has stabilized before queries.",
+      "probe_ref": "genesis::autostart.verify",
+      "runner": "genesis",
+      "implementation_status": "implemented",
+      "level": "readiness",
+      "required_when": {
+        "decision_ref": "autostart",
+        "operator": "equals",
+        "value": "enabled"
+      },
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "install_launchagent"
+      ]
+    },
+    "keychain_available": {
+      "name": "Keychain is available",
+      "description": "Confirms the current user can access the configured Keychain service.",
+      "probe_ref": "plugin::macos_vault_plugin.check_keychain",
+      "runner": "platform_process",
+      "implementation_status": "adapter_required",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "vault_round_trip_valid": {
+      "name": "Vault round trip is valid",
+      "description": "Stores and retrieves a generated canary through the same agent-blind broker used by connector setup, then removes only the canary.",
+      "probe_ref": "plugin::macos_vault_plugin.qualify",
+      "runner": "platform_process",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "codex_cli_authenticated": {
+      "name": "Codex CLI is authenticated",
+      "description": "Confirms the client can access its provider-owned auth session without exposing a token to the wizard.",
+      "probe_ref": "hydration::codex.probe_auth",
+      "runner": "external_cli",
+      "implementation_status": "adapter_required",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "claude_cli_authenticated": {
+      "name": "Claude CLI is authenticated",
+      "description": "Confirms the client can access its provider-owned auth session without exposing a token to the wizard.",
+      "probe_ref": "hydration::claude.probe_auth",
+      "runner": "external_cli",
+      "implementation_status": "adapter_required",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "codex_plugin_visible": {
+      "name": "Codex plugin is visible",
+      "description": "Confirms the generated repository plugin is listed by Codex.",
+      "probe_ref": "hydration::codex.probe_plugin",
+      "runner": "external_cli",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "install_codex_plugin"
+      ]
+    },
+    "claude_plugin_visible": {
+      "name": "Claude plugin is visible",
+      "description": "Confirms the generated repository marketplace and plugin are listed by Claude Code.",
+      "probe_ref": "hydration::claude.probe_plugin",
+      "runner": "external_cli",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "install_claude_plugin"
+      ]
+    },
+    "codex_fresh_session_hook_active": {
+      "name": "Codex fresh-session hook is active",
+      "description": "Starts a fresh Codex session and proves the generated hook runs under the selected interpreter and reaches the solet.",
+      "probe_ref": "hydration::codex.probe_fresh_session",
+      "runner": "external_cli",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "claude_fresh_session_hook_active": {
+      "name": "Claude fresh-session hook is active",
+      "description": "Starts a fresh Claude Code session and proves the generated hook runs under the selected interpreter and reaches the solet.",
+      "probe_ref": "hydration::claude.probe_fresh_session",
+      "runner": "external_cli",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "coding_agent_plugins_visible": {
+      "name": "Selected coding-agent plugins are visible",
+      "description": "Aggregates plugin-list proof for every selected coding agent.",
+      "probe_ref": "setup::coding_agents.verify_plugins",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "completion",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "fresh_session_hooks_active": {
+      "name": "Selected coding-agent hooks are active",
+      "description": "Aggregates fresh-session behavioral proof; marketplace listing alone is insufficient.",
+      "probe_ref": "setup::coding_agents.verify_hooks",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "completion",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "peer_identity_valid": {
+      "name": "Peer identity is valid",
+      "description": "Confirms the live bridge identity and stable session key match the generated environment.",
+      "probe_ref": "plugin::agent_messaging_plugin.peer_identity",
+      "runner": "platform_process",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "fleet_spawn_and_receive_valid": {
+      "name": "Fleet spawn and receive are valid",
+      "description": "Spawns a bounded worker with explicit runtime, model, effort, work class, budget, and TTL; verifies role claim and fresh addressed delivery; then retires it.",
+      "probe_ref": "plugin::agent_messaging_plugin.qualify_fleet",
+      "runner": "platform_process",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "plugin_roster_matches_plan": {
+      "name": "Plugin roster matches plan",
+      "description": "Confirms installed plugins equal the resolved selections and profile dependencies, while dormant connectors remain visibly unconfigured.",
+      "probe_ref": "service_interface::lifecycle_management_service.list_plugins",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "completion",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "codex_session_roots_readable": {
+      "name": "Approved Codex roots are readable",
+      "description": "Confirms only the displayed roots are readable before registration.",
+      "probe_ref": "hydration::sessions.probe_codex_roots",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "claude_session_roots_readable": {
+      "name": "Approved Claude roots are readable",
+      "description": "Confirms only the displayed roots are readable before registration.",
+      "probe_ref": "hydration::sessions.probe_claude_roots",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "codex_session_retrieval_valid": {
+      "name": "Codex session retrieval is valid",
+      "description": "Proves source registration, nonzero backfill, and content retrieval after the required restart.",
+      "probe_ref": "plugin::codex_filesystem_session_source_plugin.qualify",
+      "runner": "platform_process",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "claude_session_retrieval_valid": {
+      "name": "Claude session retrieval is valid",
+      "description": "Proves source registration, nonzero backfill, and content retrieval after the required restart.",
+      "probe_ref": "plugin::claude_code_filesystem_session_source_plugin.qualify",
+      "runner": "platform_process",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "session_sources_retrievable": {
+      "name": "Selected session sources are retrievable",
+      "description": "Aggregates live retrieval proof for each consented source; declined sources are reported, not treated as failures.",
+      "probe_ref": "service_interface::session_ledger_service.qualify_selected_sources",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "completion",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "google_workspace_connection_valid": {
+      "name": "Google Workspace connection is valid",
+      "description": "Confirms account identity and a harmless read through the selected OAuth session.",
+      "probe_ref": "plugin::g_suite_plugin.test_connection",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "required_when": {
+        "decision_ref": "connectors_to_configure",
+        "operator": "contains",
+        "value": "google_workspace"
+      },
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "jira_connection_valid": {
+      "name": "Jira connection is valid",
+      "description": "Confirms the configured site and user through a harmless read; no setup write is used as proof.",
+      "probe_ref": "plugin::jira_plugin.test_connection",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "marketo_connection_valid": {
+      "name": "Marketo connection is valid",
+      "description": "Runs test_connection and check_setup; reports unknown asset entitlements and unverified write paths separately.",
+      "probe_ref": "plugin::marketo_plugin.check_setup",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "required_when": {
+        "decision_ref": "connectors_to_configure",
+        "operator": "contains",
+        "value": "marketo"
+      },
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "salesforce_cli_available": {
+      "name": "Salesforce CLI is available",
+      "description": "Confirms the configured absolute sf executable path and version.",
+      "probe_ref": "plugin::salesforce_plugin.probe_cli",
+      "runner": "external_cli",
+      "implementation_status": "adapter_required",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "salesforce_connection_valid": {
+      "name": "Salesforce connection is valid",
+      "description": "Confirms the expected org alias, instance host, and authenticated identity.",
+      "probe_ref": "plugin::salesforce_plugin.test_connection",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "required_when": {
+        "decision_ref": "connectors_to_configure",
+        "operator": "contains",
+        "value": "salesforce"
+      },
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "schwab_connection_valid": {
+      "name": "Schwab connection is valid",
+      "description": "Confirms the OAuth session with a representative options-chain request.",
+      "probe_ref": "plugin::schwab_market_data_plugin.test_connection",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "required_when": {
+        "decision_ref": "connectors_to_configure",
+        "operator": "contains",
+        "value": "schwab"
+      },
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "snowflake_connection_valid": {
+      "name": "Snowflake connection is valid",
+      "description": "Confirms account, user, warehouse, database, schema, and effective role.",
+      "probe_ref": "plugin::snowflake_plugin.test_connection",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "required_when": {
+        "decision_ref": "connectors_to_configure",
+        "operator": "contains",
+        "value": "snowflake"
+      },
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "zuora_connection_valid": {
+      "name": "Zuora connection is valid",
+      "description": "Confirms the OAuth client against the intended tenant and environment.",
+      "probe_ref": "plugin::zuora_plugin.test_connection",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "required_when": {
+        "decision_ref": "connectors_to_configure",
+        "operator": "contains",
+        "value": "zuora"
+      },
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "external_postgres_connection_valid": {
+      "name": "External PostgreSQL connection is valid",
+      "description": "Confirms host, database, effective role, SSL mode, and a harmless query for each configured connection.",
+      "probe_ref": "plugin::external_postgres_plugin.test_connection",
+      "runner": "platform_process",
+      "implementation_status": "implemented",
+      "level": "behavior",
+      "required_when": {
+        "decision_ref": "connectors_to_configure",
+        "operator": "contains",
+        "value": "external_postgres"
+      },
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "router_ready": {
+      "name": "Blue-green router is ready",
+      "description": "Confirms the router socket, active color, and dynamic port state for profiles selecting self deployment.",
+      "probe_ref": "service_interface::local_self_deployment_service.swap_status",
+      "runner": "platform_process",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "required_when": {
+        "decision_ref": "setup_profile",
+        "operator": "equals",
+        "value": "macos-bizops"
+      },
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "knowledge_retrieval_succeeds": {
+      "name": "Knowledge retrieval succeeds",
+      "description": "Proves live retrieval returns a nonempty result for the known session start orientation query after embeddings and vector state are configured.",
+      "probe_ref": "service_interface::knowledge_service.search",
+      "runner": "platform_process",
+      "implementation_status": "adapter_required",
+      "level": "completion",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "install_state_projection_matches": {
+      "name": "Install-state projection matches",
+      "description": "Verifies that the target-local non-secret install-state projection matches the manager journal identity. The separate engine guarantee for interruption, durable attempt evidence, resume from the first unverified checkpoint, and no duplicate mutation is discharged by solet_cli/tests/journal_resume_round_trip_smoke.py.",
+      "probe_ref": "setup::journal.install_state_projection_matches",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "completion",
+      "expectation": {
+        "operator": "truthy"
+      }
+    },
+    "decisions_resolved": {
+      "name": "Stage decisions are resolved",
+      "description": "Verifies that every active required decision assigned to this stage is present and, for discovered values, qualified before the stage advances.",
+      "probe_ref": "manager::decisions.all_required_resolved",
+      "runner": "manager",
+      "implementation_status": "implemented",
+      "level": "precondition",
+      "expectation": {
+        "operator": "truthy"
+      }
+    }
+  },
+  "stages": {
+    "preflight": {
+      "title": "Preflight",
+      "description": "Inspect host, checkout, runtime, package manager, service state, existing clients, and permissions without mutation.",
+      "sequence": 0,
+      "checkpoint": true,
+      "operation_refs": [],
+      "exit_probe_refs": [
+        "git_checkout_valid",
+        "python_version_valid"
+      ]
+    },
+    "decision_review": {
+      "title": "Resolve choices and review plan",
+      "description": "Collect decisions, discover dynamic options, show implications, and require final review before any mutation.",
+      "sequence": 10,
+      "depends_on_stage_refs": [
+        "preflight"
+      ],
+      "checkpoint": true,
+      "operation_refs": [],
+      "exit_probe_refs": [
+        "decisions_resolved"
+      ]
+    },
+    "system_dependencies": {
+      "title": "Install system dependencies",
+      "description": "Apply only the reviewed dependency plan and positively verify versions and security posture.",
+      "sequence": 20,
+      "depends_on_stage_refs": [
+        "decision_review"
+      ],
+      "checkpoint": true,
+      "operation_refs": [
+        "request_homebrew_install",
+        "install_python_runtime",
+        "build_instance_environment",
+        "install_postgresql",
+        "configure_postgresql",
+        "install_tmux"
+      ],
+      "exit_probe_refs": [
+        "python_version_valid",
+        "postgres_ready",
+        "postgres_role_policy_valid",
+        "pgvector_ready"
+      ]
+    },
+    "genesis": {
+      "title": "Genesis",
+      "description": "Provision the environment, install the resolved plugin roster, materialize config and vault, and install selected service topology.",
+      "sequence": 30,
+      "depends_on_stage_refs": [
+        "system_dependencies"
+      ],
+      "checkpoint": true,
+      "operation_refs": [
+        "run_genesis",
+        "install_shell_integration",
+        "install_launchagent"
+      ],
+      "exit_probe_refs": [
+        "genesis_artifacts_valid",
+        "fresh_shell_path_valid",
+        "fresh_shell_python_valid",
+        "launchagent_running",
+        "router_ready"
+      ]
+    },
+    "models": {
+      "title": "Configure and qualify models",
+      "description": "Discover candidates from selected implementations, collect explicit model choices, materialize config, and run behavior qualification.",
+      "sequence": 40,
+      "depends_on_stage_refs": [
+        "genesis"
+      ],
+      "checkpoint": true,
+      "entry_probe_refs": [
+        "decisions_resolved"
+      ],
+      "operation_refs": [
+        "configure_lm_studio_embeddings",
+        "configure_lm_studio_inference"
+      ],
+      "exit_probe_refs": [
+        "embedding_request_succeeds"
+      ]
+    },
+    "coding_agents": {
+      "title": "Integrate coding agents",
+      "description": "Install selected client plugins and prove authentication, plugin discovery, fresh-session hooks, PATH, identity, and receive behavior.",
+      "sequence": 50,
+      "depends_on_stage_refs": [
+        "models"
+      ],
+      "checkpoint": true,
+      "operation_refs": [
+        "install_codex_plugin",
+        "install_claude_plugin"
+      ],
+      "exit_probe_refs": [
+        "coding_agent_plugins_visible",
+        "fresh_session_hooks_active",
+        "peer_identity_valid"
+      ]
+    },
+    "optional_accounts": {
+      "title": "Configure selected accounts",
+      "description": "Run only explicitly selected plugin-specific account flows; leave every other connector visibly dormant.",
+      "sequence": 60,
+      "depends_on_stage_refs": [
+        "coding_agents"
+      ],
+      "checkpoint": true,
+      "operation_refs": [
+        "configure_google_workspace",
+        "configure_marketo",
+        "configure_salesforce",
+        "configure_schwab",
+        "configure_snowflake",
+        "configure_zuora",
+        "configure_external_postgres"
+      ],
+      "exit_probe_refs": [
+        "plugin_roster_matches_plan",
+        "google_workspace_connection_valid",
+        "marketo_connection_valid",
+        "salesforce_connection_valid",
+        "schwab_connection_valid",
+        "snowflake_connection_valid",
+        "zuora_connection_valid",
+        "external_postgres_connection_valid"
+      ]
+    },
+    "session_sources": {
+      "title": "Configure selected session sources",
+      "description": "After separate consent, write approved roots, restart, register, backfill, and verify retrieval without altering local history files.",
+      "sequence": 70,
+      "depends_on_stage_refs": [
+        "coding_agents"
+      ],
+      "checkpoint": true,
+      "operation_refs": [
+        "register_codex_session_source",
+        "register_claude_session_source"
+      ],
+      "exit_probe_refs": [
+        "session_sources_retrievable"
+      ]
+    },
+    "completion": {
+      "title": "End-to-end verification",
+      "description": "Prove the resolved installation from fresh processes and report selected, declined, dormant, and unverified items honestly.",
+      "sequence": 80,
+      "depends_on_stage_refs": [
+        "coding_agents"
+      ],
+      "checkpoint": true,
+      "operation_refs": [],
+      "exit_probe_refs": [
+        "knowledge_retrieval_succeeds",
+        "coding_agent_plugins_visible",
+        "fresh_session_hooks_active",
+        "plugin_roster_matches_plan",
+        "install_state_projection_matches"
+      ]
+    }
+  },
+  "wizard": {
+    "frontends": [
+      "local_web_wizard",
+      "terminal_wizard",
+      "headless_answer_file"
+    ],
+    "pages": [
+      {
+        "id": "identity",
+        "title": "Installation identity",
+        "item_refs": [
+          {
+            "kind": "input",
+            "ref": "repository_ref"
+          },
+          {
+            "kind": "input",
+            "ref": "solet_name"
+          },
+          {
+            "kind": "input",
+            "ref": "clone_directory"
+          }
+        ]
+      },
+      {
+        "id": "capabilities",
+        "title": "Capabilities and implementations",
+        "item_refs": [
+          {
+            "kind": "decision",
+            "ref": "setup_profile"
+          },
+          {
+            "kind": "decision",
+            "ref": "embeddings_implementation"
+          },
+          {
+            "kind": "decision",
+            "ref": "embedding_model"
+          },
+          {
+            "kind": "decision",
+            "ref": "inference_implementation"
+          },
+          {
+            "kind": "decision",
+            "ref": "inference_model"
+          }
+        ]
+      },
+      {
+        "id": "agents",
+        "title": "Coding agents and execution",
+        "item_refs": [
+          {
+            "kind": "decision",
+            "ref": "coding_agents"
+          },
+          {
+            "kind": "decision",
+            "ref": "execution_topology"
+          },
+          {
+            "kind": "decision",
+            "ref": "autostart"
+          }
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "External accounts",
+        "item_refs": [
+          {
+            "kind": "decision",
+            "ref": "connector_configuration_timing"
+          },
+          {
+            "kind": "decision",
+            "ref": "connectors_to_configure"
+          }
+        ]
+      },
+      {
+        "id": "sessions",
+        "title": "Session history and memory",
+        "item_refs": [
+          {
+            "kind": "decision",
+            "ref": "session_sources"
+          },
+          {
+            "kind": "consent",
+            "ref": "codex_session_ingestion_consent"
+          },
+          {
+            "kind": "consent",
+            "ref": "claude_session_ingestion_consent"
+          }
+        ]
+      },
+      {
+        "id": "review",
+        "title": "Review the effective plan",
+        "item_refs": [
+          {
+            "kind": "consent",
+            "ref": "system_change_consent"
+          },
+          {
+            "kind": "consent",
+            "ref": "shell_modification_consent"
+          },
+          {
+            "kind": "summary",
+            "ref": "effective_setup_plan"
+          }
+        ]
+      }
+    ],
+    "answer_review": {
+      "required": true,
+      "show_effective_plugins": true,
+      "show_system_changes": true,
+      "show_permissions": true,
+      "show_secret_destinations": true
+    },
+    "plan_preview": {
+      "required": true,
+      "show_operations": true,
+      "show_restarts": true,
+      "show_verification": true
+    },
+    "headless_parity": {
+      "same_schema": true,
+      "same_validation": true,
+      "interactive_authorization_must_be_preapproved": true
+    }
+  },
+  "state_policy": {
+    "durable_journal": true,
+    "journal_location_ref": "setup_journal_path",
+    "resume_mode": "from_first_unverified_checkpoint",
+    "statuses": [
+      "pending",
+      "awaiting_user",
+      "consented",
+      "applying",
+      "applied",
+      "verified",
+      "declined",
+      "blocked",
+      "failed",
+      "not_applicable"
+    ],
+    "record_source_revision": true,
+    "record_answers_hash": true,
+    "record_probe_evidence": true,
+    "record_secret_values": false,
+    "repair_before_reapply": true
+  },
+  "completion": {
+    "required_probe_refs": [
+      "python_version_valid",
+      "instance_environment_dependency_closure_valid",
+      "fresh_shell_python_valid",
+      "postgres_ready",
+      "postgres_role_policy_valid",
+      "pgvector_ready",
+      "embedding_request_succeeds",
+      "knowledge_retrieval_succeeds",
+      "coding_agent_plugins_visible",
+      "fresh_session_hooks_active",
+      "peer_identity_valid",
+      "plugin_roster_matches_plan",
+      "genesis_artifacts_valid",
+      "launchagent_running",
+      "router_ready",
+      "install_state_projection_matches"
+    ],
+    "allow_health_only": false,
+    "report": {
+      "show_selected_options": true,
+      "show_declined_options": true,
+      "show_unverified_items": true,
+      "show_recurring_maintenance": true,
+      "show_resume_command": true
+    }
+  },
+  "known_gaps": [
+    {
+      "id": "hook_interpreter_drift",
+      "summary": "Generated and shipped hook surfaces have historically relied on ambient python3 resolution.",
+      "impact": "A plugin may appear installed while its hooks are inert under an older system Python.",
+      "status": "partial",
+      "evidence": [
+        "plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md"
+      ]
+    },
+    {
+      "id": "plugin_guidance_coverage",
+      "summary": "Only a minority of shipped plugins currently provide structured hydration guidance.",
+      "impact": "The wizard cannot infer missing auth, permission, and maintenance requirements safely; undocumented plugins must remain explicitly marked partial, implicit, or missing.",
+      "status": "open",
+      "evidence": [
+        "plugins/*/knowledge_base/hydration_guidance.md"
+      ]
+    },
+    {
+      "id": "dynamic_model_qualification_missing",
+      "summary": "Current profiles hard-code model identifiers rather than discovering and qualifying selectable models. Separately, a hard-coded identifier is a serve-time API alias and not necessarily a downloadable catalog name, so it cannot be used to acquire the model it names.",
+      "impact": "Changing a model is an undocumented config edit and readiness may accept an endpoint without proving representative behavior.",
+      "status": "planned",
+      "evidence": [
+        "plugins/github_midwife_plugin/knowledge_base/profile_baseline/openai_embeddings_plugin.json",
+        "plugins/github_midwife_plugin/knowledge_base/profile_baseline/default_inference_plugin.json",
+        "plugins/github_midwife_plugin/knowledge_base/profile_templates/lm_studio_models.yaml"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "natural_language_query": "Disable the sound_effects_plugin in the live orchestrator and persist the change",
+  "expected_process_key": "service_interface::lifecycle_management_service::set_plugin_enabled",
+  "expected_arguments_structure": {
+    "plugin_name": "string",
+    "enabled": "boolean"
+  }
+}

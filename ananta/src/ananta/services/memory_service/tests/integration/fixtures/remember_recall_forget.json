@@ -1,0 +1,35 @@
+{
+  "name": "test_remember_recall_forget_cycle",
+  "description": "Full memory lifecycle: create a memory, search for it, then archive it",
+  "sequence": [
+    {
+      "step": "remember_fact",
+      "process_key": "service_interface::memory_service::remember",
+      "arguments": {
+        "content": "The Eiffel Tower was completed in 1889 and is located in Paris, France.",
+        "tags": ["facts", "landmarks", "test-memory"]
+      },
+      "capture": {
+        "memory_id": {
+          "source": "output",
+          "output_key": "Memory ID"
+        }
+      }
+    },
+    {
+      "step": "recall_memory",
+      "process_key": "service_interface::memory_service::recall",
+      "arguments": {
+        "query": "When was the Eiffel Tower built?",
+        "top_k": 5
+      }
+    },
+    {
+      "step": "cleanup_forget",
+      "process_key": "service_interface::memory_service::forget",
+      "arguments": {
+        "memory_id": "${memory_id}"
+      }
+    }
+  ]
+}

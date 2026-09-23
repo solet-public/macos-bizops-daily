@@ -1,0 +1,5 @@
+{
+  "query": "Is the discovery service working?",
+  "expected_process_key": "service_interface::discovery_service::get_discovery_service_health",
+  "expected_arguments": {}
+}

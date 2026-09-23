@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::zuora_plugin::update_object",
+  "display_name": "Zuora: Update Object",
+  "description": "Apply a non-empty fields object to an existing object by type + id. This is a write action. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the update finishing; the confirmation is delivered when the job completes.",
+  "embedding_description": "Update fields on an existing Zuora billing record by type and id, applying a non-empty field-value object to an Account, Subscription, Invoice, Payment, or Product. Dispatches asynchronously: a job_id comes back at once, the update confirmation lands moments later. Changes customer billing data in place.",
+  "result_processor_customizations": {
+    "action_label": "Zuora object update queued",
+    "result_type": "zuora_update_object_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT confirmation the update was applied -- the success flag arrives separately, as its own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the update was queued -- do not present job_id/status as proof the update was applied. Acknowledge the request is in flight; the confirmation lands in a follow-up message when the job completes. Once delivered, confirm the update was applied; low sensitivity (flag only, data_sensitivity 0.0)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Update a Zuora object's fields.",
+    "error_interpretation": "zuora.invalid_params: missing/unsupported type, id, or an empty/missing fields object. zuora.object_not_found: no object with that id exists. zuora.validation_failed: a field value was rejected.",
+    "recovery_guidance": "zuora.object_not_found: verify the id and type via data_query or get_object. zuora.validation_failed: check valid values for that object type."
+  }
+}

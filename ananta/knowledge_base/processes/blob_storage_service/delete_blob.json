@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::blob_storage_service::delete_blob",
+  "display_name": "Delete Blob",
+  "description": "Permanently delete a blob by blob_id. This operation cannot be undone.",
+  "embedding_description": "Remove file from blob storage. Delete stored content. Erase binary data. Remove audio image document. Clean up old files. Delete attachment. Remove media file. Permanently delete stored file. Purge blob by ID. Remove uploaded artifact. Delete saved output.",
+  "result_processor_customizations": {
+    "action_label": "Blob deleted",
+    "result_type": "blob_deleted",
+    "result_description": "Deletion confirmation with blob_id that was removed, namespace, and deletion timestamp",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Permanently deletes a blob from storage - this operation cannot be undone",
+    "error_interpretation": "NotFoundError: blob_id does not exist (may already be deleted). AccessError: namespace access denied or insufficient permissions. StorageError: blob storage service unavailable.",
+    "recovery_guidance": "For not found errors: blob may already be deleted, verify with search_blobs. For access errors: check permissions for delete operations. For storage errors: retry or check service status."
+  }
+}

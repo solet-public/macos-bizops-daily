@@ -1,0 +1,9 @@
+name: macos_coding_agent_session_plugin
+description: |
+  Plugin-side knowledge base for the macOS coding-agent session plugin —
+  the four @platform_process bridge-lifecycle verbs (spawn_bridge,
+  terminate_bridge, restart_bridge, list_bridges) plus the FSEvents
+  watcher overview. The canonical service-interface KB lives at
+  ananta/knowledge_base/processes/coding_agent_session_service/; this
+  plugin-side KB carries the plugin::* surface that mirrors it per the
+  D1 two-layer mandate.

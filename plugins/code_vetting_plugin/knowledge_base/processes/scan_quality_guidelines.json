@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::code_vetting_plugin::scan_quality_guidelines",
+  "display_name": "Scan quality guidelines (platform gate toolchain)",
+  "description": "Run only the platform quality-gate toolchain over the local git worktree and return a bounded metrics summary plus a markdown report. Runs the aggregate code-quality gate (ruff, pyright-strict, the radon cyclomatic/maintainability + god-class coherence trio, whole-tree integration, service-interface AST, return-shape), the SQL-access lockdown gate, and vulture dead-code. Allowlisted findings are preserved as visible tracked debt but do not block. ADVISORY only — it never replaces Git-Controller's canonical pre-commit gate run. This verb is ALWAYS SELF-ANCHORED to the platform's own worktree — it takes no 'target_path' (unlike vet_codebase): its entire roster is the platform gate toolchain, so a foreign run would be an honest 0/3 and nothing else. Optional 'scope' is a cosmetic label; the target is always our own worktree.",
+  "embedding_description": "Check the codebase against the platform's own quality bar: run the maintainability toolchain - ruff lint, pyright strict typing, radon cyclomatic complexity and maintainability index, the god-class single-responsibility check, dead-code detection, and the raw-SQL lockdown gate - reporting non-allowlisted violations while preserving allowlisted tracked debt. Advisory lint and typing review.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "code_vetting_plugin scan_quality_guidelines",
+    "result_type": "code_vetting_quality_guidelines_result",
+    "result_description": "Object: run_id, target ({repo, ref, scope}), started/finished ISO timestamps, total_findings, counts_by_severity, counts_by_dimension (code_quality / security / dead_code), scanners_ran, scanners_total (three: code_quality, sql_access, vulture), coverage_gaps, and report (a bounded severity-ranked markdown register). Findings here are ADVISORY.",
+    "presentation_guidance": "Lead with pass/fail: zero total_findings means the worktree clears the platform quality bar. Otherwise summarize by gate (code_quality / sql_access / dead_code). Make the advisory nature explicit — this informs, it does not block a commit; Git-Controller's canonical gate run remains the authority. Name any coverage_gaps (an absent tool, e.g. vulture not installed)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Running the platform quality-gate toolchain (advisory) over the local git worktree.",
+    "error_interpretation": "A RuntimeError about locating the worktree root means no ancestor of APP_HOME carries both quality_gates/ and .git — this verb is local-profile only and needs the git worktree. A code_quality gate 'usage error' means the aggregate gate script was invoked wrong (a defect, not a code finding). A missing gate script or absent vulture records a coverage gap rather than failing.",
+    "recovery_guidance": "Confirm the solet runs on a local profile whose APP_HOME sits under the git worktree. If the aggregate gate raised a usage error, that is a wiring defect in the gate wrapper — do not retry blindly; inspect the reported output. Coverage gaps (absent tools) are expected and non-fatal."
+  }
+}

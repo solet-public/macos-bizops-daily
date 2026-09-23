@@ -1,0 +1,32 @@
+# Retrieval-test companion for the seat running-log convention article.
+# Gated by service_interface::knowledge_service::test_retrieval (W7).
+# Semantics: rank is 1-indexed, smaller is better. A target query passes when
+# the article ranks at or above min_rank; a forbidden query passes when the
+# article is absent or ranks no better than forbidden_min_rank; a process_key
+# assertion passes when the key resolves in the live process registry.
+
+article_path: knowledge_bases/ananta_service/seat_running_log_convention.md
+consumer_profile: both
+
+target_queries:
+  - "what must a seat running log contain"
+  - "seat running log convention obligations slot"
+  - "authorizations owed rulings owed retirements owed"
+  - "where does the running log convention live as a durable artifact"
+  - "record a pending authorization before rotating out"
+  - "obligation written at creation time not at handoff"
+  - "a pending authorization is seat state that lives nowhere durable"
+  - "what should a fresh seat write down after boot"
+  - "running log section for what I still owe another party"
+  - "difference between a running log instance and the running log convention"
+
+forbidden_queries:
+  - "coordinator dispatch watchdog pattern"                # coordinator_dispatch_discipline should win this
+  - "how do I author a knowledge base article"              # kb_article_authoring_rubric should win this
+  - "how does memory-driven scheduling work"                # scheduling_memory_driven should win this
+  - "peer pre-completion gate procedure commands"            # 22_testing_03_peer_precompletion_gate_procedure should win this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions: []

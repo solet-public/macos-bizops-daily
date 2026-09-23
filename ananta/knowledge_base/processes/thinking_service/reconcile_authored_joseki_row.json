@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::reconcile_authored_joseki_row",
+  "display_name": "Reconcile Authored Joseki Row",
+  "description": "repair a registered joseki card's lifecycle row so its stored knowledge-base path points at the canonical location; fixes a card whose row kept a pre-migration path after the card moved into the dedicated authored-joseki knowledge base.",
+  "embedding_description": "Row maintenance for an authored joseki: normalise the stored knowledge-base path on its lifecycle record to the canonical card location. Repairs rows carrying a stale pre-migration path so downstream readers resolve the correct card. Idempotent — a row already pointing at the canonical path is left unchanged.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Authored joseki row reconciled",
+    "result_type": "authored_joseki_reconcile_result",
+    "result_description": "Reconciliation result with keys: joseki_key, previous_knowledge_base_path, knowledge_base_path, status",
+    "presentation_guidance": "Report the canonical knowledge_base_path; when status is 'reconciled' also surface the previous_knowledge_base_path that was repaired, and when 'unchanged' note the row was already canonical.",
+    "output_action_guidance": "The stored path now resolves the correct card. This is a bookkeeping repair; continue the current plan."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reconciling the stored knowledge-base path on an authored joseki lifecycle row. reconcile_authored_joseki_row accepts {joseki_key}.",
+    "error_interpretation": "JosekiNotFound: no lifecycle row exists for the key. StorageError: the state read or update failed.",
+    "recovery_guidance": "Missing row: register the card first. Storage failures: retry once the platform reports healthy."
+  }
+}

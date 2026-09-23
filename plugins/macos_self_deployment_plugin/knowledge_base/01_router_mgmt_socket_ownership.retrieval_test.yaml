@@ -1,0 +1,33 @@
+# Retrieval-test companion for the router mgmt socket ownership contract.
+# Gated by service_interface::knowledge_service::test_retrieval.
+#
+# Run (Lane X, 2026-08-14) against the live index after
+# service_interface::knowledge_service::update on this plugin's KB:
+#   passed: true — target ranks 1, 1, 2, 1; absent from both forbidden queries.
+#
+# The forbidden set is the point of this fixture as much as the target set. This
+# article shares almost all of its vocabulary with the blue-green deploy and
+# birth runbooks, so the risk it introduces is not that it fails to surface —
+# it is that it starts winning THEIR queries. An operator asking how to deploy a
+# release must still get the deploy joseki, not a socket-ownership contract.
+
+article_path: plugins/macos_self_deployment_plugin/knowledge_base/01_router_mgmt_socket_ownership.md
+consumer_profile: both
+
+target_queries:
+  - "router socket not found but the router process is alive"
+  - "who may unlink the router mgmt socket"
+  - "solet crash loop after an overlapping launchctl restart"
+  - "test router liveness with the status verb instead of checking the socket file exists"
+  - "launchctl kickstart -k deletes the new router's socket"
+  - "lsof shows the router holding a socket whose path does not exist"
+  - "stale router socket file reads as healthy"
+
+min_rank: 3
+
+forbidden_queries:
+  - "how do I deploy a local blue-green release"
+  - "operator environment setup after genesis birth"
+  - "update a live solet from a re-minted seed"
+
+forbidden_min_rank: 3

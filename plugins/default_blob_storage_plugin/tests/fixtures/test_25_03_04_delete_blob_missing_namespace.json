@@ -1,0 +1,14 @@
+{
+  "name": "test_delete_blob_missing_namespace",
+  "description": "Attempt to delete blob without namespace parameter",
+  "process_key": "plugin::default_blob_storage_plugin::delete_blob",
+  "arguments": {
+    "params": {
+      "blob_id": "gen-abc123xyz4567"
+    },
+    "state": {
+      "current_session_id": "test-delete-no-ns-001"
+    },
+    "timeout_seconds": 30
+  }
+}

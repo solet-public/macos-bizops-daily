@@ -1,0 +1,80 @@
+# embedding_description length-bound gate — tracked-debt allowlist
+#
+# The bound itself is the platform's, not this gate's: the gate reads
+# EMBEDDING_DESCRIPTION_MIN_LENGTH / _MAX_LENGTH out of
+# ananta/src/ananta/core/process_registry/plugin_registration_validator.py at
+# run time. That check has always existed at registry load, but it is
+# WARNING-only, so nothing ever red on it and nothing ran at authoring time.
+#
+# Format: <file_path>::<process_key>
+#   file_path   — repo-relative POSIX path, suffix-matched
+#   process_key — the JSON's own process_key, matched exactly
+#
+# Allowlisted findings are STILL PRINTED — the gate stays honest about known
+# debt — but they do not contribute to the exit-2 verdict. Removing an entry is
+# the unit of remediation progress. This register is NOT a skip path: adding
+# entries requires operator ratification (see the KB article "Gate Allowlist
+# Conventions — Negative-Fixture Markers, Content-Anchored Pins, and the
+# Ratification Practice").
+#
+# The gate reports "[stale-allowlist]" for any entry here that no longer
+# matches a finding — the value came back into range, or the file/key was
+# renamed. Those entries are latent OVER-ALLOWS: an exception nobody
+# remembers, guarding nothing, that silently permits the condition if it
+# returns. Delete them when reported. (Stale entries are reported, never
+# fatal — reddening the gate for someone who just improved a description
+# would punish the behaviour this register exists to encourage.)
+#
+# ---------------------------------------------------------------------------
+# INITIAL SEED — measured 2026-07-30, 74 entries across 15 plugins.
+#
+# This register was seeded from the tree's existing state, discovered while
+# fixing four out-of-range marketo values. The measurement that motivated the
+# gate: 528 discoverable processes, 74 of them out of range. The four
+# marketo values were not special — they were the ones we happened to look at.
+#
+# ★ THE HOOK FOR WHOEVER PAYS THIS DOWN: the worst offenders in the tree are
+# seed_factory_plugin's own verbs — publish_seed at 1152 chars, assemble_seed
+# at 942, validate_and_seal_seed_bundle at 907, all roughly 2-3x the ceiling.
+# The factory that enforces seed hygiene ships the least hygienic descriptions
+# we have.
+#
+# Remediation is NOT a mechanical trim. embedding_description is the text
+# embedded for semantic process retrieval, so both directions change which
+# verb wins at rank 1: a thin value is under-specified, a fat one dilutes its
+# own distinctive terms. Fixing an entry means adding real vocabulary a caller
+# would search with (floor cases) or cutting the clause doing least retrieval
+# work (ceiling cases) — and phrasing AFFIRMATIVELY, since the field is
+# cosine-only and a negation attracts the queries it means to repel.
+# ---------------------------------------------------------------------------
+
+
+# agent_messaging_plugin — 6 above
+
+# audio_processing_plugin — 1 above
+
+# chatgpt_export_session_source_plugin — 1 above
+
+# claude_ai_export_session_source_plugin — 1 above
+
+# claude_code_cloud_session_source_plugin — 1 above
+
+# code_vetting_plugin — 4 above
+
+# external_postgres_plugin — 7 above
+
+# g_suite_plugin — 19 above
+
+# github_midwife_plugin — 1 above
+
+# jira_plugin — 11 above
+
+# macos_self_deployment_plugin — 3 above
+
+# salesforce_plugin — 2 above, 4 below
+
+# seed_factory_plugin — 3 above
+
+# snowflake_plugin — 2 above, 3 below
+
+# zuora_plugin — 5 below

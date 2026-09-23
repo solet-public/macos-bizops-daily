@@ -1,0 +1,17 @@
+{
+  "name": "test_search_blobs_by_mime_type",
+  "description": "Search blobs filtered by mime_type",
+  "process_key": "plugin::default_blob_storage_plugin::search_blobs",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "metadata_filters": {
+        "mime_type": "image/png"
+      }
+    },
+    "state": {
+      "current_session_id": "test-search-mime-001"
+    },
+    "timeout_seconds": 30
+  }
+}

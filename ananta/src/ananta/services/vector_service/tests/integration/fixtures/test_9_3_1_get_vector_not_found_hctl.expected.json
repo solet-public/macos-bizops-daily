@@ -1,0 +1,20 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "nonexistent",
+    "not found",
+    "doesn't exist",
+    "does not exist",
+    "error",
+    "Error",
+    "vector",
+    "id",
+    "ID",
+    "couldn't find",
+    "could not find",
+    "12345",
+    "status",
+    "result",
+    "COMPLETED"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::default_address_book_plugin::list_types",
+  "display_name": "List Types",
+  "description": "List all address types with counts.",
+  "embedding_description": "List all address types with usage counts. Use to understand the categories in the address book and how many records exist for each type. Includes total count summary and supports reporting or UI filters.",
+  "result_processor_customizations": {
+    "action_label": "List Address Types",
+    "result_type": "address_types_list",
+    "result_description": "List of address types with usage counts",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

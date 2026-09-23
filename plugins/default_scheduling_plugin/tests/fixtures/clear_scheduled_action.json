@@ -1,0 +1,8 @@
+{
+  "name": "test_clear_scheduled_action",
+  "description": "Cancel and remove a specific scheduled job by ID",
+  "process_key": "plugin::default_scheduling_plugin::clear_scheduled_action",
+  "arguments": {
+    "schedule_id": "test_value"
+  }
+}

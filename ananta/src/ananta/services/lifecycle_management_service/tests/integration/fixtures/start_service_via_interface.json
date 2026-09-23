@@ -1,0 +1,10 @@
+{
+  "name": "test_start_service_via_interface",
+  "description": "Start a service plugin with specified configuration",
+  "process_key": "service_interface::lifecycle_management_service::start_service_via_interface",
+  "arguments": {
+    "service": {},
+    "start": "test_value",
+    "config": {}
+  }
+}

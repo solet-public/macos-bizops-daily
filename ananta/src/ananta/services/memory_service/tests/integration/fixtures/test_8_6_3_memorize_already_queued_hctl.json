@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::memorize",
+  "arguments": {
+    "memory_id": "test-memory-id-placeholder"
+  },
+  "notes": "This test requires a memory_id that is already in the memorization queue"
+}

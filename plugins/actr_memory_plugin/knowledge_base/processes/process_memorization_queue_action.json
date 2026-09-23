@@ -1,0 +1,6 @@
+{
+  "process_key": "plugin::actr_memory_plugin::process_memorization_queue_action",
+  "display_name": "Process Memorization Queue",
+  "description": "Process all due memorization reviews",
+  "embedding_description": "Process all due memorization reviews and update schedules and strengths. Use to run spaced repetition maintenance; returns processed_count and status message. Updates next review times for due items and runs any reviews that are due now."
+}

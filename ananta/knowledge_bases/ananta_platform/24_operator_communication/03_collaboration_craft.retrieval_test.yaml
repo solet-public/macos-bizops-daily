@@ -1,0 +1,26 @@
+# Retrieval-test companion for the operator collaboration craft article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+
+article_path: knowledge_bases/ananta_platform/24_operator_communication/03_collaboration_craft.md
+consumer_profile: both
+
+target_queries:
+  - "operator collaboration craft working conventions"
+  - "how should I report results to the operator"
+  - "should I ask the operator again before finishing a granted task"
+  - "how to run a credential setup wizard with the operator"
+  - "what to do when the operator's request is confusing"
+  - "record the operator's correction so it never has to be said twice"
+
+forbidden_queries:
+  # Calibration note (2026-07-20, first gate run): a same-section sibling sits
+  # naturally at rank 2 behind the owner for the owner's broadest phrasing, so
+  # the forbidden probe uses format-specific vocabulary the owner alone carries.
+  - "the eight parts of a decision brief and its deadline default"   # 01_operator_decision_briefs owns this
+  - "solet charter template platform constant"     # 02_solet_charter_template owns this
+  - "vault credential storage conventions"              # the vault/address-book KB section owns this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions: []

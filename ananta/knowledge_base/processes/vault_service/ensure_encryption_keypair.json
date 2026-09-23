@@ -1,0 +1,13 @@
+{
+  "process_key": "service_interface::vault_service::ensure_encryption_keypair",
+  "display_name": "Ensure Encryption Keypair",
+  "description": "Generate the solet's X25519 identity keypair if absent. Idempotent. Returns the public key.",
+  "embedding_description": "Idempotent bootstrap of the solet's X25519 identity keypair used for cross-solet sealed-box secret transfer. Generates a fresh keypair only if one is not already stored, then returns the public key (base64) plus a created flag. Safe to call on every boot. The private key never leaves the vault plugin process; only the public key is exposed.",
+  "result_processor_customizations": {
+    "action_label": "Encryption keypair ensured",
+    "result_type": "encryption_keypair_status",
+    "result_description": "Whether the keypair was freshly created plus the X25519 public key",
+    "presentation_guidance": "Report whether the keypair was created or already present and present the base64 public key so the operator can hand it to a peer solet.",
+    "output_action_guidance": "If created=True, share the public_key with peer solets that need to send secrets to this one. If created=False, no action needed."
+  }
+}

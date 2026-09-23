@@ -1,0 +1,15 @@
+{
+  "process_key": "service_interface::thinking_service::get_playbook_section",
+  "display_name": "Get Playbook Section",
+  "description": "Retrieve a single section from a playbook by playbook ID and section ID. Used by the platform to hydrate playbook guidance into prompts during plan execution.",
+  "embedding_description": "Retrieve a single section from a playbook by playbook_id + section_id. Returns the section's markdown content. Used by the platform to hydrate playbook guidance into prompts during plan execution. Section identified by `<!-- section: --> ` marker in the playbook source. Distinct from get_playbook (whole document).",
+  "result_processor_customizations": {
+    "action_label": "section retrieved",
+    "result_type": "playbook_section",
+    "result_description": "Single playbook section markdown content"
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving a section from a playbook. get_playbook_section accepts {playbook_id, section_id}.",
+    "error_interpretation": "NotFound: playbook or section not found. SectionNotFound: section_id does not match any <!-- section: --> marker in the playbook."
+  }
+}

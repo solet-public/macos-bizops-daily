@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::set_autonomic_slot",
+  "display_name": "Set the autonomic inference slot",
+  "description": "Manually bind the sys:autonomic system slot to a live session by agent_instance_id (INF-01 auto-assignment lifecycle, manual override lane). The sys:autonomic holder is the frontier session that serves the organism's own error/result inference turns instead of the local default model. The general peer_claim_role verb REJECTS sys:* names for user-facing callers (reserved keyspace, v4 slice-C), so this verb is the sanctioned manual path: it validates the target is live AND registered with provides_inference=True (a holder without a live inference provider would strand every organism turn in the deferred queue), claims via the v4 role_binding CAS, fires the REL-04 transition notices (the new holder always hears it; a displaced LIVE prior holder gets the both-party notice), and drains the durable deferred-vertex queue when the claim re-lights a dark lane. Override-then-resume: the Trigger-1/Trigger-2 auto-assignment keeps the slot filled afterwards.",
+  "embedding_description": "Assign or override the autonomic system slot holder by hand: bind the slot serving organism error and result inference turns to a chosen live inference-capable session. The new holder is notified; a displaced prior holder is notified while live. This manual lane lets the operator choose the session carrying autonomic inference.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Autonomic slot bound",
+    "result_type": "set_autonomic_slot_result",
+    "result_description": "action (claimed on a fresh bind, displaced when a prior holder was replaced, refreshed on an idempotent self re-bind), name (always sys:autonomic), agent_instance_id (the bound session).",
+    "presentation_guidance": "Confirm which session now holds sys:autonomic and whether a prior holder was displaced. The bound session serves the organism's autonomic inference turns from now on."
+  },
+  "error_processor_customizations": {
+    "action_context": "Claims the sys:autonomic role_binding row via the v4 CAS (claim_role_binding_v4) after validating the target session has a live bridge-open inference provider. Notices and the deferred-queue drain are best-effort side effects; the claim itself is the authority.",
+    "error_interpretation": "missing_argument: agent_instance_id was empty. no_live_provider: the target session has no live inference provider (not registered with provides_inference=True, or its bridge is closed/swept). not_registered: the target has no live peer registration on any open bridge. bridge.not_started: the bridge interface is not running on this solet.",
+    "recovery_guidance": "no_live_provider / not_registered: have the target session (re)connect its MCP bridge — a coding-agent session registers with provides_inference=True automatically — then retry with its current agent_instance_id from peer_list. bridge.not_started: start the agent_messaging bridge interface first."
+  }
+}

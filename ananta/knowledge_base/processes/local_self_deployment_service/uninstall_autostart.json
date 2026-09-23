@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::local_self_deployment_service::uninstall_autostart",
+  "display_name": "Uninstall solet LaunchAgent",
+  "description": "Unload and remove the per-solet macOS LaunchAgent. This stops future login-time autostart but does not terminate the currently running solet. Idempotent: an already absent plist returns a successful terminal state. dry_run reports without invoking launchctl or deleting files.",
+  "embedding_description": "Uninstall macOS LaunchAgent autostart for the local solet. Unloads launchd definition, removes ~/Library/LaunchAgents/local.solet.<name>.plist, leaves the running solet process alone, and returns status, verb, solet_name, label, plist_path, prior_state, last_run_at, dry_run, and message.",
+  "result_processor_customizations": {
+    "action_label": "LaunchAgent uninstalled",
+    "result_type": "macos_self_deployment_autostart_uninstall_result",
+    "result_description": "AutostartResult envelope with status, verb, solet_name, label, plist_path, prior_state, last_run_at, dry_run, and message.",
+    "presentation_guidance": "Lead with status. On success or not_installed, surface label, plist_path, and message. Clarify that this does not stop the currently running solet."
+  },
+  "error_processor_customizations": {
+    "action_context": "Unload and remove a macOS LaunchAgent for solet autostart.",
+    "error_interpretation": "Failures usually indicate launchctl refusal or filesystem permission errors while removing the plist.",
+    "recovery_guidance": "Inspect launchctl output and file permissions under ~/Library/LaunchAgents. Retry after correcting ownership or removing stale files manually."
+  }
+}

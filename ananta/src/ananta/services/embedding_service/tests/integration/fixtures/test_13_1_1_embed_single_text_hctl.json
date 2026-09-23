@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::embedding_service::generate_embeddings",
+  "arguments": {
+    "inputs": ["This is a test text for embedding"]
+  }
+}

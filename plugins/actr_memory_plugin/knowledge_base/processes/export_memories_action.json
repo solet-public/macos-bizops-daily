@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::export_memories_action",
+  "display_name": "Export Memories",
+  "description": "Export memories to JSON file",
+  "embedding_description": "Export memories to a JSON file for backup. Optional file_path and include_archived. Returns file_path and memory_count. Use for backups, migrations, or offline analysis. Creates a portable snapshot including metadata and tags.",
+  "result_processor_customizations": {
+    "action_label": "Memories exported",
+    "result_type": "memories_exported",
+    "result_description": "Export results with file_path and memory_count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "query": "What tables are in the core schema?",
+  "expected_process_key": "service_interface::state_service::describe_schema",
+  "expected_arguments": {
+    "namespace": "core"
+  }
+}

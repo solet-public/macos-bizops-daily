@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::consolidate",
+  "display_name": "Consolidate Memories",
+  "description": "Summarize weak episodic memories into semantic memories. Part of memory lifecycle - compresses old, unused memories.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Consolidate Memories",
+    "result_type": "consolidation_results",
+    "result_description": "Results of memory consolidation including candidates found, clusters formed, and actions taken",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Consolidating weak episodic memories into semantic memories",
+    "error_interpretation": "InferenceError: failed to generate summaries for memory clusters. EmbeddingError: failed to generate embeddings for consolidated memories. DatabaseError: failed to update memory records.",
+    "recovery_guidance": "For inference errors: verify inference service is available. For embedding errors: verify embedding service is available. For database errors: verify state and vector storage are accessible."
+  }
+}

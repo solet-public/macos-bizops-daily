@@ -1,0 +1,5 @@
+{
+  "name": "coordination-hooks",
+  "version": "0.8.2",
+  "description": "Fleet coordination hooks: knowledge-base-first, check-your-messages and role-binding reminders; idle-wake and git-mutation guard; heartbeat report-alive, rotation-due watch, and rotation-due notice; memory-passthrough capture, session context, drain, hydrate, index and sync utilities; spawn-injected worker hooks; and owner-qualified receipt guards for heartbeat, rotation-due, and wake effects."
+}

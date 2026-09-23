@@ -1,0 +1,7 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::peer_role_read_receipts",
+  "display_name": "Check exact role display receipts",
+  "description": "Read-only lookup of exact acknowledged role-row display receipts for the calling session's currently held roles. Used by wake reconciliation; a missing result is not served and a scalar watermark alone is never suppression authority.",
+  "embedding_description": "Check whether named role spool rows have exact immutable display receipts for this calling session and its currently held roles. Wake reconciliation uses this read-only lookup before suppressing a durable role delivery: missing, malformed, foreign, or failed lookup results are never evidence that a row was served.",
+  "processor_policy_category": "edge"
+}

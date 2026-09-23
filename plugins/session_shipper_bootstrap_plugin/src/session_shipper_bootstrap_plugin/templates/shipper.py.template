@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Session shipper — operator-side daemon.
+
+Rendered from shipper.py.template at install time by the solet's
+session_shipper_bootstrap_plugin renderer (spec §17.5 / KB
+client-deployment-plugin-pattern).
+
+Pairs once against the solet's pairing routes
+(POST /api/v1/ledger/pairing/initiate, POST /api/v1/ledger/pairing/poll),
+then tails ~/.codex and ~/.claude session spools, POSTing each chunk to
+service_interface::session_ledger_service::ingest_raw_chunk over an
+OAuth client_credentials bearer.
+
+Credentials are NEVER embedded in this rendered file. After successful
+pairing the shipper writes client_id + client_secret to a sidecar at
+~/.config/${DEPLOYMENT_ID}-credentials.json (mode 0600) and reads it
+on subsequent boots. The template-render pipeline scans every output
+for credential markers and refuses to render anything that would
+flow a secret to disk through this file.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+# ── Render-time substitutions (paths/URLs/ids only — no secrets) ──
+SOLET_PUBLIC_URL = "${SOLET_PUBLIC_URL}"
+DEPLOYMENT_ID = "${DEPLOYMENT_ID}"
+MACHINE_ID = "${MACHINE_ID}"
+
+CREDENTIALS_PATH = Path.home() / ".config" / f"{DEPLOYMENT_ID}-credentials.json"
+POLL_INTERVAL_SECONDS = 300
+
+logger = logging.getLogger("session_shipper")
+
+
+def load_credentials() -> dict[str, str] | None:
+    """Read the post-pairing credentials sidecar; None means not yet paired."""
+    if not CREDENTIALS_PATH.is_file():
+        return None
+    try:
+        return json.loads(CREDENTIALS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.error("credentials sidecar unreadable at %s: %s", CREDENTIALS_PATH, exc)
+        return None
+
+
+def store_credentials(client_id: str, client_secret: str) -> None:
+    """Write credentials sidecar (0600) after a successful /pairing/poll mint."""
+    CREDENTIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CREDENTIALS_PATH.write_text(
+        json.dumps({"client_id": client_id, "client_secret": client_secret}),
+        encoding="utf-8",
+    )
+    CREDENTIALS_PATH.chmod(0o600)
+
+
+def run_pairing_poll(pairing_token: str) -> dict[str, Any]:
+    """One /pairing/poll call. Returns the parsed JSON body."""
+    import urllib.request  # noqa: PLC0415
+    body = json.dumps({"deployment_id": DEPLOYMENT_ID, "pairing_token": pairing_token}).encode()
+    req = urllib.request.Request(  # noqa: S310
+        f"{SOLET_PUBLIC_URL.rstrip('/')}/api/v1/ledger/pairing/poll",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+        return json.loads(resp.read())
+
+
+def main() -> int:
+    logging.basicConfig(level=logging.INFO)
+    creds = load_credentials()
+    if creds is None:
+        logger.info("not paired yet — operator must run generate_ingest_setup + approve_pairing")
+        return 1
+    logger.info(
+        "shipper boot deployment_id=%s machine_id=%s",
+        DEPLOYMENT_ID, MACHINE_ID,
+    )
+    # TODO(M5.D): tail loop over ~/.codex and ~/.claude spools.
+    while True:
+        time.sleep(POLL_INTERVAL_SECONDS)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

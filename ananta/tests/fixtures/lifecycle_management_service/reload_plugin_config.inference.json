@@ -1,0 +1,7 @@
+{
+  "natural_language_query": "Re-read the musical_synthesis_plugin's config from disk and push it into the running plugin",
+  "expected_process_key": "service_interface::lifecycle_management_service::reload_plugin_config",
+  "expected_arguments_structure": {
+    "plugin_name": "string"
+  }
+}

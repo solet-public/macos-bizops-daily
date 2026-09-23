@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "kind": "existing_install_doctor_contract",
+  "contracts": ["candidate", "verified", "diagnostic"],
+  "sections": [
+    {
+      "section": "identity",
+      "order": 1,
+      "checks": [
+        {"check_id": "head_commit", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "head_tree", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "committed_provenance", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "working_provenance", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "trailers", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "enrollment_drift", "required": {"candidate": false, "verified": false, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "source_topology",
+      "order": 2,
+      "checks": [
+        {"check_id": "origin_canonical", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "branch_attached", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "no_repo_operation", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "no_linked_worktree", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "no_submodule", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "not_shallow", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "local_state_admissible", "required": {"candidate": true, "verified": true, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "software_dependencies",
+      "order": 3,
+      "checks": [
+        {"check_id": "dependency_closure", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "host_python_313", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "instance_python", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "instance_bridge_cli", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "homebrew_present", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "tmux_present", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "postgresql_client_present", "required": {"candidate": false, "verified": false, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "environment_closure",
+      "order": 4,
+      "checks": [
+        {"check_id": "python_313", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "pip_present", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "build_backend", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "bridge_cli_version", "required": {"candidate": true, "verified": true, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "database_policy",
+      "order": 5,
+      "checks": [
+        {"check_id": "database_policy", "required": {"candidate": false, "verified": false, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "keychain_vault",
+      "order": 6,
+      "checks": [
+        {"check_id": "keychain_item_present", "required": {"candidate": false, "verified": false, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "configuration",
+      "order": 7,
+      "checks": [
+        {"check_id": "root_manifest_name", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "genesis_marker", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "profile_app_home", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "launchagent_label_coherence", "required": {"candidate": true, "verified": true, "diagnostic": true}}
+      ]
+    },
+    {
+      "section": "files_managed_blocks",
+      "order": 8,
+      "checks": [
+        {"check_id": "managed_artifact", "dynamic": true, "required": {"candidate": true, "verified": true, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "service_router",
+      "order": 9,
+      "checks": [
+        {"check_id": "launch_topology", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "launchagent_loaded", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "bridge_health", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "runtime_attestation", "condition": "launch_topology=materialized_supervisor", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "router_serving", "condition": "launch_topology=materialized_supervisor", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "runtime_process_identity", "condition": "launch_topology=legacy_direct", "required": {"candidate": true, "verified": true, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "shell_launchers",
+      "order": 10,
+      "checks": [
+        {"check_id": "named_launcher_target", "condition": "named_launcher_target=present", "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "shell_startup_block", "condition": "shell_startup_artifact=declared", "required": {"candidate": true, "verified": true, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "coding_agent_integrations",
+      "order": 11,
+      "checks": [
+        {"check_id": "plugin_cache_current", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "user_claude_md_section", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "stale_target_processes", "required": {"candidate": false, "verified": false, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "permissions",
+      "order": 12,
+      "checks": [
+        {"check_id": "permissions", "required": {"candidate": false, "verified": false, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "plugin_roster",
+      "order": 13,
+      "checks": [
+        {"check_id": "roster_matches_tree", "required": {"candidate": true, "verified": true, "diagnostic": true}}
+      ]
+    },
+    {
+      "section": "knowledge_session_retrieval",
+      "order": 14,
+      "checks": [
+        {"check_id": "knowledge_positive_search", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "knowledge_negative_search", "dynamic": true, "required": {"candidate": true, "verified": true, "diagnostic": false}},
+        {"check_id": "session_retrieval", "required": {"candidate": false, "verified": false, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "pending_release_migrations",
+      "order": 15,
+      "checks": [
+        {"check_id": "migration", "dynamic": true, "required": {"candidate": true, "verified": true, "diagnostic": false}}
+      ]
+    },
+    {
+      "section": "update_availability",
+      "order": 16,
+      "checks": [
+        {"check_id": "installed_descriptor_release", "required": {"candidate": false, "verified": false, "diagnostic": false}},
+        {"check_id": "active_update", "required": {"candidate": false, "verified": false, "diagnostic": false}}
+      ]
+    }
+  ]
+}

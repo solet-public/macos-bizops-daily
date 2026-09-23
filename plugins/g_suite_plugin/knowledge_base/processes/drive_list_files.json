@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::drive_list_files",
+  "display_name": "Drive: List Files",
+  "description": "List Google Drive files matching a Drive search query (for example \"name contains 'budget' and mimeType='application/pdf'\"), newest first. Runs as a background job: dispatch returns a job_id immediately, and the matching files (id, name, mime type, modified time, size per file) arrive via a follow-up message once the listing completes. Defaults to 500 files to avoid exhausting rate limits and pulling more than needed. To fetch more, pass acknowledge_default_limit_override=true together with an explicit row_limit (up to 1000, Drive's own real single-call maximum, Google, current as of this writing) -- both are required together, and a row_limit above the cap is refused rather than silently clamped. Requires a connected account (run connect_account first).",
+  "embedding_description": "Search the connected Google Drive as a background job using Drive's own search grammar - name contains, mimeType, modifiedTime, trashed, parents in a folder. Dispatch returns a job_id for tracking; completion delivers each matching file's id, name, mime type, modified time, and size, newest first, defaulting to 500 files.",
+  "result_processor_customizations": {
+    "action_label": "Drive file listing started",
+    "result_type": "g_suite_drive_list_result",
+    "result_description": "Job queued for the Drive listing; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to list Google Drive files matching a search query.",
+    "error_interpretation": "gsuite.invalid_params: missing session_id/flow_id context. gsuite.not_connected: no account linked. gsuite.auth_expired: the refresh token was revoked. gsuite.rate_limited: Google throttled the request. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.not_connected / gsuite.auth_expired: run connect_account. gsuite.rate_limited: back off and retry. gsuite.api_error: retry once platform startup has completed."
+  }
+}

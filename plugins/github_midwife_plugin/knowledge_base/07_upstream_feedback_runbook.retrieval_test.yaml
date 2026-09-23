@@ -1,0 +1,45 @@
+# Retrieval-test companion for the upstream feedback runbook article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+
+article_path: knowledge_bases/github_midwife_plugin/07_upstream_feedback_runbook.md
+consumer_profile: both
+
+target_queries:
+  - "how do I report a platform bug to the seed maintainers"
+  - "request a feature upstream from a deployed solet"
+  - "file a seed feedback item as a github issue form"
+  - "should feedback be an issue or a pull request design document"
+  # Added 2026-08-15 with R9. The runbook used to route RFC-shaped design
+  # offers to a pull request; under the "open source, closed contribution"
+  # ruling it routes them to a feature-request issue instead. These are the
+  # questions a driving agent now asks BEFORE doing the wrong thing, so they
+  # are the ones that must retrieve.
+  #
+  # A phrasing NOT used, and why: "can I contribute code back to the seed I was
+  # born from" measured at rank 8 here, beaten by four seed_factory_plugin
+  # articles. That is an ORIGIN-index artifact, not an adopter's experience —
+  # seed_factory_plugin is NO-FACTORY and ships in no seed, so in a born clone
+  # those competitors do not exist. The phrasing was still dropped rather than
+  # asserted around: "born from" is provenance/lifecycle vocabulary and pulls
+  # lifecycle articles, and a target query that only passes once you discount
+  # half the index is a weak assertion. The three kept here rank 1 both overall
+  # and among shipped articles.
+  - "does the seed repository accept pull requests or patches"
+  - "how do I send an RFC shaped design proposal to the maintainers"
+  - "how do I contribute a fix upstream to the seed"
+  - "does upstream want my patch"
+  - "group a multi item feedback round under a parent issue"
+  - "what is safe to include in an outbound feedback report"
+  - "carrying a local fix should we upstream it"
+  - "how do I find out that my reported item was fixed"
+  - "our seed feedback got no response is it deprioritized or overlooked"
+
+forbidden_queries:
+  - "seed hydration environment setup postgres launchers"     # 01_hydration_runbook owns this
+  - "updating a live solet from a re-minted seed"        # 05_seed_update_runbook owns this
+  - "deployment report card what remains to configure"        # 08_deployment_report_card owns this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions: []

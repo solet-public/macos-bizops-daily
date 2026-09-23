@@ -1,0 +1,12 @@
+{
+  "process_key": "service_interface::state_service::delete_records",
+  "arguments": {
+    "namespace": "core",
+    "query": {
+      "table": "test_table",
+      "filters": {
+        "id": "test_record_123"
+      }
+    }
+  }
+}

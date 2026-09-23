@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::reinforce",
+  "display_name": "Reinforce Memory",
+  "description": "Explicitly reinforce a memory by adding a retrieval timestamp. This strengthens the memory's ACT-R activation, making it more likely to surface in future recalls. Use this when surfacing memories in context to ensure useful memories stay strong.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Reinforce Memory",
+    "result_type": "memory_reinforced",
+    "result_description": "Confirmation that the memory has been reinforced with updated strength",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reinforcing a memory by adding a retrieval timestamp",
+    "error_interpretation": "MemoryNotFoundError: the specified memory_id does not exist. ArchivedMemoryError: cannot reinforce an archived memory. DatabaseError: failed to update memory record.",
+    "recovery_guidance": "For memory not found: verify the memory_id is correct. For archived memory: the memory must be active to be reinforced. For database errors: verify state storage is accessible."
+  }
+}

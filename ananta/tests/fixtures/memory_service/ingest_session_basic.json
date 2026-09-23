@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::ingest_session",
+  "arguments": {
+    "transcript": "User: What is ACT-R?\nAssistant: ACT-R is a cognitive architecture that models human cognition with production rules and declarative memory.\nUser: How does memory decay work?\nAssistant: In ACT-R, memories have activation values that decay over time based on recency and frequency of use.",
+    "session_id": "test_session_001",
+    "chunk_by_turns": true
+  }
+}

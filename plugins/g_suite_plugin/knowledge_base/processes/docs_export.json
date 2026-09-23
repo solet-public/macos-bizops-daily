@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::g_suite_plugin::docs_export",
+  "display_name": "Docs: Export",
+  "description": "Export a Google Docs document to pdf, docx, or txt into blob storage and return its doc_blob_key. Requires a connected account.",
+  "embedding_description": "Export a Google Docs document through Drive into platform blob storage as PDF, DOCX, or plain TXT. PDF and DOCX preserve rendered formatting and images; TXT carries plain text. Returns a document blob key for email attachments or downstream plugins.",
+  "result_processor_customizations": {
+    "action_label": "Document exported to blob",
+    "result_type": "g_suite_docs_export_result",
+    "result_description": "Dict with doc_blob_key (a blob-storage reference to the exported bytes).",
+    "presentation_guidance": "Confirm the export and format used. The doc_blob_key references potentially sensitive content — surface it for downstream use but do not treat it as public."
+  },
+  "error_processor_customizations": {
+    "action_context": "Export a Google Docs document into blob storage.",
+    "error_interpretation": "gsuite.invalid_params: missing id, or format is not pdf/docx/txt. gsuite.not_found: the id does not exist. gsuite.not_connected: no account linked.",
+    "recovery_guidance": "gsuite.invalid_params: pass format as pdf, docx, or txt. gsuite.not_found: the document may have been deleted. gsuite.not_connected: run connect_account."
+  }
+}

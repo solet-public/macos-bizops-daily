@@ -1,0 +1,15 @@
+{
+  "name": "test_get_vector_not_found",
+  "description": "Attempt to retrieve a non-existent vector - should return error",
+  "process_key": "plugin::pgvector_service_plugin::get_vector_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vector_id": "non-existent-vector-id-99999"
+    },
+    "state": {
+      "current_session_id": "test-get-notfound-001"
+    },
+    "timeout_seconds": 30
+  }
+}

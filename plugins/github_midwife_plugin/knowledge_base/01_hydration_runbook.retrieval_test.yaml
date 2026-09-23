@@ -1,0 +1,53 @@
+# Retrieval-test companion for the seed-hydration operator-environment runbook.
+# Gated by service_interface::knowledge_service::test_retrieval (W7). Until the
+# gate is live, run each query through service_interface::knowledge_service::search
+# and confirm this article ranks at or above min_rank for targets and no better
+# than forbidden_min_rank for forbidden queries.
+#
+# R2 CANARY: hydration_templates/* is EXCLUDED
+# from ingestion via this KB's manifest.yaml content.patterns.exclude. The
+# template-flavored target queries below double as the regression canary — if
+# a hydration_templates/ file path ever appears in results for them, the
+# ingestion exclusion has regressed (the runbook article, not a template file,
+# must be what answers template-flavored questions).
+
+article_path: knowledge_bases/github_midwife_plugin/01_hydration_runbook.md
+consumer_profile: both
+
+target_queries:
+  - "how do I set up my shell environment after birthing a solet"
+  - "hydration runbook operator environment setup"
+  - "offer to replace the user's zshrc with a backup"
+  - "setup agent should inspect zshrc before asking about shell integration"
+  - "command line way to start claude with a properly named session"
+  - "generated CLAUDE.md for a newborn solet clone"
+  - "where does the generated AGENTS.md file come from after birthing a solet"
+  - "newborn claude code settings session start hook"
+  - "why does the launcher never pass dangerously-skip-permissions"
+  - "wizard step one create the database before birthing a solet"
+  - "second solet on the same machine database credential pipe"
+  - "pg_hba scram line for a new solet database negative auth check"
+  - "how do I know the newborn solet is alive checklist"
+  - "coordination-hooks plugin registered in settings.json but hooks never fire"
+  - "explicit CLI command to install the coordination-hooks plugin during hydration"
+  - "what does my solet capture and embed from my sessions"
+  - "does peer messaging get ingested into the knowledge base"
+  - "where does ingested session content get embedded, local or cloud"
+  - "how do I see which session sources this solet is actually ingesting from"
+  - "can I opt out of or redact session transcript ingestion"
+
+forbidden_queries:
+  - "how do I birth a local solet on macOS"        # 13_solet_setup/08 should win
+  - "how do I assemble and publish a seed bundle"       # seed factory design surface should win
+  - "how do I transfer a secret between solets"      # macos_vault_plugin articles should win
+  - "ledger allowed roots allow-list containment enforcement"  # 19_session_ledger/07_ledger_allowed_roots_authz should win — this article discloses ingestion exists, that one owns the containment mechanism
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions:
+  - plugin::github_midwife_plugin::birth_solet
+  - service_interface::knowledge_service::search
+  - plugin::agent_messaging_plugin::peer_claim_role
+  - service_interface::session_ledger_service::list_sources
+  - service_interface::session_ledger_service::drain_event_embeddings

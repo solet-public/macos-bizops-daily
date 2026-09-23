@@ -1,0 +1,293 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://solet.ai/schemas/setup-adapter-envelope-v1.json",
+  "title": "Solet target-local operation adapter exchange",
+  "description": "One closed request/result protocol shared by pre-venv stdlib and post-venv target-local adapters.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {"const": 1},
+    "kind": {"enum": ["operation_request", "operation_result"]},
+    "request_id": {"type": "string", "format": "uuid"},
+    "operation_id": {"$ref": "#/definitions/id"},
+    "operation_ref": {"type": "string", "pattern": "^[a-z][a-z0-9_]*::[a-z][a-z0-9_.]*$"},
+    "phase": {"enum": ["probe", "apply"]},
+    "probe_purpose": {
+      "oneOf": [
+        {"type": "null"},
+        {"enum": ["preview", "pre_apply", "post_apply", "completion", "decision_discovery", "decision_qualification", "stage_entry", "stage_exit"]}
+      ]
+    },
+    "attempt": {"type": "integer", "minimum": 1},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{1,31}$"},
+    "target": {"type": "string", "pattern": "^/", "minLength": 2},
+    "flow_id": {"const": "macos.repository_setup"},
+    "flow_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "answers_fingerprint": {"$ref": "#/definitions/sha256"},
+    "approval_fingerprint": {"oneOf": [{"type": "null"}, {"$ref": "#/definitions/sha256"}]},
+    "dry_run": {"type": "boolean"},
+    "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 900},
+    "public_inputs": {
+      "type": "object",
+      "propertyNames": {
+        "allOf": [
+          {"pattern": "^[a-z][a-z0-9_]{1,127}$"},
+          {"not": {"pattern": "(?i)(password|secret|token|credential|private_key|oauth_code)"}}
+        ]
+      },
+      "additionalProperties": {"$ref": "#/definitions/public_value"}
+    },
+    "checkpoint_status": {"$ref": "#/definitions/checkpoint_status"},
+    "error_kind": {"oneOf": [{"type": "null"}, {"$ref": "#/definitions/id"}]},
+    "retry_safe": {"type": "boolean"},
+    "exit_code": {"oneOf": [{"type": "null"}, {"type": "integer", "minimum": 0, "maximum": 255}]},
+    "timed_out": {"type": "boolean"},
+    "duration_ms": {"type": "integer", "minimum": 0},
+    "stdout": {"type": "string", "maxLength": 16384},
+    "stderr": {"type": "string", "maxLength": 16384},
+    "planned_actions": {"type": "array", "items": {"$ref": "#/definitions/planned_action"}},
+    "discovered_candidates": {"type": "array", "items": {"$ref": "#/definitions/discovered_candidate"}},
+    "evidence": {"type": "array", "items": {"$ref": "#/definitions/evidence"}},
+    "reason": {"oneOf": [{"type": "null"}, {"$ref": "#/definitions/failure_reason"}]},
+    "repair": {"oneOf": [{"type": "null"}, {"type": "string", "maxLength": 2048}]}
+  },
+  "oneOf": [
+    {
+      "properties": {"kind": {"const": "operation_request"}},
+      "required": [
+        "protocol_version",
+        "kind",
+        "request_id",
+        "operation_id",
+        "operation_ref",
+        "phase",
+        "probe_purpose",
+        "attempt",
+        "name",
+        "target",
+        "flow_id",
+        "flow_source_revision",
+        "answers_fingerprint",
+        "approval_fingerprint",
+        "dry_run",
+        "timeout_seconds",
+        "public_inputs"
+      ],
+      "not": {"required": ["checkpoint_status"]}
+    },
+    {
+      "properties": {"kind": {"const": "operation_result"}},
+      "required": [
+        "protocol_version",
+        "kind",
+        "request_id",
+        "operation_id",
+        "phase",
+        "probe_purpose",
+        "checkpoint_status",
+        "error_kind",
+        "retry_safe",
+        "exit_code",
+        "timed_out",
+        "duration_ms",
+        "stdout",
+        "stderr",
+        "planned_actions",
+        "discovered_candidates",
+        "evidence",
+        "reason",
+        "repair"
+      ],
+      "not": {"required": ["operation_ref"]}
+    }
+  ],
+  "allOf": [
+    {
+      "if": {"properties": {"phase": {"const": "apply"}}, "required": ["phase"]},
+      "then": {"properties": {"probe_purpose": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"phase": {"const": "probe"}}, "required": ["phase"]},
+      "then": {"properties": {"probe_purpose": {"type": "string"}}}
+    },
+    {
+      "if": {
+        "properties": {"kind": {"const": "operation_request"}, "phase": {"const": "apply"}},
+        "required": ["kind", "phase"]
+      },
+      "then": {
+        "properties": {
+          "dry_run": {"const": false},
+          "approval_fingerprint": {"$ref": "#/definitions/sha256"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"kind": {"const": "operation_request"}, "phase": {"const": "probe"}},
+        "required": ["kind", "phase"]
+      },
+      "then": {
+        "properties": {
+          "dry_run": {"const": true},
+          "approval_fingerprint": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"kind": {"const": "operation_result"}, "phase": {"const": "apply"}},
+        "required": ["kind", "phase"]
+      },
+      "then": {
+        "properties": {
+          "checkpoint_status": {"not": {"const": "verified"}},
+          "planned_actions": {"maxItems": 0},
+          "discovered_candidates": {"maxItems": 0}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"kind": {"const": "operation_result"}, "phase": {"const": "probe"}},
+        "required": ["kind", "phase"]
+      },
+      "then": {
+        "properties": {
+          "checkpoint_status": {"not": {"enum": ["consented", "applying", "applied"]}}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {"const": "operation_result"},
+          "probe_purpose": {
+            "enum": ["post_apply", "completion", "decision_discovery", "decision_qualification", "stage_entry", "stage_exit"]
+          }
+        },
+        "required": ["kind", "probe_purpose"]
+      },
+      "then": {"properties": {"planned_actions": {"maxItems": 0}}}
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {"const": "operation_result"},
+          "probe_purpose": {
+            "enum": ["preview", "pre_apply", "post_apply", "completion", "decision_qualification", "stage_entry", "stage_exit"]
+          }
+        },
+        "required": ["kind", "probe_purpose"]
+      },
+      "then": {"properties": {"discovered_candidates": {"maxItems": 0}}}
+    }
+  ],
+  "definitions": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,127}$"},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "checkpoint_status": {
+      "enum": [
+        "pending",
+        "awaiting_user",
+        "consented",
+        "applying",
+        "applied",
+        "verified",
+        "declined",
+        "blocked",
+        "failed",
+        "not_applicable"
+      ]
+    },
+    "failure_reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome_class", "exit_code", "duration_ms", "timed_out", "stdout_bytes", "stderr_bytes", "stdout_truncated", "stderr_truncated"],
+      "properties": {
+        "outcome_class": {"enum": ["executable_missing", "launch_error", "timeout", "nonzero_exit"]},
+        "exit_code": {"oneOf": [{"type": "null"}, {"type": "integer", "minimum": 0, "maximum": 255}]},
+        "duration_ms": {"type": "integer", "minimum": 0},
+        "timed_out": {"type": "boolean"},
+        "stdout_bytes": {"type": "integer", "minimum": 0},
+        "stderr_bytes": {"type": "integer", "minimum": 0},
+        "stdout_truncated": {"type": "boolean"},
+        "stderr_truncated": {"type": "boolean"}
+      }
+    },
+    "public_value": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "integer"},
+        {"type": "number"},
+        {"type": "string"},
+        {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      ]
+    },
+    "planned_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "mutation_kind",
+        "target",
+        "requires_confirmation",
+        "condition_or_evidence_ref"
+      ],
+      "properties": {
+        "id": {"$ref": "#/definitions/id"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 256},
+        "mutation_kind": {"$ref": "#/definitions/id"},
+        "target": {"type": "string", "minLength": 1, "maxLength": 512},
+        "requires_confirmation": {"type": "boolean"},
+        "condition_or_evidence_ref": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "discovered_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "value", "label", "recommendation_rank", "metadata"],
+      "properties": {
+        "decision_id": {"$ref": "#/definitions/id"},
+        "value": {"type": "string", "minLength": 1, "maxLength": 256},
+        "label": {"type": "string", "minLength": 1, "maxLength": 256},
+        "recommendation_rank": {"type": "integer", "minimum": 0},
+        "metadata": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/definitions/id"},
+          "additionalProperties": {"$ref": "#/definitions/public_value"}
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "status",
+        "summary",
+        "observed",
+        "expected",
+        "source",
+        "digest",
+        "captured_at",
+        "sensitivity"
+      ],
+      "properties": {
+        "id": {"$ref": "#/definitions/id"},
+        "kind": {"$ref": "#/definitions/id"},
+        "status": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "maxLength": 512},
+        "observed": {"$ref": "#/definitions/public_value"},
+        "expected": {"$ref": "#/definitions/public_value"},
+        "source": {"type": "string", "minLength": 1, "maxLength": 512},
+        "digest": {"type": "string", "pattern": "^(sha256:[0-9a-f]{64}|none)$"},
+        "captured_at": {"type": "string", "format": "date-time"},
+        "sensitivity": {"enum": ["public", "redacted"]}
+      }
+    }
+  }
+}

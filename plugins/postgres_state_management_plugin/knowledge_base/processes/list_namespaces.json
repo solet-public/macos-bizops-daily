@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::postgres_state_management_plugin::list_namespaces",
+  "display_name": "List Namespaces (Postgres)",
+  "description": "List all available namespaces in the PostgreSQL state database.",
+  "embedding_description": "List all namespaces in the PostgreSQL state store. Use to discover available data partitions, debug storage, or verify configured schemas. Returns namespaces array and count so you can inventory or select target namespaces.",
+  "result_processor_customizations": {
+    "action_label": "List Namespaces",
+    "result_type": "namespace_list",
+    "result_description": "List of all namespaces in the PostgreSQL database with count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing all namespaces in the PostgreSQL state database",
+    "error_interpretation": "ConnectionError: PostgreSQL connection failed or information_schema not accessible.",
+    "recovery_guidance": "For connection errors: verify PostgreSQL is running and accessible. Check that the pg_schema exists."
+  }
+}

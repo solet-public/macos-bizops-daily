@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::local_self_deployment_service::swap_rollback",
+  "display_name": "Rollback local blue-green swap",
+  "description": "Operator-triggered rollback for local blue-green self-deployment. While the prior color is still inside its drain window, asks the local router to make that prior color active again. Returns rolled_back on success or rollback_not_applicable when no prior color can still be restored.",
+  "embedding_description": "Rollback a local blue-green swap during the drain window. Re-points the local router back to the previous color when rollback is still possible. Takes reason and returns status, rolled_back_to, and reason. Use when a newly activated local the solet color should be abandoned before complete_swap tears down the prior color.",
+  "result_processor_customizations": {
+    "action_label": "local swap rollback complete",
+    "result_type": "local_blue_green_swap_rollback_result",
+    "result_description": "Rollback envelope with status, rolled_back_to, and reason.",
+    "presentation_guidance": "Lead with status. If rolled_back, name the active color. If rollback_not_applicable, explain that the prior color is no longer inside the drain window."
+  },
+  "error_processor_customizations": {
+    "action_context": "Rollback the local blue-green router to the prior color during the drain window.",
+    "error_interpretation": "rollback_not_applicable means the prior color cannot be restored. router failures indicate local router unavailability or refusal.",
+    "recovery_guidance": "Check swap_status. If rollback is no longer applicable, use restart_with_manifest or manual launch recovery instead of retrying rollback."
+  }
+}

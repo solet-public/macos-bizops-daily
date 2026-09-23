@@ -1,0 +1,21 @@
+name: platform_health_plugin
+description: |
+  WARNING: a diagnostic name does not make this process diagnose-safe: live
+  read-shape calls can reach external systems. `dry_run` defaults to true and
+  returns the complete classification table without dispatching anything.
+  Live dispatch requires `dry_run=false`; its default scope is read-shape
+  `service_interface` providers only. An outward-facing plugin provider must
+  be explicitly enumerated in `external_namespaces` and accompanied by an
+  `operator_confirmation` turn/message id. `write_enabled` still gates only
+  write-shape verbs. NOT a startup-blocking gate — manual operator/CI use via
+  `plugin::platform_health_plugin::execute_registry_sweep`.
+
+  Catches the failure modes that bit the platform 2026-05-28..30:
+  D5 EDGE-wake schema mismatch; scheduling_service::execute_in_seconds
+  "Process not found or malformed in registry"; session_ledger SQL
+  "operator does not exist: integer = boolean".
+
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider

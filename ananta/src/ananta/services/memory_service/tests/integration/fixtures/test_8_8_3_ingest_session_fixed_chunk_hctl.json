@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::ingest_session",
+  "arguments": {
+    "transcript": "This is a long transcript that should be chunked by fixed size rather than conversation turns.",
+    "session_id": "test-fixed-chunk-002",
+    "chunk_by_turns": false
+  }
+}

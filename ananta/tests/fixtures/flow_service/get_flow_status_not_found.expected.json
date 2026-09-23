@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "\"flow\": null"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Get status of non-existent flow - should return null flow gracefully"
+}

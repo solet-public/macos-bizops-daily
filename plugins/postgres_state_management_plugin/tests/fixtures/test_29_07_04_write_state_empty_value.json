@@ -1,0 +1,22 @@
+{
+  "name": "test_write_state_empty_value",
+  "description": "Verify write_state handles empty string values",
+  "process_key": "plugin::postgres_state_management_plugin::write_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "data": {
+        "table": "key_value_store",
+        "record": {
+          "id": "test_empty_01",
+          "namespace": "test_empty",
+          "key": "empty_key",
+          "value": "",
+          "scope": "GLOBAL"
+        }
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

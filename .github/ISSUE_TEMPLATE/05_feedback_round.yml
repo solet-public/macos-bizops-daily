@@ -1,0 +1,84 @@
+name: Feedback round (parent issue)
+description: The container for a multi-item round. File this first, then attach each item's issue to it as a sub-issue.
+title: "Part N — feedback round from <your-solet-name>"
+labels: ["feedback-round"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        File this **only for a multi-item round**. A single-item round needs no
+        parent — just file the one issue. The parent carries the round's context
+        and gives both sides one place to see what is still open; the children
+        carry the individually answerable items.
+
+  - type: input
+    id: part_number
+    attributes:
+      label: Part number
+      description: >-
+        Your round number — one monotonically increasing part number per
+        deployment, never reused. Repeat it in the issue title.
+      placeholder: "Part 42"
+    validations:
+      required: true
+
+  - type: input
+    id: release
+    attributes:
+      label: Release this round was measured against
+      description: The seed HEAD commit and the RELEASE_NOTES.md version, if present.
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What this round is about
+      description: >-
+        A few sentences of context: what you were doing across these items, and
+        anything that ties them together. Detail belongs in the child issues —
+        this is the orientation a maintainer reads first.
+    validations:
+      required: true
+
+  - type: textarea
+    id: items
+    attributes:
+      label: Items in this round
+      description: >-
+        One line per item — number, class, and one-line summary. Attach each
+        item's issue as a sub-issue once filed; this list is the human-readable
+        index of the same thing.
+      value: |
+        | Item | Class | Summary |
+        |---|---|---|
+        | §N.1 | defect | |
+        | §N.2 | question | |
+    validations:
+      required: true
+
+  - type: textarea
+    id: still_open
+    attributes:
+      label: Items carried forward from earlier rounds (optional)
+      description: >-
+        Open items from previous rounds you are re-raising, by number, as a list —
+        briefly, not re-argued. Reference the still-open issues rather than filing
+        duplicates. Silence is not a disposition, and this is how you say so
+        without repeating yourself.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: content_gate
+    attributes:
+      label: Content gate
+      description: >-
+        This issue is published the moment you submit it, and editing it
+        afterwards does not unpublish what was there.
+      options:
+        - label: >-
+            I re-read this issue and it contains no personal identifiers, no
+            employer or business specifics, and no credentials or secret-looking
+            values.
+          required: true

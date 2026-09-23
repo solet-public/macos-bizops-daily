@@ -1,0 +1,11 @@
+{
+  "action_status_any": ["completed", "error"],
+  "output_contains_any": [
+    "confirm",
+    "required",
+    "purged",
+    "cancelled",
+    "aborted"
+  ],
+  "timeout_seconds": 60
+}

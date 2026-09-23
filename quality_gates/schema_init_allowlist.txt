@@ -1,0 +1,32 @@
+# schema-init gate — tracked-debt allowlist
+#
+# The gate (quality_gates/schema_init_gate.py) BOOTS the platform's own
+# initialize_schemas path against the tree under test: core schemas, every
+# plugin's get_schema_definitions() (instantiated exactly as startup does),
+# the discovery/ledger vector schemas, then the real SchemaManager with the
+# lifecycle install recorded instead of written. A finding here is a startup
+# crash: SchemaStandardizer._validate_no_protected_field_overrides or
+# SchemaDefinition.validate() refused the schema, or a plugin's constructor /
+# get_schema_definitions() raised (iss_63d91ca9, iss_5f91287d).
+#
+# Format: <key>  # owner: <id> reason: <free text> expires: <YYYY-MM-DD>
+#   key — <namespace>::<table[,table...]> for a schema-init violation, or
+#         <plugin_name>::boot for a plugin that could not be instantiated /
+#         collected. Matched exactly against the gate's own finding keys.
+#
+# Allowlisted findings are STILL PRINTED; they do not contribute to the
+# exit-2 verdict. Removing an entry is the unit of remediation progress.
+# This register is NOT a skip path. Standing fleet-steward ruling (2026-09-20,
+# under rul_367d8bd6): a LIVE boot-crash is never allowlisted — the gate
+# reddening master until the fix lands is the correct verdict. Entries here
+# require operator ratification (KB: "Gate Allowlist Conventions").
+#
+# The gate reports "[stale-allowlist]" for any entry that no longer matches
+# a finding; delete those entries when reported.
+#
+# ---------------------------------------------------------------------------
+# Registered 2026-09-20 (lane-fix-schema-floor-prelanding-gate-20260920)
+# with ZERO entries: the two live findings at registration
+# (seed_factory_plugin dependency_snapshots, iss_2bc76075; release_runs,
+# iss_5f91287d) are being fixed by the chg_7fb2e9f8 redo lane and block
+# landings until they land, by ruling.

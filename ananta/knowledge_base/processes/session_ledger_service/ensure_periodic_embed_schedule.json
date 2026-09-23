@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::session_ledger_service::ensure_periodic_embed_schedule",
+  "display_name": "Ensure Periodic Ledger Event-Embedding Drain Schedule",
+  "description": "Idempotently install (or normalize) a single cron schedule that fires `service_interface::session_ledger_service::drain_event_embeddings` every `cadence_minutes` minutes. Mirrors `ensure_periodic_summarize_schedule` for the LED-01 event-content embedding path: clears any existing schedules tagged `ledger:periodic_embed`, then creates one fresh schedule with the requested cadence.\n\nBoot-only — wired via the profile's `starting_actions` so a fresh solet starts embedding her own event content the moment her services come up, and the historical backlog drains in the background. The `is_discoverable=False` flag keeps the verb out of the model's `process_search` results; operator-initiated re-runs go through the operator bridge directly.\n\nFails fast if scheduling_service is not bound at session_ledger_service construction. Returns `{outcome, schedule_id, tag, cadence_minutes, cleared_count}` where `outcome` is `created` (fresh) or `normalized` (stale/duplicate schedules cleared first).",
+  "embedding_description": "Boot-wired schedule that makes the searchable event-content index fill and stay current on its own: it registers the recurring job that periodically drains not-yet-embedded USER/ASSISTANT ledger messages through the local embedder, so a fresh solet backfills her historical event backlog and keeps it current with no operator loop. Idempotent, tagged ledger:periodic_embed.",
+  "result_processor_customizations": {
+    "action_label": "Ensure Periodic Ledger Event-Embedding Drain",
+    "result_type": "ledger_periodic_embed_ensured",
+    "result_description": "Periodic event-embedding-drain schedule status — outcome created or normalized after duplicate cleanup, plus the active schedule_id.",
+    "presentation_guidance": "",
+    "output_action_guidance": "The ledger now drains not-yet-embedded event content every configured interval. If you are diagnosing whether event embeddings are landing, run a search_event_content query (or watch the drain's completion log line) after the next firing rather than re-running this verb."
+  },
+  "error_processor_customizations": {
+    "action_context": "Ensuring a single periodic event-embedding-drain cron schedule for the LLM session ledger",
+    "error_interpretation": "RuntimeError: scheduling_service not bound (profile omits scheduling). ValueError: cadence_minutes out of the 1..59 range. SchedulerError: scheduling backend rejected the cron expression or refused to clear/create the schedule.",
+    "recovery_guidance": "If scheduling is unavailable, the operator can invoke drain_event_embeddings directly from the operator bridge as a one-shot. If cadence validation failed, retry with a value in [1, 59]."
+  }
+}

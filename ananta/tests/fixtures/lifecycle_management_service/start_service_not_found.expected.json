@@ -1,0 +1,10 @@
+{
+  "exit_code": 1,
+  "output_contains": [
+    "not found",
+    "service"
+  ],
+  "output_not_contains": [
+    "success"
+  ]
+}

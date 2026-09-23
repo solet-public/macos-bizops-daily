@@ -1,0 +1,18 @@
+{
+  "name": "test_write_state_missing_table",
+  "description": "Verify write_state returns error when table is missing",
+  "process_key": "plugin::postgres_state_management_plugin::write_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "data": {
+        "record": {
+          "id": "test_no_table",
+          "value": "should_fail"
+        }
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,16 @@
+{
+  "name": "test_search_similar_empty_vector",
+  "description": "Attempt similarity search with empty query vector - should fail",
+  "process_key": "plugin::pgvector_service_plugin::search_similar_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "query_vector": [],
+      "top_k": 5
+    },
+    "state": {
+      "current_session_id": "test-search-empty-001"
+    },
+    "timeout_seconds": 30
+  }
+}

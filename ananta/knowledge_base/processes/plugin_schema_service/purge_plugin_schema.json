@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::plugin_schema_service::purge_plugin_schema",
+  "display_name": "Purge Plugin Schema",
+  "description": "Destructive — drops every platform-owned table for the namespace and deletes the ownership rows. Refuses against an active namespace unless force=True is passed. Refuses to touch any table not recorded in ownership for this namespace.",
+  "embedding_description": "Permanently drop all tables and ownership rows for a plugin namespace. Safe-by-default: refuses against active namespaces unless force=True. After uninstall_plugin_schema marks a namespace inactive, purge is the verb that actually removes the data.",
+  "result_processor_customizations": {
+    "action_label": "Plugin schema purged",
+    "result_type": "plugin_schema_purged",
+    "result_description": "Lifecycle outcome with status (purged | not_installed), namespace, tables dropped, and the force flag value.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Drops platform-owned tables and ownership rows for the namespace in one transaction.",
+    "error_interpretation": "ValueError: namespace is active and force=False. Postgres errors propagate from the transactional apply (failure rolls back atomically — no partial drop).",
+    "recovery_guidance": "For 'refused — active': call uninstall_plugin_schema first to mark the namespace inactive, then call purge again. Or pass force=True if the data loss is intentional. For Postgres errors: confirm postgres_state_management_plugin is healthy; the transaction rolled back, no tables were dropped."
+  }
+}

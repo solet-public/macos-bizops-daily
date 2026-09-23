@@ -1,0 +1,23 @@
+name: default_scheduling_plugin
+description: >
+  Scheduling service reference: cron-style scheduling, one-shot timers,
+  recurring task management, and scheduling plugin operations.
+
+category: plugin-internal
+tags:
+  - plugin_reference
+  - scheduling_operations
+
+content:
+  patterns:
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+      - "processes/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

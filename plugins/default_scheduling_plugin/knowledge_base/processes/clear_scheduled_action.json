@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_scheduling_plugin::clear_scheduled_action",
+  "display_name": "Clear Scheduled Action",
+  "description": "Cancel and remove a specific scheduled job by ID",
+  "embedding_description": "Cancel and remove a specific scheduled job by schedule_id. Use to stop pending jobs or clean up after a workflow completes. Safe to call if a job already executed. Returns cancelled flag and status message.",
+  "result_processor_customizations": {
+    "action_label": "Schedule cleared",
+    "result_type": "schedule_cleared",
+    "result_description": "Confirmation of schedule removal with schedule_id",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Canceling and removing a specific scheduled job by its unique ID",
+    "error_interpretation": "ScheduleNotFoundError: schedule_id doesn't exist (already executed, cancelled, or never created). ParameterError: schedule_id is missing or empty. ScheduleDeleteError: scheduler service error during job removal or state service deletion failure.",
+    "recovery_guidance": "For not found errors: verify schedule_id is correct; one-time schedules auto-cleanup after execution so this may be expected. For Pattern 6a async monitoring: it's safe to attempt cancellation even if job already completed - handle gracefully. For parameter errors: ensure schedule_id is provided and non-empty. For deletion errors: verify scheduler and state services are accessible."
+  }
+}

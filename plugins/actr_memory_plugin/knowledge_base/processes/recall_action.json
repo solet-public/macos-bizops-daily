@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::recall_action",
+  "display_name": "Recall",
+  "description": "Search memories with strength-weighted ranking. Supports filtering by tags and excluding specific IDs.",
+  "embedding_description": "Search memories using semantic similarity and activation strength. Provide query, optional top_k, memory_type, tags, and exclude_ids. Returns ranked memories and count. Use to recall relevant past knowledge.",
+  "result_processor_customizations": {
+    "action_label": "Memory recall",
+    "result_type": "memories_retrieved",
+    "result_description": "Matching memories with content, strength scores, and metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

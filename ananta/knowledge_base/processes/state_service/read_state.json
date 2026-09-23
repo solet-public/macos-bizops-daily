@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::state_service::read_state",
+  "display_name": "Read State",
+  "description": "Query and retrieve data from the state database.\n\nUse this for safe, structured introspection of platform tables when no higher-level domain process exists (for example: verifying a schedule exists by reading the scheduling plugin's schedules table).\n\nPrefer domain-specific processes when available (for example: scheduling_service::* for scheduling operations, memory_service::* for memory operations). Use read_state when you need observability or diagnostics and you can express the query safely with table+filters.",
+  "embedding_description": "Read records from the state database with table+filters. Use for observability/diagnostics (e.g., inspect default_scheduling_plugin schedules to verify a heartbeat exists). Prefer domain-specific processes when available; use read_state when you need direct table introspection without raw SQL.",
+  "result_processor_customizations": {
+    "action_label": "Read State",
+    "result_type": "query_results",
+    "result_description": "Records retrieved from state database with count and metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "State query results were returned. Use the records as evidence. If you were checking for the existence of a heartbeat or follow-up schedule, decide whether to create/repair it (via scheduling_service) or proceed normally."
+  },
+  "error_processor_customizations": {
+    "action_context": "Querying state database for records matching specified filters",
+    "error_interpretation": "QueryError with 'table': missing or invalid table name in query. QueryError with 'limit': limit must be an integer. ConnectionError: database connection failed or pool exhausted.",
+    "recovery_guidance": "For table errors: ensure the query includes a valid 'table' key. For limit errors: provide an integer value for limit. For connection errors: verify database is running and accessible."
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "test_list_models_basic",
+  "description": "List available embedding models from the API",
+  "process_key": "plugin::openai_embeddings_plugin::list_models_action",
+  "arguments": {},
+  "timeout_seconds": 60
+}

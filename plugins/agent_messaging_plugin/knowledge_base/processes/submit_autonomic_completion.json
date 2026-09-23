@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::submit_autonomic_completion",
+  "display_name": "Serve an autonomic completion request",
+  "description": "Serve one INF-02 autonomic-routed completion request: the sys:autonomic holder session calls this with the request_id from its inference_completion_request bridge event plus the completion text it produced. The verb CAS-transitions the durable core inference_completion_request row pending-to-served (exactly one serve wins; a repeat reports already_served and submits nothing) and, on the CAS win, submits the consumer's resume continuation named by the row's resume_process_key — for planning requests that is resume_thinking_completion, which re-enters the planning loop with the served text. Unknown request ids and already-failed requests are typed rejections.",
+  "embedding_description": "Answer an autonomic completion request with generated text: the session holding the autonomic slot calls this after receiving an inference completion request carrying a request id, purpose, and messages. Serves the durable request exactly once and resumes the planning flow that was waiting on the text. The response half of the autonomic inference queue.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Completion request served",
+    "result_type": "submit_autonomic_completion_result",
+    "result_description": "status (served on the CAS win; already_served / already_failed / unknown_request as typed rejections), request_id, resume_process_key (the consumer continuation submitted on a win).",
+    "presentation_guidance": "Confirm the request was served and the resume continuation submitted. On already_served, another serve won the CAS first — the completion was not double-applied; nothing further to do."
+  },
+  "error_processor_customizations": {
+    "action_context": "CAS-transitions the durable core inference_completion_request row pending-to-served, then submits the row's resume_process_key as a platform-owned continuation action (Pattern 6a returned-action submission). The serve CAS is the idempotency gate.",
+    "error_interpretation": "missing_argument: request_id or text was empty. unknown_request: no live row carries that request_id (mistyped, or hard-cleaned). already_served: a prior serve won the CAS - the completion is already applied. already_failed: the request failed terminally (requeue attempts exhausted) before this serve arrived.",
+    "recovery_guidance": "already_served: nothing to do; the resume already ran. unknown_request: re-read the request_id from the inference_completion_request bridge event. already_failed: the requesting flow will not resume from this request - check the completion request row's failure_reason and the requesting surface's state before re-driving the work."
+  }
+}

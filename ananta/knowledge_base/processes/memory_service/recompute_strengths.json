@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::recompute_strengths",
+  "display_name": "Recompute Strengths",
+  "description": "Recalculate ACT-R activation strength for all active memories. Called periodically to update cached strength values.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Recompute Strengths",
+    "result_type": "strength_recomputed",
+    "result_description": "Results of recomputing ACT-R activation strength for all active memories",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Recalculating ACT-R activation strength for all active memories",
+    "error_interpretation": "DatabaseError: failed to query or update memory strength values.",
+    "recovery_guidance": "For database errors: verify state storage is accessible."
+  }
+}

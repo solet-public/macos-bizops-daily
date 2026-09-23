@@ -1,0 +1,100 @@
+# Serial-only smoke schedule -- the ONE source of truth for which registered
+# smokes hold a HOST-EXCLUSIVE resource for their whole run and therefore
+# cannot share the host with ANY concurrently-running smoke.
+#
+# Consumed by BOTH schedulers that run the register: quality_gates/run_smokes.py
+# (the checkout battery, which reads this file next to itself) and the born-clone
+# publication gate in seed_factory_plugin (which reads the copy shipped inside
+# the bundle under verification, alongside the register it runs). Until
+# 2026-09-20 each carried its own hand-maintained list and the two diverged
+# twice (iss_f939bae7; first divergence root-caused as the r17/r20 born-clone
+# gate red, iss_169b1b80). A regression smoke fails when the two readers can be
+# made to disagree.
+#
+# Grammar is the register's: one repo-relative smoke path per line, `#` starts a
+# comment. An entry names the specific resource MEASURED, not a guess. An entry
+# absent from the register being run is inert. Members are run one at a time
+# before the worker pool starts; run_smokes.py additionally host-serializes that
+# phase across separate batteries (iss_0fb8f519). The same contention class is
+# filed cross-lane as GTE-16/GTE-17; when those land as per-run-unique
+# resources, the corresponding entry can be removed.
+
+# Shells out to REAL `pip install -e` / `pip uninstall` against the shared repo
+# venv three times per run -- rewrites the __editable__ .pth site configuration
+# every pooled smoke's freshly-spawned interpreter would be reading mid-flight.
+ananta/tests/lifecycle_management_service/set_plugin_enabled_reenable_smoke.py
+
+# Real-tmux tier spawns an actual session under a FIXED name (agi-realtmux01)
+# on the host-global tmux server, and the spawn backgrounds a live solet-bridge
+# watch sidecar whose registration row is visible to any concurrently-running
+# smoke that reads live fleet state. GTE-17's fix (transport=mcp, no sidecar)
+# makes this poolable; until it lands this stays serial.
+plugins/agent_messaging_plugin/tests/tmux_adapter_smoke.py
+
+# Real-tmux-PTY wall-clock stabilization proof
+# (test_real_tmux_parked_composer_requires_interrupt_before_drive) is
+# timing-sensitive to host CPU contention under pooled concurrency, not a
+# fixture/port collision -- 550/565 pooled failure vs. 70/70 isolated pass in
+# the born-clone gate (iss_cf3a897d); the same red-under-concurrency /
+# green-under-serial mechanism was reproduced directly in the checkout battery.
+plugins/agent_messaging_plugin/tests/codex_managed_session_smoke.py
+
+# Both exercise existing_solet_diagnostics' pinned static read, whose stability
+# predicate re-stats EVERY ancestor directory of the fixture -- including the
+# shared macOS per-user temp root -- and reports "artifact changed while it was
+# inspected" when any concurrent process creates or deletes a temp entry there
+# (measured: 3 such flips across 5 pooled batteries, zero serial; reproduced
+# again in the born-clone gate, whose HOME==TMPDIR workdir every pooled child
+# churns). The contended resource is the host-shared temp directory's metadata,
+# i.e. the whole suite; poolable only if the predicate stops spanning shared
+# ancestors or the fixtures move off the shared temp root.
+solet_cli/tests/inspect_command_smoke.py
+solet_cli/tests/existing_solet_diagnostic_smoke.py
+
+# _check_no_index_formula_install builds a --system-site-packages venv
+# against, and pip-installs the formula's pinned resources into, the REAL
+# shared system Homebrew python@3.13 prefix -- the only smoke in this repo
+# that mutates that real host-wide install (every other python@3.13-touching
+# smoke mocks brew or builds a fixture Cellar). Under run_smokes.py's pooled
+# concurrency this has been observed to fail three different ways on the
+# same underlying step, each passing cleanly in isolation: a subprocess
+# timeout/nonzero-exit (iss_469b680c, mitigated with a bounded retry, see
+# _run_with_contention_retry), a fast venv-creation failure, and a
+# `BackendUnavailable: Cannot import 'setuptools.build_meta'` inside the
+# pinned-resources install. The retry survives a few seconds of contention;
+# it does not survive a longer disruption from another concurrently-running
+# battery or gate verification also touching this same shared prefix.
+solet_cli/homebrew/tests/release_payload_smoke.py
+
+# The FSEvents-driven-restart scenario depends on real OS kernel event
+# delivery timing plus real spawned subprocesses (`sleep` stand-ins) -- both
+# CPU-scheduler-latency sensitive, not a fixture/port collision. Two
+# independent full-register born-clone gate runs (gr_00908dd4-8f4f-4611-
+# b7ed-69bf3ea8d857, gr_103b79f3-145b-4303-9f30-c14553e4f09a; both mode=full,
+# 674 entries) failed on this exact smoke and nothing else (658/674 both
+# times); the identical smoke passed standalone on the same host at the same
+# time (25.08s, all scenarios green) and on a direct re-run immediately after
+# each gate failure. Same red-under-concurrency / green-under-serial
+# mechanism as codex_managed_session_smoke.py above (iss_55cda20b-6765-4c1a-
+# 9d90-d073d0eee69c).
+plugins/macos_coding_agent_session_plugin/tests/coding_agent_session_smoke.py
+
+# These crash-sweep and cold-host slices repeatedly build real-style fixtures,
+# run update transitions, and inspect their results. In the sole-host default
+# parallel battery on 2026-09-22, all eight write slices plus router-failure
+# slice 4 and cold-host slice 3 hit the unchanged 120s runner limit. Isolated
+# controls passed: write slices 1/2 in 87.10/88.59s on the candidate and
+# 95.35/96.41s on clean master, write slice 8 in 69.5s, router-failure slice
+# 4 in 80.9s, and cold-host slice 3 in 54.2s. The shared resource is host
+# CPU/I/O capacity during many concurrent fixture builds. Other slices passed
+# in the same battery and remain pooled.
+solet_cli/tests/existing_install_router_failure_sweep_4_smoke.py
+solet_cli/tests/cold_host_matrix_3_smoke.py
+solet_cli/tests/real_style_sweep_writes_1_smoke.py
+solet_cli/tests/real_style_sweep_writes_2_smoke.py
+solet_cli/tests/real_style_sweep_writes_3_smoke.py
+solet_cli/tests/real_style_sweep_writes_4_smoke.py
+solet_cli/tests/real_style_sweep_writes_5_smoke.py
+solet_cli/tests/real_style_sweep_writes_6_smoke.py
+solet_cli/tests/real_style_sweep_writes_7_smoke.py
+solet_cli/tests/real_style_sweep_writes_8_smoke.py

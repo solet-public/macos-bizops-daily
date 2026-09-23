@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::default_address_book_plugin::search",
+  "display_name": "Search Addresses",
+  "description": "Search addresses. Returns list without entries (use resolve for full data).",
+  "embedding_description": "Search addresses by query text, address_type, tag, and limit. Returns a list without entries (use resolve for full data). Use to locate matching address records quickly and then resolve details as needed.",
+  "result_processor_customizations": {
+    "action_label": "Search Addresses",
+    "result_type": "address_search_results",
+    "result_description": "List of matching addresses with count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

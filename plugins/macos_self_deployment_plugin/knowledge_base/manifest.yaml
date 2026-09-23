@@ -1,0 +1,22 @@
+name: macos_self_deployment_plugin
+description: >
+  macOS self-deployment plugin reference: router-mediated process-swap
+  self-deployment for the operator's local the solet. Plugin-namespace process
+  registrations backing the local-profile self_deployment_service binding.
+
+category: plugin-internal
+tags:
+  - plugin_reference
+  - self_deployment
+  - blue_green
+  - macos
+  - L3
+
+content:
+  patterns:
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"

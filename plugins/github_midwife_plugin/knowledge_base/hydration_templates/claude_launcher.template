@@ -1,0 +1,96 @@
+#!/bin/zsh
+# claude-{{SOLET_NAME}} — start a properly-named Claude Code session
+# connected to {{SOLET_NAME}}.
+#
+# Usage: claude-{{SOLET_NAME}} [label] [model] [effort]
+#   label   session name shown in Claude Code and in {{SOLET_NAME}}'s
+#           peer registry (default: Operator)
+#   model   optional Claude model alias; empty = your settings default
+#   effort  optional effort level; empty = your settings default
+#
+# Works standalone by absolute path — no shell integration required.
+
+label="${1:-Operator}"
+model="$2"
+effort="$3"
+
+cd {{CLONE_DIR_ZSH}} || exit 1
+
+typeset -a extra_flags
+[[ -n "$model" ]]  && extra_flags+=(--model "$model")
+[[ -n "$effort" ]] && extra_flags+=(--effort "$effort")
+
+# AskUserQuestion default deny (operator ruling 2026-08-14): the structured-
+# choice picker blocks a session until a human answers (its timeout defaults
+# to "never"), which strands unattended and worker sessions and breaks
+# inter-agent messaging flows. Claude Code settings sources MERGE, so this
+# overlay unions a permissions deny into the session without touching the
+# user's own settings. Override for an attended session that wants the
+# picker: launch with SOLET_ALLOW_ASKUSERQUESTION=1. Rationale and doctrine:
+# search the knowledge base for "structured-choice prompt default deny".
+[[ "$SOLET_ALLOW_ASKUSERQUESTION" != "1" ]] && \
+  extra_flags+=(--settings {{CLONE_DIR_ZSH}}/client/claude-session-overlay.json)
+
+# Permission posture. Three explicit states via SOLET_PERMISSION_POSTURE
+# (seed feedback #30/§48.3, 2026-08-24): "bypass" (default) passes
+# --permission-mode bypassPermissions so a fresh install can actually do
+# work; "prompt" passes --permission-mode default, which forces Claude
+# Code's own standard per-action approval flow regardless of what this
+# machine's own ~/.claude/settings.json otherwise says; "inherit" passes no
+# permission-mode flag at all, deferring entirely to Claude Code's own
+# resolution (this machine's global settings, whatever they are — the state
+# an unset posture used to reach only via SOLET_PERMISSION_PROMPTS=1, kept
+# below as a permanent alias so no existing deployment's exported env
+# changes behavior). "prompt" is the new state "inherit" cannot promise:
+# inherit follows the operator's own global config, which can itself change
+# across a Claude Code update (the exact gap #30 reported — a flagless
+# session came up auto-denying with no approval path because the global
+# config's own meaning shifted under a CLI update); prompt is a fixed,
+# explicit request for standard prompting that does not depend on it.
+#
+# Note this launcher takes POSITIONAL arguments (label, model, effort) and
+# forwards no arbitrary flags, so `claude-{{SOLET_NAME}} --permission-mode ...`
+# is read as label="--permission-mode" and fails with an error naming neither
+# cause. Use the environment variable.
+_permission_posture="${SOLET_PERMISSION_POSTURE:-bypass}"
+[[ "$SOLET_PERMISSION_PROMPTS" == "1" ]] && _permission_posture="inherit"
+case "$_permission_posture" in
+  bypass)  extra_flags+=(--permission-mode bypassPermissions) ;;
+  prompt)  extra_flags+=(--permission-mode default) ;;
+  inherit) ;;
+  *)
+    print -u2 "claude-{{SOLET_NAME}}: unknown SOLET_PERMISSION_POSTURE=$_permission_posture (want bypass|prompt|inherit); using bypass"
+    extra_flags+=(--permission-mode bypassPermissions)
+    ;;
+esac
+
+# Session label: read by the optional peer bridge for role identity and by the
+# coordination-hooks plugin's role-binding reminder for the role re-claim.
+# Session id: stable for this whole process tree, so the role binding
+# re-points to this same session across reconnects instead of going stale.
+# Wake CLI: names the coordination CLI for the coordination-hooks plugin's
+# Stop-hook waiter ($AGENT_WAKE_CLI wake); harmless when that plugin is absent.
+# Git controller: names the ONE role allowed to mutate git in this deployment
+# directory. Its PRESENCE is what arms the plugin's git gate — the gate reads
+# no session label, so this export is the only thing deciding where it
+# evaluates. A solo deployment DELETES this line: absence is the exemption
+# (see TEMPLATE_VARS.md). Keep it identical in this launcher and in
+# {{SOLET_NAME}}-fleet.zsh — arming one and not the other creates a
+# session class that escapes the gate depending on which launcher started it.
+# Solet name: NOT part of the neutral AGENT_* fleet-identity family
+# above (that family is deliberately unprefixed per the 2026-07-28 ruling in
+# agent_messaging_plugin/env_contract.py) — this is the separate variable
+# naming which solet this shell talks to. Several plugins resolve it at
+# module-import time for scoped vault keys, and quality_gates/run_smokes.py
+# (the Git-Controller gate path) fails loudly without it, so a session
+# launched without this export cannot run gate scripts without the caller
+# setting it by hand. launch.template (the daemon launcher) already exports
+# it; keep both launchers in lockstep the same way the git-controller export
+# above is kept in lockstep with the fleet script.
+SOLET_NAME="{{SOLET_NAME}}" \
+AGENT_SESSION_LABEL="$label" \
+AGENT_SESSION_ID="ases-$(date +%s)-$$-${RANDOM}" \
+AGENT_WAKE_CLI="{{SOLET_NAME}}" \
+AGENT_COORDINATION_RECEIPT_PATH="{{CLONE_DIR}}/profile/data/coordination-hooks/claude/installation.v1.json" \
+GIT_CONTROLLER_NAME="{{GIT_CONTROLLER_NAME}}" \
+exec claude --name "$label" "${extra_flags[@]}"

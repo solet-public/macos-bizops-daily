@@ -1,0 +1,6 @@
+{
+  "process_key": "plugin::actr_memory_plugin::setup_schedules",
+  "display_name": "Setup Schedules",
+  "description": "Set up periodic maintenance schedules for memory operations",
+  "embedding_description": "Configure periodic maintenance schedules for memory operations such as memorization queue processing and consolidation. Creates cron schedules via the scheduling service and returns configured schedule list."
+}

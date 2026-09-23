@@ -1,0 +1,12 @@
+name: session_bridge_plugin
+description: >
+  Drains the Claude Code dispatch hook spool (~/.ananta/_session/spool/dispatch/)
+  into this solet's memory_service so peers (coordinator, watchdog, Codex)
+  see live Task dispatch state via tag-scoped recall. Background plumbing only —
+  surfaces no inference-facing process. W4 hook bridge M1: TaskCreated /
+  TaskCompleted, single local solet, delete-after-drain (cursor machinery
+  and cloud fan-out are M1.5).
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider

@@ -1,0 +1,15 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "couldn't find",
+    "not found",
+    "nonexistent",
+    "does not exist",
+    "no entry",
+    "address",
+    "delete",
+    "status",
+    "result",
+    "COMPLETED"
+  ]
+}

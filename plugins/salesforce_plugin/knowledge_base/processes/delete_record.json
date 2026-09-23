@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::delete_record",
+  "display_name": "Salesforce: Delete Record",
+  "description": "Permanently delete a record by sobject + id. This is a destructive write action taking an EXPLICIT target -- sobject and id are required and there is no bulk form. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the record being deleted; the confirmation is delivered when the job completes.",
+  "embedding_description": "Delete a single Salesforce record by its object type and id (e.g. remove a Contact or Opportunity). Record deletion is an acceptable-loss class on this connector, still a real destructive write -- use deliberately. Requires sobject and id. Dispatched asynchronously: job_id returns immediately, the deletion confirmation follows in a later message.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce record deletion queued",
+    "result_type": "salesforce_delete_record_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT confirmation the record was deleted -- the success flag arrives separately, as its own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the delete was queued -- do not present job_id/status as proof the record is gone. Acknowledge the request is in flight; the deletion confirmation lands in a follow-up message when the job completes. Once delivered, confirm the deletion; low sensitivity (flag only, data_sensitivity 0.0)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Delete a Salesforce record.",
+    "error_interpretation": "sf.invalid_params: missing sobject or id. sf.not_found: no record with that id exists. sf.permission_denied: the CLI's authenticated user cannot delete this record.",
+    "recovery_guidance": "sf.not_found: verify the id and sobject via soql_query or get_record before retrying. sf.permission_denied: ask the operator to check delete permission for this object."
+  }
+}

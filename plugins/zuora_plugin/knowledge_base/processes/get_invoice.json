@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::zuora_plugin::get_invoice",
+  "display_name": "Zuora: Get Invoice",
+  "description": "Fetch one invoice by id. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; the invoice's fields are delivered when the job completes.",
+  "embedding_description": "Read one Zuora invoice in full by its id: the amount charged, the outstanding balance, the invoice status, and the line items making up the total. Dispatches asynchronously: a job_id comes back at once, the invoice's fields land moments later. A billing-document lookup against a known invoice id.",
+  "result_processor_customizations": {
+    "action_label": "Zuora invoice fetch queued",
+    "result_type": "zuora_get_invoice_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the invoice -- its fields arrive separately, as their own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the fetch was queued -- do not present job_id/status as the invoice itself. Acknowledge the lookup is in flight; the invoice's fields land in a follow-up message when the job completes. Once delivered, show the invoice's key fields; reflects sensitive financial/billing content (data_sensitivity 0.5) — surface for downstream use but never treat as public."
+  },
+  "error_processor_customizations": {
+    "action_context": "Fetch one Zuora invoice by id.",
+    "error_interpretation": "zuora.invalid_params: missing id. zuora.object_not_found: no invoice with that id exists. zuora.auth_failed: the OAuth client credentials were rejected.",
+    "recovery_guidance": "zuora.object_not_found: verify the invoice id via list_invoices or data_query."
+  }
+}

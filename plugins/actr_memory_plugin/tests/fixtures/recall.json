@@ -1,0 +1,9 @@
+{
+  "name": "test_recall_direct_plugin_blocked",
+  "description": "Verify that direct plugin invocation is blocked when plugin is bound to a service interface. Must use service_interface::memory_service::recall instead.",
+  "process_key": "plugin::actr_memory_plugin::recall",
+  "arguments": {
+    "query": "what color is the sky",
+    "top_k": 5
+  }
+}

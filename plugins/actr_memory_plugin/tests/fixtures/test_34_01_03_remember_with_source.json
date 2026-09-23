@@ -1,0 +1,16 @@
+{
+  "name": "test_remember_with_source",
+  "description": "Verify storing a memory with source file attribution for provenance tracking",
+  "process_key": "plugin::actr_memory_plugin::remember_action",
+  "arguments": {
+    "params": {
+      "content": "The ACT-R architecture uses base-level activation to model memory decay over time",
+      "tags": ["cognitive-science", "actr"],
+      "source_file": "/docs/actr_theory.md"
+    },
+    "state": {
+      "session_id": "test-session-003"
+    }
+  },
+  "timeout_seconds": 30
+}

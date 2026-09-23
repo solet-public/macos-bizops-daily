@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::embedding_service::generate_embeddings",
+  "arguments": {
+    "texts": [
+      "Machine learning is a subset of artificial intelligence",
+      "Deep learning uses neural networks with multiple layers",
+      "Natural language processing enables computers to understand human language"
+    ]
+  }
+}

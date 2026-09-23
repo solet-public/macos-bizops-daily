@@ -1,0 +1,24 @@
+{
+  "process_key": "plugin::pgvector_service_plugin::store_vectors_action",
+  "display_name": "Store Vectors",
+  "description": "Store vector embeddings with metadata for semantic search",
+  "embedding_description": "Store vector embeddings with metadata in a namespace. Provide a list of vectors (embedding plus metadata). Returns inserted_ids and count. Use to index embeddings for semantic search, retrieval, or clustering.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Vectors stored",
+    "result_type": "vectors_stored",
+    "result_description": "Vector storage result with inserted_ids and count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result.",
+    "field_sensitivities": {
+      "inserted_ids": 0.3,
+      "count": 0.1
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Inserts a batch of vectors (embedding plus metadata) into a pgvector namespace.",
+    "error_interpretation": "ValidationError: namespace is missing, vectors list is empty, individual vector payloads are malformed (not dicts, embedding missing, dimension inconsistent across the batch), or metadata is not JSON-serializable. DatabaseError: the underlying INSERT failed (transaction conflict, disk full, schema missing).",
+    "recovery_guidance": "Ensure every vector dict carries a numeric embedding list of consistent length and a JSON-serializable metadata field; the dimension of the first vector defines the namespace's dimension if it is new and must match for subsequent inserts. Batch size is bounded by available connection memory; very large batches should be split. Retry transient database errors once.",
+    "retryable": true
+  }
+}

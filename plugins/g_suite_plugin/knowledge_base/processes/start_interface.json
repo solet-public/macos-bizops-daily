@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::g_suite_plugin::start_interface",
+  "display_name": "Start Google OAuth Callback Server",
+  "description": "Start the FastAPI/uvicorn HTTPS callback server that handles the Google OAuth redirect. Must be running before the operator completes the browser flow. A local solet defaults to explicit IPv4 loopback (127.0.0.1); an ALB-fronted cloud deployment must configure 0.0.0.0 explicitly and routes /oauth/google/* by path rule to this task's port. Returns the bound host, port, and callback URL.",
+  "embedding_description": "Launch the Google Workspace OAuth redirect listener before connect_account. Serves GET /oauth/google/callback, validates state and PKCE, exchanges the authorization code, and vaults tokens. Local default: 127.0.0.1. For ALB-fronted cloud, explicitly bind 0.0.0.0 and route /oauth/google/* to this port. Returns host, port, callback_url.",
+  "result_processor_customizations": {
+    "action_label": "Google OAuth callback server started",
+    "result_type": "g_suite_interface_start_result",
+    "result_description": "Dict with the bound host, allocated port, and callback URL.",
+    "presentation_guidance": "Confirm the callback server is listening and state the callback_url. Note that connect_account can now be run."
+  },
+  "error_processor_customizations": {
+    "action_context": "Start the Google OAuth callback uvicorn server.",
+    "error_interpretation": "service_not_available: the vault or address-book service the callback needs was not injected at readiness. callback_server_start_failed: the uvicorn server could not bind its socket within the five-second startup window — almost always another process already listening on that port, occasionally a host the process may not bind. The message carries the host, the port, and the underlying bind error.",
+    "recovery_guidance": "service_not_available: confirm the plugin reached readiness (vault + address_book bound). Check plugin load logs; retry after the platform is fully started. callback_server_start_failed: find what already holds the port (lsof -nP -iTCP:<port> -sTCP:LISTEN), then either stop that process or call start_interface again with an explicit free port. Never treat this error as cosmetic — the callback server is NOT listening, so the Google redirect would land on whatever else owns the port and the browser flow cannot complete."
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "action_status": "completed",
+  "data_keys": ["blob_id", "metadata"],
+  "timeout_seconds": 30
+}

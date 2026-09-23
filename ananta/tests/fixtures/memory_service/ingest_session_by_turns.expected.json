@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "memories_created"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Chunk conversation by turns - each exchange becomes a memory"
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::memory_stats",
+  "display_name": "Memory Statistics",
+  "description": "Get statistics about long-term memories: total count, breakdown by type (episodic, semantic), by status (active, archived), and strength distribution. Use this when user asks 'how many memories', 'memory stats', or 'memory statistics'.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Memory Statistics",
+    "result_type": "memory_statistics",
+    "result_description": "Statistics about long-term memories including total count, breakdown by type and status, and strength distribution",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving statistics about the long-term memory store",
+    "error_interpretation": "DatabaseError: failed to query memory statistics from storage.",
+    "recovery_guidance": "For database errors: verify state and vector storage are accessible."
+  }
+}

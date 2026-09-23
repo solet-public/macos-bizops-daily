@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "salesforce_plugin"
+version = "3.0.0"
+description = "Salesforce org connector (SOQL, record CRUD, describe) for Ananta"
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    # No Salesforce SDK dependency: full CLI delegation — every verb shells
+    # out to the operator's `sf` CLI, which owns all auth/HTTP concerns.
+]
+
+[project.entry-points."ananta.plugins"]
+salesforce_plugin = "salesforce_plugin.plugin:SalesforcePlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["salesforce_plugin*"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

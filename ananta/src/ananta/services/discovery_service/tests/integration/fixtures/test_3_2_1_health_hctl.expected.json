@@ -1,0 +1,6 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "health"
+  ]
+}

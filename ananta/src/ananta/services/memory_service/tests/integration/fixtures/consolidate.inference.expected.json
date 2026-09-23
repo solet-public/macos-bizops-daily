@@ -1,0 +1,15 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "consolidat",
+    "candidates",
+    "clusters",
+    "dry",
+    "preview",
+    "memory",
+    "status",
+    "result",
+    "COMPLETED",
+    "process"
+  ]
+}

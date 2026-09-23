@@ -1,0 +1,6 @@
+{
+  "action_status": "error",
+  "error_code": "blob_storage.validation_error",
+  "error_message_contains": "limit cannot exceed 1000",
+  "timeout_seconds": 30
+}

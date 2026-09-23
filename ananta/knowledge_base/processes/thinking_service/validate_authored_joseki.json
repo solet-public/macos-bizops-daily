@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::validate_authored_joseki",
+  "display_name": "Validate Authored Joseki",
+  "description": "dry-run validate a joseki knowledge-base card that the calling agent authored by value — card identity, contract sections, step sequence — returning every hard-fail error and soft warning without storing anything.",
+  "embedding_description": "Validate an agent-authored joseki card before it is registered. Non-mutating dry run over the reusable pattern card: JOSEKI_KEY identity, description pair, input and output contract sections, expected step count, next and repair references, and live process keys in the step sequence. Returns errors and warnings; stores nothing.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Authored joseki validated",
+    "result_type": "authored_joseki_validation_report",
+    "result_description": "Validation report with keys: valid, errors, warnings, joseki_key",
+    "presentation_guidance": "Present valid first, then every entry of errors and warnings verbatim — the caller needs the full list to repair the card in one pass.",
+    "output_action_guidance": "If valid is true, the card can be registered. If valid is false, repair the listed errors in the authored card and validate again; warnings are advisory and do not block registration."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dry-run validating an agent-authored joseki knowledge-base card. validate_authored_joseki accepts {content, joseki_key?}. The card is passed by value; nothing is stored.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema (note: card findings are returned in the result's errors list, not raised). ServiceUnavailable: the process discovery service is not available, so live process-key existence could not be checked.",
+    "recovery_guidance": "Argument-shape failures: fix the action arguments and resubmit. Discovery unavailability: retry after the platform finishes starting; do not treat it as a card error."
+  }
+}

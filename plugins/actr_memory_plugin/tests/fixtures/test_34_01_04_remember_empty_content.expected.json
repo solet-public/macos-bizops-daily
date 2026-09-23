@@ -1,0 +1,10 @@
+{
+  "action_status_any": ["error", "completed"],
+  "output_contains_any": [
+    "empty",
+    "content required",
+    "invalid",
+    "memory_id"
+  ],
+  "timeout_seconds": 60
+}

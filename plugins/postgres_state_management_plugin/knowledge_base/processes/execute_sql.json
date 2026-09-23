@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::postgres_state_management_plugin::execute_sql",
+  "display_name": "Execute SQL (Postgres)",
+  "description": "Execute raw SQL query on PostgreSQL database. Use with caution - supports parameterized queries.",
+  "embedding_description": "Execute raw SQL against the PostgreSQL state database with optional parameters. Use for advanced queries not supported by the read/write API. Requires valid SQL and permissions. Returns records and count; use cautiously.",
+  "result_processor_customizations": {
+    "action_label": "Execute SQL",
+    "result_type": "sql_results",
+    "result_description": "Raw SQL query execution results with records and count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Executing raw SQL query on PostgreSQL database",
+    "error_interpretation": "SQLError: invalid SQL syntax or query execution failed. PermissionError: insufficient privileges for the operation. ConnectionError: PostgreSQL connection failed.",
+    "recovery_guidance": "For SQL errors: verify SQL syntax is valid PostgreSQL. For permission errors: check database user privileges. For connection errors: verify PostgreSQL is running and accessible."
+  }
+}

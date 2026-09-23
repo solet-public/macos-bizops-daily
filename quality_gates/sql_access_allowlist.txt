@@ -1,0 +1,166 @@
+# SQL-access gate tracked-debt allowlist (category-keyed).
+# Regenerated 2026-06-30 (SQL-lockdown G2 endgame) from the live finding set
+# AFTER: (a) the kb_indexing foreign-namespace migration to owner verbs, and
+# (b) the gate recalibration that exempts the typed-txn transactional() wrapper
+# (forks-ruling §4). The src raw-SQL migration is COMPLETE — every remaining
+# entry is PERMANENT (false-positive prose / test fixture / the sanctioned
+# runtime-enforcement guard). ZERO '# migrate-with:' entries remain; the ~211
+# stale migrate-with entries from the 2026-06-23 snapshot were drained (their
+# sites migrated or their lines shifted off the finding). Format:
+#   <category_id>::<posix-path-suffix>::<lineno>   # false-positive:|# sanctioned-exempt: <reason>
+# Permanent (parked) entries never block; --require-clean ignores them. Adding
+# entries without operator approval defeats the gate (KB "Gate Allowlist
+# Conventions").
+
+# ===== S0 =====
+S0::ananta/src/ananta/core/orchestration/postgres_authorization_guard.py::sql:import psycopg  # sanctioned-exempt: runtime psycopg-monkey-patch lockdown ENFORCEMENT guard (operator 2026-06-21, GAP-CORE-4) — cannot route through state_service; it IS the enforcement (the runtime twin of this gate) | legacy: 2026-09-03 W2-1
+S0::ananta/src/ananta/core/orchestration/postgres_authorization_guard.py::sql:import psycopg_pool  # sanctioned-exempt: runtime psycopg-monkey-patch lockdown ENFORCEMENT guard (operator 2026-06-21, GAP-CORE-4) — cannot route through state_service; it IS the enforcement (the runtime twin of this gate) | legacy: 2026-09-03 W2-1
+S0::ananta/src/ananta/core/orchestration/tests/postgres_authorization_guard_smoke.py::40  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::ananta/src/ananta/core/orchestration/tests/postgres_authorization_guard_smoke.py::86  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::plugins/actr_memory_plugin/tests/actr_memory_clear_session_migration_live_smoke.py::sql:import psycopg  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::plugins/actr_memory_plugin/tests/actr_orphan_reconcile_migration_live_smoke.py::sql:import psycopg  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::plugins/actr_memory_plugin/tests/actr_vector_rebuild_live_smoke.py::sql:import psycopg  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::plugins/agent_messaging_session_source_plugin/tests/read_events_read_thread_messages_live_smoke.py::sql:from psycopg.types.json import ...  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::plugins/macos_vault_plugin/tests/secret_transfer_protocol_live_smoke.py::sql:import psycopg  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::plugins/macos_vault_plugin/tests/secret_transfer_protocol_live_smoke.py::sql:from psycopg.rows import ...  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::plugins/pgvector_service_plugin/tests/find_missing_external_ids_live_smoke.py::sql:import psycopg  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::plugins/postgres_state_management_plugin/tests/conflict_predicate_upsert_smoke.py::sql:import psycopg  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+S0::plugins/postgres_state_management_plugin/tests/store_abstraction_smoke.py::sql:from psycopg import ...  # false-positive: test fixture exercises the postgres driver directly | legacy: 2026-09-03 W2-1
+# ---- foreign-system connectors (operator-ratified RATIFY-1, 2026-07-09): SQL/driver use
+# ---- targets EXTERNAL databases resolved from external_pg::* address-book entries;
+# ---- structurally incapable of reaching the platform DB (assert_foreign_target containment
+# ---- invariant + red-first smoke_containment.py; KB 01_external_postgres_overview.md).
+S0::plugins/external_postgres_plugin/src/external_postgres_plugin/connection.py::*  # sanctioned-exempt: psycopg to operator-registered external_pg::* foreign DSNs only (RATIFY-1) | legacy: 2026-09-03 W2-1
+# ===== S1 =====
+S1::ananta/src/ananta/core/orchestration/service_manager.py::sql:.execute_sql()  # false-positive: StateServiceAdapter forwards to the bound state service (owner-infra, permanent) | legacy: 2026-09-03 W2-1
+# ===== S2 =====
+# ---- foreign-system connector (RATIFY-1, 2026-07-09): SELECT/information_schema SQL composed
+# ---- for an EXTERNAL Postgres DB, never the platform DB (same containment invariant as the S0
+# ---- connection.py entry above). connection.py needs NO S2 entry — its only SQL strings are
+# ---- statement_timeout startup options, and SET is not an S2 verb (Codex MINOR-4).
+S2::plugins/external_postgres_plugin/src/external_postgres_plugin/query_actions.py::*  # sanctioned-exempt: SQL composed for the foreign DB (RATIFY-1) | legacy: 2026-09-03 W2-1
+S2::plugins/salesforce_plugin/src/salesforce_plugin/soql_actions.py::*  # sanctioned-exempt: SOQL composed for the foreign Salesforce org, not platform SQL (RATIFY-1) | legacy: 2026-09-03 W2-1
+# external_postgres_plugin TEST fixtures (2026-07-09): whole-file over per-line to avoid the
+# documented line-drift churn. Every S2 hit in these files is either a FOREIGN-SQL guard/query
+# fixture (exercising the read-only guard + single-statement parser against a foreign/scratch
+# target) or an assert-label string — NONE is platform-DB SQL. The gate's platform-DB protection
+# is fully retained on the plugin's src (only query_actions.py is src-exempt; plugin.py /
+# connection.py / statement_guard.py / app_config.py / constants.py stay fully gated).
+S2::plugins/external_postgres_plugin/tests/smoke_guard.py::*  # false-positive: read-only guard test fixtures (foreign-SQL leader/statement strings) | legacy: 2026-09-03 W2-1
+S2::plugins/external_postgres_plugin/tests/smoke_query.py::*  # false-positive: query-verb test fixtures (foreign-SQL strings) | legacy: 2026-09-03 W2-1
+S2::plugins/external_postgres_plugin/tests/smoke_data_export.py::*  # false-positive: export test fixtures (foreign-SQL strings) | legacy: 2026-09-03 W2-1
+S2::plugins/external_postgres_plugin/tests/smoke_multistatement.py::*  # false-positive: single-statement/defense-in-depth test fixtures (foreign-SQL strings) | legacy: 2026-09-03 W2-1
+S2::plugins/external_postgres_plugin/tests/smoke_readonly.py::*  # false-positive: LIVE read-only test fixtures (foreign-SQL write-attempt strings + assert labels) | legacy: 2026-09-03 W2-1
+S2::plugins/external_postgres_plugin/tests/smoke_async_jobs.py::*  # false-positive: D0.3 worker-dispatch test fixtures (foreign-SQL strings fed to a fully monkeypatched fake connection, zero real DB access — same shape as smoke_query.py/smoke_data_export.py above) | legacy: 2026-09-03 W2-1
+S2::plugins/external_postgres_plugin/tests/smoke_write.py::*  # false-positive: LIVE write-capability test fixtures (foreign-SQL INSERT/UPDATE/DELETE/RETURNING/SELECT-count strings against the scratch DB, epg_smoke_scratch — same shape as smoke_readonly.py above) | legacy: 2026-09-03 W2-1
+# snowflake_plugin TEST fixtures (2026-07-13, wave-2): same shape as external_postgres_plugin's
+# test allowlisting above — every S2/S3 hit is a warehouse-SQL guard/query fixture (read-leader
+# refusal strings, export sql params), none is platform-DB SQL. query_actions.py itself
+# needs NO S2 entry: its introspection strings are SHOW/DESCRIBE (not S2 verbs) and the caller's
+# free-text sql/run_query text is a runtime variable, never a literal SELECT/INSERT/… string.
+S2::plugins/snowflake_plugin/tests/smoke_guard.py::*  # false-positive: read-only guard test fixtures (warehouse-SQL leader/statement strings) | legacy: 2026-09-03 W2-1
+S2::plugins/snowflake_plugin/tests/smoke_query.py::*  # false-positive: query-verb test fixtures (warehouse-SQL strings) | legacy: 2026-09-03 W2-1
+S2::plugins/snowflake_plugin/tests/smoke_data_export.py::*  # false-positive: export test fixtures (warehouse-SQL strings) | legacy: 2026-09-03 W2-1
+S2::plugins/snowflake_plugin/tests/smoke_async_jobs.py::*  # false-positive: D0.3 worker-dispatch test fixtures (warehouse-SQL strings fed to a fully monkeypatched fake connection, zero real warehouse access — same shape as smoke_query.py/smoke_data_export.py above) | legacy: 2026-09-03 W2-1
+S2::plugins/salesforce_plugin/tests/smoke_soql.py::*  # false-positive: SOQL query-verb test fixtures (foreign-org SOQL strings) | legacy: 2026-09-03 W2-1
+S2::plugins/salesforce_plugin/tests/smoke_async_jobs.py::*  # false-positive: D0.3 worker-dispatch test fixtures (foreign-org SOQL strings) | legacy: 2026-09-03 W2-1
+S2::plugins/zuora_plugin/tests/smoke_data_query.py::*  # false-positive: ZOQL query-verb test fixtures (foreign-tenant ZOQL strings, never platform SQL) | legacy: 2026-09-03 W2-1
+S2::ananta/src/ananta/llm/session_ledger/ingest.py::sql:upsert_session canonical race: Phase 1 ON CONFLICT fired but…  # false-positive: log/comment literal containing 'ON CONFLICT' (hand-reviewed, not SQL); CONTENT-ANCHORED 2026-07-02 (FIX-2a — first consumer of the sql:<snippet> form): line-agnostic, immune to the line drift that forced the sibling plugin.py 'Create the…' entry to be re-pinned 2752→2763→2764→2786 (4× in one day) | legacy: 2026-09-03 W2-1
+# REMOVED 2026-07-02: the default_thinking_plugin plugin.py 'Create the Work Breakdown
+# Structure document for …' f-string entry (last pinned ::2786) is obsoleted by FIX-2b
+# (S2 statement-shape): a leading CREATE not followed by a SQL object keyword ('Create
+# the …') no longer classifies as SQL, so the string stops firing and needs no entry.
+# This was the drift-plagued line (re-pinned 4× on 2026-07-02); the detector fix, not a
+# pin, is the real resolution.
+S2::ananta/src/ananta/llm/session_ledger/vendor/codex_goals.py::sql:SELECT FROM thread_goals ORDER BY updated_at_ms  # sanctioned-exempt: external read-only sqlite3 reader of a Codex state DB under ~/.codex (state_5/goals_1/memories_1.sqlite) — foreign data source, NOT platform state (no state_service path to a foreign app's DB); documented canonical import path, KB 19_session_ledger_09 | legacy: 2026-09-03 W2-1
+S2::ananta/src/ananta/llm/session_ledger/vendor/codex_goals.py::sql:SELECT FROM thread_goals WHERE updated_at_ms > ? ORDER BY up…  # sanctioned-exempt: external read-only sqlite3 reader of a Codex state DB under ~/.codex (state_5/goals_1/memories_1.sqlite) — foreign data source, NOT platform state (no state_service path to a foreign app's DB); documented canonical import path, KB 19_session_ledger_09 | legacy: 2026-09-03 W2-1
+S2::ananta/src/ananta/llm/session_ledger/vendor/codex_memories.py::sql:SELECT FROM stage1_outputs ORDER BY generated_at  # sanctioned-exempt: external read-only sqlite3 reader of a Codex state DB under ~/.codex (state_5/goals_1/memories_1.sqlite) — foreign data source, NOT platform state (no state_service path to a foreign app's DB); documented canonical import path, KB 19_session_ledger_09 | legacy: 2026-09-03 W2-1
+S2::ananta/src/ananta/llm/session_ledger/vendor/codex_state.py::sql:SELECT FROM threads ORDER BY rowid  # sanctioned-exempt: external read-only sqlite3 reader of a Codex state DB under ~/.codex (state_5/goals_1/memories_1.sqlite) — foreign data source, NOT platform state (no state_service path to a foreign app's DB); documented canonical import path, KB 19_session_ledger_09 | legacy: 2026-09-03 W2-1
+S2::ananta/src/ananta/llm/session_ledger/vendor/codex_state.py::sql:SELECT FROM threads WHERE rowid > ? ORDER BY rowid  # sanctioned-exempt: external read-only sqlite3 reader of a Codex state DB under ~/.codex (state_5/goals_1/memories_1.sqlite) — foreign data source, NOT platform state (no state_service path to a foreign app's DB); documented canonical import path, KB 19_session_ledger_09 | legacy: 2026-09-03 W2-1
+S2::ananta/src/ananta/llm/session_ledger/vendor/codex_state.py::sql:SELECT FROM thread_dynamic_tools WHERE thread_id = ? ORDER B…  # sanctioned-exempt: external read-only sqlite3 reader of a Codex state DB under ~/.codex (state_5/goals_1/memories_1.sqlite) — foreign data source, NOT platform state (no state_service path to a foreign app's DB); documented canonical import path, KB 19_session_ledger_09 | legacy: 2026-09-03 W2-1
+S2::plugins/github_midwife_plugin/src/github_midwife_plugin/credential_seed.py::sql:SELECT 1 FROM pg_roles WHERE rolname=' '  # sanctioned-exempt: genesis birth-time role-EXISTENCE probe reads pg_roles (Postgres SYSTEM CATALOG — no state_service path to role metadata); runs as the trust-superuser admin role BEFORE the newborn's state service exists (provisioning predates state service, same class as bootstrap.py host-provisioning + the postgres_authorization_guard runtime-enforcement exemption). Operator-ratified 2026-07-12. (content-anchored per Convention 2 [22_testing/02]; replaces the deleted pg_authid ownership probe — the per-solet role-isolation build (2026-07-12) retired the tri-state ownership guard for a two-state guard + role-absent fail-loud.) | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_memory_clear_session_migration_live_smoke.py::sql:INSERT INTO " "." " (id, session_id, source_namespace, event…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_memory_clear_session_migration_live_smoke.py::sql:SELECT COUNT(*) FROM " "." "  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_memory_clear_session_migration_live_smoke.py::sql:SELECT COUNT(*) FROM " "." " WHERE session_id = %s  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_memory_clear_session_migration_live_smoke.py::sql:SELECT source_namespace FROM " "." " WHERE session_id = %s  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_memory_hard_delete_migration_live_smoke.py::sql:INSERT INTO " "." __memory" (id, content, memory_type, statu…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_memory_hard_delete_migration_live_smoke.py::sql:INSERT INTO " "." __ " (id , is_deleted, created_at, updated…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_memory_hard_delete_migration_live_smoke.py::sql:SELECT id FROM " "." __ " ORDER BY id  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_memory_hard_delete_migration_live_smoke.py::sql:SELECT is_deleted FROM " "." __memory" WHERE id = %s  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_memory_read_migration_live_smoke.py::sql:INSERT INTO " "." " (id, session_id, source_namespace, event…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_orphan_reconcile_migration_live_smoke.py::sql:INSERT INTO " "." " (id, namespace, content, status, tags, i…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_orphan_reconcile_migration_live_smoke.py::sql:INSERT INTO " "." " (id, external_id, is_deleted) VALUES (%s…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_orphan_reconcile_migration_live_smoke.py::sql:DELETE FROM " "." " WHERE status = %s  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/actr_vector_rebuild_live_smoke.py::sql:INSERT INTO " "." " (id, namespace, content, status, tags, i…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/delete_memories_by_ids_live_smoke.py::sql:INSERT INTO " "." " (id, namespace, content, status, is_dele…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/actr_memory_plugin/tests/delete_memories_by_ids_live_smoke.py::sql:SELECT 1 FROM " "." " WHERE id = %s  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/agent_messaging_plugin/tests/read_thread_messages_live_smoke.py::sql:INSERT INTO " "." " (id, namespace, originator_type, origina…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/agent_messaging_plugin/tests/read_thread_messages_live_smoke.py::sql:INSERT INTO " "." " (id, namespace, thread_id, cursor, role,…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/agent_messaging_session_source_plugin/tests/discover_sessions_list_threads_live_smoke.py::sql:INSERT INTO " "." " (id, namespace, originator_type, target_…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/agent_messaging_session_source_plugin/tests/read_events_read_thread_messages_live_smoke.py::sql:INSERT INTO " "." " (id, namespace, thread_id, cursor, role,…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/claude_code_filesystem_session_source_plugin/tests/cross_host_subagent_push_smoke.py::sql:SELECT COUNT(*) FROM session_ledger__event e  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/codex_goals_session_source_plugin/tests/codex_goals_session_source_smoke.py::sql:INSERT INTO thread_goals (thread_id, goal_id, objective, sta…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/codex_goals_session_source_plugin/tests/codex_goals_session_source_smoke.py::sql:UPDATE thread_goals SET status=?, updated_at_ms=? WHERE thre…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/codex_memories_session_source_plugin/tests/codex_memories_session_source_smoke.py::sql:INSERT INTO stage1_outputs (thread_id, source_updated_at, ra…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/codex_state_session_source_plugin/tests/codex_state_session_source_smoke.py::128  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/codex_state_session_source_plugin/tests/codex_state_session_source_smoke.py::sql:INSERT INTO thread_dynamic_tools (thread_id, position, name,…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/codex_state_session_source_plugin/tests/codex_state_session_source_smoke.py::298  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/default_knowledge_plugin/tests/install_record_reinstall_live_smoke.py::sql:SELECT " " FROM " "." " WHERE id = %s  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/default_knowledge_plugin/tests/w5p_orphan_invariant_smoke.py::sql:DELETE FROM actr_memory_plugin__memory  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/default_knowledge_plugin/tests/w5p_orphan_invariant_smoke.py::sql:SELECT id FROM actr_memory_plugin__memory  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/default_knowledge_plugin/tests/w5p_orphan_invariant_smoke.py::sql:with state_service.transactional() as txn:  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+# REMOVED 2026-07-02 (FIX-2b statement-shape): default_scheduling plugin.py 'Create
+# recurring scheduled jobs using cron …' (CREATE + non-object 'recurring') and the stale
+# default_thinking plugin.py prose f-string (was ::2724) — both verb-led prose that no
+# longer classifies as SQL, so no entry is needed.
+S2::plugins/default_thinking_plugin/tests/default_thinking_update_state_migration_live_smoke.py::sql:INSERT INTO " "." " (id, planning_context_id, plan_id, statu…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/default_thinking_plugin/tests/default_thinking_update_state_migration_live_smoke.py::sql:SELECT " " FROM " "." " WHERE id = %s  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/macos_vault_plugin/tests/secret_transfer_protocol_live_smoke.py::sql:SELECT direction, secret_name, peer_identifier, peer_pubkey_…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/pgvector_service_plugin/tests/delete_all_in_namespace_smoke.py::sql:DELETE FROM "state"."discovery_processes__embeddings"  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/pgvector_service_plugin/tests/find_missing_external_ids_live_smoke.py::sql:INSERT INTO " "." " (id, external_id, is_deleted, created_at…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/postgres_state_management_plugin/tests/acquire_lease_smoke.py::sql:SELECT * FROM " "." " WHERE id = %s  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/postgres_state_management_plugin/tests/acquire_lease_smoke.py::sql:SELECT trigger_name FROM information_schema.triggers WHERE e…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/postgres_state_management_plugin/tests/acquire_lease_smoke.py::sql:SELECT data_type FROM information_schema.columns WHERE table…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/postgres_state_management_plugin/tests/conflict_predicate_upsert_smoke.py::sql:first insert -> (inserted=True, id='s1') (got , ); ON CONFLI…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/postgres_state_management_plugin/tests/conflict_predicate_upsert_smoke.py::sql:incomplete predicate -> ON CONFLICT inference fails (42P10)  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/postgres_state_management_plugin/tests/consolidated_fix_regression_smoke.py::sql:SELECT indexdef FROM pg_indexes WHERE indexdef ILIKE %s AND …  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/postgres_state_management_plugin/tests/create_index_using_opclass_smoke.py::sql:INSERT INTO " "." " (content_text) VALUES (%s) RETURNING len…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/postgres_state_management_plugin/tests/create_index_using_opclass_smoke.py::sql:SELECT indexdef FROM pg_indexes WHERE schemaname = %s AND in…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+S2::plugins/postgres_state_management_plugin/tests/filter_grammar_smoke.py::sql:INSERT INTO " "." " (id, grp, tag, is_deleted, created_at) V…  # false-positive: test fixture SQL | legacy: 2026-09-03 W2-1
+# REMOVED 2026-07-02 (FIX-2b statement-shape): s3_blob_storage plugin.py 'Delete temporary
+# blobs from S3' (DELETE + non-FROM 'temporary') no longer classifies as SQL — no entry needed.
+# ===== S3 =====
+# external_postgres_plugin TEST fixtures (2026-07-09): CREATE/DROP/ALTER TABLE strings are either
+# read-only-guard write-REFUSAL fixtures (proving these DDL leaders are rejected) or the LIVE
+# smokes' scratch-DB seed/probe DDL against epg_smoke_scratch (NEVER the platform DB). Whole-file
+# to avoid line drift; the plugin's src stays fully gated.
+S3::plugins/external_postgres_plugin/tests/smoke_guard.py::*  # false-positive: read-only-guard DDL write-refusal fixtures | legacy: 2026-09-03 W2-1
+S3::plugins/external_postgres_plugin/tests/smoke_multistatement.py::*  # false-positive: LIVE scratch-DB seed DDL (epg_smoke_scratch) | legacy: 2026-09-03 W2-1
+S3::plugins/external_postgres_plugin/tests/smoke_readonly.py::*  # false-positive: LIVE scratch-DB seed/probe DDL (epg_smoke_scratch) | legacy: 2026-09-03 W2-1
+S3::plugins/external_postgres_plugin/tests/smoke_write.py::*  # false-positive: LIVE scratch-DB seed/probe DDL (epg_smoke_scratch) | legacy: 2026-09-03 W2-1
+S3::plugins/snowflake_plugin/tests/smoke_guard.py::*  # false-positive: read-only-guard DDL write-refusal fixtures (warehouse-SQL) | legacy: 2026-09-03 W2-1
+S3::plugins/actr_memory_plugin/tests/actr_memory_clear_session_migration_live_smoke.py::sql:CREATE TABLE " "." " ( )  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/actr_memory_plugin/tests/actr_memory_hard_delete_migration_live_smoke.py::sql:CREATE TABLE " "." __ " ( )  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/actr_memory_plugin/tests/actr_memory_read_migration_live_smoke.py::sql:CREATE TABLE " "." " ( )  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/actr_memory_plugin/tests/actr_orphan_reconcile_migration_live_smoke.py::148  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/actr_memory_plugin/tests/actr_orphan_reconcile_migration_live_smoke.py::149  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/actr_memory_plugin/tests/actr_vector_rebuild_live_smoke.py::sql:CREATE TABLE " "." " ( )  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/actr_memory_plugin/tests/delete_memories_by_ids_live_smoke.py::sql:CREATE TABLE " "." " ( )  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/codex_goals_session_source_plugin/tests/codex_goals_session_source_smoke.py::sql:CREATE TABLE thread_goals ( thread_id TEXT PRIMARY KEY NOT N…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/codex_goals_session_source_plugin/tests/codex_goals_session_source_smoke.py::sql:CREATE TABLE _sqlx_migrations (version TEXT)  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/codex_memories_session_source_plugin/tests/codex_memories_session_source_smoke.py::sql:CREATE TABLE stage1_outputs ( thread_id TEXT PRIMARY KEY, so…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/codex_state_session_source_plugin/tests/codex_state_session_source_smoke.py::sql:CREATE TABLE threads ( id TEXT PRIMARY KEY, rollout_path TEX…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/codex_state_session_source_plugin/tests/codex_state_session_source_smoke.py::sql:CREATE TABLE thread_dynamic_tools ( thread_id TEXT NOT NULL,…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/default_thinking_plugin/tests/default_thinking_update_state_migration_live_smoke.py::sql:CREATE TABLE " "." " ( )  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/pgvector_service_plugin/tests/find_missing_external_ids_live_smoke.py::sql:CREATE TABLE " "." " ( )  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/acquire_lease_smoke.py::sql:CREATE TABLE " "." " (id text PRIMARY KEY, timestamp, text, …  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/autocommit_delete_guard_smoke.py::sql:CREATE TABLE " "." " (id text PRIMARY KEY, val text, is_dele…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/conflict_predicate_upsert_smoke.py::sql:CREATE TABLE " "." " (id text PRIMARY KEY, vendor text NOT N…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/conflict_predicate_upsert_smoke.py::sql:CREATE UNIQUE INDEX " " ON " "." " (vendor, external_session…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/conflict_predicate_upsert_smoke.py::sql:CREATE TABLE " "." " (id text PRIMARY KEY, k text NOT NULL U…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/consolidated_fix_regression_smoke.py::sql:CREATE TABLE " "." " (id text PRIMARY KEY, val text, counter…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/create_index_using_opclass_smoke.py::sql:CREATE TABLE " "." " (id text PRIMARY KEY DEFAULT gen_random…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/filter_grammar_smoke.py::sql:CREATE TABLE " "." " (id text PRIMARY KEY, grp text NOT NULL…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/state_aggregate_primitive_smoke.py::sql:CREATE TABLE " "." " (id text PRIMARY KEY, status text, amou…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/store_abstraction_smoke.py::sql:DROP TABLE IF EXISTS {} CASCADE  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1
+S3::plugins/postgres_state_management_plugin/tests/typed_txn_ops_smoke.py::sql:CREATE TABLE " "." " (id text PRIMARY KEY, val text, counter…  # false-positive: test fixture DDL | legacy: 2026-09-03 W2-1

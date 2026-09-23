@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_blob_storage_plugin::get_blob_metadata",
+  "display_name": "Get Blob Metadata",
+  "description": "Retrieve only metadata for a blob without downloading content, including its resolved on-disk path. Useful for checking properties or reading the file directly from a script.",
+  "embedding_description": "Retrieve only metadata for a blob without downloading content. Use to check size, mime type, filenames, custom tags, or the resolved filesystem path before retrieval. Provide namespace and blob_id and receive metadata plus resolved_path without transferring content bytes into context.",
+  "result_processor_customizations": {
+    "action_label": "Blob Metadata Retrieved",
+    "result_type": "metadata_retrieved",
+    "result_description": "Blob metadata including size, type, custom attributes, and the resolved on-disk path",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving metadata for a blob without downloading content",
+    "error_interpretation": "NotFoundError: Blob with given ID does not exist, OR its metadata record exists but the on-disk file is missing (a loud failure, not a null resolved_path). StorageError: Failed to read metadata from filesystem. PermissionError: Insufficient permissions to read from storage.",
+    "recovery_guidance": "For not found: verify blob_id is correct and blob exists. If metadata exists but the file is reported missing, the blob was deleted or moved outside the blob store — do not retry silently. For storage errors: check filesystem health. For permission errors: verify storage directory permissions."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "error",
+    "top_k must be positive",
+    "invalid",
+    "must be greater"
+  ],
+  "action_status": "error"
+}

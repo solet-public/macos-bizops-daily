@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::delete_issue",
+  "display_name": "Jira: Delete Issue",
+  "description": "Permanently delete a Jira issue by key. Destructive write action taking an EXPLICIT target — the issue key is required and there is no bulk form. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the delete being applied; the confirmation is delivered when the job completes.",
+  "embedding_description": "Permanently delete exactly one Jira issue by its required key, including the ticket's comments and attachments. Dispatches asynchronously, returning a job_id immediately; the deletion confirmation arrives via job completion. This irreversible destructive write has a single-record target.",
+  "result_processor_customizations": {
+    "action_label": "Jira issue deletion queued",
+    "result_type": "jira_delete_issue_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the deletion confirmation -- that arrives separately when the job completes and is delivered as its own message.",
+    "presentation_guidance": "This call only confirms the deletion was queued -- do not present job_id/status as proof the issue is gone. Acknowledge the request is in flight; the deletion confirmation lands in a follow-up message when the job completes. Once delivered, be explicit that the named issue was permanently deleted and that this cannot be undone. State the exact key that was removed."
+  },
+  "error_processor_customizations": {
+    "action_context": "Permanently delete a Jira issue by key.",
+    "error_interpretation": "jira.not_found: no issue with that key exists (it may already be deleted). jira.permission_denied: the service account lacks delete permission for this project. jira.invalid_params: the key was missing or empty.",
+    "recovery_guidance": "jira.not_found: confirm the key; the issue may already be gone. jira.permission_denied: deletion often needs an elevated project role — grant it or ask an admin. jira.invalid_params: supply the exact issue key."
+  }
+}

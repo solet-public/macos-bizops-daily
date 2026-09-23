@@ -1,0 +1,4 @@
+{
+  "process_key": "service_interface::embedding_service::get_embedding_dimension",
+  "arguments": {}
+}

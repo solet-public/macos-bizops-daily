@@ -1,0 +1,24 @@
+# {{SOLET_NAME}}.zsh — per-solet shell environment, sourced by ~/.zshrc.
+# Lives in the deployment directory so improvements arrive via `git pull`, never another
+# ~/.zshrc replacement.
+#
+# Commands this puts on PATH:
+#   claude-{{SOLET_NAME}} [label] [model] [effort]
+#       start a properly-named Claude Code session connected to {{SOLET_NAME}}
+#   codex-{{SOLET_NAME}} [role] [codex arguments ...]
+#       start stock Codex with the no-MCP watcher and durable inbox identity armed
+#   launch-{{SOLET_NAME}}
+#       run {{SOLET_NAME}} in the foreground (debugging; launchd is the
+#       normal run mode — see the hydration runbook before using this)
+
+path_prepend_once() {
+  local path_entry="$1"
+  local existing_path_entry
+  for existing_path_entry in ${(s/:/)PATH}; do
+    [[ "$existing_path_entry" == "$path_entry" ]] && return 0
+  done
+  export PATH="${path_entry}${PATH:+:${PATH}}"
+}
+
+path_prepend_once {{CLONE_DIR_ZSH}}/client/bin
+path_prepend_once "$HOME/.local/bin"

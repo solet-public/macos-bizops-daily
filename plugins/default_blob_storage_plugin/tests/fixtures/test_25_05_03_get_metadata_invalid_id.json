@@ -1,0 +1,15 @@
+{
+  "name": "test_get_metadata_invalid_id",
+  "description": "Attempt to get metadata with invalid blob ID format",
+  "process_key": "plugin::default_blob_storage_plugin::get_blob_metadata",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "blob_id": "not-valid-id"
+    },
+    "state": {
+      "current_session_id": "test-getmeta-invalid-001"
+    },
+    "timeout_seconds": 30
+  }
+}

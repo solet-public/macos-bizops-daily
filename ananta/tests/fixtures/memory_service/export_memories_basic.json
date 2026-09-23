@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::export_memories",
+  "arguments": {
+    "file_path": null,
+    "include_archived": false,
+    "include_embeddings": false
+  }
+}

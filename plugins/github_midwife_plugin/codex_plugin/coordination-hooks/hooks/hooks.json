@@ -1,0 +1,62 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${PLUGIN_ROOT}/hooks/step_zero_reminder.js",
+            "timeout": 5,
+            "statusMessage": "Loading project-orientation reminder"
+          },
+          {
+            "type": "command",
+            "command": "node ${PLUGIN_ROOT}/hooks/check_messages_reminder.js",
+            "timeout": 5,
+            "statusMessage": "Loading coordination reminder"
+          },
+          {
+            "type": "command",
+            "command": "node ${PLUGIN_ROOT}/hooks/role_binding_reminder.js",
+            "timeout": 5,
+            "statusMessage": "Loading role-binding reminder"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/git_controller_gate.py",
+            "timeout": 30,
+            "statusMessage": "Checking Git-Controller policy"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/context_status_reporter.py",
+            "timeout": 30,
+            "async": true,
+            "statusMessage": "Reporting fresh Codex context status"
+          },
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/hooks/inbox_consumer.py",
+            "timeout": 8,
+            "statusMessage": "Checking peer inbox before ending turn"
+          }
+        ]
+      }
+    ]
+  }
+}

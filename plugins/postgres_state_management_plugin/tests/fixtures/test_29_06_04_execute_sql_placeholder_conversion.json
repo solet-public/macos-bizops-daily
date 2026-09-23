@@ -1,0 +1,13 @@
+{
+  "name": "test_execute_sql_placeholder_conversion",
+  "description": "Verify execute_sql converts ? placeholders to PostgreSQL %s format",
+  "process_key": "plugin::postgres_state_management_plugin::execute_sql",
+  "arguments": {
+    "params": {
+      "sql_query": "SELECT ? as converted_param",
+      "sql_params": ["converted_value"]
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

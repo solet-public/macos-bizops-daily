@@ -1,0 +1,10 @@
+{
+  "action_status_any": ["completed", "error"],
+  "output_contains_any": [
+    "memories_created",
+    "files_skipped",
+    "not found",
+    "does not exist"
+  ],
+  "timeout_seconds": 120
+}

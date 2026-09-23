@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "deleted_count"
+  ],
+  "output_not_contains": [
+    "exception"
+  ]
+}

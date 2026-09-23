@@ -1,0 +1,320 @@
+{
+  "title": "AI App Definition Schema",
+  "description": "Schema for defining AI Apps in the Ananta platform",
+  "type": "object",
+  "required": ["app_id", "version", "name"],
+  "properties": {
+    "app_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*[a-z0-9]$",
+      "minLength": 2,
+      "maxLength": 50,
+      "description": "Unique identifier for the AI App (snake_case)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version number (e.g., '1.0.0')"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Human-readable name for the AI App"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Brief description of the AI App's purpose"
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Author or organization that created this AI App"
+    },
+    "license": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "License under which this AI App is distributed"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 30
+      },
+      "maxItems": 10,
+      "description": "Tags for categorizing and discovering the AI App"
+    },
+    "custom_objects": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*[a-z0-9]$": {
+          "$ref": "#/definitions/custom_object"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Custom objects defined by this AI App"
+    },
+    "global_actions": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*[a-z0-9]$": {
+          "$ref": "#/definitions/action_definition"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Global actions available across all objects"
+    },
+    "dependencies": {
+      "type": "object",
+      "properties": {
+        "plugins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required plugins for this AI App"
+        },
+        "ai_apps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Other AI Apps this app depends on"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Dependencies required by this AI App"
+    },
+    "configuration": {
+      "type": "object",
+      "properties": {
+        "default_model": {
+          "type": "string",
+          "description": "Default LLM model to use for inference"
+        },
+        "resource_limits": {
+          "type": "object",
+          "properties": {
+            "max_memory_mb": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_cpu_percent": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "max_concurrent_actions": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true,
+      "description": "Configuration settings for the AI App"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this AI App was created"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this AI App was last updated"
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri",
+          "description": "Homepage URL for this AI App"
+        },
+        "repository": {
+          "type": "string",
+          "format": "uri",
+          "description": "Source code repository URL"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Additional metadata about the AI App"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "custom_object": {
+      "type": "object",
+      "required": ["fields"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Description of this custom object"
+        },
+        "fields": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*[a-z0-9]$": {
+              "$ref": "#/definitions/field_definition"
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1,
+          "description": "Fields that define the structure of this object"
+        },
+        "actions": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*[a-z0-9]$": {
+              "$ref": "#/definitions/action_definition"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Actions that can be performed on this object"
+        },
+        "validation_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["field", "rule"],
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "rule": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Custom validation rules for this object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "field_definition": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean", "array", "object", "geolocation", "datetime"],
+          "description": "Data type of the field"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether this field is required"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Description of this field"
+        },
+        "validation": {
+          "type": "string",
+          "description": "Validation rule for this field"
+        },
+        "default": {
+          "description": "Default value for this field"
+        },
+        "enum": {
+          "type": "array",
+          "description": "Allowed values for this field"
+        },
+        "format": {
+          "type": "string",
+          "description": "Format specification for the field"
+        }
+      },
+      "additionalProperties": false
+    },
+    "action_definition": {
+      "type": "object",
+      "required": ["description", "executor"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Description of what this action does"
+        },
+        "executor": {
+          "type": "string",
+          "pattern": "^[a-z_]+::[a-z_]+::[a-z_]+$",
+          "description": "Process key that executes this action (format: provider_type::provider::function)"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "required": ["name", "type"],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "required": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          },
+          "description": "Parameters required by this action"
+        },
+        "return_value": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "schema": {
+              "type": "object"
+            }
+          },
+          "description": "Description of the value returned by this action"
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "parameters": {
+                "type": "object"
+              },
+              "expected_result": {
+                "description": "Expected result for this example"
+              }
+            }
+          },
+          "description": "Usage examples for this action"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "test_delete_records_invalid_filters",
+  "description": "Verify delete_records returns error when filters is not a dictionary",
+  "process_key": "plugin::postgres_state_management_plugin::delete_records",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "query": {
+        "table": "key_value_store",
+        "filters": "invalid_not_a_dict"
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

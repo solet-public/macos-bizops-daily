@@ -1,0 +1,15 @@
+{
+  "name": "test_search_blobs_basic",
+  "description": "Search blobs with empty filters to list all in namespace",
+  "process_key": "plugin::default_blob_storage_plugin::search_blobs",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "metadata_filters": {}
+    },
+    "state": {
+      "current_session_id": "test-search-basic-001"
+    },
+    "timeout_seconds": 30
+  }
+}

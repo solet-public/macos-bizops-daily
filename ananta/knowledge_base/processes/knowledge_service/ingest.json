@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::ingest",
+  "display_name": "Ingest Knowledge Base",
+  "description": "Idempotently (re)ingest a knowledge base, or all of them with name='all'. Content-hash-gated: skips knowledge bases whose indexed content is already current and reindexes only stale or not-yet-installed ones. In 'all' mode, per-KB failures are collected and status becomes 'partial'; a single named KB fails loud. Unlike install (which always archives and recreates), ingest is the changed-only entry point used by provisioning and edit-then-reingest.",
+  "embedding_description": "Idempotently refresh the knowledge index by reingesting only the knowledge bases whose content changed, skipping ones already current, optionally sweeping every knowledge base at once.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge bases ingested",
+    "result_type": "knowledge_bases_ingested",
+    "result_description": "Which KBs were reindexed, which were skipped as current, any per-KB failures, and the total chunk count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Idempotently ingesting one or all knowledge bases",
+    "error_interpretation": "FileNotFoundError: the named knowledge base directory does not exist. A single-KB ingest fails loud; in 'all' mode individual KB failures are reported in the failed list with status='partial'.",
+    "recovery_guidance": "Verify the knowledge base directory exists under the knowledge_base root, or pass name='all' to ingest every available knowledge base."
+  }
+}

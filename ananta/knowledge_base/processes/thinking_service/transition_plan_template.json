@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::transition_plan_template",
+  "display_name": "Transition Plan Template Curation Lifecycle",
+  "description": "advance a registered plan-template card along its curation lifecycle: endorse a draft as active (the canonical skeleton to fork by intent), mark a template superseded by a replacement, or archive it for retirement.",
+  "embedding_description": "Change the curation-lifecycle state of a plan template. Endorse a draft template to active so it is the canonical reusable skeleton agents fork by intent; supersede a template by naming its replacement; or archive a template to retire it. A plan template does not run, so there is no proven state and no run evidence — the state is pure curation metadata edited directly in the card's front-matter. Idempotent: transitioning to the state a template already holds is a no-op.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Plan-template curation lifecycle transitioned",
+    "result_type": "plan_template_transition_result",
+    "result_description": "Transition result with keys: template_key, previous_state, state, superseded_by, status",
+    "presentation_guidance": "Report the template_key with its previous_state and new state; when status is 'unchanged' note the template already held that state. For a supersession, surface superseded_by so the caller knows the replacement skeleton to fork instead.",
+    "output_action_guidance": "The curation state is now durable in the card's front-matter and surfaces in retrieval. An active template is the canonical skeleton to fork by intent; a superseded or archived template is no longer forkable, and its front-matter state is the searchable retirement signal (there is no separate banner — the state lives in the card)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Transitioning a plan template along draft -> active -> superseded -> archived. transition_plan_template accepts {template_key, target_state, superseded_by?}; superseded_by is required only for target_state 'superseded'. There is no 'proven' state and no run evidence — a template does not run.",
+    "error_interpretation": "PlanTemplateNotFound: no card exists for the key (register it first), or the named replacement is not registered. PlanTemplateStateConflict: the transition is illegal from the template's current state, the card's Template Key disagrees with the key operated on, or the replacement is archived. TemplateStateConflict / TemplateParameterError (core): 'draft' was requested as a manual target (it is the authoring origin), superseded_by was supplied for a non-supersession target, or superseded_by is missing/self for a supersession. ParameterError: target_state is not one of draft/active/superseded/archived.",
+    "recovery_guidance": "Illegal transition: read the current state with get_plan_template and choose a legal target (active from draft; superseded from draft/active; archived from any non-terminal state). Supersession: name a registered, non-archived, non-self replacement in superseded_by, and drop superseded_by for any other target. To make a template forkable, transition it to active — never to 'draft' (that is where it is authored)."
+  }
+}

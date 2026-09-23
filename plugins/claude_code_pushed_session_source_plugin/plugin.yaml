@@ -1,0 +1,16 @@
+name: claude_code_pushed_session_source_plugin
+description: |
+  LLM session ledger source for Claude Code sessions pushed live via MCP
+  (e.g. by the session shipper packaged by `session_shipper_bootstrap_plugin`
+  or by `session_bridge_plugin`'s drainer if a sibling messages-stream is
+  emitted). Receives one or more newline-separated Claude Code JSONL lines
+  per chunk and converts them into raw ledger events. Per Architect 2026-05-30
+  this lives as a sibling to the filesystem and W4 hook-bridge sources;
+  no Python code is shared beyond the platform-owned vendor parser at
+  `ananta.llm.session_ledger.vendor.claude_code`.
+
+implements:
+  - interface: LLMSessionSourceInterface
+  - interface: PushedSourceMixin
+
+optional: true

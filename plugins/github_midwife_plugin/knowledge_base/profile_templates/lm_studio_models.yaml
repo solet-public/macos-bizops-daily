@@ -1,0 +1,48 @@
+# Reviewed host provisioning artifacts. Download identity is not the served ID.
+# Measured pinned-llmster guest receipts: 2026-09-08. Exact byte sizes and
+# source.owner/repo/file provenance rechecked on the development host 2026-09-10.
+# Explicit loading is required. JIT is prohibited by rul_12c99e57.
+models:
+  embeddings:
+    api_identifier: text-embedding-nomic-embed-text-v1.5-embedding
+    download_source: https://huggingface.co/gaianet/Nomic-embed-text-v1.5-Embedding-GGUF
+    download_file: nomic-embed-text-v1.5.f16.gguf
+    size_bytes: 274290560
+    get_argv: [get, https://huggingface.co/gaianet/Nomic-embed-text-v1.5-Embedding-GGUF, --gguf, --yes]
+    load_argv: [load, text-embedding-nomic-embed-text-v1.5-embedding, --gpu, "off", --yes]
+    required: true
+    consumed_by: openai_embeddings_plugin
+    warning: The unsuffixed 84.11 MB bundled Nomic model is a different artifact.
+  inference:
+    api_identifier: qwen3-14b
+    download_source: https://huggingface.co/lmstudio-community/Qwen3-14B-GGUF@Q4_K_M
+    download_file: Qwen3-14B-Q4_K_M.gguf
+    size_bytes: 9001753376
+    get_argv: [get, https://huggingface.co/lmstudio-community/Qwen3-14B-GGUF@Q4_K_M, --gguf, --yes]
+    load_argv: [load, qwen3-14b, --gpu, "off", --context-length, "8192", --yes]
+    required: true
+    consumed_by: default_inference_plugin
+
+  chatmusician:
+    api_identifier: chatmusician-hf-mlx
+    identifier_class: derived_from_download_source
+    download_source: mlx-community/ChatMusician-hf-4bit-mlx
+    get: lms get "https://huggingface.co/mlx-community/ChatMusician-hf-4bit-mlx" --yes
+    load: Explicit lms load is required before serving; not provisioned by setup.
+    required: false
+    consumed_by: generative_composition_plugin::generate_musical_phrase
+
+  thinking:
+    api_identifier: qwen3-30b-a3b-thinking-2507-mlx
+    identifier_class: derived_from_download_source
+    download_source: lmstudio-community/Qwen3-30B-A3B-Thinking-2507-MLX-8bit
+    get: lms get "https://huggingface.co/lmstudio-community/Qwen3-30B-A3B-Thinking-2507-MLX-8bit" --yes
+    load: Explicit lms load is required before serving; not provisioned by setup.
+    required: false
+    consumed_by: none
+    note: >-
+      Present in the reference machine's live default_thinking_plugin.json but read by
+      nothing: default_thinking_plugin owns no model path (DEP-01 Phase-2b) and its
+      base_url/model/inference_backend fields are dead config. Recorded here so the next
+      person who finds that string knows where it came from and that they need not
+      download 32GB for it. See profile_baseline/README.md.

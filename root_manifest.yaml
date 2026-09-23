@@ -1,0 +1,181 @@
+# Root manifest — per-solet declarative root-strictness contract.
+#
+# Source of truth for what is allowed at the repo root.  Three consumers
+# read it, with explicit blocking semantics per layer:
+#
+#   1. .githooks/pre-commit             BLOCKING (drift refused at commit)
+#   2. restart_with_manifest cutover    BLOCKING (drift refused at cutover)
+#   3. ananta.cli startup diagnostic    NEVER BLOCKING (structured log only)
+#
+# Architectural lock 2026-06-15 PT + operator Q&A locks 2026-06-16 PT
+# (Phase A planning §10 + Cycle 10 design memo
+# workbench/2026-06-16_root_manifest_yaml_design.md).
+
+schema_version: 1
+solet_name: solet
+
+# `universal:` is the REQUIRED set — every solet MUST have these, in a
+# development checkout AND in a freshly-born seed clone alike.  Absence is
+# BLOCKING at pre-commit and at cutover, so an entry belongs here ONLY if it
+# is present in BOTH shapes.  The seed ships this file verbatim (the midwife
+# rewrites `solet_name:` and nothing else), so anything listed here that
+# a newborn does not have hard-blocks that newborn's very first
+# `apply_manifest` — no code or plugin update can deploy until a human
+# hand-edits the manifest.  See the `sanctioned:` note below.
+universal:
+  files:
+    - README.md
+    - RELEASE_NOTES.md
+    - LICENSE
+    - NOTICE
+    - CONTRIBUTING.md
+    - root_manifest.yaml
+    - bootstrap.py
+    - pyproject.toml           # gate-parity ruff/pyright config (born-clone-gates fix, 2026-08-10); moved here FROM sanctioned: below — that entry's absence-tolerance was written for the packaging-install angle only and predates this gate-config dependency
+  directories:
+    # Layer-0 operation adapter ships with bootstrap.py in development and seed clones.
+    - bootstrap_adapter
+    - ananta
+    - solet_setup_contracts
+    - plugins
+    - knowledge_bases
+    - profile
+    - quality_gates
+    # Homebrew manager source ships in both the development checkout and every
+    # seed release that supports `solet create`; the packaging lane adds the
+    # matching seed allowlist entry before this release is assembled.
+    - solet_cli
+
+platform_managed:
+  directories:
+    - .git
+    - .venv
+    - __pycache__
+    - .ruff_cache
+    - .mypy_cache
+    - .pytest_cache
+    - .idea
+
+# `sanctioned:` is the ALLOWED-PERMANENT set — declared, so presence is never
+# `unknown_root_entries` (BLOCKING), and absence is only `missing_sanctioned`
+# (INFO).  That present-or-absent tolerance is exactly what the entries below
+# need: each one legitimately exists in one shape of the tree and legitimately
+# does not exist in the other.  An external seed review (2026-07-22, against
+# seed b31a54e and still reproducing five mints later in a61d6b6) reported
+# these as a hard cutover block on every fresh birth.
+#
+# Development-checkout surfaces — present in a git clone of the platform
+# origin; NOT in a sealed seed bundle, and not yet created at the moment a
+# newborn runs its first apply_manifest.  `.claude/` is written by the
+# operator-run hydration runbook, which happens AFTER birth — so the cutover
+# gate can and does fire before it exists.  CLAUDE.md and AGENTS.md are the
+# exception since 2026-08-15: they now have TWO legitimate lifecycles (see
+# their entries below), and remain sanctioned rather than required because
+# neither shape is universal across the clones that exist today.
+sanctioned:
+  - path: .gitignore
+    reason: "development-checkout surface; a sealed seed ships no dotfiles and a newborn's is written by git-init at hydration, after the first cutover gate"
+    operator_approved: "2026-07-28"
+
+  - path: .dockerignore
+    reason: "development-checkout surface; container build context is origin-only, never shipped in a seed"
+    operator_approved: "2026-07-28"
+
+  - path: .mcp.json
+    reason: "development-checkout surface; per-clone MCP wiring, written at hydration if the operator selects the MCP transport"
+    operator_approved: "2026-07-28"
+
+  # BOTH states, since 2026-08-15. (1) PRE-BIRTH: a sealed seed now ships a
+  # generated AGENTS.md/CLAUDE.md at its root (seed_factory_plugin's
+  # seed_agents.md.template / seed_claude.md.template, written by assemble
+  # exactly as the generated README is), so a downloaded-but-uninstalled clone
+  # HAS them before any cutover gate runs.  (2) POST-BIRTH: the operator-run
+  # hydration runbook merges its managed block into whichever file is there,
+  # creating it if absent — so a clone born before 2026-08-15, or one whose
+  # hydration has not been run, legitimately has neither.  Sanctioned (not
+  # required) is exactly the present-or-absent tolerance both states need.
+  - path: AGENTS.md
+    reason: "agent-instruction bootstrap surface with two lifecycles: shipped pre-birth as a generated file in a sealed seed bundle (2026-08-15), and merged into post-birth by the operator-run hydration runbook — absent only in a clone born before that change whose hydration has not run"
+    operator_approved: "2026-07-28"
+
+  - path: CLAUDE.md
+    reason: "agent-instruction bootstrap surface with two lifecycles: shipped pre-birth as a generated file in a sealed seed bundle (2026-08-15), and merged into post-birth by the operator-run hydration runbook — absent only in a clone born before that change whose hydration has not run"
+    operator_approved: "2026-07-28"
+
+  - path: .claude
+    reason: "Claude Code session surface; current hydration installs skills and hooks at USER scope (~/.claude), so a born clone may never have a local one"
+    operator_approved: "2026-07-28"
+
+  - path: .github
+    reason: "upstream-feedback issue forms (hybrid feedback adoption); ships via seed manifest copy, absent in clones born before 2026-08-13 — sanctioned not universal so those clones stay deployable"
+    operator_approved: "2026-08-13"
+
+  # Operator ruling 2026-08-01 ("declare it approved"), relayed via
+  # Coordinator-Dawn.  Regenerated by the local Claude Code tooling, so
+  # removing it from disk recurs; declaring it is the durable disposition.
+  - path: .agents
+    reason: "Claude Code plugin-marketplace surface; written by local agent tooling (.agents/plugins/marketplace.json), origin-only and never shipped in a seed"
+    operator_approved: "2026-08-01"
+
+  # Operator ruling 2026-08-06 (wording approved in-seat, coordinator-seat session).
+  # Landing this entry is what un-parks the directory: restore
+  # workbench/2026-08-06_claude_plugin_parked/marketplace.json to
+  # .claude-plugin/marketplace.json after it lands (fresh clones get it
+  # from setup_clone.sh instead).
+  - path: .claude-plugin
+    reason: "Claude Code plugin-marketplace surface; holds the reviewed marketplace.json that registers the in-repo coordination-hooks plugin as an in-place directory marketplace (used where it sits, never cloned, so the installed catalog cannot drift from the reviewed one); written by clone setup/hydration after birth, so it may be absent at a newborn's first cutover gate"
+    operator_approved: "2026-08-06"
+
+  - path: .githooks
+    reason: "development-checkout surface; tracked hooks are wired by deployment/scripts/setup_clone.sh, which is origin-only"
+    operator_approved: "2026-07-28"
+
+  - path: binary_libraries
+    reason: "development-checkout surface; vendored binaries are deliberately excluded from the seed (the seed ships no dependency bytes)"
+    operator_approved: "2026-07-28"
+
+  - path: workbench
+    reason: "development-checkout surface; agent working notes are origin-only and never shipped in a seed"
+    operator_approved: "2026-07-28"
+
+  - path: docs
+    reason: "development-checkout surface; a coordinator dispatch-brief convention (register-CLI backlog burndown work, first appeared 2026-09-11), same lifecycle class as workbench above -- agent working notes, origin-only, never shipped in a seed"
+    operator_approved: "2026-09-11"
+
+  # Birth-time surfaces — created by or for a newborn; absent in the platform
+  # origin checkout, which is not itself seed-born.
+  - path: PROVENANCE.json
+    reason: "seed provenance stamp; mandatory in every sealed bundle and every born clone, absent in the platform origin checkout"
+    operator_approved: "2026-07-28"
+
+  - path: client
+    reason: "birth-time surface reported present by seed-review §19.6; declared so it can never be BLOCKING unknown drift in a born clone"
+    operator_approved: "2026-07-28"
+
+  - path: disabled_plugins
+    reason: "operator-sanctioned plugin retirement holding pen; not drift"
+    operator_approved: "2026-06-15"
+
+  - path: deployment
+    reason: "in-transition during 2026-06-15+ verb-conversion; will empty out per Phase F migration"
+    operator_approved: "2026-06-15"
+    sunset_target: "Phase F-3 + F-4 close"
+
+  - path: initialization
+    reason: "F4 retirement workstream; folds into ananta/src/ananta/profile_loader/"
+    operator_approved: "2026-06-16"
+    sunset_target: "F4 retirement closes"
+
+overrides: []
+
+diagnostic:
+  report_categories:
+    - unknown_root_entries
+    - missing_universal_entries
+    - sunset_overdue
+    - cleanup_overdue
+  ignore_patterns:
+    - "*.swp"
+    - "*.bak"
+    - ".DS_Store"
+    - "Thumbs.db"

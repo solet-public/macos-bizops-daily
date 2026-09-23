@@ -1,0 +1,17 @@
+[Unit]
+Description=Solet session ledger shipper (deployment ${DEPLOYMENT_ID})
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${PYTHON_BIN} ${INSTALL_DIR}/shipper.py
+Restart=on-failure
+RestartSec=10
+Environment=DEPLOYMENT_ID=${DEPLOYMENT_ID}
+Environment=MACHINE_ID=${MACHINE_ID}
+StandardOutput=append:${INSTALL_DIR}/shipper.log
+StandardError=append:${INSTALL_DIR}/shipper.err
+
+[Install]
+WantedBy=default.target

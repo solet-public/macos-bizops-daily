@@ -1,0 +1,11 @@
+{
+  "name": "test_create_flow",
+  "description": "Create a new flow record to track a unit of work. A flow represents one user request and all spawned actions within it.",
+  "process_key": "service_interface::flow_service::create_flow",
+  "arguments": {
+    "session_id": "test_value",
+    "trigger_type": "test_value",
+    "trigger_data": {},
+    "priority": 1
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "\"flow_id\":"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\"",
+    "\"flow_id\": null"
+  ],
+  "description": "Create flow with required params - should return valid flow_id"
+}

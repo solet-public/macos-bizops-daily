@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_self_deployment_plugin::uninstall_autostart",
+  "display_name": "Uninstall solet LaunchAgent",
+  "description": "Unload the per-solet macOS LaunchAgent via launchctl unload -w and remove its plist from ~/Library/LaunchAgents/local.solet.<name>.plist. After this verb, the solet no longer boots automatically at user login; only manual `SOLET_NAME=<name> ./launch.py` or blue-green service_interface::self_deployment_service::restart_with_manifest brings it up. Idempotent: an already-absent LaunchAgent returns status=success with prior_state=absent (no error, no work). The verb is sync. Omitting dry_run performs no action; dry_run=true plans the actions without invoking launchctl or unlinking the plist. Malformed dry_run values are refused before launchctl or plist removal. Use when decommissioning a solet from autostart (e.g. before its final teardown, or when migrating its autostart surface to a different deployment mechanism). Backlog item #13 (operator-approved 2026-06-04).",
+  "embedding_description": "Remove macOS LaunchAgent so the solet no longer auto-starts at login. Unloads via launchctl + unlinks the plist. Idempotent: absent plist returns success. Inverse of install_autostart. Does NOT terminate the running solet — only severs cold-start-at-login. To stop a live solet use self_deployment_service::stop_self. Returns AutostartResult: status, label, plist_path, prior_state.",
+  "result_processor_customizations": {
+    "action_label": "LaunchAgent uninstalled",
+    "result_type": "macos_self_deployment_autostart_uninstall_result",
+    "result_description": "AutostartResult frozen dataclass with status (success / dry_run / failed), verb='uninstall_autostart', solet_name, label, plist_path, prior_state (absent / present_not_loaded / present_and_loaded), last_run_at (echo from pre-unload observation, empty when absent), dry_run flag echo, and human-readable message.",
+    "presentation_guidance": "Lead with status. On status='success' with prior_state='absent', confirm there was nothing to do — operator's expectation that uninstall is harmless on first call is honored. On status='success' with prior_state in {present_not_loaded, present_and_loaded}, surface the message — autostart is severed. On status='failed', surface the message verbatim (launchctl stderr or filesystem error)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Uninstall the macOS LaunchAgent that boots the solet at user login.",
+    "error_interpretation": "launchctl_unload_failed: the launchctl invocation could not unload the label (typically the label is unknown to launchd despite the plist on disk — operator-tampered state). plist_unlink_failed: the unlink syscall failed (permission denied, file gone between observe and unlink, etc.).",
+    "recovery_guidance": "launchctl_unload_failed: re-run status_autostart to see launchd's current view; the launchctl quirk usually clears on re-run. plist_unlink_failed: check filesystem permissions on the plist path; manually `rm` the plist if needed and re-run uninstall_autostart to confirm clean state."
+  }
+}

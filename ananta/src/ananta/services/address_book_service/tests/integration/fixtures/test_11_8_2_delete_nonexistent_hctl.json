@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::address_book_service::delete",
+  "arguments": {
+    "name": "nonexistent_address_11_8_2_xyz"
+  }
+}

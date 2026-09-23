@@ -1,0 +1,16 @@
+{
+  "name": "test_search_similar_basic",
+  "description": "Basic similarity search with cosine distance metric",
+  "process_key": "plugin::pgvector_service_plugin::search_similar_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "query_vector": [0.1, 0.2, 0.3, 0.4, 0.5],
+      "top_k": 5
+    },
+    "state": {
+      "current_session_id": "test-search-basic-001"
+    },
+    "timeout_seconds": 30
+  }
+}

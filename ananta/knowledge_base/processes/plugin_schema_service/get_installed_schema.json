@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::plugin_schema_service::get_installed_schema",
+  "display_name": "Get Installed Plugin Schema",
+  "description": "Read-only introspection. Returns the recorded SchemaDefinition snapshot and per-table status (active or inactive) for the namespace, plus install/update/uninstall timestamps.",
+  "embedding_description": "Read-only introspection: return the recorded SchemaDefinition snapshot and per-table status (active/inactive) for a plugin namespace, plus install/update/uninstall timestamps. Returns object with namespace + tables map (each entry: status, schema_snapshot, installed_at, updated_at, uninstalled_at). Use to inspect what's installed before mutating; unknown namespace returns empty tables dict.",
+  "result_processor_customizations": {
+    "action_label": "Plugin schema fetched",
+    "result_type": "plugin_schema_fetched",
+    "result_description": "Object with namespace and tables map. Each table entry has status, schema_snapshot, installed_at, updated_at, uninstalled_at.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads platform__plugin_schema_ownership for the namespace and returns recorded snapshots.",
+    "error_interpretation": "Postgres connectivity errors; otherwise an unknown namespace simply returns an empty tables dict (not an error).",
+    "recovery_guidance": "For Postgres errors: confirm postgres_state_management_plugin is healthy."
+  }
+}

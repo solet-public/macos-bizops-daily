@@ -1,0 +1,12 @@
+{
+  "action_status": "completed",
+  "data_contains": {
+    "total": true,
+    "by_type": true,
+    "by_status": true
+  },
+  "output_not_contains": [
+    "error"
+  ],
+  "timeout_seconds": 60
+}

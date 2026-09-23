@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::quality_service::run_test",
+  "display_name": "Run Smoke Tests",
+  "description": "Execute the platform's gate-eligible smoke-test suite, or a single registered smoke, and return the aggregate pass/fail with bounded output. With no argument it runs the whole suite via quality_gates/run_smokes.py against the tracked register (quality_gates/gate_smokes.txt). With a 'smoke' argument — a repo-relative path — that path must already be present in the register (the register IS the allowlist boundary) or the verb rejects it with a typed error; the single smoke is then run directly. Smokes are standalone no-pytest scripts that exit 0 on pass. SOLET_NAME is set server-side. Long-running: the full suite runs 60+ smokes in series.",
+  "embedding_description": "Run the platform smoke-test suite (run_smokes.py) or one registered smoke and get the aggregate pass/fail. Behavioral half of the commit gate — executes the gate_smokes.txt register of standalone smoke scripts. Single-smoke path must be in the register. Long-running, bounded output.",
+  "result_processor_customizations": {
+    "action_label": "Smoke suite run",
+    "result_type": "quality_test_run_result",
+    "result_description": "Object with 'target' ('suite' or the single smoke path), 'passed', 'exit_code', 'timed_out', 'summary' (e.g. 'smokes: N/M passed'), 'output' (bounded tail), 'truncated', 'output_chars_total'.",
+    "presentation_guidance": "Lead with target and passed. On failure, surface 'summary' (the N/M line) and the failing-smoke tail from 'output'; note truncation against output_chars_total when 'truncated' is true.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Running the gate-eligible smoke suite via run_smokes.py (or one registered smoke directly) as a server-side subprocess with a hard timeout and bounded output.",
+    "error_interpretation": "ValueError/QualityGateError: the requested smoke path is not in quality_gates/gate_smokes.txt — only registered smokes may be run (this is the allowlist boundary), NOT a test failure. A suite/smoke that runs but fails returns passed=false with exit_code!=0. timed_out=true with exit_code 124 means the wall-clock cap fired before the suite finished.",
+    "recovery_guidance": "For an unregistered-smoke error: call list_gates to see the registered smoke paths, or omit the argument to run the whole suite. For a real failure (passed=false): read 'summary' and the failing-smoke output and fix the code under test. For a timeout: run a single smoke instead of the full suite to narrow the slow test."
+  }
+}

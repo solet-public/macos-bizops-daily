@@ -1,0 +1,12 @@
+{
+  "name": "test_consolidate_basic",
+  "description": "Verify memory consolidation - summarizing weak episodic memories into semantic memories",
+  "process_key": "plugin::actr_memory_plugin::consolidate_action",
+  "arguments": {
+    "params": {},
+    "state": {
+      "session_id": "test-session-080"
+    }
+  },
+  "timeout_seconds": 120
+}

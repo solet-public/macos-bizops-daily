@@ -1,0 +1,180 @@
+---
+name: rename
+description: Take ownership of a session role name on the declared fleet transport — arms the {{SOLET_NAME}} watch registered-presence watcher (default) or re-registers over the optional MCP bridge (when declared) — keeping the platform-side role binding, the address book, and the local Claude Code session label in lock-step. Use on /rename <Role-Name> and on SessionStart re-claim prompts.
+---
+
+The user (or the SessionStart re-claim hook) supplied a role name as the
+argument — call it `$ROLE` below. Take ownership of it for this session: the
+platform-side role binding and address-book entry that back
+`peer_send_by_name` routing and scheduled wake-ups, kept in lock-step with
+the local Claude Code session label.
+
+This is the seed render of the canonical rename skill; the platform-checkout
+render is `.claude/commands/rename.md` in the platform repo. The two bodies
+stay in lock-step and differ only in CLI command name, MCP tool prefix, and
+the unset-transport default.
+
+**Transport selection — declared, never probed, never silently crossed.**
+Read `FLEET_TRANSPORT` from this session's environment (Bash:
+`echo "${FLEET_TRANSPORT:-watch}"` — unset means `watch`, the
+standing default on hydrated machines).
+
+- `watch` → watcher path below.
+- `mcp` → MCP path below (only ever declared where the operator explicitly
+  wired the optional MCP bridge at hydration).
+- If the declared path's mechanism is missing or fails, surface the exact
+  error and stop. Do NOT switch to the other path on your own — the other
+  path may be used only when the user explicitly asks for it in this
+  conversation. An explicit instruction is not a fallback. In particular, do
+  not register, troubleshoot, or suggest MCP to make renaming work when the
+  declared transport is `watch`.
+
+## Watcher path (transport `watch`, the default)
+
+**Detect the incumbent watcher FIRST — it decides which of the two branches
+below you take.** A fleet-spawned worker is launched with its presence
+watcher already armed by the spawn adapter (`--no-claim`: it registered
+presence and deliberately claimed no role); an operator-launched session has
+no sidecar and must arm its own. Arming a second watcher for the same session
+is REFUSED, never merged — `{{SOLET_NAME}} watch` takes a per-session flock
+and exits with `another watcher already holds this session's lock ... one
+watch per session; stop the incumbent first` — so branch 1b run blindly just
+errors out on every spawned worker.
+
+A watcher does NOT register under `$AGENT_INSTANCE_ID`. It registers under a
+derived, stable id: `agi-watch-` + the first 24 hex chars of
+`sha256($AGENT_SESSION_ID)`. Compute it and look for it in the registry:
+
+```bash
+WATCH_ID="agi-watch-$(printf %s "$AGENT_SESSION_ID" | shasum -a 256 | cut -c1-24)"
+echo "$WATCH_ID"
+{{SOLET_NAME}} call plugin::agent_messaging_plugin::peer_list '{}' | grep -c "$WATCH_ID"
+```
+
+- **`$WATCH_ID` present in `peer_list`** (count ≥ 1) → branch 1a.
+- **Absent** (count 0) → branch 1b.
+
+### 1a. Incumbent sidecar → claim the role through it (do NOT arm a second)
+
+Presence already exists; only the durable role binding is missing. Claim it
+with the verb, against the identity the WATCHER actually registered — never
+`$AGENT_INSTANCE_ID`, which is the launcher's id and holds no binding:
+
+```bash
+{{SOLET_NAME}} call plugin::agent_messaging_plugin::peer_claim_role \
+  "{\"name\": \"$ROLE\", \"agent_id\": \"$AGENT_IDENTITY\", \"agent_instance_id\": \"$WATCH_ID\", \"agent_session_id\": \"$AGENT_SESSION_ID\", \"session_label\": \"$ROLE\"}"
+```
+
+Confirm `action` is `registered` (first claim) or `updated` (refresh). If the
+call reports `role_held_live`, another live session holds the name — report
+that and stop; do not pass `takeover` without operator confirmation. Then go
+to step 4, using `$WATCH_ID` wherever it asks for the instance id.
+
+### 1b. No incumbent → arm the watcher with the role, as before
+
+1. Start the registered-presence watcher as a persistent background process
+   (a background Bash task; keep it running for the session's lifetime; if a
+   previous watcher from this conversation is running for a different role,
+   stop it first):
+   ```bash
+   {{SOLET_NAME}} watch --role "$ROLE"
+   ```
+   On arming it registers this session in the peer registry (identity from
+   the launcher-exported `AGENT_SESSION_ID`), claims `$ROLE` as
+   the durable role binding, drains messages that arrived while unwatched,
+   then streams one JSON line per delivery — and nothing while idle. It
+   reconnects and re-claims automatically across solet restarts and
+   blue-green swaps. It also tees each delivery into a per-session spool
+   consumed by the `{{SOLET_NAME}} wake` Stop hook (installed at user
+   scope by hydration): when this session goes idle, that hook blocks at
+   zero token cost and turns the next delivery into a session turn — no MCP,
+   and it works the same on any inference provider. If the hook is absent (a
+   harness without hook support), deliveries wait in the watch output for
+   the next look; that is the floor, not the ceiling. If the watcher exits
+   immediately complaining about a missing session id, the session was not
+   started via the `claude-{{SOLET_NAME}}` launcher or fleet
+   functions — say so rather than inventing an id.
+
+2. Verify from the watcher's first output line: `"watch": "armed"` with the
+   claim result (`claimed`/`updated`/`displaced`) and note the
+   `agent_instance_id` it printed. New JSON lines on later looks are
+   deliveries (peer messages, role-addressed sends) — treat them like any
+   peer message.
+
+   Note the `"claim"` value here reports `{"claimed": false, "reason":
+   "managed_registration_only"}` for a `--no-claim` arm — that is the
+   sidecar's shape, not this branch's; seeing it means you took the wrong
+   branch and should claim via 1a instead.
+
+## MCP path (transport `mcp`)
+
+Requires the `mcp__{{SOLET_NAME}}__*` tools in this session (the
+operator explicitly wired the optional MCP bridge, and the launcher attaches
+it in this mode). If they are absent, that is a launch/configuration error —
+report it.
+
+1. Call `mcp__{{SOLET_NAME}}__peer_register` with
+   `agent_id="claude_code"` and `session_label="$ROLE"`. Capture BOTH
+   `agent_instance_id` AND `parent_pid` from the response.
+
+2. Call `mcp__{{SOLET_NAME}}__process_call` with:
+   - `process_key`: `plugin::agent_messaging_plugin::peer_claim_role`
+   - `arguments`: `{"name": "$ROLE", "agent_id": "claude_code", "agent_instance_id": "<value from step 1>", "session_label": "$ROLE"}`
+   - `reason`: brief explanation of the rename
+
+3. Read the `bridge_delivery_result` channel notification for the
+   `process_call` response. Confirm `action` is `registered` (first claim)
+   or `updated` (refresh of an existing claim).
+
+## Both paths — finish
+
+4. If the new role differs from the label this session was launched with,
+   patch the local Claude Code session label: set the top-level `name` field
+   of `~/.claude/sessions/<parent_pid>.json` (MCP path: `parent_pid` from
+   step 1; watcher path: the ancestor `claude` process pid, e.g. walk up
+   from `$$` with `ps -o ppid= -p`). Use jq with an atomic rename:
+   ```bash
+   jq --arg name "$ROLE" '.name = $name' ~/.claude/sessions/<parent_pid>.json > /tmp/rename.$$.json && mv /tmp/rename.$$.json ~/.claude/sessions/<parent_pid>.json
+   ```
+   Skip this step when the role equals the launch label (the SessionStart
+   re-claim case) — the file already says the right thing.
+
+   **This patch is the last lock-step action of a completed claim from steps
+   1–3 above, never a standalone act.** Writing this label without a
+   preceding successful claim does not work around a blocked claim — it
+   forges the lock-step invariant this step exists to preserve: a git-mutation
+   gate that reads this file checks for the label only, so a label written
+   without its claim looks identical to one earned by a real claim while
+   holding none of the protection (the platform-side singleton lock, the loud
+   refusal on a second live claim) that makes holding the role mean anything.
+   If steps 1–3 failed or the declared transport was unavailable, that is the
+   "declared path's mechanism is missing or fails" case from the transport
+   selection guidance above — the correct response is still to surface the
+   error and stop, not to reach this step anyway.
+
+5. Report in one short sentence: which role this session now holds, over
+   which transport, and whether it was a fresh claim, a refresh, or a
+   displacement (displacement from a stale binding is normal after a restart
+   or /clear). The visible terminal session indicator follows the
+   launch-time `--name` argument and only changes after restarting via the
+   launcher; the platform-side claim is effective immediately and is the one
+   that matters for routing.
+
+Notes:
+- Ground truth for any claim, on demand:
+  `{{SOLET_NAME}} call plugin::agent_messaging_plugin::peer_holds_role`
+  with `{"name": "$ROLE", "agent_instance_id": "<from the armed line / step 1>"}`
+  — a raw peer-list entry is presence, not a claim.
+- If the role is already held by ANOTHER LIVE session, the claim is REFUSED
+  with `role_held_live`, naming the incumbent. It does NOT displace the
+  holder. Report the refusal and stop; passing `takeover` needs explicit
+  operator confirmation first, exactly as branch 1a says. (This paragraph
+  used to say the opposite — that the claim "still succeeds and displaces the
+  prior holder". That described the behaviour BEFORE the `role_held_live`
+  gate shipped, and it contradicted this skill's own branch-1a instruction.)
+- A holder that reads DEAD by the liveness window is still claimable, with no
+  takeover and no explicit terminate. That is deliberate, not a gap: a
+  crashed session cannot release its own role, so refusing dead holders too
+  would strand the role permanently behind a session that no longer exists.
+- Still only run one session per role name at a time.
+- If any step fails, surface the error verbatim — don't paper over it.

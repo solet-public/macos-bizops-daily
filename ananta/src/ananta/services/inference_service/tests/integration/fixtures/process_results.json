@@ -1,0 +1,19 @@
+{
+  "name": "test_process_results",
+  "description": "Format and present results to user. Converts raw data into human-readable output.",
+  "process_key": "service_interface::inference_service::process_results",
+  "arguments": {
+    "params": {
+      "prompt": "Return valid JSON with keys reasoning and actions. The single action MUST use process_key 'plugin::discord_plugin::post_message' and set arguments.message to a short summary. Summarize: synthetic tool call completed successfully.",
+      "model": {
+        "name": "llama-3.1-8b-instruct-meta",
+        "temperature": 0.0,
+        "max_tokens": 256
+      }
+    },
+    "state": {
+      "current_session_id": "sess-test-inference",
+      "flow_id": "flow-test-inference"
+    }
+  }
+}

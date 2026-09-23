@@ -1,0 +1,26 @@
+{
+  "process_key": "service_interface::thinking_service::graft_work_breakdown_structure_detail_steps",
+  "display_name": "Graft WBS Detail Steps",
+  "description": "Read a WBS outline and splice one detail-authoring plan step per work item into the active plan. Deterministic — no thinking model call.",
+  "embedding_description": "Graft WBS detail authoring steps into the active plan from a completed outline. Deterministic splice operation that creates one plan step per work item, plus assembly and execution graft steps. Second step of detailed WBS authoring.",
+  "result_processor_customizations": {
+    "action_label": "WBS detail steps grafted",
+    "result_type": "wbs_graft_detail_result",
+    "result_description": "Count of grafted detail steps",
+    "presentation_guidance": "",
+    "output_action_guidance": "WBS detail authoring steps have been grafted into the plan. Continue to the next step to author individual work item details.",
+    "message_rendering": {
+      "renderer_key": "artifact_result_compact",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Grafting WBS detail steps from an outline. graft_work_breakdown_structure_detail_steps accepts {outline_id, anchor_step_number}.",
+    "error_interpretation": "MissingOutline: the outline_id does not exist or has been superseded. PlanGraftError: the active plan does not contain the anchor step number."
+  }
+}

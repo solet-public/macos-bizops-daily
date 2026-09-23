@@ -1,0 +1,8 @@
+{
+  "name": "test_clear_scheduled_actions_by_tag",
+  "description": "Cancel and remove all scheduled jobs matching a specific tag",
+  "process_key": "plugin::default_scheduling_plugin::clear_scheduled_actions_by_tag",
+  "arguments": {
+    "tag": "test_value"
+  }
+}

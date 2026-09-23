@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::embedding_service::list_models",
+  "display_name": "List Embedding Models",
+  "description": "List available embedding models and their capabilities.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Embedding models listed",
+    "result_type": "models_listed",
+    "result_description": "Available models with keys: models (list of model objects with name, dimension, description, and capabilities), default_model (current default)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Lists all available embedding models and their metadata. Used for discovering which models can be used for embedding generation.",
+    "error_interpretation": "ServiceError: embedding service unavailable or not configured. ConfigurationError: no embedding models are configured.",
+    "recovery_guidance": "For service errors: check embedding service status and configuration. Ensure at least one embedding provider is properly configured."
+  }
+}

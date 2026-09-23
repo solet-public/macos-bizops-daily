@@ -1,0 +1,5 @@
+{
+  "query": "Stop memorizing that fact",
+  "expected_process_key": "service_interface::memory_service::stop_memorizing",
+  "expected_arguments": {}
+}

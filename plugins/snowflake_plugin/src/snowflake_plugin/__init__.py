@@ -1,0 +1,1 @@
+"""Snowflake warehouse connector plugin."""

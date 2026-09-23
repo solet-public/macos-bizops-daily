@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::terminate_session",
+  "display_name": "Terminate a managed session",
+  "description": "Fleet session-management Phase B, D1 (§4). Resolves the row's host driver and calls its real terminate(host_ref, grace_seconds) — driver-level graceful stop, SIGKILL after the grace window — BEFORE the ledger write, so the ledger never claims 'terminated' over a process still running. Then transitions the managed_session ledger row to 'terminated' via a predicated CAS on the current lifecycle_state (illegal_lifecycle_transition if the requested edge is not in the §3.2 matrix; stale_lifecycle_state if a concurrent writer already moved the row). 'operator'-hosted rows (every normal peer-registered fleet session, never dispatched through spawn_session) keep the driver's designed degenerate behavior — it cannot kill a process it never spawned, so that step is a no-op and the ledger transition still lands; this is not a silent degradation, the driver's own terminate() actively reports 'cannot spawn/kill', which this verb tolerates on purpose so operator-hosted rows can still reach a terminal state. Idempotent: an already-terminal row (terminated or retired) returns already_terminal=true rather than erroring and never re-attempts the host action, since retire_session composes this step and must be able to re-run it safely.",
+  "embedding_description": "Terminate a managed session: stop the real host process (headless workers get a real SIGTERM/SIGKILL sequence; operator-hosted rows skip the host step by design) and transition its lifecycle ledger row to 'terminated', idempotently. Distinct from retire_session (the fuller lane-landing verb that composes this step, plus role-binding cleanup and dependency-edge firing).",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Session terminated",
+    "result_type": "terminate_session_result",
+    "result_description": "already_terminal (true if the row was already terminated/retired and nothing changed) and lifecycle_state (the row's state after this call — always 'terminated' unless already_terminal was true, in which case it reflects whatever terminal state the row was already in).",
+    "presentation_guidance": "Note plainly when already_terminal is true — this call did not just cause a state change, the session was already stopped."
+  },
+  "error_processor_customizations": {
+    "action_context": "A single predicated update_state on the managed_session table, keyed on the row's CURRENT lifecycle_state read just before the write — a race with another writer (the sweep, report_alive, a concurrent terminate) surfaces as stale_lifecycle_state rather than silently overwriting.",
+    "error_interpretation": "session_not_found: no managed_session row exists for the given agent_instance_id. illegal_lifecycle_transition: the row's current state has no legal path to 'terminated' in the §3.2 matrix (should not occur in practice — every non-terminal state can reach terminated). stale_lifecycle_state: another writer moved the row between this call's read and its write.",
+    "recovery_guidance": "For stale_lifecycle_state, re-read via session_status and retry if the fresh state still warrants termination — the row may already be where the caller wanted it."
+  }
+}

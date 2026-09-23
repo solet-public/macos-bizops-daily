@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::refresh_plugin_process",
+  "display_name": "Refresh Plugin Process",
+  "description": "Reload a single process JSON file from the named plugin's knowledge base and update the live process registry entry. Performs full discovery rebuild after applying the change. Use plugin_name='ananta' for platform service interfaces.",
+  "embedding_description": "Hot-reload exactly one process definition selected by its process_key after you edit that single verb's JSON, updating its one live registry entry without a restart. Targets a single named process and requires the process_key; for platform service interfaces pass plugin_name 'ananta'. Use right after changing one verb's wording, embedding text, or processor customizations.",
+  "result_processor_customizations": {
+    "action_label": "Plugin process refreshed",
+    "result_type": "process_refresh_result",
+    "result_description": "Confirmation of the single-process refresh: refreshed_process_key (the process key that was reloaded), updated (whether the live registry entry changed), and errors (empty on a clean refresh)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reloading a single process definition from a knowledge base JSON file",
+    "error_interpretation": "FileNotFoundError: process JSON file not found. ValueError: JSON validation failed (process_key mismatch). RuntimeError: orchestrator not available for registry update.",
+    "recovery_guidance": "Verify the process_key and plugin_name are correct and the JSON file exists."
+  }
+}

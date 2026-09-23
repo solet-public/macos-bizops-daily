@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::vault_rotate_passphrase",
+  "display_name": "Rotate Vault Passphrase",
+  "description": "Change the vault passphrase without re-encrypting any stored secrets. Re-derives the KEK from the new passphrase and re-wraps the unchanged master key. Operator-only.",
+  "embedding_description": "Vault: rotate the passphrase without re-encrypting any stored secrets. Re-derives the KEK from the new passphrase via PBKDF2 + re-wraps the unchanged DEK (master key) under the new KEK + replaces the persisted wrapped key atomically. The two-tier KEK/DEK design exists precisely to make this fast. Vault must be unlocked under the old passphrase. Operator-only.",
+  "result_processor_customizations": {
+    "action_label": "Vault passphrase rotated",
+    "result_type": "vault_passphrase_rotated",
+    "result_description": "Passphrase rotation result. Contains message confirming the rotation. No secrets were re-encrypted.",
+    "presentation_guidance": "Confirm the rotation and remind the operator that any recovery passphrase set via vault_create_recovery is unaffected and still valid.",
+    "output_action_guidance": "Update any out-of-band records of the operator's vault passphrase. No further vault action is required."
+  },
+  "error_processor_customizations": {
+    "action_context": "Rotates the vault passphrase by re-deriving the KEK and re-wrapping the unchanged master key.",
+    "error_interpretation": "VaultNotInitialized: vault_init has not been run. InvalidPassphrase: old_passphrase does not unwrap the master key. EncryptionFailed: KDF or re-wrap operation failed. VaultAccessDeniedError: caller is not operator.",
+    "recovery_guidance": "For VaultNotInitialized: run vault_init first. For InvalidPassphrase: verify the old passphrase; if forgotten, unlock via the recovery passphrase and rotate from there. For VaultAccessDeniedError: re-invoke from operator-MCP context."
+  }
+}

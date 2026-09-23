@@ -1,0 +1,178 @@
+{
+  "flow_id": "existing-install",
+  "schema_version": 1,
+  "supported_predecessors": [
+    {
+      "repository": "https://github.com/solet-public/macos-bizops.git",
+      "commit": "fab22b6f2c832a5b86176f6916166f6c6bc7677b",
+      "tree": "13461a6db6829e5d6546852fe49574adfaf40874",
+      "provenance_sha256": "7136ce79e4f06f28889a3daf91f1a4ad62eb48c0aca5f8b8d6f3b49160be6d6f",
+      "seed_id": "bb782efa-a331-5748-bc29-7f012b9a5f9d",
+      "origin_id": "123e4567-e89b-12d3-a456-426614174001",
+      "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "legacy_anchor_id": "stable-pre-manager-seed-v1"
+    }
+  ],
+  "source_operation": {
+    "operation_ref": "existing::source.fast_forward",
+    "runner": "manager",
+    "planned_actions": [
+      "manager.acquire_update_candidate",
+      "target.fetch_exact_candidate",
+      "target.fast_forward_exact_candidate"
+    ]
+  },
+  "runtime_operations": [
+    {
+      "operation_id": "dependencies_reconcile",
+      "operation_ref": "existing::dependencies.reconcile",
+      "runner": "bootstrap",
+      "stage": "dependencies",
+      "mutation_class": "venv",
+      "rollback_class": "reversible",
+      "retry_policy": "retry_safe",
+      "idempotency_key": "sha256(candidate_commit, operation_id, instance_id)",
+      "applies_when": "any",
+      "precondition_probe_refs": ["dependency_closure_probe"],
+      "postcondition_probe_refs": ["dependency_closure_probe"],
+      "public_inputs": ["declared_closure"],
+      "requires_confirmation": false
+    },
+    {
+      "operation_id": "migration_solet_rename",
+      "operation_ref": "existing::migration.solet_rename",
+      "runner": "target_adapter",
+      "stage": "migrations_pre",
+      "mutation_class": "launchd",
+      "rollback_class": "backup_required",
+      "retry_policy": "retry_safe",
+      "idempotency_key": "sha256(candidate_commit, operation_id, instance_id)",
+      "applies_when": "any",
+      "precondition_probe_refs": ["solet_rename_postcondition"],
+      "postcondition_probe_refs": ["solet_rename_postcondition"],
+      "public_inputs": [],
+      "requires_confirmation": true
+    },
+    {
+      "operation_id": "migration_export_root_containment",
+      "operation_ref": "existing::migration.export_root_containment",
+      "runner": "target_adapter",
+      "stage": "migrations_pre",
+      "mutation_class": "filesystem_managed_artifact",
+      "rollback_class": "backup_required",
+      "retry_policy": "retry_safe",
+      "idempotency_key": "sha256(candidate_commit, operation_id, instance_id)",
+      "applies_when": "any",
+      "precondition_probe_refs": ["export_root_containment_postcondition"],
+      "postcondition_probe_refs": ["export_root_containment_postcondition"],
+      "public_inputs": [],
+      "requires_confirmation": true
+    },
+    {
+      "operation_id": "hydration_reconcile",
+      "operation_ref": "existing::hydration.reconcile",
+      "runner": "target_adapter",
+      "stage": "hydration",
+      "mutation_class": "filesystem_managed_artifact",
+      "rollback_class": "backup_required",
+      "retry_policy": "retry_safe",
+      "idempotency_key": "sha256(candidate_commit, operation_id, instance_id)",
+      "applies_when": "any",
+      "precondition_probe_refs": ["managed_artifact_state"],
+      "postcondition_probe_refs": ["managed_artifact_state"],
+      "public_inputs": ["artifact_ids", "planned_destinations"],
+      "requires_confirmation": true
+    },
+    {
+      "operation_id": "autostart_reconcile",
+      "operation_ref": "existing::autostart.reconcile",
+      "runner": "target_adapter",
+      "stage": "hydration",
+      "mutation_class": "launchd",
+      "rollback_class": "backup_required",
+      "retry_policy": "retry_safe",
+      "idempotency_key": "sha256(candidate_commit, operation_id, instance_id)",
+      "applies_when": "any",
+      "precondition_probe_refs": ["launchagent_plist_state"],
+      "postcondition_probe_refs": ["launchagent_plist_state"],
+      "public_inputs": ["artifact_ids", "planned_destinations"],
+      "requires_confirmation": true
+    },
+    {
+      "operation_id": "plugin_cache_refresh",
+      "operation_ref": "existing::runtime.plugin_cache_refresh",
+      "runner": "target_adapter",
+      "stage": "runtime_reconcile",
+      "mutation_class": "plugin_cache",
+      "rollback_class": "reversible",
+      "retry_policy": "retry_safe",
+      "idempotency_key": "sha256(candidate_commit, operation_id, instance_id)",
+      "applies_when": "any",
+      "precondition_probe_refs": ["plugin_cache_diff"],
+      "postcondition_probe_refs": ["plugin_cache_diff"],
+      "public_inputs": [],
+      "requires_confirmation": true
+    }
+  ],
+  "managed_artifacts": [
+    {
+      "artifact_id": "instance_launchagent_plist",
+      "kind": "launchd_plist",
+      "logical_destination": "{HOME}/Library/LaunchAgents/local.solet.{NAME}.plist",
+      "preservation_class": "manager_generated_whole",
+      "marker": null,
+      "stamp": "<!-- rendered-from: {TEMPLATE_REF}@{TEMPLATE_DIGEST} -->",
+      "template_ref": "plugins/github_midwife_plugin/knowledge_base/hydration_templates/launchagent.plist.template",
+      "template_digest": "sha256:5e7ecf4b8d86251ddb18ef190786e39374964d0e661c04b8cc4e4a381ceb1e48",
+      "previous_template_digests": [
+        "sha256:5e7ecf4b8d86251ddb18ef190786e39374964d0e661c04b8cc4e4a381ceb1e48"
+      ]
+    },
+    {
+      "artifact_id": "shell_startup_block",
+      "kind": "managed_block",
+      "logical_destination": "{HOME}/.zshrc",
+      "preservation_class": "operator_owned_with_managed_block",
+      "marker": {
+        "begin": "# BEGIN SOLET {NAME} v{TEMPLATE_DIGEST8}",
+        "end": "# END SOLET {NAME}"
+      },
+      "stamp": null,
+      "template_ref": "plugins/github_midwife_plugin/knowledge_base/hydration_templates/zshrc_block.template",
+      "template_digest": "sha256:e008ef5560fa47e68fed8ac1ce3e12f31779a3e781aa332b1dbf87645726d85c",
+      "previous_template_digests": [
+        "sha256:e008ef5560fa47e68fed8ac1ce3e12f31779a3e781aa332b1dbf87645726d85c"
+      ]
+    },
+    {
+      "artifact_id": "user_claude_md_section",
+      "kind": "managed_block",
+      "logical_destination": "{HOME}/.claude/CLAUDE.md",
+      "preservation_class": "operator_owned_with_managed_block",
+      "marker": {
+        "begin": "<!-- BEGIN SOLET {NAME} v{TEMPLATE_DIGEST8} -->",
+        "end": "<!-- END SOLET {NAME} -->"
+      },
+      "stamp": null,
+      "template_ref": "plugins/github_midwife_plugin/knowledge_base/hydration_templates/user_claude_md_section.template",
+      "template_digest": "sha256:f18e3ad0f57b41c488ad8815a96e29e24d08ecfb1140ee7c9fc4afa9eb668ef1",
+      "previous_template_digests": [
+        "sha256:f18e3ad0f57b41c488ad8815a96e29e24d08ecfb1140ee7c9fc4afa9eb668ef1"
+      ]
+    }
+  ],
+  "dependency_closure": {
+    "additions": [],
+    "removals": []
+  },
+  "knowledge_removals": [],
+  "lifecycle": {
+    "strategy": "router_preferred",
+    "readiness_budget_seconds": 300,
+    "readiness_release_signal": "bridge_health_healthy",
+    "verification_modules": [
+      "ananta.cli",
+      "macos_self_deployment_plugin.plugin"
+    ]
+  }
+}

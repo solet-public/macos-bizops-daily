@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "github_midwife_plugin"
+version = "1.0.0"
+description = "GitHub-sourced genesis midwife — births a solet from a public clone with no parent solet present."
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    "pyyaml>=6.0",
+    # macos_vault_plugin is already a first-class declared dependency of this
+    # profile (bound as vault_service in macos-free-solet.yaml, installed
+    # by profile_install.py's allowlist pass) — credential_seed.py constructs
+    # its SystemKeychain DIRECTLY (design doc §6.5 rider), not a fork, because
+    # duplicating the RFC-2397 encode/decode logic risks the exact key-shape
+    # mismatch that crash-looped a boot before. This is NOT a violation of the
+    # own-copy-per-convention guardrail, which applies to the OTHER
+    # reference-code map entries (birther.py/venv_setup.py/autostart_manager.py
+    # patterns) that genesis does not install or depend on at runtime.
+    "macos_vault_plugin",
+]
+
+[project.entry-points."ananta.plugins"]
+github_midwife_plugin = "github_midwife_plugin.plugin:GithubMidwifePlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["github_midwife_plugin*"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

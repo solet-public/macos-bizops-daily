@@ -1,0 +1,17 @@
+{
+  "name": "test_read_state_missing_table",
+  "description": "Verify read_state returns error when table is missing from query",
+  "process_key": "plugin::postgres_state_management_plugin::read_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "query": {
+        "filters": {
+          "id": "test123"
+        }
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

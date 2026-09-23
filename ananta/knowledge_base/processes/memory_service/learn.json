@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::learn",
+  "display_name": "Learn",
+  "description": "Ingest knowledge from files, optionally memorizing it all. Documents are chunked and stored as episodic memories. Use --memorize flag to add all chunks to spaced repetition queue.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Learn",
+    "result_type": "knowledge_ingested",
+    "result_description": "Results of document ingestion including memories created and optionally memorized",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Ingesting knowledge from files into episodic memories",
+    "error_interpretation": "FileNotFoundError: the specified path does not exist. NoFilesMatchedError: no files matched the pattern in the directory. EmbeddingError: failed to generate embeddings for document chunks.",
+    "recovery_guidance": "For file not found: verify the path exists and is accessible. For no files matched: check the glob pattern matches files in the directory. For embedding errors: verify embedding service is available."
+  }
+}

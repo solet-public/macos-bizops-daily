@@ -1,0 +1,105 @@
+name: Stage Homebrew release payload
+
+# Builds and self-checks the sealed manager+seed archive and the rendered
+# Formula/seed-lock for one seed release tag, then uploads them as workflow
+# artifacts for review. It does not publish anything: no tap repository is
+# created or written, no GitHub release is cut, no asset is uploaded to any
+# release, and nothing is pushed anywhere. See
+# workbench/2026-08-23_release_lane_design.md for the full design and the
+# explicit boundary this workflow stops at.
+#
+# The follow-up publish step (tap commit + release asset upload) is a
+# separate, not-yet-authorized job. Wiring it here would require write
+# credentials to a public org this workflow does not have and should not
+# assume; that stays the operator's call.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: >-
+          Immutable tag on this repository to stage a release payload for
+          (e.g. release-2026-08-19). Must already exist.
+        required: true
+        type: string
+      formula_revision:
+        description: Homebrew formula revision (0 for a first release of this version).
+        required: false
+        type: string
+        default: "0"
+      seed_profile:
+        description: Identity profile for the seed release being staged.
+        required: false
+        type: string
+        default: "macos-bizops"
+      manager_repository:
+        description: Public GitHub repository that will host the manager release asset.
+        required: true
+        type: string
+      manager_release_tag:
+        description: Immutable manager-specific release tag (for example manager-v0.1.0-r0).
+        required: true
+        type: string
+      manager_source_repository:
+        description: GitHub source repository whose manager bytes will be archived.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the source repository (for the staging scripts)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: manager-checkout
+
+      - name: Checkout the seed release tag
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+          path: seed-checkout
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Offline self-check (stage_release.py against a local fixture)
+        run: python3 manager-checkout/solet_cli/homebrew/tests/stage_release_smoke.py
+
+      - name: Stage the release payload
+        run: |
+          python3 manager-checkout/solet_cli/homebrew/scripts/stage_release.py \
+            --seed-checkout seed-checkout \
+            --release-tag "${{ inputs.release_tag }}" \
+            --seed-repository https://github.com/${{ github.repository }}.git \
+            --seed-profile "${{ inputs.seed_profile }}" \
+            --manager-repository "${{ inputs.manager_repository }}" \
+            --manager-release-tag "${{ inputs.manager_release_tag }}" \
+            --manager-checkout manager-checkout \
+            --manager-ref "${{ github.sha }}" \
+            --manager-source-repository "${{ inputs.manager_source_repository }}" \
+            --formula-revision "${{ inputs.formula_revision }}" \
+            --output-root "$RUNNER_TEMP/staged-release"
+
+      - name: Summarize what was staged
+        run: |
+          echo "### Staged release payload" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/staged-release/release_metadata.json" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "Nothing was pushed, tagged, released, or uploaded to any GitHub org." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload staged payload for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-payload-${{ inputs.release_tag }}
+          path: ${{ runner.temp }}/staged-release/
+          retention-days: 14

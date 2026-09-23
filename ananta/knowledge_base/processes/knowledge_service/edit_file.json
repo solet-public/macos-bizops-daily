@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::edit_file",
+  "display_name": "Edit Knowledge Base File",
+  "description": "Write, update, or overwrite content of an existing file in a knowledge base, optionally with an expected_content_hash precondition (optimistic concurrency). For git knowledge bases: commits to managed branch. Re-chunks and updates memories.",
+  "embedding_description": "Update, revise, overwrite, or save changes to a document that already exists in a knowledge base — typically a markdown (.md) file — replacing its text with new content. Optionally pass expected_content_hash (the content_sha256 from read_file) so a stale overwrite fails loud instead of silently clobbering a concurrent writer's change; some knowledge bases require that precondition. For git-backed KBs the change is committed to the managed branch, then the file is re-chunked and re-indexed. This is the way to revise a workbench planning document: workbench requires the hash precondition, so read_file first and pass its content_sha256. Use to modify or correct an existing document, not to create a new one.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge base file edited",
+    "result_type": "knowledge_base_file_edited",
+    "result_description": "File updated and re-indexed",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Editing a knowledge base file",
+    "error_interpretation": "NotFoundError: file not found. PathTraversalError: path escapes KB root.",
+    "recovery_guidance": "Use browse to verify the file path, or use create_file for new files."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::session_ledger_service::ensure_periodic_poll_schedule",
+  "display_name": "Ensure Periodic Ledger Poll Schedule",
+  "description": "Idempotently install (or normalize) a single cron schedule that fires `service_interface::session_ledger_service::trigger_poll` every `cadence_minutes` minutes. Mirrors `service_interface::scheduling_service::ensure_global_heartbeat` for the LLM session ledger: clears any existing schedules tagged `ledger:periodic_poll`, then creates one fresh schedule with the requested cadence.\n\nBoot-only — wired via the profile's `starting_actions` so a fresh solet auto-paces her own ledger ingest the moment her services come up. The `is_discoverable=False` flag keeps the verb out of the model's `process_search` results; operator-initiated re-runs go through the operator bridge directly.\n\nThe scheduled cron simply enqueues a trigger_poll action on the platform action queue; the importer runs synchronously when the action fires, persists events, and updates per-source cursors. There is no per-cron retry — the next cron tick is the retry path, so a transient backend hiccup won't compound.\n\nFails fast if scheduling_service is not bound at session_ledger_service construction (a profile that omits scheduling has no business booting this verb).",
+  "embedding_description": "Boot-time idempotent helper that installs a single periodic-poll cron firing trigger_poll on the LLM session ledger every N minutes. Mirrors ensure_global_heartbeat. Tag: ledger:periodic_poll. Default cadence 5 minutes.",
+  "result_processor_customizations": {
+    "action_label": "Ensure Periodic Ledger Poll",
+    "result_type": "ledger_periodic_poll_ensured",
+    "result_description": "Periodic trigger_poll schedule status — created, already_present, or normalized after duplicate cleanup.",
+    "presentation_guidance": "",
+    "output_action_guidance": "The ledger now auto-polls every configured interval. If you are diagnosing whether ingest is stalled, check `get_import_status` / `list_sessions` rather than re-running this verb."
+  },
+  "error_processor_customizations": {
+    "action_context": "Ensuring a single periodic trigger_poll cron schedule for the LLM session ledger",
+    "error_interpretation": "RuntimeError: scheduling_service not bound (profile omits scheduling). ValueError: cadence_minutes out of the 1..59 range. SchedulerError: scheduling backend rejected the cron expression or refused to clear/create the schedule.",
+    "recovery_guidance": "If scheduling is unavailable, the operator can fall back to invoking `trigger_poll` directly from the operator bridge. If cadence validation failed, retry with a value in [1, 59]. If the scheduling backend failed, inspect `get_schedules_by_tag` for stuck duplicates and consider clearing them by tag."
+  }
+}

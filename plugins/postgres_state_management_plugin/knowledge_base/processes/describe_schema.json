@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::postgres_state_management_plugin::describe_schema",
+  "display_name": "Describe Schema (Postgres)",
+  "description": "Get schema definition for a namespace including tables, columns, and data types from PostgreSQL.",
+  "embedding_description": "Describe the schema for a namespace: tables, columns, types, and constraints. Use to inspect structure before reading/writing data or generating migrations. Returns schema metadata for the namespace, including table definitions and column details.",
+  "result_processor_customizations": {
+    "action_label": "Describe Schema",
+    "result_type": "schema_definition",
+    "result_description": "PostgreSQL schema information including tables, columns, data types, and constraints",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving PostgreSQL schema information for a namespace",
+    "error_interpretation": "SchemaError: namespace not found or has no tables. ConnectionError: PostgreSQL connection failed or information_schema not accessible.",
+    "recovery_guidance": "For namespace errors: verify the namespace exists and has tables. For connection errors: verify PostgreSQL is running and accessible."
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "test_search_blobs",
+  "description": "Search for blobs by metadata filters. Returns matching blob_ids and their metadata.",
+  "process_key": "service_interface::blob_storage_service::search_blobs",
+  "arguments": {
+    "namespace": "test_namespace",
+    "metadata_filters": {}
+  }
+}

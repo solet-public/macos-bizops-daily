@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::create_issue",
+  "display_name": "Jira: Create Issue",
+  "description": "Create a Jira issue in a project of a given type with a summary and optional plain-text description; optional additional fields merge in. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the issue being created; the new issue's key and id are delivered when the job completes. Write action.",
+  "embedding_description": "Open a brand-new Jira issue in a project: supply the project key, the issue type such as Task, Bug or Story, a one-line summary, and an optional description, with an optional fields object for priority, labels, or custom fields. Files the ticket in the background and hands back its key and numeric id once created, after an immediate job_id acknowledgment.",
+  "result_processor_customizations": {
+    "action_label": "Jira issue creation queued",
+    "result_type": "jira_create_issue_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the new issue's key/id -- those arrive separately when the job completes and are delivered as their own message.",
+    "presentation_guidance": "This call only confirms the creation was queued -- do not present job_id/status as the new issue's key. Acknowledge the request is in flight; the new issue's key and id land in a follow-up message when the job completes. Once delivered, confirm the issue was created and give its key. Because this files a real ticket, be explicit that it now exists."
+  },
+  "error_processor_customizations": {
+    "action_context": "Create a new Jira issue.",
+    "error_interpretation": "jira.bad_request: a required field is missing or a field value is invalid for this project/issue type (e.g. an unknown issue type or a required custom field). jira.permission_denied: the service account cannot create issues in this project. jira.invalid_params: project, issue_type, or summary was missing.",
+    "recovery_guidance": "jira.bad_request: check the issue_type name and any required fields for the project; pass them in 'fields'. jira.permission_denied: grant the service account create permission. jira.invalid_params: supply project, issue_type, and summary."
+  }
+}

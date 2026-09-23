@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::restart_session",
+  "display_name": "Restart a dead or hung managed session (dispatch)",
+  "description": "maintenance-verbs M1, D0.3-ratified deferred-completion shape. Dispatches a restart_session choreography job (capture the old ledger row's dispatch config, terminate_session, spawn_session under the same lane, drive an explicit role-reclaim turn unless a lane charter already covers it, then verify the fresh session actually claimed the target role) and returns {job_id, status: 'queued'} in milliseconds — the choreography itself runs in a background worker, never inline in this call. Poll check_choreography_job_status with the returned job_id for the outcome.",
+  "embedding_description": "Recover a worker whose process is dead, hung, or unresponsive by killing it outright and spawning a brand-new process in the same lane, then driving the fresh process to reclaim the old one's durable role name — process-replacement recovery, never for a session that is merely full but still working fine (that is rotate_session's job).",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Restart dispatched",
+    "result_type": "restart_session_dispatch_result",
+    "result_description": "{job_id, status: 'queued'} — the dispatch's own outcome, NOT the restart's outcome.",
+    "presentation_guidance": "State plainly that this only confirms the job was queued, not that the new session is up and holding the role — poll check_choreography_job_status for the real outcome, which reports old_agent_instance_id, new_agent_instance_id, role_reclaim_driven, and role_reclaim_verified once terminal."
+  },
+  "error_processor_customizations": {
+    "action_context": "Validates agent_instance_id/role_name/role_class plus the caller's own flow/session context, then writes one AsyncJobManager job row.",
+    "error_interpretation": "missing_argument: a required field was empty (role_class is required from the caller because managed_session carries no role_class column of its own). missing_flow_context: the caller's session_id/flow_id were not resolvable — refused before a job with a hole in it could be created. job_creation_failed: AsyncJobManager.create_job itself failed. async_job_manager_unavailable: the platform's AsyncJobManager is not bound on this solet.",
+    "recovery_guidance": "For missing_argument, read the dying session's own session_status first to confirm its lane_id/brief_ref before restarting, and supply the role_class it was originally spawned under. missing_flow_context and async_job_manager_unavailable are platform-state issues, not caller mistakes."
+  }
+}

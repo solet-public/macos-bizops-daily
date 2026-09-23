@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::remember",
+  "arguments": {
+    "content": "Test memory with multiple tags for categorization",
+    "tags": ["test", "integration", "categorization"]
+  }
+}

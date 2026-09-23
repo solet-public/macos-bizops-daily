@@ -1,0 +1,174 @@
+# macos-free-solet profile — public GitHub genesis, zero API keys.
+#
+# Born via github_midwife_plugin from a public clone with NO parent
+# solet present (a "genesis" birth). Inference is declared VACANT
+# (INF-03) — the user's own Claude Code session is the frontier driver;
+# there is no local completion-model requirement. Embeddings are local
+# (LM Server + nomic via the OpenAI-compatible openai_embeddings_plugin —
+# NOT the cloud, no API key, ever; "openai" in the plugin name is the
+# API shape, not the provider). Reference environment (v1): Homebrew
+# Postgres + pgvector, macOS Keychain vault (macos_vault_plugin), LM
+# Server (LM Studio) + nomic. macOS-first.
+#
+
+profile_name: macos-free-solet
+description: |
+  Minimal, general, zero-API-key local solet profile for the
+  public GitHub genesis path. Foundational services (state, blob,
+  address book, vault) + memory/knowledge/thinking (mandatory-real
+  per INF-03b) + pgvector + local embeddings + the REST and
+  agent-messaging IO surfaces + scheduling + the platform health
+  diagnostic + github_midwife_plugin itself (dual-use: this genesis
+  entrypoint AND a birth_solet verb for birthing further
+  solets from a running instance). Inference is declared VACANT
+  (INF-03) — no local completion model; the user's Claude Code
+  session drives completions. Connectors, audio/media, and
+  session-source ingest are opt-in payloads layered on top, not part
+  of the base profile.
+
+plugins:
+  # Foundational services
+  - postgres_state_management_plugin
+  - default_blob_storage_plugin
+  - default_address_book_plugin
+  - macos_vault_plugin
+
+  # Memory + knowledge + thinking (mandatory-real per INF-03b operator
+  # ruling — vacancy is an inference-only concept)
+  - actr_memory_plugin
+  - default_knowledge_plugin
+  - default_thinking_plugin
+
+  # Vector search
+  - pgvector_service_plugin
+
+  # Embeddings (local flavor: OpenAI-compatible endpoint pointed at the
+  # local LM Server + nomic — NOT cloud, NOT the OpenAI API)
+  - openai_embeddings_plugin
+
+  # IO surfaces
+  - agent_messaging_plugin
+
+  # Scheduling
+  - default_scheduling_plugin
+
+  # Operator/CI diagnostic gate (read-only; idle until invoked manually)
+  - platform_health_plugin
+
+  # This plugin: dual-use genesis entrypoint + birth_solet verb
+  - github_midwife_plugin
+
+plugin_config_overrides:
+  # Per-solet role isolation (operator override): the newborn's
+  # postgres_state_management_plugin must connect as its OWN non-superuser role
+  # (== the solet name), never the retired shared `ananta`.
+  # config_materialize.apply_profile_overrides substitutes ${SOLET_NAME} at
+  # write time and materialize_profile fail-louds if the resolved `user` is not
+  # the newborn's name. database + db_schema already default to SOLET_NAME
+  # in PostgresConfig, so only `user` needs injecting here.
+  postgres_state_management_plugin:
+    user: ${SOLET_NAME}
+
+# Address-book entries genesis materializes to
+# profile/config/plugins/default_address_book_plugin/entries.json, which the
+# address-book plugin auto-seeds at boot (its prepare_for_readiness ->
+# seed_loader.auto_seed_entries_from_file, idempotent skip-by-name).
+#
+# openai_embeddings is MANDATORY for this profile: embedding_service binds
+# openai_embeddings_plugin, whose prepare_for_readiness FAIL-FASTS with
+# "Address book entry 'openai_embeddings' not found" unless this entry exists
+# (finding F9 — verb-mode genesis crash-looped the newborn 64x
+# without it; the entry is Postgres DATA no other genesis step creates).
+#
+# NON-SECRET by construction: the local LM Server's OpenAI-compatible base_url
+# + the nomic embeddings model name only — never an api_key, never a vault
+# reference. "openai" is the API shape, not the provider (the endpoint is the
+# operator's own local LM Server).
+address_book_entries:
+  - name: openai_embeddings
+    address_type: api
+    description: OpenAI-compatible embeddings via LM Studio
+    tags: []
+    entries:
+      - field_type: base_url
+        description: LM Studio OpenAI-compatible base URL
+        value: http://localhost:1234/v1
+      - field_type: model
+        description: Embeddings model name
+        value: text-embedding-nomic-embed-text-v1.5-embedding
+  # Finding F11: pgvector_service_plugin resolves its DB
+  # connection params (host/port/database/db_schema/user) from THIS entry
+  # (_resolve_address_book_overrides reads each sub-entry's `description` as
+  # the param name). Without it a newborn's pgvector fails at readiness.
+  # `${SOLET_NAME}` is substituted with the newborn's actual name at
+  # write time (write_address_book_entries) -- the template stays static and
+  # operator-identity-free. The password is NOT read from here (pgvector
+  # fetches it from its own vault namespace, seeded dual-key by
+  # credential_seed); the vault:: reference mirrors the live shape.
+  - name: pgvector_service_db
+    address_type: database
+    description: PostgreSQL/pgvector connection for this solet
+    tags: []
+    entries:
+      - field_type: host
+        description: host
+        value: localhost
+      - field_type: port
+        description: port
+        value: "5432"
+      - field_type: note
+        description: database
+        value: ${SOLET_NAME}
+      - field_type: note
+        description: db_schema
+        value: ${SOLET_NAME}
+      - field_type: note
+        description: user
+        value: ${SOLET_NAME}
+      - field_type: password
+        description: password
+        value: vault::${SOLET_NAME}.pgvector_service_plugin.password
+
+# Actions auto-submitted at boot by EventOrchestrator. Each entry's
+# process_key must reference a plugin in the `plugins:` list above —
+# orphan entries crash startup deep inside action_factory. The ledger
+# poll/summarize schedules and the register_*_source actions carried by
+# local.yaml are deliberately NOT included here: the register_* actions
+# hard-code the operator's own home-directory session paths, and
+# session-source ingest is an opt-in bundle layered on top of this base
+# profile, not part of genesis.
+starting_actions:
+  - name: start_agent_messaging_interface
+    process_key: plugin::agent_messaging_plugin::start_interface
+    description: |
+      Start the consolidated agent_messaging bridge — single FastAPI
+      surface on a dynamic port backing every mcp__<name>__* tool
+      (platform-call, peer messaging, backend-agent threads).
+
+# Service bindings written to profile/config/service_bindings.json.
+# inference_service is intentionally ABSENT — declared-VACANT boot
+# (INF-03), mirroring initialization/profiles/cloud.yaml's shape.
+# self_deployment_service is intentionally ABSENT — opt-in; when added,
+# github_midwife_plugin owns a simple one-time plist renderer instead
+# of the macos_self_deployment_plugin blue/green supervisor.
+service_bindings:
+  state_service: postgres_state_management_plugin
+  plugin_schema_service: postgres_state_management_plugin
+  vault_service: macos_vault_plugin
+  address_book_service: default_address_book_plugin
+  memory_service: actr_memory_plugin
+  vector_service: pgvector_service_plugin
+  embedding_service: openai_embeddings_plugin
+  blob_storage_service: default_blob_storage_plugin
+  knowledge_service: default_knowledge_plugin
+  thinking_service: default_thinking_plugin
+
+notes:
+  excluded:
+    default_inference_plugin: Not loaded — inference_service boots declared-VACANT (INF-03); the user's own Claude Code session is the frontier driver, not a local completion model.
+    mock_inference_plugin: RETIRED platform-wide (INF-03/INF-03b).
+    macos_self_deployment_plugin: Opt-in upgrade, not part of the base — default update path is `git pull` + LaunchAgent restart; github_midwife_plugin owns a simple one-time plist renderer instead of the blue/green supervisor (which also requires a separately-installed router).
+    demo_canary_plugin: Origin-internal apply_manifest demo target, not relevant to a genesis solet.
+    audio_processing_plugin, audio_separation_plugin, cosyvoice2_tts_plugin, comfyui_image_generation_plugin, musical_synthesis_plugin, sound_effects_plugin, voice_embeddings_plugin, whisper_asr_plugin, generative_composition_plugin, pedalboard_effects_plugin, soundcloud_artist_studio_plugin, ssml_plugin: Dropped — heavyweight audio/media stack, not part of the minimal free footprint.
+    agent_messaging_session_source_plugin, codex_filesystem_session_source_plugin, claude_code_filesystem_session_source_plugin, claude_code_pushed_session_source_plugin, chatgpt_export_session_source_plugin, session_bridge_plugin: Opt-in ingest bundle, layered on top of this base profile — not baked in (privacy; the local.yaml equivalents also hard-code operator filesystem paths).
+    connector plugins (Jira/Snowflake/Salesforce/etc.): Opt-in payload, land into this profile after genesis if the user chooses to add them — not part of the base vehicle.

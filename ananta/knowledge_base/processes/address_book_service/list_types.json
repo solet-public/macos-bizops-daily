@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::list_types",
+  "display_name": "List Address Types",
+  "description": "List all address types with counts.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Address types listed",
+    "result_type": "type_summary_retrieved",
+    "result_description": "Type summary with keys: types (list of {type, count} records showing each address type and how many addresses use it)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Lists all address types in use with counts of how many addresses use each type",
+    "error_interpretation": "DatabaseError: listing failed due to storage issues.",
+    "recovery_guidance": "For database errors: suggest retrying the operation or checking service status."
+  }
+}

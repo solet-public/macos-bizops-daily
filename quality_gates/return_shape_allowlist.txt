@@ -1,0 +1,15 @@
+# Tracked-debt register for quality_gates/return_shape_gate.py (GTE-07).
+#
+# One `<file_path>::<function_name>` per line — POSIX-suffix-matched file
+# path, bare function name (the radon_cc_check convention). Blank lines and
+# `#` comments ignored.
+#
+# Allowlisted findings are still printed by the gate (prefixed
+# `[allowlisted]`); they do not contribute to the exit-2 verdict. Removing
+# an entry is the unit of remediation progress. Adding an entry requires
+# operator ratification — this register is tracked debt, NOT a skip path.
+#
+# EMPTY since the Part-B slice (2026-07-06): the seed entry
+# (get_recent_memory_structured — the one genuine defect the REL-11 Part-2
+# sweep found) was RETIRED by its envelope fix ({"events": [...], "count": N})
+# in the same slice, per the retirement note it carried.

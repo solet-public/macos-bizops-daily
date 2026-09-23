@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::flow_service::get_flow_status",
+  "arguments": {
+    "flow_id": "PLACEHOLDER_FLOW_ID"
+  },
+  "notes": "flow_id should be set to an existing flow ID from create_flow test"
+}

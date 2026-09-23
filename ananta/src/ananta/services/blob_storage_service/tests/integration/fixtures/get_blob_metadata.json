@@ -1,0 +1,45 @@
+{
+  "name": "test_get_blob_metadata",
+  "description": "Store a blob with metadata, fetch metadata without content, then delete the blob.",
+  "sequence": [
+    {
+      "step": "store_blob",
+      "process_key": "service_interface::blob_storage_service::store_blob",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "content": "QmxvYiBzdG9yYWdlIG1ldGFkYXRhIHZhbGlkYXRpb24gcGF5bG9hZC4=",
+        "metadata": {
+          "original_name": "integration_get_metadata_blob.txt",
+          "mime_type": "text/plain",
+          "description": "Blob storage integration payload for metadata test",
+          "tags": "blob-tests,metadata",
+          "plugin_metadata": {
+            "test_case": "get_metadata"
+          }
+        }
+      },
+      "capture": {
+        "blob_id": {
+          "source": "output",
+          "key": "blob_id"
+        }
+      }
+    },
+    {
+      "step": "get_metadata",
+      "process_key": "service_interface::blob_storage_service::get_blob_metadata",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "blob_id": "${blob_id}"
+      }
+    },
+    {
+      "step": "cleanup_delete_blob",
+      "process_key": "service_interface::blob_storage_service::delete_blob",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "blob_id": "${blob_id}"
+      }
+    }
+  ]
+}

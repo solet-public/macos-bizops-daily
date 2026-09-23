@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::record_fleet_liveness_run",
+  "display_name": "Record a structured fleet-liveness pass",
+  "description": "Appends one complete Phase-A fleet-liveness observation to deployment-native StateManagementInterface-backed storage. It records the checked population, structured stuck findings, actions, outcome, coordinator role-inbox drain, host-sleep result, and escalations. Call it on every pass, including a clear pass; empty lists are evidence of no findings, not omitted prose. It is append-only and intentionally non-retryable because an uncertain retry could create a duplicate operational observation.",
+  "embedding_description": "Persist one complete structured Phase-A fleet-liveness observation in deployment-native state, including the checked population, stuck findings, recovery actions, coordinator inbox-drain result, host-sleep check, and any escalations, without editing an append-only workbench markdown log.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Fleet liveness run recorded",
+    "result_type": "record_fleet_liveness_run_result",
+    "result_description": "{\"status\": \"recorded\"} means one append-only structured run record was written.",
+    "presentation_guidance": "Routine clear-path success needs no narration; surface the record's factual findings and escalations, not a claim inferred from a write receipt."
+  },
+  "error_processor_customizations": {
+    "action_context": "One StateManagementInterface append to the deployment's fleet_liveness_run table; no project-solet register access and no filesystem write.",
+    "error_interpretation": "missing_argument or invalid_argument means the caller did not provide a complete structured pass. state_service_unavailable means deployment-native persistence is unavailable; do not substitute a markdown log.",
+    "recovery_guidance": "Fix the structured payload before retrying a validation failure. For an uncertain transport failure after a write attempt, query recent runs before deciding whether a new pass record is warranted."
+  }
+}

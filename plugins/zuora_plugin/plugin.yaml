@@ -1,0 +1,46 @@
+name: zuora_plugin
+description: >
+  Zuora subscription-billing connector — Data Query (ZOQL) reads, typed
+  object CRUD (Account/Subscription/Invoice/Payment/Product; no delete verb),
+  and bulk export. REST API (no official Zuora SDK, no CLI) via a plain
+  synchronous httpx client. Auth: OAuth 2.0 client-credentials against a
+  Connected client, resolved from the address book entry "zuora_tenant" via
+  chain-consumed vault:: references — the simplest of the platform's
+  connector auth models: no browser, no callback server, and the short-lived
+  bearer token is re-minted in process memory and never vaulted (only the
+  durable client_secret is a vault secret).
+
+  Foreign-target invariant (SQL-lockdown honesty condition, umbrella design
+  §3): this plugin reaches ONLY the Zuora tenant resolved from the
+  operator-registered "zuora_tenant" address-book entry — no base_url
+  parameter on any verb. It never imports or touches the platform state DB,
+  and (being a pure REST connector with no SQL-shaped strings) trips no
+  SQL-lockdown gate class at all.
+
+  No delete verb exists in v1 (billing records are voided/cancelled through
+  Zuora's own workflow, not deleted through this tool) — create_object and
+  update_object cover the write surface.
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider
+
+config:
+  request_timeout_seconds:
+    type: number
+    required: false
+    default: 30
+    description: >
+      Per-request HTTP timeout for the Zuora REST client, bounding hung calls.
+
+# Credentials live in the address book entry "zuora_tenant": literals
+# (base_url — the environment selector: US prod rest.zuora.com, EU
+# rest.eu.zuora.com, sandbox rest.apisandbox.zuora.com — and client_id) plus
+# a client_secret field that stores a
+# "vault::<solet>.default_address_book_plugin.zuora_client_secret"
+# reference (chain-consumed). The secret lives in the RESOLVER's namespace so
+# the address book reads it under its own identity (resolve_with_secrets).
+# It is chain-consumed — this plugin neither declares nor reads that vault
+# key directly, and it holds no plugin-owned runtime vault keys of its own
+# (the re-minted bearer token is in-memory only, never persisted), so both
+# VaultKeysProvider hooks return [].

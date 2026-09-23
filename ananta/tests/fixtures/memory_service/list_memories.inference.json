@@ -1,0 +1,7 @@
+{
+  "query": "Show me my strongest memories",
+  "expected_process_key": "service_interface::memory_service::list_memories",
+  "expected_arguments": {
+    "sort_by": "strength"
+  }
+}

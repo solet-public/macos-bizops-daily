@@ -1,0 +1,16 @@
+{
+  "name": "test_recall_with_tags",
+  "description": "Verify filtering recall by tags - returns only memories with ALL specified tags",
+  "process_key": "plugin::actr_memory_plugin::recall_action",
+  "arguments": {
+    "params": {
+      "query": "programming concepts",
+      "tags": ["python", "syntax"],
+      "top_k": 10
+    },
+    "state": {
+      "session_id": "test-session-013"
+    }
+  },
+  "timeout_seconds": 30
+}

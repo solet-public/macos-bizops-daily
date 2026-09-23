@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::register",
+  "display_name": "Register Address",
+  "description": "Register a named address entry for connection info like URLs, API endpoints, database connection strings, or service credentials. NOT for storing file content - use blob storage or SSML/audio plugins for files. Auto-ingests to memory for search.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Address registered",
+    "result_type": "address_created",
+    "result_description": "New address registration with keys: address_id (database ID), memory_id (UUID for semantic search), name (registered lookup key), message (confirmation)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Registers a new address with entries in the address book and automatically ingests to memory for semantic search",
+    "error_interpretation": "DuplicateError with 'name': address name already exists. ValidationError with 'entries': missing required entry fields. MemoryServiceError: memory ingestion failed but address may exist.",
+    "recovery_guidance": "For duplicate names: suggest using 'resolve' to check existing address or choose a different name. For validation errors: ensure entries have field_type, description, and value. For memory errors: address is still usable, memory search may not find it."
+  }
+}

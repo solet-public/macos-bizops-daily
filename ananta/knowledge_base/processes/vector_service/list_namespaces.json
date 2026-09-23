@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vector_service::list_namespaces",
+  "display_name": "List Vector Namespaces",
+  "description": "List all vector namespaces in the database.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Namespaces listed",
+    "result_type": "namespace_list",
+    "result_description": "List of all vector namespaces with their names and basic configuration (dimension, count)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Lists all vector namespaces (collections) available in the vector database",
+    "error_interpretation": "ConnectionError: database unavailable. PermissionError: insufficient access to list namespaces.",
+    "recovery_guidance": "For connection errors: check database status and retry. For permission errors: verify access credentials."
+  }
+}

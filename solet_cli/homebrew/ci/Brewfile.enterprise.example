@@ -1,0 +1,5 @@
+# Formula-scoped trust for a managed/internal deployment. Do not replace this
+# with a whole-tap trust setting unless every current and future tap item is
+# deliberately trusted.
+tap "solet-public/tap", trusted: { formula: "solet" }
+brew "solet-public/tap/solet"

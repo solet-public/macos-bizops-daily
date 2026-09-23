@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::ingest_session",
+  "display_name": "Ingest Session",
+  "description": "Ingest a conversation transcript as episodic memories. Each conversation turn becomes a separate memory.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Ingest Session",
+    "result_type": "session_ingested",
+    "result_description": "Results of conversation transcript ingestion with memory IDs created",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Ingesting a conversation transcript as episodic memories",
+    "error_interpretation": "ValidationError: transcript is empty or invalid format. EmbeddingError: failed to generate embeddings for conversation chunks. DatabaseError: failed to persist memories to storage.",
+    "recovery_guidance": "For validation errors: ensure transcript contains valid conversation text. For embedding errors: verify embedding service is available. For database errors: verify state and vector storage are accessible."
+  }
+}

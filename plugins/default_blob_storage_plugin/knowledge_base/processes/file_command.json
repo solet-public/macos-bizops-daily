@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_blob_storage_plugin::file_command",
+  "display_name": "File Command",
+  "description": "Provides Unix-style file commands for blob storage.\nCommands:\n  ls [-l] [--type TYPE] [--sort FIELD] [--count]\n  file ID\n  find PATTERN    Search files by name (case-insensitive substring match)\nOptions:\n  -l, --details    Long listing format\n  --type TYPE      Filter by type (image, audio, video, document)\n  --sort FIELD     Sort by: time, size, name\n  --count          Show count only\nExamples:\n  find speech      Find files with 'speech' in their name\n  find i_am        Find the 'i_am.wav' file",
+  "embedding_description": "Run Unix-style file commands against blob storage (ls, file, find). Supports type filters, sorting, and counts to list files, inspect metadata, or search by filename pattern across stored blobs and namespaces.",
+  "result_processor_customizations": {
+    "action_label": "File Listing",
+    "result_type": "file_listing",
+    "result_description": "Structured file listing with filename, type, size, and date for each file",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Executing file command on blob storage",
+    "error_interpretation": "ParseError: Invalid command syntax. NotFoundError: Specified file ID does not exist. StorageError: Failed to access blob storage.",
+    "recovery_guidance": "For parse errors: check command syntax (ls, ls -l, file ID). For not found: verify the file ID exists. For storage errors: check storage accessibility."
+  }
+}

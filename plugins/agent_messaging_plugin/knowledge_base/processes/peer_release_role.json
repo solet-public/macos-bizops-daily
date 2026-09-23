@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::peer_release_role",
+  "display_name": "Release an agent role",
+  "description": "Hard-delete the agent_role_binding state-table row for the named role. Used when a session deliberately vacates a role — operator runs /rename to a different label, the session shuts down cleanly, or the role is reassigned to a new session via a different /rename. v10 Control #2 made agent_role_binding the sole resolution authority, so the release is a HARD delete (soft_delete=False is required — a soft delete would still resolve and enumerate, i.e. not release at all). After release, subsequent peer_send_by_name calls return peer_role_vacant until a new session claims the role; the one-shot backfill marker (Control #2 B5) prevents a released role from being re-seeded on a later boot.",
+  "embedding_description": "Release a durable peer role binding, removing the row that routes role-addressed messages for names like Coordinator, Architect, or Git-Controller. Used when a session vacates its role on clean shutdown, an operator rename, or a handoff. Role-addressed sends then report the role vacant until someone claims it again.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Agent role released",
+    "result_type": "peer_release_role_result",
+    "result_description": "released (True on a completed hard-delete), name (the role). The delete is keyed on external_id='role:{name}' with soft_delete=False, so the row is gone — a subsequent peer_send_by_name returns peer_role_vacant.",
+    "presentation_guidance": "Confirm the release; the operator-facing identifier is the name. After release, the role resolves as vacant until re-claimed."
+  },
+  "error_processor_customizations": {
+    "action_context": "Hard-deletes the agent_role_binding state-table row (keyed on external_id='role:{name}', soft_delete=False) that backs peer_send_by_name resolution. Deletes via the StateManagementInterface (delete_records); no address book.",
+    "error_interpretation": "missing_name: name was empty. state_service_unavailable: the state_service is not bound on this solet.",
+    "recovery_guidance": "missing_name: supply a non-empty role name. state_service_unavailable: bind the state_service (postgres_state_management_plugin) in service_bindings.json and restart."
+  }
+}

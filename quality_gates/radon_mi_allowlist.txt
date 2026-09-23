@@ -1,0 +1,85 @@
+# Radon-MI tracked-debt register.
+#
+# File paths whose reformed-MI rank C is acknowledged and deferred to
+# the post-AWS-solet cycle. Operator decision: 2026-05-25.
+# Tracking: Task #74.
+#
+# Per `workbench/2026-05-25_plugin_god_class_remediation.md`
+# §9.D–§9.Z + §9.K, each entry overlaps with a god-class flag (same
+# file flags both gates) OR is a standalone "pure helper / DSP
+# module" whose MI score reflects size-driven complexity that the
+# coherence-aware strip can't relieve. Removing an entry from this
+# list is the unit of remediation progress.
+#
+# Format: one POSIX-style file path per line (suffix-matched against
+# each candidate's resolved path; repo-relative paths preferred).
+# Blank lines and `#` comments are ignored.
+#
+# D-3-structural migration (2026-09-20, iss_23fa51b5/iss_9b0ad3d5): every
+# entry now carries the mandatory owner/reason/expires schema (see
+# quality_gates/allowlist_schema.py). The entries below that predate the
+# schema keep their original explanatory comment block untouched and get a
+# compact `reason:` pointer back to it; `owner:` is the real attribution
+# already recorded in that block (a task, a ruling, a lane, or the
+# 2026-09-03 W2-1 sweep where nothing more specific was recorded).
+# `expires: 2027-03-20` is a uniform 180-day migration default, not a
+# reassessed per-entry date -- it gives every one of them a real, finite
+# life instead of the indefinite grandfathering the old format allowed.
+
+# ------------------------------------------------------------
+# Files currently rank-C under the reformed MI check
+# ------------------------------------------------------------
+
+# §9.E god-class also fails MI rank C.
+ananta/src/ananta/core/actions/action_queue_poller.py  # owner: task-74-mi-remediation reason: see comment above, §9.E overlaps a god-class flag expires: 2027-03-20
+
+# §9.D-adjacent: ActionProcessor is god-class flagged; same file MI rank C.
+ananta/src/ananta/core/actions/action_processor.py  # owner: task-74-mi-remediation reason: see comment above, §9.D-adjacent overlaps a god-class flag expires: 2027-03-20
+
+# §9.I god-class flag (TemplateFunctionRegistry) overlaps with MI rank C.
+ananta/src/ananta/core/templates/template_functions.py  # owner: task-74-mi-remediation reason: see comment above, §9.I overlaps a god-class flag expires: 2027-03-20
+
+# §9.H follow-on: ACTRMemoryBackend is god-class flagged; MI also rank C.
+plugins/actr_memory_plugin/src/actr_memory_plugin/backend.py  # owner: task-74-mi-remediation reason: see comment above, §9.H overlaps a god-class flag expires: 2027-03-20
+
+# §9.K standalone: pure DSP module, no @platform_process methods to
+# strip; split by function family (pitch / envelope / spectral).
+plugins/audio_processing_plugin/src/audio_processing_plugin/audio_analysis.py  # owner: task-74-mi-remediation reason: see comment above, §9.K standalone pure-DSP module expires: 2027-03-20
+
+# ------------------------------------------------------------
+# Files that were rank-C in Git-Controller's earlier gate report
+# (preserved on the list as deferred work; some have since been
+# fixed in working-tree state but kept for operator-stated debt
+# tracking)
+# ------------------------------------------------------------
+
+
+plugins/default_inference_plugin/src/default_inference_plugin/plugin.py  # owner: git-controller-gate-report-legacy reason: rank-C in Git-Controller's earlier gate report, preserved as deferred debt expires: 2027-03-20
+plugins/default_thinking_plugin/src/default_thinking_plugin/plugin.py  # owner: git-controller-gate-report-legacy reason: rank-C in Git-Controller's earlier gate report, preserved as deferred debt expires: 2027-03-20
+plugins/macos_vault_plugin/src/macos_vault_plugin/plugin.py  # owner: git-controller-gate-report-legacy reason: rank-C in Git-Controller's earlier gate report, preserved as deferred debt expires: 2027-03-20
+
+# agent_messaging_plugin is god-class-allowlisted; the GAP-5 STUB-2
+# list_threads interface delegation (FORCED by the new ABC abstractmethod
+# that obligates this nominal subclass) tipped MI B(9.11)->C(8.95).
+# Operator-approved 2026-06-22 (Decision 1).
+plugins/agent_messaging_plugin/src/agent_messaging_plugin/plugin.py  # owner: operator-decision-2026-06-22 reason: see comment above, GAP-5 STUB-2 forced ABC delegation tipped MI B->C expires: 2027-03-20
+
+# Added 2026-08-28 (Git-Controller-ratified pre-existing debt).
+# Skeptical review: Git-Controller measured this file at HEAD as C(6.60);
+# the earlier models-stage test additions measured C(6.40), a real 0.20 movement,
+# not a neutral diff. The revised adapter-side scope measures C(6.60), but the
+# pre-existing C debt remains. Remediation contract: split scenario families,
+# then remove this entry as the burn-down unit; no new-code MI exceptions are implied.
+solet_cli/tests/discovered_decision_scenarios.py  # owner: git-controller-2026-08-28 reason: see comment above, pre-existing C(6.60) debt ratified on measurement expires: 2027-03-20
+
+# Added 2026-08-30 (coordinator ruling for lane-cdx-fix-review-r1-r1-defects).
+# Inherited from master's c60cbce87 Unit-A refactor, which folded the live
+# operation-selection family into plan_builder.py and deleted operation_selection.py.
+# This lane's D1 delta did not introduce or worsen the C-grade MI. Proper remediation:
+# extract that selection family into a dedicated module in a separately reviewed unit.
+solet_cli/src/solet_manager/plan_builder.py  # owner: lane-cdx-fix-review-r1-r1-defects reason: see comment above, inherited MI debt from master's Unit-A refactor expires: 2027-03-20
+
+# Added 2026-09-17 under rul_11fcd2ec-d5ef-4504-80f9-f79c4bfab5a7;
+# iss_a2bba79e-ae59-4e68-b363-2133b4f585db tracks complexity reduction.
+quality_gates/macos_bizops_identity_gate.py  # owner: rul_11fcd2ec-d5ef-4504-80f9-f79c4bfab5a7 reason: iss_1f9be587-7543-4eeb-b199-44d9403f9ecb tracked debt expires: 2026-12-17
+quality_gates/tests/macos_bizops_identity_gate_smoke.py  # owner: rul_11fcd2ec-d5ef-4504-80f9-f79c4bfab5a7 reason: iss_1f9be587-7543-4eeb-b199-44d9403f9ecb tracked debt expires: 2026-12-17

@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::cloud_self_deployment_service::deploy_status",
+  "display_name": "Read this solet's live deploy state from AWS",
+  "description": "Read-only introspection. Resolves the ALB listener rule for this solet's hostname, identifies the live resource version from the forward target group's name, and returns the current version label. Detects sibling target groups whose name suggests an in-flight deploy (one resource-version above the live one) and includes them as an in_progress_deploy snapshot. Setting detail=true includes resolved ARNs.",
+  "embedding_description": "Read this solet's live deploy state. What version is currently serving traffic? Is a sibling target group in flight? Read-only — touches no resources. Returns current_version label and optional in_progress_deploy with target version + target group ARN. Use to confirm a deploy has fully completed or to discover that one is mid-flight.",
+  "result_processor_customizations": {
+    "action_label": "Deploy status read",
+    "result_type": "self_deployment_status",
+    "result_description": "Live version label and any in-flight sibling deploy snapshot.",
+    "presentation_guidance": "Lead with current_version. If in_progress_deploy is present, name the target version and resource ARN. detail=true response includes the live service + target group ARNs."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reading the solet's own ALB listener rule and ECS service to identify the live version.",
+    "error_interpretation": "no_listener_rule_for_solet: provisioning is incomplete or the ALB has been modified externally.",
+    "recovery_guidance": "Confirm via AWS Console that the listener rule for the solet's FQDN still exists; re-run provision_solet.py if needed."
+  }
+}

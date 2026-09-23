@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::retire_held_authorization",
+  "display_name": "Retire a held-authorization entry",
+  "description": "R1 held-authorization queue (2026-08-17). Retires one open entry by entry_id, setting retired_at exactly once via a predicated update (retired_at IS NULL -> set) — a double-retire is a loud entry_not_found_or_already_retired, never a silent overwrite of an earlier retirement's provenance. Convention (not mechanically enforced): Git-Controller retires an entry on receiving the matching first-party authorization and proceeding with the commit; the owed_by_role holder may also retire directly when the work is abandoned or superseded (retired_reason e.g. 'superseded', 'withdrawn'). There is no TTL/silent-expiry path anywhere in this queue — every retirement is an explicit, reasoned call.",
+  "embedding_description": "Closing out a held-authorization entry once the first-party authorization finally arrived, or because the blocked work was superseded or withdrawn. The explicit act that removes an obligation from the open queue — never a timer, never automatic.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Held authorization retired",
+    "result_type": "retire_held_authorization_result",
+    "result_description": "{\"entry_id\": \"hau_...\", \"status\": \"retired\"} on success.",
+    "presentation_guidance": "Routine when it follows a successful commit landing; worth a one-line note otherwise (which entry, why)."
+  },
+  "error_processor_customizations": {
+    "action_context": "A predicated state update on held_authorization: SET retired_at/retired_reason/retired_by WHERE id = entry_id AND retired_at IS NULL.",
+    "error_interpretation": "missing_argument: one of entry_id/retired_reason/retired_by/retired_at was empty. entry_not_found_or_already_retired: the predicate matched no row — either entry_id does not exist or the entry was already retired; the caller cannot need to distinguish the two, since either way there is nothing further for this call to do. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "missing_argument means fix the call, do not retry as-is. entry_not_found_or_already_retired after your own prior call is expected and benign (the retire already landed) — confirm via list_held_authorizations rather than treating it as a fault. state_service_unavailable is worth a retry once the platform is up; this verb is safe to retry in general because the predicate makes a repeat call a no-op, not a double-action."
+  }
+}

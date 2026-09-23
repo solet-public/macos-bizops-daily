@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::oauth_client_add_redirect_uri",
+  "display_name": "Add OAuth Redirect URI",
+  "description": "Idempotently append a redirect URI to an existing OAuth client's allow-list. The /authorize endpoint exact-matches the redirect_uri parameter against this list; only URIs added via this process (or at registration time) are accepted.",
+  "embedding_description": "Pre-register a callback URL for an existing OAuth client so claude.ai's authorization_code flow can redirect back to it. Provide client_id and redirect_uri (absolute URL). Returns the full redirect_uris list after the add plus an `added` flag indicating whether this call mutated the list. Idempotent: adding an already-present URI is a no-op that returns added=False.",
+  "result_processor_customizations": {
+    "action_label": "OAuth redirect URI added",
+    "result_type": "oauth_redirect_uri_added",
+    "result_description": "Confirmation that the redirect_uri is now registered for the client; surfaces the full updated list and an `added` flag",
+    "presentation_guidance": "Echo the redirect_uris list verbatim so the operator can confirm the URI landed.",
+    "output_action_guidance": "Proceed with the OAuth flow that needs this redirect URI registered."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads the oauth_client row for client_id, appends redirect_uri to its redirect_uris JSON array if not already present, persists via update_state.",
+    "error_interpretation": "OAuthClientNotFound: client_id is not registered. OAuthClientInvalidName: client_id or redirect_uri is empty/non-string. OAuthClientStoreUnavailable: vault store has not been opened.",
+    "recovery_guidance": "For OAuthClientNotFound: register the client first via oauth_client_register. For OAuthClientInvalidName: supply non-empty strings. For OAuthClientStoreUnavailable: wait for vault startup to complete."
+  }
+}

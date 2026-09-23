@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::list_memorizing_action",
+  "display_name": "List Memorizing",
+  "description": "List all memories in the memorization queue",
+  "embedding_description": "List all memories in the memorization queue, optionally including completed items. Returns queue entries and count. Use to inspect scheduled reviews, due items, and overall spaced repetition workload.",
+  "result_processor_customizations": {
+    "action_label": "Memorization queue",
+    "result_type": "memorization_list",
+    "result_description": "List of memories in spaced repetition with review status",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

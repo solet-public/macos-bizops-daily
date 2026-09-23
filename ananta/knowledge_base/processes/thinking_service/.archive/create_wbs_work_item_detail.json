@@ -1,0 +1,29 @@
+{
+  "process_key": "service_interface::thinking_service::create_wbs_work_item_detail",
+  "display_name": "Create WBS Work Item Detail",
+  "description": "Create detailed executable steps for a single WBS work item via the thinking model. One model call per work item.",
+  "embedding_description": "Create detailed executable steps for one work item in a WBS outline. Produces numbered steps with process keys, arguments, and sub-steps. Uses the thinking_artifact profile with the wbs_detail context loader. Repeated per work item in the outline.",
+  "prompt_contract": {
+    "kind": "delegated_artifact_creation"
+  },
+  "result_processor_customizations": {
+    "action_label": "WBS work item detail created",
+    "result_type": "wbs_work_item_detail_result",
+    "result_description": "Work item detail with executable steps",
+    "presentation_guidance": "",
+    "output_action_guidance": "The work item detail has been created. Continue to the next work item or proceed to assembly.",
+    "message_rendering": {
+      "renderer_key": "artifact_result_compact",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Creating WBS work item detail. create_wbs_work_item_detail accepts {outline_id, wbs_id, item_number, item_key, directive, support_articles}.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. MissingDependency: outline, manifest, or sketch section not found. StorageError: knowledge base write failed."
+  }
+}

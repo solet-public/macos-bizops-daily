@@ -1,0 +1,15 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "process",
+    "match",
+    "results",
+    "query",
+    "Here",
+    "Present",
+    "data",
+    "state",
+    "database",
+    "returned"
+  ]
+}

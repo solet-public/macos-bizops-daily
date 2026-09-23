@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::import_memories",
+  "display_name": "Import Memories",
+  "description": "Import memories from a JSON export file. The file_path must resolve under an operator-configured export_allowed_roots directory (an unset roots list refuses every import). Existing memory IDs are skipped, not overwritten. Use to restore a backup or load a memory snapshot from a sanctioned workspace file.",
+  "embedding_description": "Load memories from a JSON export file to restore a backup or ingest a snapshot, skipping IDs that already exist. The source path must be contained under an operator-configured workspace root. File-based bulk import, not a bridge stream.",
+  "result_processor_customizations": {
+    "action_label": "Import Memories",
+    "result_type": "import_complete",
+    "result_description": "Results of memory import including counts of imported, skipped, and total in file",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Importing memories from a JSON backup file",
+    "error_interpretation": "memory.export_path_refused: the file_path is not contained under a configured export_allowed_roots directory (or none is configured). FileNotFoundError: the import file does not exist at the specified path. InvalidFormatError: the file is not valid JSON or has wrong structure. EmbeddingError: failed to regenerate embeddings for imported memories.",
+    "recovery_guidance": "For memory.export_path_refused: pass a path under an operator-configured export_allowed_roots directory, or ask the operator to add one. For file not found: verify the file path is correct. For format errors: ensure the file is a valid memory export JSON. For embedding errors: verify embedding service is available."
+  }
+}

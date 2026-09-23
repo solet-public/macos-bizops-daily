@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code_vetting_plugin"
+version = "1.0.0"
+description = "AI code-vetting suite — deterministic L1 scanners + platform-gate wrappers + AI-critic verifier, promoted from the landed quality_gates/vetting/ engine. Exposes vet_codebase + scan_quality_guidelines verbs; the L2/L3 inference stages run as joseki-dispatched agent sessions, not inline verbs (action-queue fast-return contract)."
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    # R8-1 structural-metrics scanner: pinned EXACT — a lizard upgrade that changes CCN/nesting
+    # counting would silently corrupt every trend line (Architect ruling §B); re-pin deliberately.
+    "lizard==1.23.0",
+    # R9-A dead-code scanner: pinned EXACT — vulture 2.16's per-class confidence map (import 90 /
+    # unreachable 100 / everything-else 60) IS the two-layer contract; an upgrade shifting those
+    # semantics must be a deliberate re-baseline, so the version is asserted at scan time.
+    "vulture==2.16",
+]
+
+[project.optional-dependencies]
+# R9-E foreign-Python type-check scanner (python_type_check.py) is absence-tolerant
+# by design — a missing checker is a disclosed coverage gap, never a gate failure
+# This extra is how an operator opts INTO full live pyright/mypy
+# coverage against foreign targets; it is never required to pass the gate.
+typecheck = [
+    "pyright>=1.1",
+    "mypy>=1.0",
+]
+
+[project.entry-points."ananta.plugins"]
+code_vetting_plugin = "code_vetting_plugin.plugin:CodeVettingPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["code_vetting_plugin*"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

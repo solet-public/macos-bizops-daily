@@ -1,0 +1,12 @@
+{
+  "name": "test_setup_schedules",
+  "description": "Verify setting up periodic maintenance schedules for memory operations",
+  "process_key": "plugin::actr_memory_plugin::setup_schedules",
+  "arguments": {
+    "params": {},
+    "state": {
+      "session_id": "test-session-110"
+    }
+  },
+  "timeout_seconds": 30
+}

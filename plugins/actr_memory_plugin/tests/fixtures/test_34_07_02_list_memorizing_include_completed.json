@@ -1,0 +1,14 @@
+{
+  "name": "test_list_memorizing_include_completed",
+  "description": "Verify listing memorization queue including completed memorizations",
+  "process_key": "plugin::actr_memory_plugin::list_memorizing_action",
+  "arguments": {
+    "params": {
+      "include_completed": true
+    },
+    "state": {
+      "session_id": "test-session-061"
+    }
+  },
+  "timeout_seconds": 30
+}

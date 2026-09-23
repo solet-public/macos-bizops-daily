@@ -1,0 +1,11 @@
+# Gate-toolchain dependencies for the quality_gates/ scripts — NOT platform
+# runtime dependencies. The platform boots and runs without these; the radon
+# complexity/maintainability wrappers import them at module load, so install
+# them into the active venv before running the full gate battery:
+#
+#   python3 -m pip install -r quality_gates/requirements.txt
+#
+# Environments without them fail LOUD, not silent: the aggregate renders a
+# wrapper import crash as GATE CRASH (never as a violation count), and the
+# gate-crash rendering smoke degrades explicitly, naming the absence.
+radon>=6.0

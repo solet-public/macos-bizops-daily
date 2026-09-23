@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::snowflake_plugin::test_connection",
+  "display_name": "Snowflake: Test Connection",
+  "description": "Open the configured Snowflake account and confirm it: account, user, role, warehouse, and server version. Use this to verify the connector is reachable and the granted role is what you expect. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; the connection details are delivered when the job completes.",
+  "embedding_description": "Verify the Snowflake connector is configured and reachable, surfacing the resolved account, user, active role, warehouse, and server version -- confirms the operator-granted role is read-only as expected. Dispatches asynchronously; the connection details land on job completion.",
+  "result_processor_customizations": {
+    "action_label": "Snowflake connection test queued",
+    "result_type": "snowflake_test_connection_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the connection test result -- that arrives separately when the job completes and is delivered as its own message: ok (bool), account, user, role, warehouse, version.",
+    "presentation_guidance": "This call only confirms the job was queued -- do not present job_id/status as confirmation the connection works. Acknowledge the request is in flight; the connection details land in a follow-up message when the job completes. Once delivered, report ok plus the account/user/role/warehouse for the operator's confirmation (low sensitivity, connection metadata, data_sensitivity 0.1)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Test the configured Snowflake connection.",
+    "error_interpretation": "snowflake.not_configured: no snowflake_account address-book entry is registered, or it is incomplete. snowflake.auth_failed: the key-pair JWT was rejected (key revoked or mismatched). snowflake.api_error: an unexpected warehouse error.",
+    "recovery_guidance": "snowflake.not_configured: register the snowflake_account address-book entry per the plugin's KB runbook. snowflake.auth_failed: ask the operator to verify the RSA public key on the connecting Snowflake user is still active."
+  }
+}

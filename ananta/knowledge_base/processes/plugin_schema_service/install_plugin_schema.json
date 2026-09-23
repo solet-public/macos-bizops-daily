@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::plugin_schema_service::install_plugin_schema",
+  "display_name": "Install Plugin Schema",
+  "description": "Idempotent install / adoption / additive update for a plugin's declared schema. Tables not on disk: CREATE. Tables on disk that match declared shape: adopt (legacy column-type normalization, index reconciliation). Identical re-install: no-op. Previously uninstalled namespace: reactivate. Different shape: diff-and-update (additive — never drops tables). Use serialization.to_json to convert a SchemaDefinition into the declared_schema_json dict.",
+  "embedding_description": "Install or update the persistent table schema for a plugin namespace from a declared SchemaDefinition JSON shape. Idempotent and additive — creates new tables, adopts existing ones with legacy types, applies column/index changes in a single transaction. Does not drop tables; use uninstall or purge for that.",
+  "result_processor_customizations": {
+    "action_label": "Plugin schema installed",
+    "result_type": "plugin_schema_installed",
+    "result_description": "Lifecycle outcome with status (installed | adopted | no_op | reactivated | updated), namespace, and the list of tables touched.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Installs (or adopts / updates) the plugin's declared schema in the live database via the plugin-schema lifecycle service. All DDL + ownership-row writes happen in a single transaction.",
+    "error_interpretation": "ValueError: declared_schema_json mismatched the namespace, or SchemaDefinition.validate() failed. NotImplementedError: declared shape requires an unsupported transition (column type change, with_history toggle, id_prefix change). AdoptionDivergence: live tables diverge from declared in a way outside the whitelisted legacy normalizations. Postgres errors propagate from the transactional apply — failure rolls back atomically.",
+    "recovery_guidance": "For ValueError: confirm the JSON shape matches serialization.to_json output and the namespace argument matches schema_def.namespace. For NotImplementedError on type/structural changes: drop and re-add the column manually, or purge_plugin_schema and reinstall. For AdoptionDivergence: surface the divergence message to the operator; manual SQL reconciliation is required before retry. For Postgres errors: the transaction rolled back; the database is in the pre-call state."
+  }
+}

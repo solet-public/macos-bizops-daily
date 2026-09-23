@@ -1,0 +1,7 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::peer_ack_role_read_page",
+  "display_name": "Acknowledge a rendered role inbox page",
+  "description": "After a consumer has successfully written and flushed a peer_inbox role page, acknowledge its opaque page token. This creates exact per-instance display receipts only for server-issued page items; it is not proof that a model consumed or acted on them.",
+  "embedding_description": "Acknowledge a role inbox page only after its complete merged output has been written and flushed. Submit the server-issued opaque page token to create immutable, exact display receipts for the calling session and instance; retrying the same acknowledgement preserves the original receipt facts.",
+  "processor_policy_category": "edge"
+}

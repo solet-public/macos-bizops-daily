@@ -1,0 +1,9 @@
+{
+  "natural_language_query": "Raise the platform log level to DEBUG without restarting the solet",
+  "expected_process_key": "service_interface::lifecycle_management_service::update_platform_config",
+  "expected_arguments_structure": {
+    "scope": "string",
+    "key": "string",
+    "value": "object"
+  }
+}

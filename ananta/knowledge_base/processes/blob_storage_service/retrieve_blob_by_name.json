@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::blob_storage_service::retrieve_blob_by_name",
+  "display_name": "Retrieve File",
+  "description": "Retrieve file content and metadata by filename from blob storage.",
+  "embedding_description": "Download file from blob storage. Get stored binary content. Retrieve audio image document. Load file by name. Fetch saved content. Read binary data. Get attachment. Download media file. Access stored file.",
+  "result_processor_customizations": {
+    "action_label": "Blob retrieved",
+    "result_type": "blob_retrieved",
+    "result_description": "Retrieved blob with content (hex-encoded binary data), metadata (user-defined key-value pairs), size, content_type, and created_at timestamp",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves binary content and metadata from blob storage by filename",
+    "error_interpretation": "NotFoundError: file does not exist in blob storage. AccessError: namespace access denied. StorageError: blob storage service unavailable.",
+    "recovery_guidance": "For not found errors: verify filename is correct or use file_command to list available files. For access errors: check namespace permissions. For storage errors: retry or check service status."
+  }
+}

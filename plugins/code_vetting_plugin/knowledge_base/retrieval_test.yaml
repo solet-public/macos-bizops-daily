@@ -1,0 +1,93 @@
+# Retrieval-test gate for the code_vetting_plugin knowledge base.
+#
+# Each case pairs a query a reader would actually type with the article that MUST
+# rank top for it. The gate (KB Authoring Rubric / W3C-1's retrieval-test step)
+# runs these against the ingested KB before an article is trusted: a query that
+# does not surface its own article means the embedding description or the
+# chunk-leading sentences need work, or two articles are competing (a cosine-
+# distinguishability failure). Added by the W3C-2 C4 KB batch (Claude-A, 2026-07-21).
+
+tests:
+  # --- test_coverage_run_profile.md ---
+  - query: "how does the vetting suite measure test coverage"
+    expect: test_coverage_run_profile.md
+  - query: "why does the vetting suite refuse a coverage-percentage gate"
+    expect: test_coverage_run_profile.md
+  - query: "measure which source the unit and smoke tests execute per plugin"
+    expect: test_coverage_run_profile.md
+  - query: "coverage of subprocess-spawning smoke tests"
+    expect: test_coverage_run_profile.md
+  - query: "run the coverage run-profile on demand"
+    expect: test_coverage_run_profile.md
+  - query: "difference between scanner coverage and test coverage in the vetting report"
+    expect: test_coverage_run_profile.md
+  - query: "test_reach finding zero test coverage plugin with verbs"
+    expect: test_coverage_run_profile.md
+
+  # --- report_format_convention.md ---
+  - query: "how should a vetting scan report be formatted"
+    expect: report_format_convention.md
+  - query: "what sections does the code-vetting report have"
+    expect: report_format_convention.md
+  - query: "finding card template severity CWE evidence remediation"
+    expect: report_format_convention.md
+  - query: "severity colors for a Google Doc vetting report"
+    expect: report_format_convention.md
+  - query: "calibrate not verdict foreign repo report framing"
+    expect: report_format_convention.md
+  - query: "coverage honesty matrix examined not-applicable tool-absent"
+    expect: report_format_convention.md
+
+  # --- 00_vetting_suite_overview.md ---
+  - query: "what is the AI code-vetting suite and how do its layers work"
+    expect: 00_vetting_suite_overview.md
+  - query: "L1 deterministic L2 critic L3 adversarial verification layers"
+    expect: 00_vetting_suite_overview.md
+  - query: "self-vet vs foreign-vet one engine run-profile"
+    expect: 00_vetting_suite_overview.md
+  - query: "which vetting layer does a new check belong at"
+    expect: 00_vetting_suite_overview.md
+  - query: "how does the vetting suite report a scanner that could not run"
+    expect: report_format_convention.md
+
+  # --- guidance_magic_strings.md ---
+  - query: "which repeated string literals should be extracted to a constant or enum"
+    expect: guidance_magic_strings.md
+  - query: "magic string vs legitimate repetition i18n test fixture path"
+    expect: guidance_magic_strings.md
+  - query: "judging the literal-frequency table for config candidates"
+    expect: guidance_magic_strings.md
+
+  # --- guidance_dead_symbols.md ---
+  - query: "is an unused public function dead code or exported API"
+    expect: guidance_dead_symbols.md
+  - query: "judging candidate dead symbols registry dynamic dispatch"
+    expect: guidance_dead_symbols.md
+  - query: "why is the 60 percent vulture confidence class evidence not a finding"
+    expect: guidance_dead_symbols.md
+
+  # --- guidance_architecture_universal.md ---
+  - query: "generic architecture review for a foreign codebase with no platform rulebook"
+    expect: guidance_architecture_universal.md
+  - query: "is this import a layering violation or a god component"
+    expect: guidance_architecture_universal.md
+  - query: "judging coupling and circular dependencies on a repo we don't own"
+    expect: guidance_architecture_universal.md
+  - query: "does this class reach past the repository boundary into storage directly"
+    expect: guidance_architecture_universal.md
+  - query: "restored foreign-target architecture lens after RB rulebook lenses were skipped"
+    expect: guidance_architecture_universal.md
+
+  # --- vet_codebase_ai_pass_joseki.md (joseki_catalog — the HOW-TO-RUN card; distinct from the overview's WHAT-IT-IS) ---
+  - query: "how do I run the AI critic pass over a codebase"
+    expect: vet_codebase_ai_pass_joseki.md
+  - query: "vet_codebase joseki dispatch L2 lenses then L3 adversarial verify"
+    expect: vet_codebase_ai_pass_joseki.md
+  - query: "why does a stale rulebook block the AI vetting pass"
+    expect: vet_codebase_ai_pass_joseki.md
+  - query: "AI vetting pass local vs subscription substrate dispatch"
+    expect: vet_codebase_ai_pass_joseki.md
+  - query: "run the full AI vet on a foreign target skipping the platform-local lenses"
+    expect: vet_codebase_ai_pass_joseki.md
+  - query: "how many L2 lenses run on a foreign target vs a self target"
+    expect: vet_codebase_ai_pass_joseki.md

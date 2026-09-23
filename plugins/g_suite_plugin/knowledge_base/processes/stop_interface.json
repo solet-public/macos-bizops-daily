@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::g_suite_plugin::stop_interface",
+  "display_name": "Stop Google OAuth Callback Server",
+  "description": "Shut down the Google OAuth callback uvicorn server and release its TCP port. Safe to call whether or not the server is running. Returns a stopped confirmation.",
+  "embedding_description": "Tear down the Google Workspace OAuth redirect listener started by start_interface. Stops the background uvicorn event loop and frees the callback port. Call after the connect_account browser flow completes and tokens are vaulted, or to reclaim the port. Idempotent — returns stopped:true even if nothing was running.",
+  "result_processor_customizations": {
+    "action_label": "Google OAuth callback server stopped",
+    "result_type": "g_suite_interface_stop_result",
+    "result_description": "Dict with stopped:true.",
+    "presentation_guidance": "Confirm the callback server was shut down and its port released."
+  },
+  "error_processor_customizations": {
+    "action_context": "Stop the Google OAuth callback uvicorn server.",
+    "error_interpretation": "Any error indicates the server thread could not be stopped cleanly.",
+    "recovery_guidance": "Retry stop_interface; if the port stays bound, a platform restart releases it."
+  }
+}

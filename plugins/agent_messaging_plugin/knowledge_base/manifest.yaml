@@ -1,0 +1,36 @@
+name: agent_messaging_plugin
+description: >
+  Consolidated reference for the agent_messaging_plugin. Covers the three
+  hats the plugin wears: the IO interface surface (post_message,
+  start_interface, stop_interface) for delivering assistant messages to a
+  bound MCP bridge session; the bridge service (FastAPI route table,
+  Python MCP stdio bridge, bridge-delivery EDGE_SINK processes
+  deliver_result and deliver_error) that backs every mcp__<server-name>__* tool
+  call; and the inter-agent messaging core (durable core__agent_thread /
+  core__agent_message schema, peer registry, the unconditional delivery
+  contract (A4, 2026-08-04 retired the sender-declared IMPORTANT-marker
+  wake gate), and the unscoped list_threads/
+  read_thread_messages reads the session-ledger projection consumes). The
+  dormant backend-dispatch surface (open_thread/send_message/list_messages/
+  get_status/close_thread, the run_turn EDGE process, GuardedAgentInterface)
+  was retired in the D3 dormant-head retirement — it had zero implementing
+  plugins.
+
+category: plugin-internal
+tags:
+  - plugin_reference
+  - agent_messaging
+  - bridge
+
+content:
+  patterns:
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

@@ -1,0 +1,9 @@
+{
+  "process_key": "service_interface::memory_service::learn",
+  "arguments": {
+    "path": "/Users/alice/Workspace/example/ananta/src/ananta/services/memory_service/",
+    "pattern": "*.py",
+    "recursive": false,
+    "tags": ["test", "directory"]
+  }
+}

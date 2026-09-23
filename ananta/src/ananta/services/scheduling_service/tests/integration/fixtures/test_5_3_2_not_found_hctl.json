@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::scheduling_service::clear_scheduled_action",
+  "arguments": {
+    "schedule_id": "00000000-0000-0000-0000-000000000000"
+  }
+}

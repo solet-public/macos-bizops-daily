@@ -1,0 +1,8 @@
+{
+  "action_status": "completed",
+  "data_keys": ["blob_id", "deleted"],
+  "data_contains": {
+    "deleted": true
+  },
+  "timeout_seconds": 30
+}

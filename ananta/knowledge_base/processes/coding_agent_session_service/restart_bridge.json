@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::coding_agent_session_service::restart_bridge",
+  "display_name": "Restart a tracked MCP bridge subprocess (terminate + re-spawn)",
+  "description": "Terminate the tracked bridge subprocess under the supplied agent_instance_id (SIGTERM + grace window + SIGKILL on overrun), then spawn a fresh subprocess in its place under the same id. The new subprocess discovers the current `<solet>.bridge.port` content and connects to the router silently. Used by the FSEvents watcher when `<solet>.bridge.port` content changes (router blue-green swap) so MCP tool calls auto-reconnect without the operator running `/mcp reconnect`. Also called by the iTerm2 plugin's `restart_session` verb. When no prior bridge is tracked, behaves like a fresh spawn (status=not_running with prior_pid=0).",
+  "embedding_description": "Atomic terminate + spawn of MCP bridge subprocess so the bridge silently reconnects after router blue-green swap or operator restart. Eliminates manual `/mcp reconnect`. Returns BridgeRestartResult: status (success/not_running/failed), agent_instance_id, prior_pid (0 when no prior), new_pid (0 when failed pre-spawn), restarted_at, message. agent_instance_id preserved across restart.",
+  "result_processor_customizations": {
+    "action_label": "MCP bridge restarted",
+    "result_type": "coding_agent_session_bridge_restart_result",
+    "result_description": "BridgeRestartResult frozen dataclass with status (success / not_running / failed), agent_instance_id, prior_pid (0 if not_running), new_pid (0 if failed pre-spawn), restarted_at ISO-8601 UTC, and human-readable message.",
+    "presentation_guidance": "Lead with status. On status='success', surface both prior_pid and new_pid (the transition the operator can verify with ps). On status='not_running', state that no prior bridge existed and that the new bridge was spawned fresh — equivalent to spawn_bridge. On status='failed', surface the message verbatim and indicate whether the terminate or the spawn step failed."
+  },
+  "error_processor_customizations": {
+    "action_context": "Restart a tracked MCP bridge subprocess (terminate + re-spawn).",
+    "error_interpretation": "terminate_failed: the SIGTERM step did not complete (kill() denied or grace window expired AND SIGKILL also failed). spawn_failed: terminate succeeded but the fresh subprocess could not be launched.",
+    "recovery_guidance": "terminate_failed: see terminate_bridge recovery guidance. spawn_failed: see spawn_bridge recovery guidance. The tracking entry is preserved on failure so a subsequent restart_bridge call can retry without losing the binding."
+  }
+}

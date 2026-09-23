@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::cloud_self_deployment_service::deploy_rollback",
+  "display_name": "Roll back a self-deploy during the observation window",
+  "description": "Operator-triggered abort. Callable only between cutover (step 6 of deploy_self) and teardown (step 9 inside complete_deploy). Verifies the old target group still exists, atomically modifies the listener rule back to it, and the running complete_deploy on the new color detects the rule change and exits status='cancelled' without tearing down the old service. Returns status='rollback_not_applicable' if called before cutover or after the old service is gone.",
+  "embedding_description": "Roll back a self-deploy during the observation window. Aborts the deploy_self in flight. Operator triggers from a second MCP client when the new color misbehaves (high error rate, broken connector). Modifies the listener rule back to the previous version's target group; the running complete_deploy detects this and exits cancelled. Cannot reverse a fully torn-down deploy.",
+  "result_processor_customizations": {
+    "action_label": "deploy_rollback completed",
+    "result_type": "self_deployment_rollback",
+    "result_description": "Status, version labels moved between, and finisher_cancelled flag.",
+    "presentation_guidance": "If status='rolled_back', name the rolled_back_from → rolled_back_to versions and confirm finisher_cancelled. If status='rollback_not_applicable', explain why (before cutover or after teardown)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Modifying the ALB listener rule back to the previous version during the observation window.",
+    "error_interpretation": "no_listener_rule_for_solet: provisioning was incomplete or the ALB has been modified externally. The rollback verb cannot recover from missing AWS state.",
+    "recovery_guidance": "Confirm via AWS Console that both the current and prior target groups still exist; if the prior is already gone, the deploy passed the observation window and rollback is no longer possible — operator must run a fresh deploy_self with the old image tag."
+  }
+}

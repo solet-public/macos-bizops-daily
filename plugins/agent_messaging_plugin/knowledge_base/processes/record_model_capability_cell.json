@@ -1,0 +1,19 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::record_model_capability_cell",
+  "display_name": "Record one model capability catalog cell directly",
+  "description": "Operator ruling rul_9e7a67ba (2026-09-22): models change daily, and anyone who gets better information must be able to update the model capability catalog directly. Writes one (runtime, model, effort) cell as accepted, with the caller's capability_score (Artificial Analysis Intelligence Index, 0-100), optional cost_per_task_usd, and a required source_ref naming where the reading came from. The reading is kept as evidence exactly like a fetched one: a model_capability_refresh_run row with trigger=manual and one model_capability_observation row per metric, with source_id manual_record and the source_ref in fetch_method. It overwrites any prior value for the same cell, whatever that cell's acceptance was, and returns the previous values so the change is auditable. The cell is servable to select_dispatch_tier at once, and stays servable for staleness_window_hours (default 72). A model on the refresh roster is then kept fresh by refresh_model_capability_catalog. A model off the roster must be re-recorded before its window lapses. A later refresh whose two live sources disagree with a manual reading moves that cell to crosscheck_conflict, so a bad reading surfaces.",
+  "embedding_description": "Typing in a newly measured AI model score and per-task dollar cost by hand, with the web page or document it came from, so a model released today becomes selectable for dispatch without waiting for a code change or an automatic fetch.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Capability cell recorded",
+    "result_type": "record_model_capability_cell_result",
+    "result_description": "run_id, runtime, model, effort, capability_score, cost_per_task_usd, acceptance (always accepted), observation_ids, previous (prior capability_score, cost_per_task_usd, acceptance and measured_at, or null for a new cell).",
+    "presentation_guidance": "Name the cell as model@effort on its runtime and give the recorded score and cost. When previous is not null, show old and new values side by side. Say that the cell is now servable to select_dispatch_tier.",
+    "output_action_guidance": "select_dispatch_tier can serve this cell immediately. read_model_capability_catalog shows it with is_fresh and servable. To keep an off-roster model fresh beyond its staleness window, record it again or add it to the refresh roster."
+  },
+  "error_processor_customizations": {
+    "action_context": "One refresh-run row, one or two observation rows and one upsert of the cell table, all through the state interface. Not retryable: a retry after a transient fault whose write already landed would record the same reading twice as two runs.",
+    "error_interpretation": "parameter_invalid: runtime is not claude_code or codex; model, effort or source_ref is blank; effort is not one of non_reasoning, none, low, medium, high, xhigh or max; capability_score is missing or outside 0-100; cost_per_task_usd is negative; or staleness_window_hours is not a positive integer. catalog_invalid: the state layer returned no generated id for a written row. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "Fix the named parameter and call again. For catalog_invalid, read_model_capability_catalog with include_unaccepted=true shows whether the cell was written before the fault; the refresh-run row may be left status=running."
+  }
+}

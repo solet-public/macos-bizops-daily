@@ -1,0 +1,13 @@
+{
+  "process_key": "service_interface::state_service::read_state",
+  "arguments": {
+    "namespace": "core",
+    "query": {
+      "table": "key_value_store",
+      "columns": ["key", "value"],
+      "filter": {
+        "key": "nonexistent_test_key_xyz_12345"
+      }
+    }
+  }
+}

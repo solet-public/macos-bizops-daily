@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::default_address_book_plugin::delete_entry",
+  "display_name": "Delete Entry",
+  "description": "Delete a specific entry by ID.",
+  "embedding_description": "Delete a specific entry by entry_id from an address. Use to remove outdated or invalid fields while keeping the address. Returns confirmation of deletion; the address remains intact. Deletion is irreversible for that entry.",
+  "result_processor_customizations": {
+    "action_label": "Delete Entry",
+    "result_type": "entry_deleted",
+    "result_description": "Confirmation that entry was deleted",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

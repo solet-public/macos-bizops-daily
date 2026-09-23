@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::bulk_job_status",
+  "display_name": "Salesforce: Bulk Job Status",
+  "description": "Fetch a Bulk API v2 ingest job's current state and record counts -- the poll target for a job created by bulk_ingest_submit. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; the Salesforce job's state (Open, UploadComplete, InProgress, JobComplete, Failed, or Aborted) and processed/failed record counts are delivered when THIS dispatch's job completes.",
+  "embedding_description": "Check a running bulk load job -- has this mass insert/update/upsert/delete finished, is it in progress, or did it fail -- and how many records processed or failed. Watch a job from bulk_ingest_submit progress toward JobComplete before pulling results. Returns a job_id at once, then the bulk job's state and counts. Call again on a timer; one check does not mean done.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce bulk job status check queued",
+    "result_type": "salesforce_bulk_job_status_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the bulk job's state -- the Salesforce job's own state and processed/failed record counts arrive separately, as their own message, when this dispatch's job completes.",
+    "presentation_guidance": "This call only confirms the STATUS CHECK was queued -- do not present job_id/status as the bulk job's own state. Once the check's result is delivered, relay the Salesforce job's state plainly (Open/UploadComplete/InProgress/JobComplete/Failed/Aborted) and the processed/failed counts. If state is anything other than JobComplete/Failed/Aborted, tell the user the job is still running and suggest checking again shortly rather than proceeding to bulk_job_results. If state is Failed, surface error_message if present."
+  },
+  "error_processor_customizations": {
+    "action_context": "Check a Bulk API v2 ingest job's state and record counts by job id.",
+    "error_interpretation": "sf.invalid_params: missing job_id. sf.not_found: no bulk job with that id exists in the configured org (wrong id, or it belongs to a different org). sf.permission_denied: the CLI's authenticated user cannot view this job.",
+    "recovery_guidance": "sf.not_found: verify the job_id came from this same bulk_ingest_submit's delivered result, not a different org or an earlier job. sf.permission_denied: ask the operator to check bulk API job visibility for this user."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::memorize_action",
+  "display_name": "Memorize",
+  "description": "Add a memory to the spaced repetition queue",
+  "embedding_description": "Add a memory to the spaced repetition queue. Provide memory_id or new content to create a memory, then schedule reviews; returns next_review_at. Use for critical knowledge requiring periodic review. Useful for procedures or checklists.",
+  "result_processor_customizations": {
+    "action_label": "Memory added to memorization queue",
+    "result_type": "memorization_scheduled",
+    "result_description": "Spaced repetition schedule with memory_id and next_review_at",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "test_recall_exclude_ids",
+  "description": "Verify that exclude_ids parameter filters out specific memory IDs from results",
+  "process_key": "plugin::actr_memory_plugin::recall_action",
+  "arguments": {
+    "params": {
+      "query": "general knowledge",
+      "exclude_ids": ["mem-uuid-001", "mem-uuid-002"],
+      "top_k": 5
+    },
+    "state": {
+      "session_id": "test-session-015"
+    }
+  },
+  "timeout_seconds": 30
+}

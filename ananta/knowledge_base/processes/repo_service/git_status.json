@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::repo_service::git_status",
+  "display_name": "Git Status",
+  "description": "Report the platform worktree's git status as structured lists. Runs a READ-ONLY 'git status --porcelain=v2 --branch' (the read-only git surface the GIT-CONTROLLER policy explicitly permits) with argv baked server-side, and parses it into {branch, staged, unstaged, untracked}. This verb NEVER mutates the repo or index — there is no add/commit/checkout path anywhere in this service. Use it to see what has changed before reading a diff or proposing a patch.",
+  "embedding_description": "Show the git working-tree status of the platform repository: current branch plus staged, unstaged, and untracked path lists. Read-only porcelain-v2 parse; never mutates the index or tree. Use to see what changed before diffing or proposing a patch.",
+  "result_processor_customizations": {
+    "action_label": "Git status read",
+    "result_type": "repo_git_status_result",
+    "result_description": "Object with 'branch', 'staged', 'unstaged', 'untracked' (path lists).",
+    "presentation_guidance": "Lead with the branch, then summarize counts and list the changed paths grouped by staged/unstaged/untracked.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Running a read-only 'git status --porcelain=v2 --branch' over the platform worktree with server-fixed argv.",
+    "error_interpretation": "RepoToolError: the git subprocess timed out or exited non-zero (e.g. not a git worktree, or git unavailable). This is a read-only call; a failure is an environment problem, not a mutation.",
+    "recovery_guidance": "Confirm the solet is running from a git worktree with git installed. This verb takes no arguments; retry after the environment is healthy."
+  }
+}

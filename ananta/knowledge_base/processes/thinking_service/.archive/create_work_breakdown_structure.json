@@ -1,0 +1,29 @@
+{
+  "process_key": "service_interface::thinking_service::create_work_breakdown_structure",
+  "display_name": "Create Work Breakdown Structure",
+  "description": "ask the thinking plugin to create a new Work Breakdown Structure document for a specific phase and return the full created Work Breakdown Structure.",
+  "embedding_description": "Create work breakdown structure for a specific phase of a work manifest. Initialize a new phase-scoped execution document with numbered work items, steps, and sub-steps. Create phase scaffold linked to parent manifest. Start a new phase execution plan.",
+  "prompt_contract": {
+    "kind": "delegated_artifact_creation"
+  },
+  "result_processor_customizations": {
+    "action_label": "Work Breakdown Structure created",
+    "result_type": "wbs_create_result",
+    "result_description": "Work Breakdown Structure creation result",
+    "presentation_guidance": "",
+    "output_action_guidance": "The Work Breakdown Structure has been created and is now available as working context. Continue executing the current step as shown in the updated ACTIVE_PLAN.",
+    "message_rendering": {
+      "renderer_key": "artifact_result_compact",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Creating a Work Breakdown Structure document. create_work_breakdown_structure accepts {wbs_id, manifest_id, phase_number, phase_name, directive}. The thinking model generates the full WBS from the directive.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. StorageError: knowledge base write failed. FileExistsError: a WBS with this ID already exists. ProcessCoverageError: a required process from the topology packet was not found in the assembled work item — retry with a more explicit directive that names the missing process and the work item it belongs to."
+  }
+}

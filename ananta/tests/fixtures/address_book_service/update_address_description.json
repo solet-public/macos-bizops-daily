@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::address_book_service::update",
+  "arguments": {
+    "name": "openai_api",
+    "description": "OpenAI API endpoint for GPT-4 and GPT-3.5-turbo models. Primary production endpoint with rate limiting and monitoring."
+  }
+}

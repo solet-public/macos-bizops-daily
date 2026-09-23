@@ -1,0 +1,8 @@
+{
+  "name": "test_stop_service",
+  "description": "Stop a running service",
+  "process_key": "service_interface::lifecycle_management_service::stop_service",
+  "arguments": {
+    "service": "test_value"
+  }
+}

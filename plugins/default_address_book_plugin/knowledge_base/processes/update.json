@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::default_address_book_plugin::update",
+  "display_name": "Update Address",
+  "description": "Update address metadata (not entries).",
+  "embedding_description": "Update address metadata such as address_type, description, or tags for an existing name. Does not change entries. Use to reclassify or retag an address; returns updated record. The address name cannot be changed.",
+  "result_processor_customizations": {
+    "action_label": "Update Address",
+    "result_type": "address_updated",
+    "result_description": "Updated address record with new metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

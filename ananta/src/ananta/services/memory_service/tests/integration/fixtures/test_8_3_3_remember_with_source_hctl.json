@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::remember",
+  "arguments": {
+    "content": "Test memory from source file: Important information about API design patterns.",
+    "source_file": "/path/to/test/document.md",
+    "tags": ["test", "source"]
+  }
+}

@@ -1,0 +1,500 @@
+{
+  "$defs": {
+    "destination_identity": {
+      "additionalProperties": false,
+      "properties": {
+        "flow_contract_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "flow_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "flow_id",
+        "flow_contract_digest"
+      ],
+      "type": "object"
+    },
+    "first_use_migration_citation": {
+      "additionalProperties": false,
+      "properties": {
+        "destination_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "manifest_entry_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "manifest_entry_id",
+        "source_digest",
+        "destination_digest"
+      ],
+      "type": "object"
+    },
+    "source_identity": {
+      "additionalProperties": false,
+      "properties": {
+        "flow_contract_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "flow_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "flow_source_revision": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "flow_id",
+        "flow_source_revision",
+        "flow_contract_digest"
+      ],
+      "type": "object"
+    },
+    "stage_probe": {
+      "additionalProperties": false,
+      "properties": {
+        "boundary": {
+          "enum": [
+            "entry",
+            "exit"
+          ]
+        },
+        "probe_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "stage_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "boundary",
+        "probe_id"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "migrations": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "destination": {
+                "$ref": "#/$defs/destination_identity"
+              },
+              "first_use_inactive_probe_migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "citation": {
+                      "$ref": "#/$defs/first_use_migration_citation"
+                    },
+                    "destination": {
+                      "$ref": "#/$defs/stage_probe"
+                    },
+                    "evidence_disposition": {
+                      "const": "preserve"
+                    },
+                    "migration_reason": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "resulting_status": {
+                      "const": "not_applicable"
+                    },
+                    "rule_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "rule_id",
+                    "destination",
+                    "resulting_status",
+                    "migration_reason",
+                    "evidence_disposition",
+                    "citation"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "migration_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "source": {
+                "$ref": "#/$defs/source_identity"
+              },
+              "stage_probe_mappings": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "destination": {
+                      "$ref": "#/$defs/stage_probe"
+                    },
+                    "source": {
+                      "$ref": "#/$defs/stage_probe"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "destination"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "migration_id",
+              "source",
+              "destination",
+              "stage_probe_mappings",
+              "first_use_inactive_probe_migrations"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "destination": {
+                "$ref": "#/$defs/destination_identity"
+              },
+              "first_use_inactive_probe_migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "citation": {
+                      "$ref": "#/$defs/first_use_migration_citation"
+                    },
+                    "destination": {
+                      "$ref": "#/$defs/stage_probe"
+                    },
+                    "evidence_disposition": {
+                      "const": "preserve"
+                    },
+                    "migration_reason": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "resulting_status": {
+                      "const": "not_applicable"
+                    },
+                    "rule_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "rule_id",
+                    "destination",
+                    "resulting_status",
+                    "migration_reason",
+                    "evidence_disposition",
+                    "citation"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "migration_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "operation_statuses_to_reset": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "source": {
+                "$ref": "#/$defs/source_identity"
+              },
+              "stage_probe_mappings": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "destination": {
+                      "$ref": "#/$defs/stage_probe"
+                    },
+                    "source": {
+                      "$ref": "#/$defs/stage_probe"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "destination"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "migration_id",
+              "source",
+              "destination",
+              "stage_probe_mappings",
+              "first_use_inactive_probe_migrations",
+              "operation_statuses_to_reset"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "answer_value_migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "decision_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "from_value": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "to_value": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "decision_id",
+                    "from_value",
+                    "to_value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "destination": {
+                "$ref": "#/$defs/destination_identity"
+              },
+              "first_use_inactive_probe_migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "citation": {
+                      "$ref": "#/$defs/first_use_migration_citation"
+                    },
+                    "destination": {
+                      "$ref": "#/$defs/stage_probe"
+                    },
+                    "evidence_disposition": {
+                      "const": "preserve"
+                    },
+                    "migration_reason": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "resulting_status": {
+                      "const": "not_applicable"
+                    },
+                    "rule_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "rule_id",
+                    "destination",
+                    "resulting_status",
+                    "migration_reason",
+                    "evidence_disposition",
+                    "citation"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "migration_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "source": {
+                "$ref": "#/$defs/source_identity"
+              },
+              "stage_probe_mappings": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "destination": {
+                      "$ref": "#/$defs/stage_probe"
+                    },
+                    "source": {
+                      "$ref": "#/$defs/stage_probe"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "destination"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "migration_id",
+              "source",
+              "destination",
+              "stage_probe_mappings",
+              "first_use_inactive_probe_migrations",
+              "answer_value_migrations"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "answer_value_migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "decision_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "from_value": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "to_value": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "decision_id",
+                    "from_value",
+                    "to_value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "destination": {
+                "$ref": "#/$defs/destination_identity"
+              },
+              "first_use_inactive_probe_migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "citation": {
+                      "$ref": "#/$defs/first_use_migration_citation"
+                    },
+                    "destination": {
+                      "$ref": "#/$defs/stage_probe"
+                    },
+                    "evidence_disposition": {
+                      "const": "preserve"
+                    },
+                    "migration_reason": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "resulting_status": {
+                      "const": "not_applicable"
+                    },
+                    "rule_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "rule_id",
+                    "destination",
+                    "resulting_status",
+                    "migration_reason",
+                    "evidence_disposition",
+                    "citation"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "migration_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "operation_statuses_to_reset": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "source": {
+                "$ref": "#/$defs/source_identity"
+              },
+              "stage_probe_mappings": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "destination": {
+                      "$ref": "#/$defs/stage_probe"
+                    },
+                    "source": {
+                      "$ref": "#/$defs/stage_probe"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "destination"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "migration_id",
+              "source",
+              "destination",
+              "stage_probe_mappings",
+              "first_use_inactive_probe_migrations",
+              "operation_statuses_to_reset",
+              "answer_value_migrations"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "migrations"
+  ],
+  "type": "object"
+}

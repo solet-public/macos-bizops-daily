@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::inference_service::process_results",
+  "arguments": {
+    "result_type": "tool_execution",
+    "result_data": {
+      "success": true,
+      "output": "Memory stored successfully with ID: mem_12345"
+    }
+  }
+}

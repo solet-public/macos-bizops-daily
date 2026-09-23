@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::job_service::detect_unresolved_completion_tokens",
+  "display_name": "Detect Unresolved Completion Tokens",
+  "description": "Report finished jobs whose flow token was never resolved, leaving their flow open forever. This is a distinct failure from a job that never finished: the ledger row already reads completed or error, so it does not look stuck, and a staleness sweep built to find never-finished jobs cannot see it. It arises because the terminal status is written before the completion handler runs and before the token is resolved — if the handler raises, the row says finished while nothing was submitted and nothing was resolved. STRICTLY READ-ONLY: this verb reports and changes nothing, because resolving the token here would manufacture a completion no worker ever produced. Jobs carrying no token row at all are not reported, since absent evidence is not evidence of the defect.",
+  "embedding_description": "Find jobs that report finished but left their flow hanging open, because the flow token tracking that work was never resolved. Diagnose a flow or plan that never closed even though its background job says it completed successfully. Read-only detection of completed-looking rows whose completion routing silently failed partway.",
+  "result_processor_customizations": {
+    "action_label": "Unresolved completion tokens detected",
+    "result_type": "unresolved_completion_tokens_detected",
+    "result_description": "A jobs array (newest first, capped by the limit argument, default 20 and maximum 100) plus a count of records in this page. Each job carries its ledger fields including flow_token_id — the token that is still sitting in a non-terminal state — and flow_id_trace, which identifies the flow left open.",
+    "presentation_guidance": "Report each job's id, provider_name, and flow_token_id, and say plainly that the job's own status is not the problem — the unresolved token is. An empty list is the healthy, normal state and should be reported as such, not as an inconclusive result. Do not describe these jobs as failed: their work may well have succeeded, and only the routing after it did not complete.",
+    "output_action_guidance": "Treat a non-empty result as a defect report, not a queue to clear: investigate why the completion handler raised for those jobs (a malformed process_key or missing flow context in job metadata are the known causes). Never resolve the tokens to tidy the list — that fabricates a completion and destroys the evidence. If the affected flows must be closed, that is a deliberate, separately-authorized act."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reports finished jobs whose flow token was never resolved",
+    "error_interpretation": "A limit outside 1-100 raises and returns an error envelope rather than being silently clamped. Every other error is the underlying job or flow-token query failing, surfaced as the stringified exception. An empty jobs list is never an error, and a job whose token row is missing entirely is deliberately excluded rather than reported.",
+    "recovery_guidance": "On a limit error: re-invoke with a limit between 1 and 100. On a query error: check database connectivity and job-service health, then re-invoke — the read is idempotent and mutates nothing."
+  }
+}

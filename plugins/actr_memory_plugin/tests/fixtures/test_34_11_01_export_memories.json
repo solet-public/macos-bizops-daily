@@ -1,0 +1,14 @@
+{
+  "name": "test_export_memories",
+  "description": "Verify exporting all memories to a JSON backup file",
+  "process_key": "plugin::actr_memory_plugin::export_memories_action",
+  "arguments": {
+    "params": {
+      "file_path": "/tmp/memory_backup_test.json"
+    },
+    "state": {
+      "session_id": "test-session-100"
+    }
+  },
+  "timeout_seconds": 60
+}

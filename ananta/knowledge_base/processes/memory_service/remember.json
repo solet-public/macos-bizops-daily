@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::remember",
+  "display_name": "Remember",
+  "description": "[NON-TERMINAL: Chains to result processor] Store a new episodic memory with vector embedding. Memories decay over time based on ACT-R activation model, and retrieval strengthens them.\n\nWHAT THIS VERB DOES NOT DO: it does not store a fact durably. A record written here starts weak, and if it is never reinforced its strength sinks below the consolidation threshold; once past the age gate, consolidation archives the record and deletes its embedding. Records recalled by similarity are not reinforced by that recall, so a fact written here and only ever read by similarity search decays as though it were never used. The call returns success either way, so the loss is silent and arrives later.\n\nUse this for in-the-moment observations and preferences whose fading is acceptable. If the content must survive across sessions or be recoverable later, use upsert_memory_by_tag instead, which writes a canonical replace-keyed slot and can carry the agent_memory umbrella tag that exempts a record from consolidation and purge.",
+  "embedding_description": "Store a fleeting episodic impression with a vector embedding: a passing preference, an in-the-moment observation, ambient conversational context. Use for 'remember that I like X' or 'note this preference'. Strength decays under the ACT-R activation model and rises again each time the memory is genuinely retrieved, so frequently-used impressions stay available and unused ones fade and are consolidated away automatically. Suited to soft, revisable impressions whose fading is acceptable and expected. Distinct from learn (semantic memory) and store_compaction_summary (session-level).",
+  "result_processor_customizations": {
+    "action_label": "Remember",
+    "result_type": "memory_created",
+    "result_description": "Confirmation of new episodic memory creation with memory ID",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Storing a new episodic memory with vector embedding",
+    "error_interpretation": "EmbeddingError: failed to generate vector embedding for content. DatabaseError: failed to persist memory to storage. ValidationError: content is empty or invalid.",
+    "recovery_guidance": "For embedding errors: verify embedding service is available. For database errors: verify state and vector storage are accessible. For validation errors: ensure content is non-empty and properly formatted."
+  }
+}

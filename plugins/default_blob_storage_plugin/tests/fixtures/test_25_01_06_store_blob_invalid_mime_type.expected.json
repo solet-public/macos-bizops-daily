@@ -1,0 +1,6 @@
+{
+  "action_status": "error",
+  "error_code": "blob_storage.invalid_metadata",
+  "error_message_contains": "mime_type must be in format",
+  "timeout_seconds": 30
+}

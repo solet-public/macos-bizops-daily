@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::job_service::get_latest_job",
+  "arguments": {
+    "plugin_name": "audio_processing_plugin",
+    "action_name": "generate_binaural"
+  }
+}

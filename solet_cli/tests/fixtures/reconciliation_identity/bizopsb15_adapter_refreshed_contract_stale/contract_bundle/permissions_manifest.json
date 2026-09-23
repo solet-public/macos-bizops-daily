@@ -1,0 +1,6 @@
+{
+  "manifest_schema_version": 1,
+  "entries": [],
+  "source_contract": "fixture:bizopsb15_adapter_refreshed_contract_stale/macos_setup_flow.json",
+  "fixture_stand_in": true
+}

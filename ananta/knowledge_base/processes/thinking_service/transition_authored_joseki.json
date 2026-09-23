@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::transition_authored_joseki",
+  "display_name": "Transition Authored Joseki Lifecycle",
+  "description": "advance a registered joseki card along its lifecycle: promote a draft to candidate (re-validating the stored card against the current process registry), mark a card superseded by a replacement, or archive it for retirement.",
+  "embedding_description": "Change the lifecycle state of an authored joseki card. Promote draft to candidate after the card re-validates against live process schemas; supersede a card by naming its replacement; or archive a card to retire it. Promotion to proven is not done here — proven is earned by recording a successful run. Idempotent: transitioning to the state a card already holds is a no-op.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Authored joseki lifecycle transitioned",
+    "result_type": "authored_joseki_transition_result",
+    "result_description": "Transition result with keys: joseki_key, previous_state, state, superseded_by, status",
+    "presentation_guidance": "Report the joseki_key with its previous_state and new state; when status is 'unchanged' note the card already held that state. For a supersession, surface superseded_by so the caller knows the replacement.",
+    "output_action_guidance": "The lifecycle state is now durable. A candidate is validated and ready to run; a proven card is earned separately by recording a successful run. A superseded or archived card carries a visible retirement banner but remains searchable — retrieval-time de-indexing is a separate per-type knowledge-base lifecycle concern."
+  },
+  "error_processor_customizations": {
+    "action_context": "Transitioning an authored joseki along draft -> candidate -> proven -> superseded -> archived. transition_authored_joseki accepts {joseki_key, target_state, superseded_by?}; superseded_by is required only for target_state 'superseded'.",
+    "error_interpretation": "JosekiNotFound: no lifecycle row exists for the key (register it first). StateConflict: the transition is illegal from the card's current state, 'proven' was requested as a manual target (it is earned via a run), or the row changed underneath the compare-and-set. ValidationError: promotion to candidate failed because the stored card no longer validates against the current process registry (e.g. it names a retired process) — the message lists every finding. ParameterError: superseded_by is missing, names the card itself, or the arguments do not conform to the schema.",
+    "recovery_guidance": "Illegal transition: re-read the current state with get_authored_joseki and choose a legal target. Candidate validation failures: repair the card (or the retired process it references) and resubmit. Missing replacement: register the successor card before superseding to it, and never point a card at itself or at an archived successor. To reach proven, record a successful run rather than transitioning."
+  }
+}

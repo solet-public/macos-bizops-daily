@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::state_service::list_namespaces",
+  "display_name": "List Namespaces",
+  "description": "List all available namespaces in the state database.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "List Namespaces",
+    "result_type": "namespace_list",
+    "result_description": "List of all available namespaces in the state database",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing all available namespaces in state database",
+    "error_interpretation": "ConnectionError: database connection failed or pool exhausted.",
+    "recovery_guidance": "For connection errors: verify database is running and accessible."
+  }
+}

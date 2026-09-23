@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "total",
+    "due_now",
+    "memorizations"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "List active memorization queue items"
+}

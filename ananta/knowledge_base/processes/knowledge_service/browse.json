@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::browse",
+  "display_name": "Browse Knowledge Base",
+  "description": "List directory contents of a knowledge base. Returns file names, types, and sizes.",
+  "embedding_description": "Navigate a knowledge base's file tree: list the entries inside one of its directories, returning each entry's name, type, and size. Read-only; it does not open file contents or change anything. Use to explore a KB's folder layout or see which files live under a path before reading or editing one.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge base browsed",
+    "result_type": "knowledge_base_browse",
+    "result_description": "Directory listing with file names and types",
+    "presentation_guidance": "Present as a file tree or list.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Browsing knowledge base contents",
+    "error_interpretation": "NotFoundError: KB or path not found.",
+    "recovery_guidance": "Use list_installed to verify KB name, or browse parent path."
+  }
+}

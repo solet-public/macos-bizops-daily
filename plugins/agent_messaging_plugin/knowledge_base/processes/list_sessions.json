@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::list_sessions",
+  "display_name": "List managed fleet sessions",
+  "description": "Fleet session-management Phase B, D1 (§4). Returns a hard-bounded managed_session roster matching at least one required filter: lane_id, work_class, host, lifecycle_state, or live_only=true. Use live_only=true for the non-terminal fleet. The default limit is 50 and the maximum is 250; if more rows match, the call refuses with result_over_limit rather than truncating or dumping the append-mostly ledger. Operator-launched sessions carry a registration-created inventory row too, with no fabricated report-by or TTL contract, so this remains the ONE fleet list.",
+  "embedding_description": "Search a bounded current fleet roster by lane, work class, host, lifecycle state, or live_only=true. Requires a filter and refuses over-limit matches instead of truncating; use live_only=true for all non-terminal sessions. Read-only, never a whole-ledger export, spawn, or single-row lookup.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Fleet session roster listed",
+    "result_type": "list_sessions_result",
+    "result_description": "sessions: an array of at most limit managed_session ledger rows matching the required filters (empty array if none match; never silently truncated).",
+    "presentation_guidance": "Summarize the count and group by lifecycle_state or lane when useful. Use live_only=true for the current non-terminal fleet. Do not claim host liveness beyond what the row's lifecycle_state says — this verb reads the ledger, not a live host probe."
+  },
+  "error_processor_customizations": {
+    "action_context": "A pure, filter-required, hard-bounded read over the managed_session table via StateManagementInterface; no state mutation and no host interaction.",
+    "error_interpretation": "filter_required: no accepted fleet filter was supplied. result_over_limit: the matching roster exceeded the requested hard bound and no rows were returned. invalid_limit: limit was not an integer from 1 through 250. state_service_unavailable: the state service is not bound on this solet.",
+    "recovery_guidance": "For filter_required, pass lane_id, work_class, host, lifecycle_state, or live_only=true; use live_only=true for the non-terminal fleet. For result_over_limit, narrow the filters and retry rather than raising the bound reflexively. state_service_unavailable is a platform binding problem, not a caller error."
+  }
+}

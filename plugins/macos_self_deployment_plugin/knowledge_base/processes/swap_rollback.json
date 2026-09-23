@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_self_deployment_plugin::swap_rollback",
+  "display_name": "Rollback an in-flight local blue-green swap",
+  "description": "Operator-triggered rollback during an in-flight blue-green swap. Plugin-namespace registration backing the service-interface verb service_interface::local_self_deployment_service::swap_rollback. Re-points the router's active color back to the prior color WHILE that color is still inside its drain window (not yet SIGTERM'd by complete_swap). Returns status='rolled_back' on success or 'rollback_not_applicable' if the prior color has already been torn down. Operator-invisible side effect: the in-flight restart_with_manifest's complete_swap durable action will execute against the NEW prior color (green) after rollback.",
+  "embedding_description": "Roll back an in-flight local blue-green swap. Reads router state; if prior color is still in the drain window (after activate, before complete_swap fires), atomically re-points active_color back. Returns 'rolled_back' with new active_color + reason. If prior already torn down, returns 'rollback_not_applicable' — recovery becomes a fresh restart_with_manifest. Idempotent on rolled-back state.",
+  "result_processor_customizations": {
+    "action_label": "blue-green swap rollback",
+    "result_type": "local_blue_green_swap_rollback_result",
+    "result_description": "Status, rolled_back_to color (if rolled_back), reason supplied by caller.",
+    "presentation_guidance": "Lead with status. If 'rolled_back', surface the rolled_back_to color + reason. If 'rollback_not_applicable', explain — operator needs to know the prior color is gone and recovery is now a fresh restart_with_manifest."
+  },
+  "error_processor_customizations": {
+    "action_context": "Operator-triggered rollback of in-flight local blue-green swap.",
+    "error_interpretation": "router_unavailable: ~/.ananta/runtime/<name>.router.sock not present. rollback_not_applicable is NOT an error — it's a status indicating the rollback window has closed.",
+    "recovery_guidance": "If router_unavailable, install via plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/blue_green_router/install_router.py and retry. If rollback_not_applicable, dispatch a fresh restart_with_manifest pointing at the desired image to recover."
+  }
+}

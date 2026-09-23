@@ -1,0 +1,28 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::reconcile_operator_session_liveness",
+  "display_name": "Reconcile operator managed-session rows against positive bridge liveness",
+  "description": "R3-U1's explicit operator-presence reconciliation and one-time backfill surface. It enumerates non-terminal managed_session rows with host='operator', evaluates each through the shared binding_is_live-based primitive, and returns one classification per row: live (untouched), dead (proposes lifecycle_state -> terminated), or indeterminate (held, never killed). It does not inspect inactivity, report_by, output volume, or work age: an operator seat may be idle for days while its bridge polls and remains live. dry_run defaults to true, so an omitted argument classifies and reports only. Only dry_run=false applies proposed terminal transitions, after review. This verb is caller-driven and one-time; it does not schedule an ongoing sweep. R3's later sweeper consumes the same library primitive for its operator-presence branch.",
+  "embedding_description": "Safe-by-default operator-session liveness backfill: omitted dry_run means classify and report only; pass dry_run=false to apply. Uses bridge polling presence, not inactivity: live or indeterminate rows stay untouched; only a provably dead binding becomes terminated.",
+  "processor_policy_category": "edge",
+  "parameters": {
+    "dry_run": {
+      "type": "boolean",
+      "required": false,
+      "description": "True = classify and report only; pass false to act.",
+      "default": true,
+      "data_sensitivity": 0.0
+    }
+  },
+  "result_processor_customizations": {
+    "action_label": "Operator session liveness reconciliation completed",
+    "result_type": "operator_session_liveness_reconciliation_result",
+    "result_description": "dry_run: whether this call only reported or also applied. classifications: every non-terminal operator managed_session row, each with agent_instance_id, lifecycle_state, classification, detail, and proposed_to_state. applied: the agent_instance_id values actually transitioned to terminated (empty for dry runs, live rows, and held indeterminate rows).",
+    "presentation_guidance": "Lead with the counts of dead/proposed, live/untouched, indeterminate/held, and applied. Preserve the row-by-row dry-run output when seeking approval for the one-time backfill. Never describe a live operator row as stale merely because it has been idle; positive bridge liveness is decisive for this row class.",
+    "output_action_guidance": "Omit dry_run (the default is true) to obtain a row-by-row report. If any classification is indeterminate, hold that row and investigate the liveness evidence; do not call dry_run=false as a way to force it terminal. After an approved dry run, call dry_run=false once; subsequent calls are idempotent because terminal rows are outside the input set."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads managed_session through StateManagementInterface and live bridge bindings through the peer registry. Apply mode writes only legal managed_session -> terminated lifecycle transitions through StateManagementInterface and records the normal transition audit row.",
+    "error_interpretation": "state_service_unavailable means the managed-session ledger is unavailable. liveness_services_unavailable means the peer registry or bridge manager is not bound, so no liveness conclusion was made. operator_liveness_reconciliation_failed means the operation aborted loudly rather than silently treating a read failure as death.",
+    "recovery_guidance": "For unavailable services, restore the messaging bridge/state binding and retry with dry_run omitted. For a failed reconciliation, inspect the returned exception and retry the dry run; do not infer that an absent result means there were no candidate rows."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::add_attachment",
+  "display_name": "Jira: Add Attachment",
+  "description": "Attach bytes from a blob (blob_key) to a Jira issue. Content comes from blob storage ONLY — no local path parameter. Optional filename override. Write action.",
+  "embedding_description": "Upload a file to a Jira issue as an attachment, taking the bytes from platform blob storage via a blob key, with an optional filename override. Attaching something held on local disk means ingesting it into blob storage first and passing the resulting key to this verb.",
+  "result_processor_customizations": {
+    "action_label": "Jira attachment added",
+    "result_type": "jira_add_attachment_result",
+    "result_description": "The new attachment's id and filename.",
+    "presentation_guidance": "Confirm the file was attached to the named issue and give the filename. This adds a real file to a ticket."
+  },
+  "error_processor_customizations": {
+    "action_context": "Attach bytes from blob storage to a Jira issue.",
+    "error_interpretation": "jira.invalid_params: key or blob_key was missing, or the blob could not be resolved to bytes. jira.not_found: the issue key does not exist. jira.permission_denied: the account cannot add attachments to this issue. blob_storage_service_not_available: the platform blob store is not bound.",
+    "recovery_guidance": "jira.invalid_params: supply both the issue key and a valid blob_key (ingest a local file via store_blob_from_file first). jira.permission_denied: grant the service account attach permission. jira.not_found: verify the issue key."
+  }
+}

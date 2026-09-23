@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::quality_service::list_gates",
+  "display_name": "List Quality Gates",
+  "description": "Read-only enumeration of the platform's quality-gate registry and its smoke-test register. Returns every gate the server knows (name, kind, description, per-gate timeout, whether it is directly runnable via run_gate or only through the 'code_quality' aggregate) plus the list of repo-relative smoke paths parsed from quality_gates/gate_smokes.txt. Executes NOTHING — this is pure discovery so a caller can pick a valid gate name for run_gate or a registered smoke path for run_test. The registry is baked server-side; there is no free-form input.",
+  "embedding_description": "Discover and enumerate the available platform quality gates and the registered smoke-test suite. Read-only catalog of gate names, kinds, and timeouts plus the gate_smokes.txt register. Use this to look up a valid gate name before running one. No execution, no arguments.",
+  "result_processor_customizations": {
+    "action_label": "Quality gate registry listed",
+    "result_type": "quality_gate_registry",
+    "result_description": "Object with 'gates' (per-gate rows), 'smokes' (registered smoke paths), and 'smoke_count'.",
+    "presentation_guidance": "Present the gate names with their kind and whether they are directly runnable. Note that the coherence trio (god_class/radon_cc/radon_mi) runs via the 'code_quality' aggregate.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Enumerating the server-side quality-gate registry and reading the tracked smoke register (quality_gates/gate_smokes.txt).",
+    "error_interpretation": "FileNotFoundError: the repo venv or the smoke register is missing — the plugin is not running from a complete platform repo tree. RuntimeError: repo root could not be located (no ancestor carries both quality_gates/ and .git).",
+    "recovery_guidance": "Confirm the solet is running from a checked-out platform repo (quality_gates/ and .git present) with a populated .venv. This verb takes no arguments; a failure indicates an environment problem, not a bad input."
+  }
+}

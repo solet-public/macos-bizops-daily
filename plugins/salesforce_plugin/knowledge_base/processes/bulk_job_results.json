@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::bulk_job_results",
+  "display_name": "Salesforce: Bulk Job Results",
+  "description": "Fetch a completed Bulk API v2 ingest job's three result CSVs (successful, failed, unprocessed records) and write each to a caller-supplied ABSOLUTE path, contained under an operator-configured export_allowed_roots entry (empty config refuses every write) -- never returned inline. Call this only after bulk_job_status reports the job reached JobComplete (or Failed/Aborted, which can still carry partial results). Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the three written paths are delivered when this dispatch's job completes.",
+  "embedding_description": "Download a finished bulk load's outcome -- which rows loaded, which failed and why, which never processed -- as three CSV files in the operator's workspace. Use after bulk_job_status shows the job done, to audit a mass insert/update/upsert/delete. Not for records still in flight or a single record's value (get_record). Returns a job_id at once, then the three file paths.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce bulk job results fetch queued",
+    "result_type": "salesforce_bulk_job_results_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the results themselves -- the three written CSV paths (successful_results_path, failed_results_path, unprocessed_results_path) arrive separately, as their own message, when this dispatch's job completes.",
+    "presentation_guidance": "This call only confirms the FETCH was queued -- do not present job_id/status as the results themselves. Once delivered, name all three written paths for downstream use (open one, feed it to create_spreadsheet_from_files) but do not inline CSV contents -- these files can carry potentially sensitive CRM row data. If the failed or unprocessed file is non-trivial, flag that explicitly rather than only confirming success."
+  },
+  "error_processor_customizations": {
+    "action_context": "Fetch a Bulk API v2 ingest job's successful/failed/unprocessed result CSVs from the registered Salesforce org, writing each to the operator's workspace.",
+    "error_interpretation": "sf.invalid_params: missing job_id or one of the three result path parameters, or a result path's parent directory does not exist. sf.export_path_refused: a result path is not absolute, not a .csv, or not contained under any operator-configured export_allowed_roots entry (an empty export_allowed_roots refuses every write by default). sf.not_found: no bulk job with that id exists. sf.auth_failed / sf.session_expired: no live CLI session -- re-establish with sf org login web.",
+    "recovery_guidance": "sf.export_path_refused: pass ABSOLUTE paths ending in .csv under a configured workspace root for all three result files; if export_allowed_roots is empty, add the operator's export directory to the salesforce_plugin config and reload. sf.invalid_params with a missing-parent message: create the parent directory first. sf.not_found: confirm the job_id via bulk_job_status before requesting results."
+  }
+}

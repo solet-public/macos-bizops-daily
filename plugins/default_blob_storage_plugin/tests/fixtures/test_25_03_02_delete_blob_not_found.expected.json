@@ -1,0 +1,6 @@
+{
+  "action_status": "error",
+  "error_code": "blob_storage.blob_not_found",
+  "error_message_contains": "Blob not found",
+  "timeout_seconds": 30
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::report_inbox_consumption",
+  "display_name": "Report that a session's inbox-consumer hook ran its check",
+  "description": "Overwrites the caller's single latest inbox-consumption-check row. Required identity is agent_instance_id plus runtime and checked_at, an ISO timestamp of when the consumer hook actually performed its existence check, regardless of what it found. checked_at is the entire honesty mechanism (CDX-06 part C): a fresh checked_at proves the mechanism executed, and an absent row proves it never has, so callers must call this on every check, including the nothing-pending path, never only when a delivery is found. Optional pending_found_at/pending_reason describe the most recent time the check found a pending delivery and forced a Stop-hook block/continue; pending_reason requires pending_found_at alongside it. Optional reporter_surface uses the same closed vocabulary as report_context_status (checkout/plugin_cache/vendored/release/unknown). Optional agent_session_id is the stable routing join, captured for a future ledger/watch-id resolution. This is a plain StateManagementInterface upsert into inbox_consumption_status, a table separate from session_context_status (no token/context/model fields) so an unrelated field never has to be threaded through an already-relied-upon verb's required parameters.",
+  "embedding_description": "A Codex Stop hook reporting that it just performed its per-turn-boundary peer-inbox existence check, whether or not it found anything pending, so a session's inbox-consumption mechanism can be proven to have run rather than assumed to have.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Inbox consumption check reported",
+    "result_type": "report_inbox_consumption_result",
+    "result_description": "{\"status\": \"recorded\"} on success — the caller's latest inbox-consumption-check row was overwritten.",
+    "presentation_guidance": "Routine and high-frequency (every Stop-hook tick on a Codex runtime with the consumer installed); do not narrate a normal success, only surface a failure."
+  },
+  "error_processor_customizations": {
+    "action_context": "A predicated upsert on inbox_consumption_status, conflicting on agent_instance_id alone (one row per session, always latest).",
+    "error_interpretation": "missing_argument: agent_instance_id/runtime/checked_at was empty, or pending_reason was given without pending_found_at. unknown_reporter_surface: reporter_surface was not one of checkout/plugin_cache/vendored/release/unknown, so the write was refused before attribution could be poisoned. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "missing_argument and unknown_reporter_surface indicate the reporting hook computed or forwarded a bad value — fix the caller, do not retry the same call; report 'unknown' when the hook cannot classify its own location. state_service_unavailable is worth a retry once the platform is up."
+  }
+}

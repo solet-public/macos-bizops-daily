@@ -1,0 +1,25 @@
+{
+  "name": "test_store_vectors_with_external_id",
+  "description": "Store vectors with custom external_id for cross-system reference",
+  "process_key": "plugin::pgvector_service_plugin::store_vectors_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vectors": [
+        {
+          "vector": [0.5, 0.5, 0.5, 0.5],
+          "dimension": 4,
+          "external_id": "doc-chunk-001",
+          "metadata": {
+            "document_id": "DOC-12345",
+            "chunk_index": 0
+          }
+        }
+      ]
+    },
+    "state": {
+      "current_session_id": "test-store-extid-001"
+    },
+    "timeout_seconds": 30
+  }
+}

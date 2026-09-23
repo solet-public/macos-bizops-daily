@@ -1,0 +1,15 @@
+{
+  "name": "test_recall_with_top_k",
+  "description": "Verify recall with custom top_k limit for result count control",
+  "process_key": "plugin::actr_memory_plugin::recall_action",
+  "arguments": {
+    "params": {
+      "query": "python programming",
+      "top_k": 3
+    },
+    "state": {
+      "session_id": "test-session-011"
+    }
+  },
+  "timeout_seconds": 30
+}

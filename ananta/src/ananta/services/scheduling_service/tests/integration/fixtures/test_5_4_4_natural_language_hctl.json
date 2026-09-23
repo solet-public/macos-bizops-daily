@@ -1,0 +1,4 @@
+{
+  "type": "inference",
+  "input": "Cancel all scheduled jobs tagged 'cleanup'"
+}

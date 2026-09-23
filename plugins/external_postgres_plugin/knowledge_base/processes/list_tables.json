@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::external_postgres_plugin::list_tables",
+  "display_name": "External Postgres: List Tables",
+  "description": "List the tables and views in a schema of a registered foreign Postgres connection. Requires connection_name and schema. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) — the dispatch returning is NOT the same as the job finishing; each object's name and kind (BASE TABLE, VIEW, etc.) is delivered when the job completes.",
+  "embedding_description": "List the tables and views inside ONE named schema, with each object's name and kind - base table, view, materialized view, or foreign table. Requires knowing which schema first (from list_schemas); the MIDDLE level of foreign-database introspection. Dispatches asynchronously; the table/view list arrives via job completion, not this call's own return.",
+  "result_processor_customizations": {
+    "action_label": "Foreign Postgres table listing queued",
+    "result_type": "external_postgres_list_tables_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the table list — that arrives separately when the job completes and is delivered as its own message.",
+    "presentation_guidance": "This call only confirms the job was queued — do not present job_id/status as the answer to 'what tables exist'. Acknowledge the request is in flight; the table list itself lands in a follow-up message when the job completes. Once delivered, list the tables and views with their kind (schema metadata, data_sensitivity 0.1) and suggest describe_table with a table to inspect its columns."
+  },
+  "error_processor_customizations": {
+    "action_context": "List the tables and views in a schema of a registered foreign Postgres connection.",
+    "error_interpretation": "external_pg.invalid_params: missing connection_name or schema. external_pg.connection_unknown: no connection registered under that name. external_pg.auth_failed / external_pg.permission_denied: the registered credential was rejected.",
+    "recovery_guidance": "external_pg.connection_unknown: run list_connections. external_pg.invalid_params: pass both connection_name and schema (use list_schemas to find a schema)."
+  }
+}

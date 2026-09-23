@@ -1,0 +1,97 @@
+{
+  "name": "test_store_vectors",
+  "description": "Store vector embeddings with metadata for semantic search.",
+  "sequence": [
+    {
+      "step": "precleanup_primary",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_store_primary"
+          },
+          "soft_delete": false
+        }
+      }
+    },
+    {
+      "step": "precleanup_secondary",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_store_secondary"
+          },
+          "soft_delete": false
+        }
+      }
+    },
+    {
+      "step": "store_vectors",
+      "process_key": "service_interface::vector_service::store_vectors",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vectors": [
+          {
+            "id": "vector_store_primary",
+            "vector": [
+              0.12,
+              -0.04,
+              0.88
+            ],
+            "dimension": 3,
+            "metadata": {
+              "label": "primary",
+              "category": "store_test"
+            }
+          },
+          {
+            "id": "vector_store_secondary",
+            "vector": [
+              -0.22,
+              0.55,
+              0.31
+            ],
+            "dimension": 3,
+            "metadata": {
+              "label": "secondary",
+              "category": "store_test"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step": "cleanup_primary",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_store_primary"
+          },
+          "soft_delete": false
+        }
+      }
+    },
+    {
+      "step": "cleanup_secondary",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_store_secondary"
+          },
+          "soft_delete": false
+        }
+      }
+    }
+  ]
+}

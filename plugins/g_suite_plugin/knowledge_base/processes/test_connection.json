@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::g_suite_plugin::test_connection",
+  "display_name": "Google Workspace: Test Connection",
+  "description": "Verify the connected Google Workspace account using Gmail's minimal profile endpoint. This does not list Drive files or return third-party content.",
+  "embedding_description": "Confirm that Google Workspace OAuth is currently usable through Gmail's minimal profile endpoint before relying on Gmail, Drive, Docs, Sheets, or Slides operations. The bounded result identifies only the connected account and whether that harmless profile read succeeded; it neither lists Drive content nor returns third-party records.",
+  "result_processor_customizations": {
+    "action_label": "Google Workspace connection checked",
+    "result_type": "g_suite_test_connection_result",
+    "result_description": "Bounded verdict containing account_identity and harmless_read_ok only.",
+    "presentation_guidance": "Report only the connection verdict and account identity; do not infer access to a broader Workspace corpus."
+  },
+  "error_processor_customizations": {
+    "action_context": "Verify the connected Google Workspace account with a minimal profile read.",
+    "error_interpretation": "gsuite.not_connected means OAuth linking has not completed. gsuite.permission_denied means the connected account cannot perform the minimal Gmail profile read.",
+    "recovery_guidance": "Run connect_account to link an account, then retry the bounded connection check."
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "output_regex": "(?i)(memories|found|recall|mitochondria|cell|ATP)",
+  "output_not_contains": [
+    "ERROR",
+    "exception",
+    "failed"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "channels": [
+    {
+      "anchor_table_sha256": "40b9f14d6b8b1d62ee22fb511fe91036275481021353fb52c1c01624f509b1f8",
+      "channel_id": "stable",
+      "seed_lock_sha256": "ed6f512cdf25de483d5fb3b090f2a133e324214a8d95e2c7cf9bd9b024f464ab"
+    }
+  ]
+}

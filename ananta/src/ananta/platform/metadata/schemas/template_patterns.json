@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Centralized template pattern definitions replacing scattered template resolution logic",
+  "template_types": {
+    "file_inclusion": {
+      "pattern": "<<<@(.+?)>>>",
+      "description": "File inclusion patterns like <<<@filename.json>>>",
+      "resolver": "file_inclusion_resolver",
+      "validation": "file_exists_check",
+      "examples": [
+        "<<<@actions/common_prompt.json>>>",
+        "<<<@templates/header.txt>>>"
+      ],
+      "processing_stage": "static"
+    },
+    "function_execution": {
+      "pattern": "<<<:(.+?)>>>",
+      "description": "Function execution patterns like <<<:service::method(args)>>>",
+      "resolver": "function_execution_resolver",
+      "validation": "function_registry_lookup",
+      "examples": [
+        "<<<:service_interface::state_service::execute_sql(SELECT * FROM table)>>>",
+        "<<<:service_interface::discovery_service::query_process_registry(category)>>>"
+      ],
+      "processing_stage": "static"
+    },
+    "variable_substitution": {
+      "pattern": "<<<([A-Z_][A-Z0-9_]*)>>>",
+      "description": "Variable substitution patterns like <<<USER_INPUT>>>, <<<SESSION_ID>>>",
+      "resolver": "variable_substitution_resolver",
+      "validation": "variable_availability_check",
+      "examples": [
+        "<<<USER_INPUT>>>",
+        "<<<SESSION_ID>>>",
+        "<<<MODEL_NAME>>>"
+      ],
+      "processing_stage": "static"
+    },
+    "hierarchical_context": {
+      "pattern": "<<<(SESSION_METADATA|FLOW_TRIGGER_DATA|ACTION_RESULT_FROM:.+?)>>>",
+      "description": "Hierarchical context patterns for session/flow/action data",
+      "resolver": "hierarchical_context_resolver", 
+      "validation": "context_availability_check",
+      "examples": [
+        "<<<SESSION_METADATA>>>",
+        "<<<FLOW_TRIGGER_DATA>>>",
+        "<<<ACTION_RESULT_FROM:PARENT>>>",
+        "<<<ACTION_RESULT_FROM:previous_action>>>"
+      ],
+      "processing_stage": "runtime"
+    },
+    "post_execution": {
+      "pattern": "<<(.+?)>>",
+      "description": "Post-execution result processing patterns like <<RESULT>>",
+      "resolver": "post_execution_resolver",
+      "validation": "execution_result_check", 
+      "examples": [
+        "<<RESULT>>",
+        "<<PROCESSED_OUTPUT>>"
+      ],
+      "processing_stage": "post_execution"
+    }
+  },
+  "resolution_order": [
+    "file_inclusion",
+    "variable_substitution",
+    "function_execution",
+    "hierarchical_context"
+  ],
+  "validation_rules": {
+    "fail_fast": true,
+    "unresolved_patterns_error": true,
+    "circular_reference_detection": true,
+    "max_resolution_depth": 5,
+    "timeout_seconds": 30
+  },
+  "processing_stages": {
+    "static": {
+      "description": "Resolved before action execution",
+      "timing": "preparation_phase",
+      "caching": "enabled"
+    },
+    "runtime": {
+      "description": "Resolved during action execution with context",
+      "timing": "execution_phase", 
+      "caching": "context_dependent"
+    },
+    "post_execution": {
+      "description": "Resolved after action execution with results",
+      "timing": "completion_phase",
+      "caching": "disabled"
+    }
+  },
+  "resolver_configurations": {
+    "file_inclusion_resolver": {
+      "base_path": "APP_HOME/actions",
+      "supported_extensions": [".json", ".txt", ".md"],
+      "encoding": "utf-8",
+      "cache_enabled": true
+    },
+    "function_execution_resolver": {
+      "registry_source": "template_function_registry",
+      "timeout_seconds": 10,
+      "error_handling": "fail_fast"
+    },
+    "variable_substitution_resolver": {
+      "sources": ["runtime_args", "state", "key_value_store"],
+      "precedence_order": ["runtime_args", "state"]
+    },
+    "hierarchical_context_resolver": {
+      "context_sources": ["session_context", "flow_context", "action_context"],
+      "database_queries_enabled": true
+    },
+    "post_execution_resolver": {
+      "result_formats": ["json", "string", "object"],
+      "transformation_enabled": true
+    }
+  },
+  "performance_targets": {
+    "max_resolution_time_ms": 100,
+    "cache_hit_ratio_target": 0.8,
+    "memory_usage_limit_mb": 10
+  },
+  "migration_compatibility": {
+    "legacy_template_engine": "template_engine.py",
+    "breaking_changes": false,
+    "feature_flag": "ANANTA_USE_NEW_TEMPLATE_ENGINE"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::memorize_by_tag",
+  "arguments": {
+    "tag": "nonexistent-tag-xyz-12345"
+  }
+}

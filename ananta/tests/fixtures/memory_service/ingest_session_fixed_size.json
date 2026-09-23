@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::ingest_session",
+  "arguments": {
+    "transcript": "This is a long conversation transcript that should be chunked using document-style fixed-size chunking rather than turn-based chunking. User: First question here. Assistant: First answer here with lots of detail. User: Second question. Assistant: Second answer with even more detail that goes on and on.",
+    "session_id": "test_session_003",
+    "chunk_by_turns": false
+  }
+}

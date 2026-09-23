@@ -1,0 +1,255 @@
+# macos-bizops profile — business-operations solet, private genesis.
+#
+# Extends macos-free-solet.yaml (see that file's header for the shared
+# foundation rationale: local LM-Server embeddings, macOS-first; the free
+# profile's VACANT-inference posture does NOT carry over — this profile binds
+# local LM-Studio inference real). This profile adds the "full functionality,
+# minus anything that lets someone clone a solet or run one in AWS, minus
+# creative/media content" tier the operator ratified: local blue-green
+# self-deployment, local inference, the Claude-family session-ledger source
+# family (so multi-session peer-coordination work is searchable), dev tooling
+# (code vetting, platform dev surface, coding-agent session management), and
+# the six business-system connectors + Google Workspace. github_midwife_plugin still ships (the seed
+# factory's fractal invariant forces it into every seed — see
+# capability_bundles.yaml's own header comment) but is expected to be REMOVED
+# from the steady-state manifest (and its source directory deleted) after
+# genesis, per the operator's explicit "don't give away the ability to create
+# solets" instruction — see the hydration runbook's post-genesis cleanup
+# step.
+#
+# Ratified in the business-operations seed plugin-scoping conversation
+# (decisions recorded turn-by-turn, no single design
+# doc). Full plugin-by-plugin rationale:
+# knowledge_bases/ananta_platform/23_plugin_inventory/01_full_plugin_roster.md.
+
+profile_name: macos-bizops
+description: |
+  Full-functionality local business-ops solet: everything
+  macos-free-solet.yaml ships, plus local blue-green self-deployment,
+  local LM-Studio inference (bound real, for autonomous completions with no
+  live driving session), the Claude-family session-ledger source family
+  (filesystem transcripts, history, tasks, cloud backfill, Claude.ai export
+  ingest, the platform's own peer-messaging ledger source, and the
+  cross-machine pushed-source/shipper pair — enabling the same multi-session
+  peer-coordination workflow used to build this seed), dev tooling (the AI
+  code-vetting suite, the read-only platform dev surface, and coding-agent
+  session management), and six business-system connectors (Jira, Snowflake,
+  Salesforce, Zuora, Marketo Engage, read-only external Postgres) plus Google
+  Workspace.
+  Excludes: every solet-cloning/AWS-hosting plugin (macos/aws midwife,
+  aws undertaker, aws self-deployment, aws account admin, and the four
+  AWS-managed-alternative split-service plugins), the full audio/media/
+  creative stack, all seven Codex-family session sources (no Codex usage),
+  the ChatGPT-export ingest, and the two dev/test fixture plugins.
+  Reconciled 2026-07-21 to the operator's plugin-scoping sheet
+  (branch_bizops column).
+
+plugins:
+  # Foundational services
+  - postgres_state_management_plugin
+  - default_blob_storage_plugin
+  - default_address_book_plugin
+  - macos_vault_plugin
+
+  # Memory + knowledge + thinking (mandatory-real per INF-03b operator ruling)
+  - actr_memory_plugin
+  - default_knowledge_plugin
+  - default_thinking_plugin
+
+  # Vector search
+  - pgvector_service_plugin
+
+  # Embeddings (local flavor — see macos-free-solet.yaml header)
+  - openai_embeddings_plugin
+
+  # Local inference (LM Studio, bound as inference_service — NOT vacant in this
+  # profile, unlike the free profile). GENESIS PRECONDITION: the local LM
+  # Studio server must be running with the model named in
+  # profile_baseline/default_inference_plugin.json loaded — the plugin
+  # fail-fasts at boot (config required, availability probed, no fallback).
+  - default_inference_plugin
+
+  # IO surfaces
+  - agent_messaging_plugin
+
+  # Scheduling
+  - default_scheduling_plugin
+
+  # Operator/CI diagnostic gate (read-only; idle until invoked manually)
+  - platform_health_plugin
+
+  # Local blue-green self-deployment (operator-ratified inclusion — "blue-green
+  # is essential for making changes and enabling/disabling plugins"). Requires
+  # the standalone router installed separately post-genesis; see hydration
+  # runbook.
+  - macos_self_deployment_plugin
+
+  # Session-ledger sources (Claude family + the platform's own ledger —
+  # multi-session peer-coordination content becomes searchable ledger history;
+  # includes the cross-machine pushed-source/shipper pair so a second machine
+  # can ship sessions in)
+  - agent_messaging_session_source_plugin
+  - claude_code_filesystem_session_source_plugin
+  - claude_code_history_session_source_plugin
+  - claude_code_tasks_session_source_plugin
+  - claude_code_cloud_session_source_plugin
+  - claude_code_pushed_session_source_plugin
+  - claude_ai_export_session_source_plugin
+  - session_bridge_plugin
+  - session_shipper_bootstrap_plugin
+
+  # Dev tooling: the AI code-vetting suite (wraps the shipped quality_gates/
+  # scripts), the read-only platform dev surface (its readiness probe needs a
+  # git worktree — genesis git-inits the born tree, so it comes ready from
+  # first boot), and coding-agent session management (MCP bridge subprocess
+  # lifecycle per coding-agent tab).
+  - code_vetting_plugin
+  - platform_dev_surface_plugin
+  - macos_coding_agent_session_plugin
+
+  # Business-system connectors (operator-ratified — foreign-target-
+  # invariant plugins; each needs its own address-book entry + vault-backed
+  # credential completed post-genesis, see notes below)
+  - jira_plugin
+  - snowflake_plugin
+  - salesforce_plugin
+  - zuora_plugin
+  - marketo_plugin
+  - external_postgres_plugin
+  - g_suite_plugin
+
+  # This plugin: dual-use genesis entrypoint + birth_solet verb. Ships
+  # because the seed factory always includes it (fractal invariant) — REMOVE
+  # from the steady-state manifest post-genesis per the operator's instruction;
+  # see notes below.
+  - github_midwife_plugin
+
+plugin_config_overrides:
+  # Per-solet role isolation (same as the free profile — see that file's
+  # comment for the full rationale).
+  postgres_state_management_plugin:
+    user: ${SOLET_NAME}
+  # P1.1.E containment allow-list (KB 19_session_ledger/07): with this key
+  # empty, EVERY filesystem session-source registration is denied by design
+  # (secure default-deny) — populating it is what lets the three filesystem
+  # PullingSourceMixin sources below actually register at boot. `~`-relative
+  # entries expand against whichever operator's home directory actually hydrates
+  # this seed (portable — never a literal absolute path baked in here).
+  session_ledger_service:
+    ledger_allowed_roots:
+      - "~/.claude/projects"
+      - "~/.claude/history.jsonl"
+      - "~/.claude/tasks"
+
+# Address-book entries genesis materializes to
+# profile/config/plugins/default_address_book_plugin/entries.json (same
+# auto-seed mechanism as the free profile).
+#
+# Only entries with a NON-SECRET, universally-correct value at genesis time
+# are templated here (openai_embeddings, pgvector_service_db — identical to
+# the free profile, both mandatory for the same reasons documented there).
+#
+# The six business connectors + Google Workspace are DELIBERATELY NOT
+# templated with address-book entries here: each needs an operator-specific,
+# real-world value (a Jira site URL, a Snowflake account identifier, a
+# Salesforce Connected App, a Zuora tenant, a Marketo LaunchPoint custom
+# service, a Google Cloud OAuth client) that
+# genesis cannot fabricate or default. Per-connector setup is a hydration-time
+# operator action — see the hydration runbook's connector-activation section,
+# which mirrors the existing schwab_market_data_plugin / g_suite_plugin
+# bootstrap runbooks. Each connector plugin fails loud at first use (not at
+# boot) if its address-book entry is missing, naming the entry it needs.
+address_book_entries:
+  - name: openai_embeddings
+    address_type: api
+    description: OpenAI-compatible embeddings via LM Studio
+    tags: []
+    entries:
+      - field_type: base_url
+        description: LM Studio OpenAI-compatible base URL
+        value: http://localhost:1234/v1
+      - field_type: model
+        description: Embeddings model name
+        value: text-embedding-nomic-embed-text-v1.5-embedding
+  - name: pgvector_service_db
+    address_type: database
+    description: PostgreSQL/pgvector connection for this solet
+    tags: []
+    entries:
+      - field_type: host
+        description: host
+        value: localhost
+      - field_type: port
+        description: port
+        value: "5432"
+      - field_type: note
+        description: database
+        value: ${SOLET_NAME}
+      - field_type: note
+        description: db_schema
+        value: ${SOLET_NAME}
+      - field_type: note
+        description: user
+        value: ${SOLET_NAME}
+      - field_type: password
+        description: password
+        value: vault::${SOLET_NAME}.pgvector_service_plugin.password
+
+# Actions auto-submitted at boot by EventOrchestrator. Each entry's
+# process_key must reference a plugin in the `plugins:` list above — orphan
+# entries crash startup deep inside action_factory (assemble_seed's
+# boot-coherence check enforces exactly this).
+#
+# Session-source filesystem registration is deliberately NOT a boot
+# starting-action. The `macos-bizops` profile pre-populates `ledger_allowed_roots` for
+# the three Claude Code local-history paths because those sources are expected
+# during hydration, but `service_interface::session_ledger_service::register_source`
+# still remains the operator-consented wiring step for sources that do not
+# advertise a default root. Do NOT add `session_ledger_service` to
+# service_bindings.json: the ledger is constructed by startup from state/blob
+# services plus this plugin config, not bound as a `ServiceName`.
+starting_actions:
+  - name: start_agent_messaging_interface
+    process_key: plugin::agent_messaging_plugin::start_interface
+    description: |
+      Start the consolidated agent_messaging bridge — single FastAPI
+      surface on a dynamic port backing every mcp__<name>__* tool
+      (platform-call, peer messaging, backend-agent threads).
+
+# Service bindings written to profile/config/service_bindings.json.
+# inference_service is bound REAL in this profile (sheet-ratified 2026-07-21;
+# unlike the free profile's declared-VACANT INF-03 boot): default_inference
+# ships exactly so the solet can run autonomous completions with no live
+# driving session, and that requires the binding. Local LM Studio, not a
+# cloud key — see the genesis precondition on the plugins list above.
+service_bindings:
+  state_service: postgres_state_management_plugin
+  plugin_schema_service: postgres_state_management_plugin
+  vault_service: macos_vault_plugin
+  address_book_service: default_address_book_plugin
+  memory_service: actr_memory_plugin
+  vector_service: pgvector_service_plugin
+  embedding_service: openai_embeddings_plugin
+  inference_service: default_inference_plugin
+  blob_storage_service: default_blob_storage_plugin
+  knowledge_service: default_knowledge_plugin
+  thinking_service: default_thinking_plugin
+  self_deployment_service: macos_self_deployment_plugin
+  local_self_deployment_service: macos_self_deployment_plugin
+
+notes:
+  excluded:
+    mock_inference_plugin: RETIRED platform-wide (INF-03/INF-03b).
+    macos_midwife_plugin, aws_midwife_plugin, aws_undertaker_plugin, aws_self_deployment_plugin, aws_account_admin_plugin: Solet-cloning / AWS-hosting capability — operator-ratified hard exclusion ("don't give anything away that would allow people to clone a solet or run one in AWS").
+    rds_postgres_state_management_plugin, rds_pgvector_service_plugin, s3_blob_storage_plugin, secrets_manager_vault_plugin, titanv2_embeddings_plugin: The AWS-hosted half of each local/cloud split-service pair — falls under the same AWS-hosting exclusion.
+    demo_canary_plugin, probe_smoke_broken_plugin: Dev/test fixtures — never belong in a production manifest (the latter's own docstring says so verbatim).
+    audio_processing_plugin, audio_separation_plugin, cosyvoice2_tts_plugin, comfyui_image_generation_plugin, musical_synthesis_plugin, sound_effects_plugin, voice_embeddings_plugin, whisper_asr_plugin, generative_composition_plugin, pedalboard_effects_plugin, soundcloud_artist_studio_plugin, ssml_plugin: Dropped — heavyweight audio/media/creative stack, out of scope for a business-ops deployment ("nobody's gonna be writing music at work").
+    codex_ambient_session_source_plugin, codex_cloud_session_source_plugin, codex_filesystem_session_source_plugin, codex_goals_session_source_plugin, codex_history_session_source_plugin, codex_memories_session_source_plugin, codex_pushed_session_source_plugin, codex_state_session_source_plugin: The full Codex-family session-source suite — operator-ratified exclusion ("the company is not using Codex"), generalized from the one plugin originally asked about to all seven siblings.
+    chatgpt_export_session_source_plugin: ChatGPT data-export ingest — unchecked in the branch_bizops sheet column (2026-07-21 reconcile); personal-export ingest is not a work-deployment capability. Ships in the samantha/developer profiles instead.
+    discord_plugin, signal_plugin: Not a business communication channel in use.
+    iterm2_coding_agent_management_plugin: iTerm2 AppleScript driver for coding-agent sessions — unchecked in every sheet column. NOTE the sheet's own pair-mismatch flag — it drives macos_coding_agent_session_plugin (which IS included here); revisit if the pair is wanted end-to-end.
+    schwab_market_data_plugin: Personal-brokerage market data, not a business-ops connector; also wants a cloud/HTTPS deployment, in tension with the AWS-hosting exclusion above.
+  transient:
+    github_midwife_plugin: The seed factory's own fractal invariant force-includes this in every seed (a seed can mint further seeds). Remove it from the steady-state manifest via apply_manifest AFTER genesis completes, and delete plugins/github_midwife_plugin/ from the newborn's tree entirely — unloading alone leaves the clone-capable source on disk. See the hydration runbook's post-genesis cleanup step.
+  operator_setup_required:
+    jira_plugin, snowflake_plugin, salesforce_plugin, zuora_plugin, marketo_plugin, g_suite_plugin: Each needs a real-world address-book entry (site/account/org identifiers) plus a vault-backed credential completed post-genesis — genesis cannot fabricate operator-specific tenant identity. external_postgres_plugin needs at least one external_pg::<name> address-book entry registered before its verbs are useful, but ships with zero entries safely (read-only, hard-refuses the platform's own DB regardless).

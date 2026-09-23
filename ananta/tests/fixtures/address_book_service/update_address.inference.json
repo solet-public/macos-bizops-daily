@@ -1,0 +1,10 @@
+{
+  "natural_language_query": "Update that address's description",
+  "expected_process_key": "service_interface::address_book_service::update",
+  "expected_arguments_structure": {
+    "name": "string",
+    "description": "string (optional)",
+    "address_type": "string (optional)",
+    "tags": "array (optional)"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "test_search_similar_complex_filters",
+  "description": "Similarity search with complex nested metadata filters",
+  "process_key": "plugin::pgvector_service_plugin::search_similar_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "query_vector": [0.1, 0.2, 0.3, 0.4, 0.5],
+      "top_k": 20,
+      "filters": {
+        "category": "integration_test",
+        "source": "test_document"
+      },
+      "distance_metric": "COSINE"
+    },
+    "state": {
+      "current_session_id": "test-search-complex-001"
+    },
+    "timeout_seconds": 30
+  }
+}

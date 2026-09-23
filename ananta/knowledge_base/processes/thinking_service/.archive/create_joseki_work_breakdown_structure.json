@@ -1,0 +1,29 @@
+{
+  "process_key": "service_interface::thinking_service::create_joseki_work_breakdown_structure",
+  "display_name": "Create Joseki Work Breakdown Structure",
+  "description": "ask the thinking plugin to create a joseki-scoped Work Breakdown Structure fragment for a specific work item within a phase, guided by a named joseki card.",
+  "embedding_description": "Create joseki-scoped work breakdown structure fragment. Initialize a work-item-scoped execution document following a specific joseki card sequence. The fragment covers one work item, not a full phase. Includes joseki_key and work_item_id metadata for provenance.",
+  "prompt_contract": {
+    "kind": "delegated_artifact_creation"
+  },
+  "result_processor_customizations": {
+    "action_label": "Joseki Work Breakdown Structure created",
+    "result_type": "wbs_create_result",
+    "result_description": "The full created joseki-scoped WBS fragment document",
+    "presentation_guidance": "",
+    "output_action_guidance": "The joseki-scoped Work Breakdown Structure fragment has been created and is now available as working context. Continue executing the current step as shown in the updated ACTIVE_PLAN.",
+    "message_rendering": {
+      "renderer_key": "raw_observation",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Creating a joseki-scoped Work Breakdown Structure fragment. create_joseki_work_breakdown_structure accepts {wbs_id, manifest_id, phase_number, phase_name, joseki_key, work_item_id, directive, support_articles}. The thinking model generates the WBS fragment following the named joseki card.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. StorageError: knowledge base write failed. FileExistsError: a WBS with this ID already exists."
+  }
+}

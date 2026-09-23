@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::flow_service::get_flow_input",
+  "display_name": "Get Flow Input",
+  "description": "Extract the original user input that triggered a flow. Returns the input string from the flow's trigger_data, handling both console ('user_input' key) and JSON-RPC ('input' key) formats.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Get Flow Input",
+    "result_type": "flow_input",
+    "result_description": "Original user input that triggered the flow, extracted from trigger_data",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Extracting original user input from flow trigger_data (handles console and JSON-RPC formats)",
+    "error_interpretation": "NotFoundError with 'flow_id': no flow record exists with the specified ID. KeyError with 'trigger_data': flow record has no trigger_data or input field. DatabaseError: failed to query flow record.",
+    "recovery_guidance": "For not found errors: verify the flow_id is correct. For missing input errors: check that the flow was created with proper trigger_data containing user_input or input. For database errors: verify database connectivity and retry."
+  }
+}

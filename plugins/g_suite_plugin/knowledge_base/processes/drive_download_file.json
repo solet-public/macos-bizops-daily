@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::drive_download_file",
+  "display_name": "Drive: Download File",
+  "description": "Download a binary Google Drive file (PDF, image, zip, Office doc, etc.) into blob storage. Runs as a background job: dispatch returns a job_id immediately, and the file_blob_key, name, and mime type arrive via a follow-up message once the download completes. Google-native docs (Docs/Sheets/Slides) cannot be downloaded this way — use the matching export verb instead. Requires a connected account.",
+  "embedding_description": "Fetch a binary Drive file's bytes and persist them to platform blob storage as a background job, returning a job_id for tracking; completion delivers a blob key plus the file's name and mime type. Handles arbitrary uploaded binaries. Google-native documents, spreadsheets and presentations each have a dedicated export verb, which is how those leave Drive as files.",
+  "result_processor_customizations": {
+    "action_label": "Drive file download started",
+    "result_type": "g_suite_drive_download_result",
+    "result_description": "Job queued for the Drive download; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to download a binary Drive file into blob storage.",
+    "error_interpretation": "gsuite.invalid_params: missing id, missing session_id/flow_id context, or the file is a Google-native doc that must be exported. gsuite.not_found: the id does not exist. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.invalid_params: pass a valid binary-file id, or use the export verb for native docs. gsuite.not_found: the file may have been deleted. gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

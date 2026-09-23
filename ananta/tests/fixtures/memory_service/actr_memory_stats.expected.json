@@ -1,0 +1,14 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "total",
+    "by_type",
+    "by_status",
+    "strength_distribution"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Get comprehensive memory system statistics"
+}

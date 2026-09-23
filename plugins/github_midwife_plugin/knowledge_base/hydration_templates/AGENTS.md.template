@@ -1,0 +1,203 @@
+# {{SOLET_NAME}} — project instructions
+
+<!-- BEGIN SOLET HYDRATION -->
+
+This directory is the home of **{{SOLET_NAME}}**, a solet on the Ananta
+platform: a named, persistent agentic instance with its own PostgreSQL schema,
+memories, knowledge bases, and plugins. You — the AGENTS.md-convention
+session reading this — are its driving agent. This managed block governs
+{{SOLET_NAME}} access for sessions opened in this directory. Existing
+project instructions still apply; if they conflict with how to reach
+{{SOLET_NAME}}, follow this block for access and ask the operator about
+the conflict.
+
+## Access mode — no-MCP CLI is the default
+
+Before responding to any question or starting any non-trivial task, ask
+{{SOLET_NAME}} through the local command genesis installed:
+
+```bash
+{{SOLET_NAME}} call service_interface::knowledge_service::search '{"query": "<plain-English description>", "top_k": 8}'
+```
+
+This talks to {{SOLET_NAME}} over its local bridge and is the primary,
+complete path for knowledge-base search and process calls. After history
+ingestion is enabled it is also the path for session-ledger recall:
+
+```bash
+{{SOLET_NAME}} call service_interface::session_ledger_service::search_event_content '{"query": "<topic>", "limit": 8}'
+```
+
+Background-job verbs — connector writes and exports (Google Workspace,
+Snowflake, external Postgres, and similar) — return
+`{"job_id": ..., "status": "queued"}` immediately; the finished result is
+delivered as a message to a live listening session, which a plain `call`
+invocation is not. From a session with no listener, fetch the finished
+payload yourself:
+
+```bash
+{{SOLET_NAME}} call service_interface::job_service::get_latest_job '{"plugin_name": "<plugin>", "action_name": "<verb>"}'
+```
+
+When the returned job's `status` is `completed`, its `result` field carries
+the payload (a created sheet's URL, an export's path); `failed` carries
+`error`; a `null` job means nothing matched the filters. It returns the
+LATEST matching job only — poll one dispatch to completion before firing
+another of the same verb from a no-listener session.
+
+It needs no MCP server and no `mcp__{{SOLET_NAME}}__*` tools.
+
+MCP is optional and exists only for the operator who explicitly asks for it
+and whose machine policy permits it. Do not register, debug, or search for MCP
+tools unprompted, and do not treat their absence as a problem to solve — the
+CLI path above is not a fallback, it is the default. Runner-specific
+peer-to-peer wake is a separate concern from knowledge/process access; retrieve
+the current messaging contract before assuming its transport.
+
+If `{{SOLET_NAME}} call` itself fails (the solet process is not
+running — check with `{{SOLET_NAME}} health`), the fallback is
+source-artifact recovery: read the KB source markdown directly under this
+deployment's own knowledge-base directories (`ananta/knowledge_bases/`,
+`ananta/knowledge_base/`, each plugin's `knowledge_base/`, and any real
+directories under `knowledge_bases/`) instead of the live search. This is an unranked,
+degraded recovery, not a substitute for the live path — it means the
+solet needs attention before claiming live retrieval; say so rather than
+treating the source read as sufficient. There is no offline query script shipped in
+this deployment to try first: `default_knowledge_plugin`'s query script lives only
+in the platform's own development repo and is pruned from every seed.
+
+Building on assumptions when a canonical answer exists in {{SOLET_NAME}}'s
+knowledge base produces drift. If a search returns nothing relevant, that is
+information too: confirm the gap before inventing a pattern, and add an
+article documenting what you ended up with.
+
+Step Zero is a sequence, not a substitution. {{SOLET_NAME}}'s knowledge
+base governs platform access and cross-session knowledge; the directory this
+session was started in governs the task. After the platform search, the next
+step is the working directory's own context — its `CLAUDE.md`/`AGENTS.md`,
+its docs, and any knowledge base it carries. A session launched outside this
+directory, with {{SOLET_NAME}} as support, anchors its work in that
+directory's own guidance — the platform search must never preempt it, and
+task-specific guidance from the working directory governs the task.
+
+Before editing code, changing config, or explaining a subsystem in this repo,
+search {{SOLET_NAME}}'s knowledge base for the current design record and
+recent implementation notes using the actual nouns from the request — do not
+reconstruct architecture from local code fragments alone.
+
+Two carve-outs: locating a specific known code symbol or file in this repo
+(grep directly), and repairing a not-running `{{SOLET_NAME}}` command
+(`{{SOLET_NAME}} health`, launchd state, logs under
+`profile/data/logs/`).
+
+## Startup discipline
+
+After any restart of {{SOLET_NAME}} (LaunchAgent reload or foreground
+launch), wait for startup to finish before querying: poll the newest log under
+`profile/data/logs/` with `wc -l <logfile> && sleep 5 && wc -l <logfile>` and
+proceed only once the two counts match. Querying mid-startup competes with the
+embedding rebuild and causes inference timeouts.
+
+## Running {{SOLET_NAME}}
+
+- Picking up updated code or config for an ALREADY-INSTALLED plugin (a
+  brand-new plugin comes online via `install_plugin_from_path` instead):
+  check whether `macos_self_deployment_plugin` is in this solet's
+  plugin roster (`list_plugins`). If it is, `apply_manifest` swaps in the
+  new version through the per-solet blue-green router, verifying
+  before cutover, and leaves `previous` as an intact rollback target —
+  zero downtime for this no-MCP CLI path (an MCP-connected caller sees the
+  bridge go dark for roughly 30–60 seconds during cutover regardless).
+  Search the knowledge base for "picking up new code without a bare
+  restart apply_manifest" via Step Zero for the exact call shape (it needs
+  `new_manifest` and `reason`). If that plugin is absent, this solet
+  has no router and no blue-green path (single-color by design) — restart
+  the LaunchAgent below instead. Either way, a bare LaunchAgent restart is a
+  full stop that drops in-memory state (blob storage by default); prefer
+  `apply_manifest` whenever the router is present.
+- Normal mode (bringing the daemon up or down, not a code/config pickup):
+  the LaunchAgent `local.solet.{{SOLET_NAME}}` (starts at login,
+  restarts on failure); stop/start with `launchctl unload -w` / `load -w`
+  on `~/Library/LaunchAgents/local.solet.{{SOLET_NAME}}.plist`.
+- Foreground (debugging): `{{CLONE_DIR}}/client/bin/launch-{{SOLET_NAME}}`
+  (stop the LaunchAgent first — never run two instances).
+- The `{{SOLET_NAME}}` CLI is on PATH via genesis's
+  `~/.local/bin/{{SOLET_NAME}}` symlink; no venv activation needed for
+  `{{SOLET_NAME}} call` / `{{SOLET_NAME}} health`.
+- Start stock Codex through
+  `{{CLONE_DIR}}/client/bin/codex-{{SOLET_NAME}} [role] [codex arguments ...]`.
+  The launcher exports one stable session ID, registers `agent_id=codex`, claims
+  the supplied durable role, and arms the parent-bound no-MCP watcher when the
+  selected fleet transport is `watch`. Do not substitute a locally patched
+  receive binary for the launcher's stock `codex` executable.
+
+## Stock Codex durable inbox
+
+No `Stop` hook ships currently: stock Codex does not execute async command
+hooks on any measured build, so a bound one never fires, and this plugin does
+not carry a synchronous one either (it would block the turn boundary).
+Delivery to this session is durable but silent — nothing surfaces it
+automatically, per-turn or otherwise. Check this session's own durable inbox
+directly, on your own initiative and whenever a reminder says to check
+messages, through the local CLI:
+
+```bash
+{{SOLET_NAME}} call plugin::agent_messaging_plugin::peer_inbox '{"agent_session_id":"'"$AGENT_SESSION_ID"'","limit":5}'
+```
+
+The response has two independent sections and two independent cursors:
+
+- `entries` is oldest-first. If `next_after_created_at` is non-null, call again
+  with that exact timestamp as `"after":"<next_after_created_at>"`.
+- `role_entries` is newest-first. If `next_role_cursor` is non-null, call again
+  with that opaque token as `"role_after":"<next_role_cursor>"`. Continue until
+  it is null; `role_section_status: "ok"` means the section was computed, not
+  that its backlog is drained.
+
+Never mix the two cursors. Treat a repeated message already handled as a
+duplicate delivery, not a new instruction. A queue or watcher receipt is
+not proof that a model turn read the inbox; completion evidence names the
+message ID and the action actually taken.
+
+## Messaging, connectivity, and governance — found via Step Zero
+
+The full contract for these lives in {{SOLET_NAME}}'s knowledge base, not
+here — search for the terms below rather than assuming the mechanism:
+
+- `router bridge blue-green local deployment architecture` — the bridge vs.
+  the optional blue-green router vs. the optional MCP bridge vs. development
+  channels; several distinct layers get loosely called "the bridge."
+- `peer registry role binding durable claim` — why an entry in a raw peer
+  list is presence, not a claim, and how `peer_send_by_name` actually
+  resolves.
+- `first days owner onboarding` / `solet charter template` / `operator
+  decision brief` / `operator collaboration craft` — the governance set for
+  working with your operator.
+- `session history ingestion session ledger hydration current notes` — how
+  and when session-ledger recall becomes available.
+- `fleet launcher session configuration model effort per role` — how model,
+  effort, and transport are configured per session role. As the driving
+  session you manage the fleet, not just your own context: dispatch
+  parallelizable, mechanical, or long-running work to additional sessions
+  rather than absorbing it inline, and declare each dispatch's model,
+  effort, and lifetime explicitly, matched to the work — a mechanical lane
+  on a cheaper model with bounded effort, a judgment-heavy lane on a
+  stronger tier, never inherited silently. Token efficiency is part of the
+  dispatch decision, and no session is left idling past its usefulness.
+
+## Development standards (if you extend the platform)
+
+Python 3.13, full type hints. Fail fast and loudly — no silent fallbacks, no
+defensive layers over broken root causes, no backwards-compatibility shims.
+Prefer an existing library over a hand-rolled implementation. Leave code
+better than you found it. Database access goes through the
+`StateManagementInterface` primitives — never raw SQL from feature code.
+
+## Reference
+
+The genesis ladder that created this solet, and the hydration runbook
+that generated this file, live in the knowledge base — search "genesis
+bootstrap ladder" or "hydration operator environment setup" via Step Zero
+above.
+
+<!-- END SOLET HYDRATION -->

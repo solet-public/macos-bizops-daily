@@ -1,0 +1,46 @@
+{
+  "name": "test_memorize_existing_memory",
+  "description": "Create a memory first, then add it to memorization queue by ID",
+  "sequence": [
+    {
+      "step": "create_memory",
+      "process_key": "service_interface::memory_service::remember",
+      "arguments": {
+        "content": "E = mc² is Einstein's mass-energy equivalence formula from special relativity.",
+        "tags": ["physics", "einstein", "test-memorize-by-id"]
+      },
+      "capture": {
+        "memory_id": {
+          "source": "output",
+          "output_key": "Memory ID"
+        }
+      }
+    },
+    {
+      "step": "memorize_by_id",
+      "process_key": "service_interface::memory_service::memorize",
+      "arguments": {
+        "memory_id": "${memory_id}"
+      }
+    },
+    {
+      "step": "verify_in_queue",
+      "process_key": "service_interface::memory_service::list_memorizing",
+      "arguments": {}
+    },
+    {
+      "step": "stop_memorizing",
+      "process_key": "service_interface::memory_service::stop_memorizing",
+      "arguments": {
+        "memory_id": "${memory_id}"
+      }
+    },
+    {
+      "step": "cleanup_forget",
+      "process_key": "service_interface::memory_service::forget",
+      "arguments": {
+        "memory_id": "${memory_id}"
+      }
+    }
+  ]
+}

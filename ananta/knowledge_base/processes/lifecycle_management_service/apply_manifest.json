@@ -1,0 +1,82 @@
+{
+  "process_key": "service_interface::lifecycle_management_service::apply_manifest",
+  "display_name": "Apply manifest",
+  "description": "Validate, atomically write, and delegate restart with a new manifest. v1 scope (Architect §15.1, updated v1.1): the new_manifest carries {plugins: list[str], profile_name?: str, service_bindings?: dict[str, str]}. Only plugin_config_overrides is rejected before any disk activity, with the stable token forbidden_v1_keys_present (config-override externalization is deferred to v2). Caller-supplied service_bindings ARE accepted and MERGED over the currently-bound snapshot (effective_bindings = {**current, **caller}) — the mechanism for plugin renames/rebinds; a non-dict service_bindings is rejected with service_bindings_shape_invalid. When service_bindings is OMITTED, the verb auto-synthesizes it from the currently-bound services so binding-satisfaction pre-flight, diff computation, and atomic writes all see a coherent manifest shape. It runs binding_validator (every currently-bound provider must remain in the new plugin list; the self_deployment_service binding must still be present), computes a set-level diff of added/removed plugins plus rebound_services (services whose bound provider changed when caller service_bindings are supplied — empty when bindings are unchanged), atomically writes service_bindings.json first then manifest.yaml under a sha256 CAS, then invokes the bound self_deployment_service plugin's restart_with_manifest verb to schedule the actual restart. Per Codex review #2 Finding 1, the bound plugin's restart status propagates into the response: a write that succeeds but cannot schedule the cutover surfaces as status='restart_failed_after_manifest_commit' (NOT 'applied'), so the operator never sees a green envelope for a partial remote commit. Pass dry_run=true to preview the diff and read the current etag without writing or restarting. Pass expected_etag (from a prior call's current_etag) as the CAS precondition; the verb returns status='rejected' with reason='precondition_failed' if the on-disk etag has shifted in the interim. The new manifest takes effect after the deployment plugin's restart completes; on local profiles the watchdog terminates the solet and re-launches, on cloud profiles the blue-green swap cuts over.",
+  "embedding_description": "Apply a new plugin manifest atomically. Kubernetes-apply semantics: declarative target + pre-flight + atomic write + delegated restart via bound self_deployment_service plugin. Pre-flight rejects manifests leaving self_deployment_service unbound. dry_run previews diff; expected_etag CAS prevents races. Returns diff (added/removed/rebound), new_etag, manifest_written_to, restart_action_id.",
+  "arguments": {
+    "type": "object",
+    "required": [
+      "new_manifest",
+      "reason"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "new_manifest": {
+        "type": "object",
+        "required": [
+          "plugins"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "plugins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "profile_name": {
+            "type": "string"
+          },
+          "service_bindings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "reason": {
+        "type": "string"
+      },
+      "expected_etag": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "binding_rule": {
+    "version": 1,
+    "service_bindings": {
+      "input_path": "new_manifest.service_bindings",
+      "provided_input": "merge_over_current_bindings",
+      "omitted_input": "copy_current_bindings",
+      "materialized_path": "profile/config/service_bindings.json"
+    },
+    "receipt": {
+      "path": ".solet/genesis.json",
+      "required_completed_steps": [
+        "validate_name",
+        "resolve_target",
+        "materialize_configs",
+        "seed_root_manifest",
+        "materialize_kb_symlinks",
+        "write_manifest_marker"
+      ]
+    }
+  },
+  "result_processor_customizations": {
+    "action_label": "apply_manifest outcome",
+    "result_type": "apply_manifest_result",
+    "result_description": "Mapping with keys: status ('applied' on commit with manifest-applied restart, 'dry_run' on preview, 'rejected' on pre-flight or CAS failure with NO disk write, 'restart_failed_after_manifest_commit' when the manifest WAS written but the deployment plugin could not schedule the restart per Codex review #2 Finding 1); diff (added_plugins, removed_plugins, rebound_services as lists — rebound_services names services whose provider changed via caller-supplied service_bindings, empty when bindings are unchanged); current_etag (sha256 of pre-write on-disk state — always populated); new_etag (sha256 of post-write state — populated on 'applied' and 'restart_failed_after_manifest_commit'); manifest_written_to / service_bindings_written_to (paths — populated whenever a write happened); restart_action_id (deployment plugin's response — empty when restart failed); restart_status (deployment plugin's verbatim status: 'queued' / 'completed' on applied; 'failed' / 'unbound' / 'plugin_protocol_error' / 'plugin_raised' on failed-after-commit); rejection_reasons (list of strings — populated on 'rejected' and 'restart_failed_after_manifest_commit', empty otherwise); message (status detail).",
+    "presentation_guidance": "When status='applied', surface the diff compactly (added_plugins + removed_plugins + rebound_services), report the restart_action_id so the operator can monitor the cutover (cloud: poll via cloud_self_deployment_service::deploy_status; local: audit-only token, restart proceeds asynchronously). When status='dry_run', surface the diff and the current_etag so the operator can commit on a follow-up call. When status='rejected', surface rejection_reasons verbatim — they are pre-formatted for operator readability. On precondition_failed (CAS miss), suggest re-running with dry_run=true to fetch the fresh etag before re-submitting.",
+    "output_action_guidance": "After status='applied': do NOT call apply_manifest again until the restart completes; in-flight restarts are racy with re-submission. For cloud cutover monitoring, use service_interface::cloud_self_deployment_service::deploy_status. For local cutover, the MCP bridge will go dark for ~30–60s during the watchdog-driven re-launch and come back when the new the solet is ready. After status='dry_run': pass the returned current_etag as expected_etag on the committing call. After status='rejected': fix the rejection_reasons and re-submit; the verb made no on-disk changes."
+  },
+  "error_processor_customizations": {
+    "action_context": "Validate + atomically write a new manifest, then delegate restart to the bound self_deployment_service plugin.",
+    "error_interpretation": "missing_reason: caller did not supply the required audit string. missing_app_home: orchestrator.APP_HOME is not set (indicates incomplete startup). precondition_failed: CAS check failed because another caller wrote the manifest between the read-current-state and write-new-state steps. forbidden_v1_keys_present: new_manifest contained plugin_config_overrides — v1 accepts {plugins, profile_name?, service_bindings?}; plugin_config_overrides remains v2 operator-tooling territory (no disk write happened). service_bindings_shape_invalid: new_manifest['service_bindings'] was present but not a dict — it must map service_name -> plugin_name. binding_provider_missing: a currently-bound provider plugin would not survive the new plugin list (every binding's provider must remain installed). required_service_unbound: self_deployment_service is somehow not currently bound on this solet — the verb cannot delegate restart. write_io_error: atomic write to manifest.yaml or service_bindings.json failed at the filesystem layer (permissions, disk full, etc.). restart_failed_after_manifest_commit: manifest written successfully but deployment plugin returned failed / unbound / plugin_protocol_error / plugin_raised — partial remote commit needs operator recovery.",
+    "recovery_guidance": "missing_reason: provide a non-empty reason string. missing_app_home: do not retry — the platform is in an inconsistent startup state and a restart is the correct recovery. precondition_failed: re-run with dry_run=true to fetch the fresh current_etag and re-submit with that as expected_etag. forbidden_v1_keys_present: remove plugin_config_overrides from new_manifest — it remains operator-tooling in v1. To change bindings, pass service_bindings inline in new_manifest (merged over current); do NOT hand-edit service_bindings.json (an omitted service_bindings clobbers hand-edits with the current snapshot). service_bindings_shape_invalid: supply service_bindings as a dict mapping service_name -> plugin_name. binding_provider_missing: edit the new_manifest's plugin list to keep the currently-bound providers. required_service_unbound: check service_bindings.json for the self_deployment_service entry; without it the verb cannot operate. write_io_error: inspect the filesystem state at the named path; the verb's atomic-temp-then-rename pattern means a failure leaves the on-disk state unchanged. restart_failed_after_manifest_commit: inspect restart_status + rejection_reasons to identify the underlying deploy failure (cloud: deploy_self error; local: watchdog spawn failure); fix and re-invoke apply_manifest, OR manually restore the prior manifest on disk / in S3."
+  }
+}

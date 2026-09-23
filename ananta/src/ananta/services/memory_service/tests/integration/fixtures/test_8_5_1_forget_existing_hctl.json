@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::forget",
+  "arguments": {
+    "memory_id": "test-memory-id-placeholder"
+  },
+  "notes": "This test requires a valid memory_id from a previously created memory"
+}

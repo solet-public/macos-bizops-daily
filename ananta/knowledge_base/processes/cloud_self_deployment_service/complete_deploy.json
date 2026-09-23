@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::cloud_self_deployment_service::complete_deploy",
+  "display_name": "Finish a deploy on the new color (internal)",
+  "description": "Steps 8–10 of the blue-green mechanic, executed on the v(N+1) container after deploy_self enqueued this row. Holds for the observation window, polling the ALB listener rule for a rollback. If the operator runs deploy_rollback during the window, the listener rule flips back to v(N)'s target group and this finisher exits status='cancelled' without tearing down the old color. Otherwise it deletes the old ECS service and target group, then submits any post-cutover destructive metadata-DDL actions via the platform action queue.",
+  "embedding_description": "Internal v(N+1)-side finisher for a self-deploy. Runs observation window watching for deploy_rollback. Tears down the old ECS service + target group on success. Submits post-cutover schema actions (column drops, table removals) via plugin_schema_service. Not invoked by operators; picked up by the new color's action_queue_poller after deploy_self enqueued it.",
+  "result_processor_customizations": {
+    "action_label": "complete_deploy finished",
+    "result_type": "self_deployment_complete",
+    "result_description": "Status, prior version label, steps completed, count of schema actions enqueued.",
+    "presentation_guidance": "If status='cancelled', note that deploy_rollback fired. If status='completed', confirm the prior version was torn down and surface schema_actions_enqueued."
+  },
+  "error_processor_customizations": {
+    "action_context": "Tearing down the previous version of this solet after a successful cutover.",
+    "error_interpretation": "teardown_failed: the old ECS service or target group could not be deleted. Often a transient AWS error or a partial state from an aborted prior deploy.",
+    "recovery_guidance": "Inspect the old service and TG via deploy_status; clean up genuinely orphaned AWS state via direct AWS CLI calls (the legacy deploy_solet.py bootstrap shim was deleted 2026-06-04)."
+  }
+}

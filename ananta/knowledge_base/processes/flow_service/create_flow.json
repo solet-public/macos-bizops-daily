@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::flow_service::create_flow",
+  "display_name": "Create Flow",
+  "description": "Create a new flow record to track a unit of work. A flow represents one user request and all spawned actions within it.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Create Flow",
+    "result_type": "flow_created",
+    "result_description": "New flow record created with flow_id for action correlation and tracking",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Creating a new flow record to track a unit of work and correlate actions",
+    "error_interpretation": "ValidationError with 'session_id': session ID is required. ValidationError with 'trigger_type': trigger type must be specified. DatabaseError: failed to insert flow record into core__flows table.",
+    "recovery_guidance": "For session_id errors: ensure a valid session_id is provided. For trigger_type errors: specify the trigger type (e.g., user_input, scheduled_task, webhook). For database errors: verify database connectivity and retry."
+  }
+}

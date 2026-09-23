@@ -1,0 +1,14 @@
+# Exact, source-absent registry keys and dedicated-handler declaration drift.
+# Remove one entry when its source declaration is repaired; wildcards are forbidden.
+#
+# D-3-structural migration (2026-09-20, iss_23fa51b5/iss_9b0ad3d5): every
+# entry now carries the mandatory owner/reason/expires schema (see
+# quality_gates/allowlist_schema.py). These four entries predate that
+# schema and no per-entry justification survives beyond the 2026-09-03 W2-1
+# sweep that added them; owner and expires are migration defaults, not a
+# reassessed per-entry review -- expires gives them a real, finite life
+# (2027-03-20) instead of the indefinite grandfathering the old format
+# allowed, and forces the next touch to either re-justify with a real owner
+# or let the entry lapse.
+plugin::macos_vault_plugin::qualify  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+plugin::schwab_market_data_plugin::test_connection  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20

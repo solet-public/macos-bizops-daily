@@ -1,0 +1,12 @@
+{
+  "name": "test_describe_schema_basic",
+  "description": "Verify describe_schema returns schema definition for a namespace",
+  "process_key": "plugin::postgres_state_management_plugin::describe_schema",
+  "arguments": {
+    "params": {
+      "namespace": "core"
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

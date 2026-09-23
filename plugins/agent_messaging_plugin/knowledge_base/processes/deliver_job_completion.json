@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::deliver_job_completion",
+  "display_name": "Deliver a background job completion to its role inbox",
+  "description": "Push a finished asynchronous job outcome into the durable role inbox stamped on its originating fleet flow, while retaining job_service pull recovery. Role delivery is persist-first and completion_reach is stamped only after the measured hand-off. The returned drive_on_delivery value describes the separate attempt to nudge the current role holder: not_managed for a completed no-row lookup, ineligible_state for a non-driveable managed lifecycle, driver_unavailable when state or channel resolution is unavailable, driver_sent when the driver channel accepted the completion notice, and driver_error when the channel raised. driver_sent does not show that a model turn began or that the completion was consumed.",
+  "embedding_description": "Deliver a background job completion to the originating durable role, preserve get_job and unreached-drain recovery, and expose managed wake disposition. Relevant outcomes are not_managed, ineligible_state, driver_unavailable, driver_sent, and driver_error; driver_sent confirms notice-channel acceptance only, not worker consumption.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Job completion delivered to role inbox",
+    "result_type": "job_completion_delivery_result",
+    "result_description": "Returns thread_id, message_id, delivery, resolved role-holder identifiers, reach_stamped, and drive_on_delivery. reach_stamped records whether completion_reach advanced, independently of the wake attempt. drive_on_delivery is not_managed (completed lookup found no managed row), ineligible_state (managed lifecycle blocks driving), driver_unavailable (state or channel could not be established), driver_sent (driver channel accepted the notice), or driver_error (channel raised). driver_sent is not proof of a model turn or completion consumption.",
+    "presentation_guidance": "Report completion durability first: identify the routed role, delivery channel, and reach_stamped value. Then state drive_on_delivery as a separate wake diagnostic. Explain not_managed, ineligible_state, driver_unavailable, and driver_error without implying the job result was lost; for driver_sent say only that the driver channel accepted the notice. Never use it as evidence that the worker read or acted on the completion."
+  },
+  "error_processor_customizations": {
+    "action_context": "Routes an already-persisted terminal job payload to its stamped durable role, records completion reach, and emits a distinct managed-driver diagnostic for the holder.",
+    "error_interpretation": "missing_arguments, peer_role_vacant, peer_role_malformed, bridge.not_running, and state_service_unavailable prevent or invalidate push routing, but the terminal job row remains retrievable. drive_on_delivery values not_managed, ineligible_state, driver_unavailable, driver_sent, and driver_error belong to successful delivery results and do not alter job persistence; driver_sent still is not consumption proof.",
+    "recovery_guidance": "Recover the terminal payload with job_service::get_job or list_unreached_job_completions rather than re-running the job. Restore a vacant or malformed completion role for later pushes. If the envelope persisted but drive_on_delivery is not_managed, ineligible_state, driver_unavailable, or driver_error, notify the holder through an independently verified route; after driver_sent, wait for explicit uptake evidence before marking the completion acted upon."
+  }
+}

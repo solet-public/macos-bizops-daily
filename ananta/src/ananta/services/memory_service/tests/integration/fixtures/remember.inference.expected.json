@@ -1,0 +1,17 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "memory",
+    "stored",
+    "remembered",
+    "gen-",
+    "ID",
+    "created",
+    "status",
+    "result",
+    "COMPLETED",
+    "discover",
+    "process",
+    "Available"
+  ]
+}

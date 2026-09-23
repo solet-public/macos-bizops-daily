@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::session_ledger_service::set_source_enabled",
+  "display_name": "Set Source Enabled",
+  "description": "Schema-debt-external-id lane, 2b-S1 quiesce-protocol prerequisite (2026-08-07). Toggles one `session_ledger__source` row's `enabled` flag — `False` blocks both the periodic poller (`list_sources(enabled_only=True)`) and a targeted `poll_source` call (which raises immediately on a disabled source). This is the missing half of the duplicate-source-repair quiesce protocol: `retire_duplicate_source` refuses `confirm=true` while the loser is still `enabled`, but no verb could actually set `enabled=false` until this one — the column existed (`session_ledger__source`'s own schema description reads \"Operator can disable a source without deletion\") but the setter was never built.\n\nIdempotent: a call whose `enabled` argument already matches the row's current value fires ZERO writes and reports `changed=false` — not an error. Operator-only (`is_discoverable=false`), matching `retire_duplicate_source`'s posture. Writes go through `StateManagementInterface` primitives only (`update_state`, via the repository's `_update`), never raw SQL.",
+  "embedding_description": "Operator-only toggle for a session_ledger__source row's enabled flag. Disabling blocks the periodic poller and any targeted poll_source call on that source — the load-bearing precondition retire_duplicate_source's quiesce protocol depends on. Idempotent (same-value call is a reported no-op, zero writes). Unknown source_id raises ValueError. Use before retire_duplicate_source's confirm=true, and to re-enable the winner afterward.",
+  "result_processor_customizations": {
+    "action_label": "Set Source Enabled",
+    "result_type": "ledger_source_enabled_toggled",
+    "result_description": "Enabled-flag toggle outcome: `source_id`, `prior_enabled`, `new_enabled`, and `changed` (false when the call was an idempotent no-op).",
+    "presentation_guidance": "",
+    "output_action_guidance": "When disabling a source as part of the duplicate-source quiesce protocol, wait for `polling_lease_until` to clear (readable only via the repair verb's own internal check today — no standalone read verb) before calling `retire_duplicate_source` with `confirm=true`. Re-enable the winner afterward with this same verb and confirm its next poll cycle picks it up (e.g. via `poll_source` or waiting for the periodic cron)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads the source row via `query_state`, and — only when the requested `enabled` value differs from the current one — writes it via `update_state` (`StateManagementInterface` primitives, never raw SQL).",
+    "error_interpretation": "ValueError 'not found or deleted': `source_id` does not resolve to a live (non-soft-deleted) `session_ledger__source` row — check the id, e.g. via `list_sources`.",
+    "recovery_guidance": "Re-check the source id (typo, or the row was soft-deleted by a prior `retire_duplicate_source` call) and retry with the correct id. A same-value call is always safe to retry — it is idempotent and reports `changed=false` rather than erroring."
+  }
+}

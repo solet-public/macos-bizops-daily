@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::local_self_deployment_service::attest_runtime_code",
+  "display_name": "Attest router-served runtime code",
+  "description": "Read-only local self-deployment attestation of the router-served process, immutable release, deterministic source and release surface digests, and already-loaded module origins. It never imports requested modules on demand.",
+  "embedding_description": "Check the active local blue-green process for its immutable release identity and loaded Python module provenance. Use during reconciliation verification or to diagnose code that is present in a release but not imported.",
+  "result_processor_customizations": {
+    "action_label": "runtime code attestation",
+    "result_type": "local_runtime_code_attestation",
+    "result_description": "Router-active process identity, release surface digests, and requested module origins.",
+    "presentation_guidance": "Lead with served_by_self and release identity. Surface unloaded modules and origins outside the immutable release root as verification evidence, not as successful proof."
+  },
+  "error_processor_customizations": {
+    "action_context": "Read router-served local runtime code provenance.",
+    "error_interpretation": "The requested runtime identity could not be measured safely. This is an unreadable verification, not a code mismatch.",
+    "recovery_guidance": "Inspect router and immutable release state, resolve the named read failure, then retry the read-only attestation."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "test_search_blobs_invalid_limit",
+  "description": "Search blobs with limit exceeding maximum",
+  "process_key": "plugin::default_blob_storage_plugin::search_blobs",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "metadata_filters": {
+        "limit": 2000
+      }
+    },
+    "state": {
+      "current_session_id": "test-search-invalid-limit-001"
+    },
+    "timeout_seconds": 30
+  }
+}

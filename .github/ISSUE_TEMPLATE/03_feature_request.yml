@@ -1,0 +1,90 @@
+name: Feature request
+description: A capability you want, with the workflow that needs it.
+title: "§N.M — "
+labels: ["feature-request"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        State the outcome you need, not the implementation you imagine. The
+        maintainers own the method, and a stated goal gives them room to solve it
+        better than a sketch would. If your sketch has outgrown an appendix, you
+        have a design offer — that is still this form: put the design in the
+        body below, alternatives and recommendation included. Long is fine. The
+        repository does not accept pull requests or patches (see
+        CONTRIBUTING.md), so a design travels as an issue or not at all.
+
+  - type: input
+    id: item_number
+    attributes:
+      label: Item number
+      description: Your round and item number, as `§N.M`. Repeat it at the front of the issue title.
+      placeholder: "§42.7"
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: The outcome you need
+      description: What you want to be true, stated without reference to how it would be built.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow
+    attributes:
+      label: The workflow that hit the gap
+      description: >-
+        The concrete thing you were doing when this became a problem — "every time
+        we do X we must hand-do Y". This is the strongest part of a feature
+        request; it is the part that cannot be guessed from the origin.
+    validations:
+      required: true
+
+  - type: textarea
+    id: cost
+    attributes:
+      label: What it costs you today
+      description: How often you hit it, and what the workaround costs each time.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Your current workaround
+      description: >-
+        What you do instead today, including "nothing, we stopped doing the task".
+        A workaround you are unhappy with tells the maintainers where the real
+        boundary is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Implementation sketch (optional appendix)
+      description: >-
+        Welcome here, never as the headline. If this section is longer than
+        everything above it, you have a design offer rather than a feature
+        request — that is fine, and it still belongs here: say so at the top of
+        the body and let this section be the design.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: content_gate
+    attributes:
+      label: Content gate
+      description: >-
+        This issue is published the moment you submit it, and editing it
+        afterwards does not unpublish what was there. Workflow descriptions are
+        the highest-risk field on this form — describe findings generically
+        ("a business-connector read of ~40k rows"), never the rows or whose they are.
+      options:
+        - label: >-
+            I re-read this issue and it contains no personal identifiers, no
+            employer or business specifics, and no credentials or secret-looking
+            values — including inside the workflow description above.
+          required: true

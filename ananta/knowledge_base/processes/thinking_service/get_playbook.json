@@ -1,0 +1,15 @@
+{
+  "process_key": "service_interface::thinking_service::get_playbook",
+  "display_name": "Get Playbook",
+  "description": "Retrieve the full content of a playbook by ID. Returns the complete playbook markdown with all phase sections.",
+  "embedding_description": "Retrieve the full markdown playbook document for a known playbook_id. Use when you need the exact phase structure, phase guidance, decision rules, retrieval instructions, and communication notes from an existing playbook for inspection, debugging, prompt hydration, or explanation of the current execution approach.",
+  "result_processor_customizations": {
+    "action_label": "playbook retrieved",
+    "result_type": "playbook_content",
+    "result_description": "Full playbook markdown content"
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving a playbook by ID. get_playbook accepts {playbook_id}.",
+    "error_interpretation": "NotFound: playbook_id does not exist or has been deleted."
+  }
+}

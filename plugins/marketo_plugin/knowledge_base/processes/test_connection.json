@@ -1,0 +1,16 @@
+{
+  "process_key": "plugin::marketo_plugin::test_connection",
+  "display_name": "Marketo: Test Connection",
+  "description": "Verify the configured Marketo credentials by minting an OAuth bearer token against the identity endpoint. Returns ok, base_url, client_id.",
+  "embedding_description": "Verify ONLY that Marketo credentials are reachable — mint a bearer token against the configured instance, confirming the marketo_instance address-book entry is complete and the client_id/client_secret are valid. Does NOT check what the API user's Role can actually DO; for that, run check_setup instead. Diagnostic only, no marketing data touched.",
+  "result_processor_customizations": {
+    "action_label": "Marketo connection verified",
+    "result_type": "marketo_test_connection_result",
+    "result_description": "Dict with ok (bool), base_url, client_id."
+  },
+  "error_processor_customizations": {
+    "action_context": "Verify the configured Marketo instance is reachable.",
+    "error_interpretation": "marketo.not_configured: no marketo_instance address-book entry registered yet. marketo.auth_failed: the OAuth client_id/client_secret were rejected.",
+    "recovery_guidance": "marketo.not_configured: register the marketo_instance address-book entry (see hydration_guidance.md). marketo.auth_failed: ask the operator to check the LaunchPoint custom service's client_id/client_secret."
+  }
+}

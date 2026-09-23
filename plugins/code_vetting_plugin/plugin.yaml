@@ -1,0 +1,17 @@
+name: code_vetting_plugin
+description: >
+  The AI code-vetting suite's runtime verb surface. Exposes the DETERMINISTIC
+  layer as two EDGE verbs — vet_codebase (the full 15-scanner L1 pipeline:
+  secrets, SAST, dependency/license, the platform gate wrappers, the rg
+  identity/PII/network battery, hidden-unicode, duplication, orphan-KB) and
+  scan_quality_guidelines (the platform quality-gate toolchain only; advisory
+  per R5). Both return a bounded metrics summary + a bounded severity-ranked
+  markdown report. The minutes-long L2 critic / L3 inference-verify stages are
+  NOT verbs (action-queue fast-return contract) — they are joseki-dispatched
+  agent sessions (W3-C). Local-profile only: the verbs self-vet the git
+  worktree (located from APP_HOME) and fail-loud where there is no worktree, so
+  exclude from cloud manifests.
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider

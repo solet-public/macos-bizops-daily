@@ -1,0 +1,21 @@
+name: default_inference_plugin
+description: Anthropic Claude inference provider
+optional: false
+
+implements:
+  - interface: InferenceInterface
+
+config:
+  api_key:
+    type: string
+    required: true
+    secret: true
+    description: Anthropic API key
+  model:
+    type: string
+    required: true
+    default: claude-sonnet-4-20250514
+    description: Model to use
+
+connection_test:
+  type: anthropic

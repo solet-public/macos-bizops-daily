@@ -1,0 +1,26 @@
+{
+  "process_key": "service_interface::thinking_service::generate_section_stem_wbs",
+  "display_name": "Generate Section Stem WBS",
+  "description": "Deterministically generate a per-section pipeline Work Breakdown Structure from a PipelineSpec. The platform reads the style-family pipeline schema, resolves layer activation and parameter values, and emits the WBS — no thinking model call. Use after the PipelineSpec has been authored to skip thinking-model WBS authoring for per-section pipeline phases.",
+  "embedding_description": "Deterministically generate work breakdown structure from pipeline specification. Resolve section layers from a pipeline spec and schema. Emit WBS without thinking model. Generate per-section pipeline WBS deterministically. Section stem assembly. Schema-driven WBS generation. Replace thinking-model WBS authoring for pipeline phases.",
+  "result_processor_customizations": {
+    "action_label": "Work Breakdown Structure generated",
+    "result_type": "wbs_create_result",
+    "result_description": "Deterministic Work Breakdown Structure generation result",
+    "presentation_guidance": "",
+    "output_action_guidance": "The Work Breakdown Structure has been generated deterministically and is now available as working context. Continue executing the current step as shown in the updated ACTIVE_PLAN.",
+    "message_rendering": {
+      "renderer_key": "artifact_result_compact",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Deterministically generating a Work Breakdown Structure from a PipelineSpec. generate_section_stem_wbs accepts {wbs_id, manifest_id, phase_number, phase_name, style_family, artifact_prefix, pipeline_spec}. The platform resolves layers and emits the WBS without a thinking model call.",
+    "error_interpretation": "ValueError: pipeline_spec failed validation against the schema (required source path missing, schema_id mismatch, parameter_group not declared). FileNotFoundError: pipeline_schema.json missing for the named style_family. StorageError: knowledge base write failed."
+  }
+}

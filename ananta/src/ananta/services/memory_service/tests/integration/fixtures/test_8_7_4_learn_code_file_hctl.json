@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::learn",
+  "arguments": {
+    "path": "/tmp/test_code_file.py",
+    "tags": ["test", "code"]
+  }
+}

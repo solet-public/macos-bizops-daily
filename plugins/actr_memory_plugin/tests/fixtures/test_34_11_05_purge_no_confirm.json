@@ -1,0 +1,14 @@
+{
+  "name": "test_purge_no_confirm",
+  "description": "Verify that purge without confirmation flag is rejected as a safety measure",
+  "process_key": "plugin::actr_memory_plugin::purge_memories_action",
+  "arguments": {
+    "params": {
+      "confirm": false
+    },
+    "state": {
+      "session_id": "test-session-104"
+    }
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,34 @@
+# Bundle-license gate — tracked-debt register.
+#
+# Format: <check_id> <bundle>::<subject>          ('#' starts a comment)
+#
+#   B0  undeclared-license    bundle plugin declares no license
+#   B1  non-apache-in-bundle  bundle plugin declares a non-Apache-2.0 SPDX id
+#   B2  strong-copyleft-dep   GPL/AGPL/SSPL/OSL/EUPL/CDDL/EPL in the closure
+#   B3  unresolvable-dep      declared dependency not installed (closure partial)
+#
+# Removing an entry is the unit of remediation progress. Allowlisted findings
+# are still PRINTED — the gate stays honest — they just do not block.
+#
+# B2 entries in particular should be rare and argued: a strong-copyleft package
+# inside an Apache-2.0 distribution is the failure this gate exists to catch.
+#
+# D-3-structural migration (2026-09-20, iss_23fa51b5/iss_9b0ad3d5): both
+# entries now carry the mandatory owner/reason/expires schema (see
+# quality_gates/allowlist_schema.py); expires (2027-03-20) is a uniform
+# 180-day migration default, not a reassessed per-entry date.
+
+# macos_samantha is a personal profile sealed `internal_private` (see the seed
+# publish runbook's license_policy contract), not part of the public Apache
+# distribution, so it may legitimately carry a separately-licensed connector.
+B1 macos_samantha::schwab_market_data_plugin  # owner: license-policy-internal-private reason: see comment above; internal_private profile policy carve-out, not remediation debt expires: 2027-03-20
+
+# PENDING OPERATOR/COORDINATOR RULING (raised 2026-07-26, Claude-Reviewer-B).
+# Found by this gate on its first run; NOT in the bizops_standard audit scope.
+# `chatgpt_export_session_source_plugin` ships only in `macos_samantha` (an
+# internal_private seed) and is a member of the ChatGPT/Codex session-source
+# family, which PLUGIN_LICENSING_CONVENTION.md names explicitly as private
+# internal tooling -> `LicenseRef-Proprietary`. That is the recommendation, but
+# the bucket was not ruled, so it is parked here rather than guessed. Remove
+# this line and stamp the plugin once the bucket is ruled.
+B0 macos_samantha::chatgpt_export_session_source_plugin  # owner: Claude-Reviewer-B reason: pending operator/coordinator ruling raised 2026-07-26, see comment above expires: 2027-03-20

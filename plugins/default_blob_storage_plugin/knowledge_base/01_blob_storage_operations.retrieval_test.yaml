@@ -1,0 +1,62 @@
+# Retrieval-test companion for the blob storage operations article.
+# Promoted from the root-level dev-only knowledge_bases/platform_capabilities/
+# article (unshippable — root knowledge_bases/ is absent from the seed's
+# copy set) into this plugin's own shipping KB shelf, per Coordinator-Dawn's
+# ruling 2026-08-02 (census disposition: PROMOTED-with-pruning — the
+# restart-semantics section was dropped as redundant with
+# ananta/knowledge_base/in_session_reload_ergonomics.md, already shipped).
+# Gated by service_interface::knowledge_service::test_retrieval — live-run
+# against the real index before landing, not just written and assumed.
+#
+# Two things measured, not silently dropped:
+#
+# 1. Prose-vs-prose dedup (Dawn's actual concern): the two forbidden_queries
+#    below confirm this article does NOT compete with
+#    in_session_reload_ergonomics.md's restart-semantics turf — both queries
+#    come back with this article entirely absent from the results. PASSES.
+#
+# 2. Prose-vs-JSON-card overreach: tried several forbidden_queries targeting
+#    a single sibling process card's param/error-code specifics (e.g.
+#    "update_blob_metadata argument shape", a verb this article never even
+#    names). This article still ranked 1-2 on every one tried. Root-caused,
+#    not accepted blind: the PRE-EXISTING root article
+#    (platform_capabilities/platform_blob_storage_operations.md, kept as-is
+#    per Dawn's ruling) shows the identical pattern on the same queries —
+#    this is a structural prose-overview-vs-narrow-JSON-card characteristic
+#    of the retrieval index, not a defect this article's authoring
+#    introduced. The gate Dawn actually named to watch — cosine
+#    distinguishability vs this shelf's own 8 sibling process JSON cards —
+#    was measured separately and passes cleanly (highest 0.8131, well under
+#    the 0.90 warn / 0.97 fail thresholds). Not encoded as a forbidden_query
+#    here because it cannot pass at any reasonable forbidden_min_rank given
+#    that structural pattern; recorded here so a future editor doesn't
+#    re-litigate it as a fresh defect.
+
+article_path: plugins/default_blob_storage_plugin/knowledge_base/01_blob_storage_operations.md
+consumer_profile: both
+
+target_queries:
+  - "how do I retrieve a file the user uploaded by name in a plan step"
+  - "list available files in blob storage"
+  - "ingest a finished FLAC render as a blob without base64-encoding it"
+  - "where does a blob's original filename live"
+  - "store_blob_from_file vs store_blob when to use which"
+  - "inspect blob metadata without downloading its content"
+  - "filename lost when reading a blob from its on-disk path"
+  - "list only audio files in blob storage by type"
+  - "find blobs by tag or metadata filter in a namespace"
+
+forbidden_queries:
+  - "how do I pick up new code without a bare restart"              # in_session_reload_ergonomics.md should win this
+  - "blue-green apply_manifest restart semantics"                   # in_session_reload_ergonomics.md should win this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions:
+  - service_interface::blob_storage_service::retrieve_blob_by_name
+  - service_interface::blob_storage_service::file_command
+  - service_interface::blob_storage_service::get_blob_metadata
+  - service_interface::blob_storage_service::store_blob_from_file
+  - service_interface::blob_storage_service::store_blob
+  - service_interface::blob_storage_service::search_blobs

@@ -1,0 +1,7 @@
+{
+  "natural_language_query": "What's the embedding dimension?",
+  "expected_process_key": "service_interface::embedding_service::get_embedding_dimension",
+  "expected_arguments_structure": {
+    "model": "string (optional)"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_scheduling_plugin::get_schedules_by_tag",
+  "display_name": "Get Schedules By Tag",
+  "description": "List schedules that match a specific tag. Use to verify that a heartbeat/check-in schedule exists (or diagnose duplicates) without querying raw tables. Read-only introspection; does not modify state.",
+  "embedding_description": "List schedules matching a tag. Verify a global heartbeat exists (heartbeat:global), detect duplicate schedules, and inspect check-in/timeout schedules before cleanup. Read-only introspection; prefer over raw state_service SQL for routine schedule checks.",
+  "result_processor_customizations": {
+    "action_label": "Schedules Listed",
+    "result_type": "schedule_list",
+    "result_description": "List of schedules that match the given tag (schedule_id, type, status, cron/run_at, label, tags, and execution context like session_id/flow_id)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Schedules matching the tag were retrieved. If none exist and you need a heartbeat/check-in, create one. If multiple exist unintentionally, clear by tag and recreate a single schedule."
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing schedules by tag for heartbeat/check-in introspection",
+    "error_interpretation": "ParameterError: tag parameter is missing or empty. ExecutionError: scheduler service unavailable or failed to query schedules.",
+    "recovery_guidance": "For parameter errors: provide a non-empty tag string. For scheduler errors: verify the scheduling service is running; as a fallback, use state_service::read_state/execute_sql to inspect schedules directly if permitted."
+  }
+}

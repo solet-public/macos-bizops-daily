@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::blob_storage_service::store_blob_from_file",
+  "display_name": "Store Blob From File",
+  "description": "Ingest a file from disk as a blob. The agent supplies an absolute file_path; the solet reads the bytes, derives metadata (filename, mime_type, source_path, byte_count, artifact_type), and stores it. Returns the blob_id for downstream actions. The agent never holds the file content.",
+  "embedding_description": "Store blob from a file. Ingest finished render, upload audio file, persist binary artifact, load image from disk. Agent supplies absolute file_path + namespace; the solet reads bytes, infers MIME, persists. Use for FLAC/M4A/MP3/WAV renders, JPEG/PNG/WebP cover art, MP4/MOV video. Returns blob_id for downstream actions like soundcloud upload_track.",
+  "result_processor_customizations": {
+    "action_label": "Blob ingested from file",
+    "result_type": "blob_stored",
+    "result_description": "Storage confirmation with blob_id (unique identifier for retrieval), namespace, and the merged metadata (filename, mime_type, source_path, byte_count, artifact_type, plus any caller-supplied fields). Never echoes the binary content.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result. The returned blob_id is the canonical reference to pass to downstream actions that consume blobs (e.g. an upload step)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads a local file from an absolute path and stores its bytes as a blob. The agent supplies only the path; the platform reads the contents.",
+    "error_interpretation": "file_path_not_absolute: file_path must be absolute (no ~, no relative paths). file_not_found: no file at the supplied path. file_not_regular: path exists but is a directory or other non-regular entry. file_unreadable: file exists but the solet's user lacks read permission. file_empty: file is zero bytes. mime_type_unknown: extension did not yield a MIME type and none was supplied explicitly.",
+    "recovery_guidance": "For file_path_not_absolute: ask the user for an absolute path (e.g. /path/to/quarterly_report.pdf, not ~/Documents/quarterly_report.pdf). For file_not_found / file_unreadable: confirm the path and that the solet's user can read it. For file_not_regular: pass a real file path, not a directory. For file_empty: confirm the render actually produced output. For mime_type_unknown: pass mime_type explicitly (e.g. 'audio/flac', 'image/jpeg')."
+  }
+}

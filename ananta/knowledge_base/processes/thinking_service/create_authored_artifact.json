@@ -1,0 +1,26 @@
+{
+  "process_key": "service_interface::thinking_service::create_authored_artifact",
+  "display_name": "Create Authored Artifact",
+  "description": "persist an authored-by-value artifact document. The calling agent authors the full document and passes it in `content`; the artifact_type parameter selects validation, storage, and focus configuration.",
+  "embedding_description": "Persist an authored artifact document. The calling agent writes the full document and passes it by value; the artifact_type parameter selects which structural validation, storage, and focus configuration to use. The platform derives identifiers, validates the authored structure, stores the document, and returns it as working context for the next turn.",
+  "result_processor_customizations": {
+    "action_label": "Authored artifact created",
+    "result_type": "authored_artifact_create_result",
+    "result_description": "Authored artifact creation result",
+    "presentation_guidance": "",
+    "output_action_guidance": "The authored artifact has been stored and is now available as working context. Continue executing the current step as shown in the updated ACTIVE_PLAN.",
+    "message_rendering": {
+      "renderer_key": "artifact_result_compact",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Persisting an authored-by-value artifact document. create_authored_artifact accepts {artifact_type, content}. The calling agent must author the full document and pass it in `content` (markdown; for pipeline_spec, the raw JSON payload) — the platform never generates it. The platform derives artifact_id and parent_id deterministically — never include them in the action arguments.",
+    "error_interpretation": "authored_content_required: `content` was missing or empty — the thinking-model authoring path was retired (DEP-01); author the full document and pass it by value. ValidationError: arguments do not conform to the schema, or the authored document failed structural validation. StorageError: knowledge base write failed. UnknownArtifactType: the artifact_type is not registered in the plugin configuration. ArtifactIdDerivationError: the authored brief is missing composition_number or genre, or no Work Manifest is in focus."
+  }
+}

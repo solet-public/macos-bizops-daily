@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::refresh_plugin_processes",
+  "display_name": "Refresh Plugin Processes",
+  "description": "Reload all process JSON files from the named plugin's knowledge base and update the live process registry. Performs full discovery rebuild after applying changes. Use plugin_name='ananta' for platform service interfaces.",
+  "embedding_description": "Bulk-reload every process a plugin owns in one sweep after editing or adding several of its JSON files, rebuilding all of that plugin's live registry entries at once without a restart. Takes only plugin_name and needs no process_key, refreshing the whole plugin's entire process surface together; pass 'ananta' for platform service interfaces. Use after a batch of process JSON edits.",
+  "result_processor_customizations": {
+    "action_label": "Plugin processes refreshed",
+    "result_type": "process_refresh_result",
+    "result_description": "Count of updated processes and their process keys",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reloading process definitions from knowledge base JSON files",
+    "error_interpretation": "FileNotFoundError: plugin knowledge base directory not found. ValueError: JSON validation failed (missing process_key or field mismatch). RuntimeError: orchestrator not available for registry update.",
+    "recovery_guidance": "Verify the plugin name is correct and the knowledge base directory contains valid process JSON files."
+  }
+}

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "macos_self_deployment_plugin"
+version = "1.0.0"
+description = "macOS self-deployment plugin — router-mediated blue-green swap between co-resident the solet instances on the same machine."
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+]
+
+[project.entry-points."ananta.plugins"]
+macos_self_deployment_plugin = "macos_self_deployment_plugin.plugin:MacosSelfDeploymentPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["macos_self_deployment_plugin*"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

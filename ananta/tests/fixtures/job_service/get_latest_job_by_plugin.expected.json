@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\""
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Filter by plugin_name only - should return job with provider_name starting with 'default_inference_plugin.' or null"
+}

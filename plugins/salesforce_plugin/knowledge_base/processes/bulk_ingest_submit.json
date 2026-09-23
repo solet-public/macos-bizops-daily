@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::bulk_ingest_submit",
+  "display_name": "Salesforce: Bulk Ingest Submit",
+  "description": "Submit a Bulk API v2 ingest job (insert, update, upsert, or delete -- NOT hardDelete, which is excluded) from a CSV file already on disk, against the configured Salesforce org. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- this is the PLUGIN's own async job envelope, distinct from the Salesforce Bulk job id delivered when this job completes. The Salesforce job is submitted with --async and NEVER waited on inline -- a bulk job can run minutes, well past this connector's per-call subprocess bound -- so poll bulk_job_status with the delivered job_id to track it to completion. csv_path must be an ABSOLUTE path contained under an operator-configured import_allowed_roots entry (empty config refuses every ingest). external_id_field is required when, and only when, operation is 'upsert'.",
+  "embedding_description": "Kick off a large bulk load of thousands of Salesforce records from a CSV file on disk -- mass insert, update, upsert-by-external-id, or delete -- without pulling data through context. Not for one record (create_record/update_record) or bypassing the recycle bin (hardDelete refused). Returns a job_id at once; poll bulk_job_status for the Salesforce job's own id and state.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce bulk ingest job queued",
+    "result_type": "salesforce_bulk_ingest_submit_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the Salesforce bulk job -- the actual bulk job_id, its initial state, and record counts arrive separately, as their own message, when this dispatch's job completes.",
+    "presentation_guidance": "This call only confirms the SUBMISSION was queued -- do not present job_id/status as proof the bulk job exists yet. Acknowledge the request is in flight; the Salesforce job_id and initial state land in a follow-up message. Once delivered, tell the user the Salesforce bulk job_id explicitly (they will need it for bulk_job_status/bulk_job_results/bulk_job_abort) and note it can take minutes to finish -- do not imply the records are loaded yet."
+  },
+  "error_processor_customizations": {
+    "action_context": "Submit a Bulk API v2 ingest job to Salesforce from an on-disk CSV file.",
+    "error_interpretation": "sf.invalid_params: missing/invalid operation, sobject, or csv_path; hardDelete requested (excluded); external_id_field given without operation=upsert, or missing when operation=upsert. sf.import_path_refused: csv_path is not absolute, not a .csv, not contained under any configured import_allowed_roots entry (empty by default refuses everything), or the file does not exist. sf.permission_denied: the CLI's authenticated user lacks bulk-load permission for this object.",
+    "recovery_guidance": "sf.invalid_params naming operation: use one of insert/update/upsert/delete; for upsert, supply external_id_field, and omit it otherwise. sf.import_path_refused: pass an ABSOLUTE path ending in .csv, pointing at a file that actually exists, under a configured workspace root -- if import_allowed_roots is empty, add the operator's ingest directory to the salesforce_plugin config (profile/config/plugins/salesforce_plugin.json) and reload the plugin config. sf.permission_denied: ask the operator to check bulk API permission for this object."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "test_read_state_no_results",
+  "description": "Verify read_state returns empty records array when no results match",
+  "process_key": "plugin::postgres_state_management_plugin::read_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "query": {
+        "table": "key_value_store",
+        "filters": {
+          "namespace": "nonexistent_namespace_xyz_12345"
+        }
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

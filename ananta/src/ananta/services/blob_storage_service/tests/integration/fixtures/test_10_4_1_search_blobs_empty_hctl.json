@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::blob_storage_service::search_blobs",
+  "arguments": {
+    "namespace": "test_namespace_empty",
+    "metadata_filters": {}
+  }
+}

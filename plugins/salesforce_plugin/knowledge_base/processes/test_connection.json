@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::test_connection",
+  "display_name": "Salesforce: Test Connection",
+  "description": "Verify the org binding by querying the org record through the sf CLI. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; ok, org_id, the verified username, and the pinned api_version are delivered when the job completes.",
+  "embedding_description": "Verify the Salesforce connector is configured and reachable, surfacing the resolved org id, the authenticated username, and the API version in use. A health check for diagnosing a credential or connection problem before relying on the query and record verbs. Dispatches asynchronously -- job_id first, the health-check outcome moments later.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce connection check queued",
+    "result_type": "salesforce_test_connection_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the health-check outcome -- ok/org_id/username/api_version arrive separately, as their own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the check was queued -- do not present job_id/status as the connection result. Acknowledge the check is in flight; ok plus org_id/username land in a follow-up message when the job completes. Once delivered, report them for the operator's confirmation; low sensitivity (connection metadata, data_sensitivity 0.1)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Test the configured Salesforce connection.",
+    "error_interpretation": "sf.not_configured: no salesforce_org address-book entry is registered, or it is incomplete, or the CLI alias resolves to a different org than the pinned instance_host. sf.auth_failed: the sf CLI has no live session for the registered org. sf.api_error: an unexpected org error.",
+    "recovery_guidance": "sf.not_configured: register the salesforce_org address-book entry per the plugin's KB runbook. sf.auth_failed: ask the operator to re-establish the org session with: sf org login web."
+  }
+}

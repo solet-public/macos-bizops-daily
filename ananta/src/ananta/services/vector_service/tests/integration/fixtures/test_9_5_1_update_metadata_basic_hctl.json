@@ -1,0 +1,11 @@
+{
+  "process_key": "service_interface::vector_service::update_metadata",
+  "arguments": {
+    "namespace": "pgvector_service_plugin",
+    "vector_id": "test-fixture-9-1-1",
+    "metadata": {
+      "updated_by": "integration_test_9_5_1",
+      "test_run": "automated"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fresh_install_smoke_plugin"
+version = "1.0.0"
+description = "Test fixture for ER-12 install_plugin_from_path smoke. Mirrors claude_ai_url_session_source_plugin's dependencies=[] shape so the smoke targets the actual root causes (entry-point cache + allowlist freeze) and not new-pip-dep resolution."
+requires-python = "==3.13.*"
+dependencies = []
+
+[project.entry-points."ananta.plugins"]
+fresh_install_smoke_plugin = "fresh_install_smoke_plugin.plugin:FreshInstallSmokePlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["fresh_install_smoke_plugin*"]

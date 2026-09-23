@@ -1,0 +1,31 @@
+{
+  "name": "test_store_vectors_batch",
+  "description": "Store multiple vector embeddings in a single batch operation",
+  "process_key": "plugin::pgvector_service_plugin::store_vectors_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vectors": [
+        {
+          "vector": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+          "dimension": 8,
+          "metadata": {"doc_id": "doc1", "chunk": 0}
+        },
+        {
+          "vector": [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+          "dimension": 8,
+          "metadata": {"doc_id": "doc1", "chunk": 1}
+        },
+        {
+          "vector": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+          "dimension": 8,
+          "metadata": {"doc_id": "doc1", "chunk": 2}
+        }
+      ]
+    },
+    "state": {
+      "current_session_id": "test-store-batch-001"
+    },
+    "timeout_seconds": 30
+  }
+}

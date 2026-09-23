@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::thinking_service::complete_joseki_run",
+  "display_name": "Complete Joseki Run",
+  "description": "Terminal step of a platform-driven joseki run. The instantiator appends this as the run WBS's final step; it CAS-transitions the run row to completed and records run evidence (candidate cards earn proven) exactly once — a lost CAS is a benign no-op. Platform-bound, not an operator entry point.",
+  "embedding_description": "Internal terminal plan step that closes a platform-driven joseki run: compare-and-set the run row to completed, release the plan focus buffer, and record the card's run evidence so a candidate joseki earns proven on its first successful run. Bound only by instantiated run WBS documents — never invoked by hand. Distinct from run_joseki (the kickoff) and record_authored_joseki_run (the bare evidence verb it delegates to)."
+}

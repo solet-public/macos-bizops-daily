@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::provision_cli",
+  "display_name": "Salesforce: Provision CLI",
+  "description": "Install the reviewed Homebrew sf formula only after explicit system-change acknowledgement, then persist the verified absolute sf_cli_path without hiding a restart or reload boundary.",
+  "embedding_description": "Provision a missing local Salesforce sf command for this plugin when a user has approved the exact Homebrew system change. This process probes first, never reinstalls a compliant executable, binds the verified absolute path into Salesforce plugin configuration, and does not perform Salesforce browser login or contact an org.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce CLI provisioned",
+    "result_type": "salesforce_provision_cli_result",
+    "result_description": "Bounded local provisioning verdict with whether Homebrew installed sf, its verified absolute executable path, version, and the explicit configuration boundary.",
+    "presentation_guidance": "State whether sf was newly installed or already present, and state that the plugin configuration was rebound without a hidden reload or restart. Do not represent this as Salesforce authentication."
+  },
+  "error_processor_customizations": {
+    "action_context": "Provision and bind the local Salesforce CLI under explicit system-change consent.",
+    "error_interpretation": "sf.provision_consent_required means no package install or executable-binding update was authorized. sf.not_configured means Homebrew, its reviewed sf plus Node plan, the post-install version probe, or the ordinary plugin configuration update could not be completed.",
+    "recovery_guidance": "For sf.provision_consent_required, obtain explicit acknowledgement and repeat. For sf.not_configured, repair the named local prerequisite, ensure Homebrew plans only sf plus Node without upgrades or removals, then retry; browser login remains a separate operator step."
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "error",
+    "Either vector_ids or filters must be provided",
+    "required"
+  ],
+  "action_status": "error"
+}

@@ -1,0 +1,26 @@
+name: claude_code_filesystem_session_source_plugin
+description: |
+  LLM session ledger source that imports Claude Code session transcripts
+  by tailing the local `.claude/projects/<encoded_cwd>/<session_id>.jsonl`
+  files. One file per session, append-only, one JSONL event per line.
+  Parent-child UUID linkage + tool_use/tool_result projection per
+  spec §17.3 M3.
+
+implements:
+  - interface: LLMSessionSourceInterface
+  - interface: PullingSourceMixin
+
+optional: true
+
+config:
+  root_uri:
+    description: >-
+      Filesystem path containing Claude Code per-project session
+      directories. Each subdirectory holds one or more <session_id>.jsonl
+      files. Defaults to the per-user CLI default.
+    default: "~/.claude/projects"
+  glob:
+    description: >-
+      File-name glob used to enumerate session files inside each project
+      subdirectory. Producer's contract is one .jsonl file per session.
+    default: "*.jsonl"

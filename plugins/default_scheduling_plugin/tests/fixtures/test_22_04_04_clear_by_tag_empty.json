@@ -1,0 +1,15 @@
+{
+  "name": "test_clear_by_tag_empty",
+  "description": "Attempt to clear by tag with an empty tag string",
+  "process_key": "plugin::default_scheduling_plugin::clear_scheduled_actions_by_tag",
+  "arguments": {
+    "params": {
+      "tag": ""
+    },
+    "state": {
+      "session_id": "test-session-304",
+      "flow_id": "test-flow-304"
+    }
+  },
+  "timeout_seconds": 30
+}

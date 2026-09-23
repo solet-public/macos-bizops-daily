@@ -1,0 +1,34 @@
+{
+  "name": "test_store_blob",
+  "description": "Store binary content with base64 payloads plus metadata, asserting the service returns a blob ID we can later delete.",
+  "sequence": [
+    {
+      "step": "store_blob",
+      "process_key": "service_interface::blob_storage_service::store_blob",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "content": "QmxvYiBzdG9yYWdlIHN0b3JlIHRlc3QgcGF5bG9hZC4=",
+        "metadata": {
+          "original_name": "integration_store_blob.txt",
+          "mime_type": "text/plain",
+          "description": "Blob storage integration payload for store test",
+          "tags": "blob-tests,store"
+        }
+      },
+      "capture": {
+        "blob_id": {
+          "source": "action_event",
+          "field": "data.file_id"
+        }
+      }
+    },
+    {
+      "step": "cleanup_delete_blob",
+      "process_key": "service_interface::blob_storage_service::delete_blob",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "blob_id": "${blob_id}"
+      }
+    }
+  ]
+}

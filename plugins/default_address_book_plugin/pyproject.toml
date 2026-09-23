@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "default-address-book-plugin"
+version = "0.1.0"
+description = "Address registry plugin for Ananta with memory integration"
+authors = [{name = "Ananta Development Team"}]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+]
+
+[project.entry-points."ananta.plugins"]
+default_address_book_plugin = "default_address_book_plugin.plugin:DefaultAddressBookPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["default_address_book_plugin"]

@@ -1,0 +1,91 @@
+{
+  "process_key": "service_interface::inference_service::process_results",
+  "display_name": "Process Results (Result Processing Inference)",
+  "description": "Process action results and determine next steps or format output for users",
+  "embedding_description": "Result-processing inference. Take action results and format user output, then decide next steps or follow-up actions. Provide a prompt with results and context; returns formatted output and continuation actions.",
+  "action_definition_template_arguments": {
+    "params": {
+      "model": {},
+      "prompt": {
+        "message_rendering": {
+        "ephemeral": false,
+        "history_kind": "output_event",
+        "transition_behavior": "living_to_ossified"
+      },
+      "observation": {
+        "action_result": {
+          "action_status": "completed",
+          "data": "<<RESULT>>",
+          "_completed_arguments": "<<ACTION_ARGUMENTS>>"
+        }
+      },
+        "user": {
+        "instructions": [
+          "For user-visible communication, first use query_process_registry to resolve the active IO plugin namespace, then invoke plugin::<namespace>::post_message with message in the actions array. Resolve any namespace-specific arguments from the returned schema.",
+          "An empty actions array ends the flow silently.",
+          "",
+          "If RESULT.data contains available_attachments, include those names in attachments.",
+          "attachments is a list of name strings from available_attachments.",
+          "To share all files: attachments: ['name1', 'name2', ...]",
+          "To share no files: attachments: []"
+        ],
+        "output_schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "actions"
+          ],
+          "properties": {
+            "actions": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "required": [
+                  "process",
+                  "reason",
+                  "arguments"
+                ],
+                "properties": {
+                  "process": {
+                    "type": "object",
+                    "required": [
+                      "provider_type",
+                      "provider",
+                      "function_name"
+                    ],
+                    "properties": {
+                      "provider_type": {
+                        "type": "string",
+                        "enum": [
+                          "plugin",
+                          "service_interface"
+                        ]
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "function_name": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "arguments": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "flow_input": "<<<:service_interface::flow_service::get_flow_input_for_presentation()>>>"
+        }
+      }
+    }
+  }
+}

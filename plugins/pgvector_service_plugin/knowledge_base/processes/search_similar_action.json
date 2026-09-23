@@ -1,0 +1,24 @@
+{
+  "process_key": "plugin::pgvector_service_plugin::search_similar_action",
+  "display_name": "Search Similar Vectors",
+  "description": "Find vectors similar to a query vector using semantic similarity",
+  "embedding_description": "Search for vectors similar to a query vector with optional filters and distance metric. Returns ranked results with similarity scores. Use for semantic search and nearest-neighbor lookup with cosine, euclidean, or dot-product metrics.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Similarity search",
+    "result_type": "vectors_searched",
+    "result_description": "Similar vectors with similarity scores and metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result.",
+    "field_sensitivities": {
+      "results": 0.5,
+      "count": 0.1
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Performs k-nearest-neighbor search in a pgvector namespace using cosine, euclidean, or dot-product distance with optional metadata filters.",
+    "error_interpretation": "ValidationError: namespace or query_vector is missing, query_vector dimension does not match the namespace's stored dimension, top_k is non-positive, distance_metric is not one of COSINE/EUCLIDEAN/DOT_PRODUCT, or filters reference unknown metadata fields. NotFoundError: the namespace has no vectors. DatabaseError: the underlying query failed.",
+    "recovery_guidance": "Verify the query_vector length matches the namespace's dimension (see get_namespace_stats_action). Use the canonical distance_metric enum values. If top_k is large and the namespace is sparse, the result count may legitimately be less than top_k — that is not an error. Retry transient database errors once.",
+    "retryable": true
+  }
+}

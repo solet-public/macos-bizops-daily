@@ -1,0 +1,26 @@
+{
+  "process_key": "service_interface::thinking_service::graft_work_breakdown_structure_segment",
+  "display_name": "Graft Execution Segment",
+  "description": "graft a WBS-derived execution segment into the active plan tail while preserving plan lineage. The platform renumbers the grafted steps mechanically.",
+  "embedding_description": "Graft execution steps into active plan. Splice WBS-derived execution steps after the current step. Deterministic tail replacement with automatic renumbering. Preserves plan lineage without full plan replacement.",
+  "result_processor_customizations": {
+    "action_label": "Execution segment grafted",
+    "result_type": "graft_result",
+    "result_description": "The active plan has been updated with the grafted execution steps",
+    "presentation_guidance": "",
+    "output_action_guidance": "The execution segment has been grafted into the active plan. Continue executing the current step as shown in the updated ACTIVE_PLAN.",
+    "message_rendering": {
+      "renderer_key": "action_label_summary",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Grafting execution steps into the active plan. graft_work_breakdown_structure_segment accepts {wbs_id, anchor_step_number}. The platform reads the WBS and projects the next incomplete work item's steps automatically.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. NotFoundError: no focused plan to graft into."
+  }
+}

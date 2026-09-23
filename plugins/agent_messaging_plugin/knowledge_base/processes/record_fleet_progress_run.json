@@ -1,0 +1,7 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::record_fleet_progress_run",
+  "display_name": "Record a structured workstream progress assessment",
+  "description": "Appends one Phase-B assessment for one stable workstream in deployment-native state. It retains the objective citation, raw metrics, measured delta, honest assessment, recommendation, independent-critique status, escalations, and optional Phase-A run citation. It is append-only and intentionally non-retryable because a blind retry could duplicate an assessment.",
+  "embedding_description": "Persist a queryable structured Phase-B assessment for one stable workstream, with objective citation, current metrics, measured delta, evidence-based assessment, recommendation, independent-critique status, escalations, and an optional cited Phase-A run, instead of appending a markdown review entry.",
+  "processor_policy_category": "edge"
+}

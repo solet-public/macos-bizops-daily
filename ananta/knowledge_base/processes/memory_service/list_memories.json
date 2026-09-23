@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::list_memories",
+  "display_name": "List Memories",
+  "description": "List memories with filters and sorting.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "List Memories",
+    "result_type": "memory_list",
+    "result_description": "List of memories matching the filter criteria with total count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing memories with optional filters and sorting",
+    "error_interpretation": "InvalidFilterError: invalid filter value for memory_type or status. DatabaseError: failed to query memories from storage.",
+    "recovery_guidance": "For filter errors: use valid values (memory_type: episodic/semantic_l1/semantic_l2, status: active/archived). For database errors: verify state storage is accessible."
+  }
+}

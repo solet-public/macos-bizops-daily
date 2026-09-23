@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::local_self_deployment_service::status_autostart",
+  "display_name": "Read solet LaunchAgent status",
+  "description": "Read-only status check for the per-solet macOS LaunchAgent. Reports whether the plist exists, whether launchd knows the label, prior/current state, last observed run time if available, and the resolved plist path. No state is mutated.",
+  "embedding_description": "Read macOS LaunchAgent autostart status for the local solet. Reports installed_loaded, installed_not_loaded, not_installed, or failed; includes verb, solet_name, label, plist_path, prior_state, last_run_at, dry_run, and message. Read-only diagnostic for login-time autostart wiring.",
+  "result_processor_customizations": {
+    "action_label": "LaunchAgent status read",
+    "result_type": "macos_self_deployment_autostart_status_result",
+    "result_description": "AutostartResult envelope with status, verb, solet_name, label, plist_path, prior_state, last_run_at, dry_run, and message.",
+    "presentation_guidance": "Lead with status. installed_loaded is the expected configured state. not_installed means login-time autostart is absent. installed_not_loaded means the plist exists but launchd does not currently know the label."
+  },
+  "error_processor_customizations": {
+    "action_context": "Read macOS LaunchAgent autostart state.",
+    "error_interpretation": "Failures usually indicate launchctl status errors or filesystem access problems.",
+    "recovery_guidance": "If status fails, inspect launchctl list for the label and verify the plist path under ~/Library/LaunchAgents."
+  }
+}

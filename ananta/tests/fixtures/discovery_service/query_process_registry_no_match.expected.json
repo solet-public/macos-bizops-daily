@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "\"processes\": []",
+    "\"match_type\": \"no_matches\""
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Query for nonexistent capability - should return empty processes array with no_matches"
+}

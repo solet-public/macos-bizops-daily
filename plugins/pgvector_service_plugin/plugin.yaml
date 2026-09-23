@@ -1,0 +1,40 @@
+name: pgvector_service_plugin
+description: PostgreSQL pgvector-based vector storage
+optional: false
+
+implements:
+  - interface: VectorServiceInterface
+
+config:
+  host:
+    type: string
+    required: true
+    default: localhost
+    description: PostgreSQL host
+  port:
+    type: integer
+    required: true
+    default: 5432
+    description: PostgreSQL port
+  user:
+    type: string
+    required: true
+    description: Database user
+  password:
+    type: string
+    required: true
+    secret: true
+    description: Database password
+  database:
+    type: string
+    required: true
+    default: ananta
+    description: Database name
+  pool_size:
+    type: integer
+    required: false
+    default: 10
+    description: Connection pool size
+
+connection_test:
+  type: postgresql

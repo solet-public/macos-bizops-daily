@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::test_connection",
+  "display_name": "Jira: Test Connection",
+  "description": "Verify the configured Jira credentials by fetching the authenticated account. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the check finishing; ok, the site base_url, and the service account's id and display name are delivered when the job completes. Read action.",
+  "embedding_description": "Confirm the Jira connector is configured and can authenticate. Dispatches asynchronously, returning a job_id immediately; the resolved site base url plus the service account's id and display name arrive via job completion. A health check after registering or rotating credentials, confirming the token works and points at the expected site.",
+  "result_processor_customizations": {
+    "action_label": "Jira connection check queued",
+    "result_type": "jira_test_connection_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the connection check result -- the ok flag, base_url, and account detail arrive separately when the job completes and are delivered as their own message.",
+    "presentation_guidance": "This call only confirms the check was queued -- do not present job_id/status as proof the connection works. Acknowledge the request is in flight; the connectivity result lands in a follow-up message when the job completes. Once delivered, confirm connectivity and echo the base_url and account so the operator can verify the plugin points at the expected site and service account."
+  },
+  "error_processor_customizations": {
+    "action_context": "Verify the configured Jira credentials.",
+    "error_interpretation": "jira.auth_failed: the token is invalid, expired, or revoked. jira.not_configured: the jira_site address-book entry is missing or incomplete. jira.api_error: the site is unreachable or returned an unexpected error.",
+    "recovery_guidance": "jira.auth_failed: rotate the API token (mint a fresh one, agent-blind vault re-store of jira_api_token, update expires_at) per the overview runbook. jira.not_configured: register the jira_site entry."
+  }
+}

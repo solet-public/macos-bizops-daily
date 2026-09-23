@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "invalid",
+    "Invalid",
+    "error",
+    "Error",
+    "not found",
+    "namespace",
+    "failed"
+  ]
+}

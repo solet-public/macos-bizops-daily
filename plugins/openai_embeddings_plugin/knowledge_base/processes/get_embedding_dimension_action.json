@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::openai_embeddings_plugin::get_embedding_dimension_action",
+  "display_name": "Get Embedding Dimension",
+  "description": "Get the vector dimension for an embedding model.",
+  "embedding_description": "Get the embedding vector dimension for a model name or default. Use before creating vector tables or validating index sizes and to ensure embeddings share a consistent dimension. Returns model and dimension for compatibility checks.",
+  "result_processor_customizations": {
+    "action_label": "Embedding dimension retrieved",
+    "result_type": "dimension_retrieved",
+    "result_description": "Embedding dimension with keys: dimension (int), model (string)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves the vector dimension for an embedding model",
+    "error_interpretation": "ConnectionError: API endpoint not reachable. ModelError: Model not available or not found.",
+    "recovery_guidance": "For connection errors: verify the embedding service is running. For model errors: check model name or try listing available models."
+  }
+}

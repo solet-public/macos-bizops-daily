@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::memory_service::upsert_memory_by_tag",
+  "display_name": "Upsert Memory By Tag",
+  "description": "Store a single canonical memory for a tag by replacing (deleting) any existing memories with that tag, then writing the new content. The slot tag stays the replace key; an optional tags list is unioned onto it so provenance/umbrella tags (for example an agent_memory umbrella plus an origin tag) land literally on the stored record. Any duplicate records left on the slot by a prior failed delete are collapsed to the single new record (newest wins) and reported as duplicates_reconciled.\n\nUse this when you need a stable, single source of truth for a wake-up instruction memory (for example: the global heartbeat instructions under tag heartbeat:global), for a memory-passthrough projection record, or when you want a deterministic follow-up policy that should not accumulate duplicates.\n\nThis is especially useful with memory-driven scheduling patterns, where schedules wake up by memory_tag and the model reads the recalled instructions at process_results.",
+  "embedding_description": "Write a memory durably so it is not lost when the session ends. This is the verb for capturing a fact you want to keep: journaling something learned, recording a note so a later session can find it, persisting a decision or a preference across sessions, saving something durably for later recall. Stores one canonical record per tag, replacing any earlier content on that tag, so re-recording the same fact updates it in place instead of accumulating duplicates. Carries provenance/umbrella tags onto the record, including the agent_memory umbrella that exempts it from decay-driven consolidation and purge — unlike an ordinary episodic memory, a record written here does not fade. Also used for a canonical heartbeat instruction (heartbeat:global), a memory-passthrough projection record, and follow-up policy, and complements memory-driven scheduling via memory_tag.",
+  "result_processor_customizations": {
+    "action_label": "Memory Upserted",
+    "result_type": "memory_upserted",
+    "result_description": "Confirmation that the tagged memory was replaced/stored, including deleted_count, duplicates_reconciled, and the new memory identifier",
+    "presentation_guidance": "",
+    "output_action_guidance": "A tagged memory was upserted. If this memory is used as a wake-up instruction (heartbeat/follow-up), ensure any schedules reference the same memory_tag so future wake-ups retrieve the updated instructions."
+  },
+  "error_processor_customizations": {
+    "action_context": "Upserting a canonical tagged memory for wake-up instructions and follow-up coordination",
+    "error_interpretation": "DatabaseError: failed to delete or store memory records. VectorStoreError: failed to update associated embeddings.",
+    "recovery_guidance": "If deletion fails, consider using a unique tag instead of replacing. If storage fails, verify state storage and vector storage are accessible."
+  }
+}
+

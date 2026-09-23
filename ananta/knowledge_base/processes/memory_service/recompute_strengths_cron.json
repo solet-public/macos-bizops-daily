@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::recompute_strengths_cron",
+  "display_name": "Recompute Strengths (Cron Sibling)",
+  "description": "Scheduler-fired EDGE_SINK sibling that recalculates ACT-R activation strength across all memories. Terminal action; no result-processor dispatch and no inference scaffold. Cron-only wiring (`is_discoverable=False`); not surfaced via process_search. The model-callable equivalent is service_interface::memory_service::recompute_strengths.",
+  "embedding_description": "Scheduler cron sibling that fires periodic ACT-R activation-strength recomputation as an EDGE_SINK terminal action. Operator wiring used only by the actr_memory daily schedule; returns updated_count without re-entering the inference scaffold. The model-callable equivalent is service_interface::memory_service::recompute_strengths."
+}

@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::marketo_plugin::remove_leads_from_list",
+  "display_name": "Marketo: Remove Leads from List",
+  "description": "Remove up to 300 leads from a static list by id. Write action.",
+  "embedding_description": "Remove leads from a Marketo static list (segment membership) by list id and up to 300 lead ids — membership only, does NOT delete the underlying lead record (use delete_leads for that) and does NOT undo any campaign effects already triggered.",
+  "result_processor_customizations": {
+    "action_label": "Marketo leads removed from list",
+    "result_type": "marketo_remove_leads_from_list_result",
+    "result_description": "Dict with results (Marketo's per-record array: id, status [removed/skipped]), row_count, and tallies (a status -> count summary).",
+    "presentation_guidance": "Summarize the tallies (e.g. '8 removed, 1 skipped: not a member')."
+  },
+  "error_processor_customizations": {
+    "action_context": "Remove a batch of leads from a static list in the configured Marketo instance.",
+    "error_interpretation": "marketo.invalid_params: missing list_id/lead_ids or more than 300 ids. marketo.object_not_found: the list_id doesn't exist. marketo.auth_failed: OAuth credentials rejected. marketo.permission_denied: the API user's Role lacks Read-Write Person (confirmed to gate list-membership writes) — this write permission is NOT checked by check_setup, so this may be the FIRST signal of the gap.",
+    "recovery_guidance": "marketo.object_not_found: confirm the list_id via list_static_lists. marketo.permission_denied: add 'Read-Write Person' under Admin > Users & Roles > Roles > <the API role> > Access API, then retry. Individual skipped records (e.g. not a member) are in the results array, not an error."
+  }
+}

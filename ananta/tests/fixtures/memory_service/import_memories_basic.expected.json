@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "imported",
+    "skipped",
+    "total_in_file"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Import memories from JSON backup file"
+}

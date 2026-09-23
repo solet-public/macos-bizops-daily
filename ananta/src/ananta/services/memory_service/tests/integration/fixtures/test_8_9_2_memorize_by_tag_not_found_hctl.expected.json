@@ -1,0 +1,5 @@
+{
+  "exit_code": 0,
+  "output_contains": ["nonexistent-tag-xyz-12345"],
+  "output_not_contains": ["exception", "traceback"]
+}

@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snowflake_plugin"
+version = "1.0.0"
+description = "Read-only Snowflake warehouse query plugin for Ananta"
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    # Official Snowflake connector — the executor. cryptography arrives
+    # transitively (PEM private-key decode for key-pair JWT auth).
+    "snowflake-connector-python>=3.12",
+]
+
+[project.entry-points."ananta.plugins"]
+snowflake_plugin = "snowflake_plugin.plugin:SnowflakePlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["snowflake_plugin*"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

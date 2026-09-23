@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::gmail_list_messages",
+  "display_name": "Gmail: List Messages",
+  "description": "List Gmail message ids matching a Gmail search query (for example 'from:alice is:unread newer_than:7d'). Runs as a background job: dispatch returns a job_id immediately, and the matching message + thread ids arrive via a follow-up message once the search completes. Returns ids only, never message content; use gmail_get_message for one message's content once you have its id. Defaults to 500 results, matching Gmail's own real single-call maximum (Google, current as of this writing) -- there is no acknowledge_default_limit_override/row_limit pair on this verb, since the default already sits at the vendor's per-call ceiling. Requires a connected account (run connect_account first).",
+  "embedding_description": "Search the connected Gmail mailbox as a background job and return matching message identifiers. Accepts a Gmail query string using native search operators (from, to, subject, is:unread, has:attachment, newer_than). Completion delivers {id, thread_id} pairs plus a count -- never message content, up to 500/call. Pair with gmail_get_message for one message's content.",
+  "result_processor_customizations": {
+    "action_label": "Gmail search started",
+    "result_type": "g_suite_gmail_list_result",
+    "result_description": "Job queued for the Gmail search; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to search Gmail messages matching a query.",
+    "error_interpretation": "gsuite.invalid_params: missing session_id/flow_id context. gsuite.not_connected: no Google account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.not_connected: run connect_account to link the account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

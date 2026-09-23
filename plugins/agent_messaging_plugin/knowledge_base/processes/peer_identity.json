@@ -1,0 +1,11 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::peer_identity",
+  "display_name": "Qualify the calling bridge identity",
+  "description": "Returns only bounded facts about the caller identity supplied by the bridge. It never returns a stable session key.",
+  "embedding_description": "Qualify caller identity facts supplied by the bridge for this process invocation without exposing a stable session key or routing credential. The result distinguishes a currently registered bridge from one-shot attribution and an unavailable identity, so setup and doctor checks can prove identity presence without treating peer enumeration or a guessed endpoint as identity evidence.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "result_type": "peer_identity_qualification",
+    "result_description": "caller_identity_available, registered_bridge, and a safe bridge identity category."
+  }
+}

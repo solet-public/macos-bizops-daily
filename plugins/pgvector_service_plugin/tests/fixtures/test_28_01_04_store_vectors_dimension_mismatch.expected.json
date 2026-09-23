@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "dimension",
+    "Inconsistent dimensions",
+    "mismatch",
+    "error"
+  ],
+  "action_status": "error"
+}

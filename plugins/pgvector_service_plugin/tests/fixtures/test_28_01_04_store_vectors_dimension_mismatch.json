@@ -1,0 +1,26 @@
+{
+  "name": "test_store_vectors_dimension_mismatch",
+  "description": "Attempt to store vectors with inconsistent dimensions in same batch - should fail",
+  "process_key": "plugin::pgvector_service_plugin::store_vectors_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vectors": [
+        {
+          "vector": [0.1, 0.2, 0.3],
+          "dimension": 3,
+          "metadata": {"test": "first"}
+        },
+        {
+          "vector": [0.1, 0.2, 0.3, 0.4, 0.5],
+          "dimension": 5,
+          "metadata": {"test": "second"}
+        }
+      ]
+    },
+    "state": {
+      "current_session_id": "test-store-dim-mismatch-001"
+    },
+    "timeout_seconds": 30
+  }
+}

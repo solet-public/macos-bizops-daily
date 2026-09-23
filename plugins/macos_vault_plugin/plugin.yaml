@@ -1,0 +1,8 @@
+name: macos_vault_plugin
+description: Secure secrets storage using macOS Keychain (per-credential, dual-write SQL fallback during W-VAULT-MIGRATE window)
+optional: false
+
+implements:
+  - interface: VaultServiceInterface
+
+config: {}

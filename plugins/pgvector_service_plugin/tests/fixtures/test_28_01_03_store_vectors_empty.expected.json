@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "error",
+    "No vectors to store",
+    "empty",
+    "required"
+  ],
+  "action_status": "error"
+}

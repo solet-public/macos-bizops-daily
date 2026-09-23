@@ -1,0 +1,5 @@
+{
+  "query": "Learn from this documentation file",
+  "expected_process_key": "service_interface::memory_service::learn",
+  "expected_arguments": {}
+}

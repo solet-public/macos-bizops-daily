@@ -1,0 +1,155 @@
+{
+  "description": "Coordination hooks: KB-first reminder, check-your-messages reminder, role-binding reminder, an opt-in idle-wake waiter, an opt-in git-mutation guard, a heartbeat report-alive hook, a rotation-due watch hook, a rotation-due notice hook (rotation_due_notice.py) that surfaces the watch hook's own self-notify marker as prompt context for a session with no steward to notify, the memory-passthrough capture/session-context pair, and two spawn-injected worker hooks (a headless tool-allowlist gate on PreToolUse and a session-mapping capture on SessionStart) now also registered here directly (2026-08-24, seed feedback #40/S51.1) so a plugin-registered firing survives a managed policy's `strictPluginOnlyCustomization: [\"hooks\"]`, which strips the host adapters' own `--settings`-injected copy; both stay inert no-ops (exit 0, no side effect) on any session the adapters never marked as a fleet-managed spawn -- see each file's own module docstring for its exact env-var gate. Cadence ruling (2026-08-11): the KB-first and check-your-messages reminders fire on SessionStart (startup|resume|clear), not UserPromptSubmit, so they stop repeating every prompt turn -- this changes CADENCE ONLY; the 2026-08-01 ruling that KB-first is unconditionally armed (no environment gate) still stands and is unchanged by this move.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/session_context.py"
+            ]
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/rotation_due_notice.py"
+            ]
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/step_zero_reminder.py"
+            ]
+          },
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/check_messages_reminder.py"
+            ]
+          },
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/role_binding_reminder.py"
+            ]
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/session_context.py"
+            ]
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/capture_session_mapping.py"
+            ]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/wake_waiter.py"
+            ],
+            "asyncRewake": true,
+            "timeout": 86400
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/git_controller_gate.py"
+            ]
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/headless_tool_allowlist_gate.py"
+            ]
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/rotation_due_watch.py"
+            ]
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/heartbeat_report_alive.py"
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/capture.py"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

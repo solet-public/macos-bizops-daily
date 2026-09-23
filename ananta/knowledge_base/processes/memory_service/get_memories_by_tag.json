@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::get_memories_by_tag",
+  "display_name": "Get Memories By Tag",
+  "description": "List all memories with a specific tag.\n\nCommon uses:\n- Inspect a memory-driven scheduling wake-up: when a schedule fires with memory_tag=X, the platform retrieves memories tagged with X and presents them as an observation at process_results.\n- Inspect follow-up queues (e.g., followup_queue:global) and queued check-in instructions.\n- Audit or clean up tagged memories before deletion.\n\nThis is read-only; it helps you understand what follow-up instructions or queued work exist for a given tag.",
+  "embedding_description": "List memories matching a tag. Use to inspect memory-driven scheduling wake-ups (memory_tag), follow-up queues (followup_queue:*), and heartbeat instruction memories (heartbeat:global). Read-only introspection before cleanup or rescheduling.",
+  "result_processor_customizations": {
+    "action_label": "Get Memories By Tag",
+    "result_type": "memories_by_tag",
+    "result_description": "List of memories matching the specified tag",
+    "presentation_guidance": "",
+    "output_action_guidance": "Memories matching the tag were retrieved. If this tag is used as a wake-up instruction, read the content to decide what to do next (post a check-in, check job status, reschedule, or clean up completed items). If you expected a memory but none exist, you may need to remember/upsert the instructions for that tag."
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing memories with a specific tag",
+    "error_interpretation": "DatabaseError: failed to query memory records.",
+    "recovery_guidance": "For database errors: verify state storage is accessible."
+  }
+}

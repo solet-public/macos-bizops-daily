@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::thinking_service::process_planning_results",
+  "display_name": "Process Planning Results",
+  "description": "Continue the planning inference loop with observation data. This is a VERTEX process that runs the planning model to produce playbook content or submit follow-up actions.",
+  "embedding_description": "Continue the planning inference loop with observation data. Planning VERTEX that runs the planning model to produce playbook content OR submit follow-up actions based on the observation. Used by the platform's planning pathway after an action's result lands. Distinct from create_plan (initial) and upsert_plan (write-only)."
+}

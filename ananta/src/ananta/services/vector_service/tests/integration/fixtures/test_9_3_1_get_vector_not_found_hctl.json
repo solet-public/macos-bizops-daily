@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::vector_service::get_vector",
+  "arguments": {
+    "namespace": "pgvector_service_plugin",
+    "vector_id": "nonexistent-vector-id-12345"
+  }
+}

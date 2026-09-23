@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::delete_memories_by_tag",
+  "display_name": "Delete Memories By Tag",
+  "description": "Delete all memories with a specific tag and their embeddings.\n\nUse cases:\n- Knowledge base lifecycle management (remove an ingested corpus).\n- Cleanup of follow-up queues or heartbeat instruction memories that should no longer exist.\n- Implement \"replace by tag\" semantics by deleting old tagged memories before writing a new canonical memory.\n\nThis is destructive and irreversible. Prefer precise tags (e.g., heartbeat:global, followup_queue:session:<id>) and avoid broad tag patterns.",
+  "embedding_description": "Delete all memories with a specific tag (destructive). Use to clean up stale follow-up queues, remove an obsolete heartbeat instruction memory, or clear an ingested knowledge base corpus. Often paired with writing a replacement memory to implement replace-by-tag semantics.",
+  "result_processor_customizations": {
+    "action_label": "Delete Memories By Tag",
+    "result_type": "memories_deleted",
+    "result_description": "Result of deleting all memories with the specified tag",
+    "presentation_guidance": "",
+    "output_action_guidance": "Tagged memories were deleted. If this tag is referenced by a schedule (memory_tag), future wake-ups for that tag will retrieve no instructions; consider whether you should also clear any schedules that reference this tag, or replace the memory with a new canonical instruction."
+  },
+  "error_processor_customizations": {
+    "action_context": "Deleting all memories with a specific tag",
+    "error_interpretation": "DatabaseError: failed to delete memory records. VectorStoreError: failed to delete associated embeddings.",
+    "recovery_guidance": "For database errors: verify state storage is accessible. For vector store errors: verify vector storage is accessible."
+  }
+}

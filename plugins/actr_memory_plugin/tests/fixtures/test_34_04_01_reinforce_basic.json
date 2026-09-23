@@ -1,0 +1,14 @@
+{
+  "name": "test_reinforce_basic",
+  "description": "Verify reinforcing a memory adds retrieval timestamp and updates ACT-R activation strength",
+  "process_key": "plugin::actr_memory_plugin::reinforce_action",
+  "arguments": {
+    "params": {
+      "memory_id": "test-memory-uuid-002"
+    },
+    "state": {
+      "session_id": "test-session-030"
+    }
+  },
+  "timeout_seconds": 30
+}

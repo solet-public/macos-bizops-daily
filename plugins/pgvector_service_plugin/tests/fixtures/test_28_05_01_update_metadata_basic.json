@@ -1,0 +1,20 @@
+{
+  "name": "test_update_metadata_basic",
+  "description": "Update metadata for an existing vector",
+  "process_key": "plugin::pgvector_service_plugin::update_metadata_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vector_id": "test-vector-id-001",
+      "metadata": {
+        "source": "updated_document",
+        "category": "updated_category",
+        "version": 2
+      }
+    },
+    "state": {
+      "current_session_id": "test-update-basic-001"
+    },
+    "timeout_seconds": 30
+  }
+}

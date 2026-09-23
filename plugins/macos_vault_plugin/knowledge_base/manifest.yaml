@@ -1,0 +1,23 @@
+name: macos_vault_plugin
+description: >
+  macOS Vault plugin process definitions and reference documentation
+  (renamed from default_vault_plugin per Tier 3 W-VAULT-LOCAL-KEYCHAIN 2026-06-07).
+
+category: plugin-internal
+tags:
+  - plugin_reference
+  - macos_vault
+
+content:
+  patterns:
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+      - "processes/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

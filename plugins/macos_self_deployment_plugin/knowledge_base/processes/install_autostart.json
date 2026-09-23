@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_self_deployment_plugin::install_autostart",
+  "display_name": "Install solet LaunchAgent (cold-start at login)",
+  "description": "Render the per-solet macOS LaunchAgent plist at ~/Library/LaunchAgents/local.solet.<name>.plist and launchctl-load it. The LaunchAgent invokes the repo's .venv python against launch.py with SOLET_NAME exported to the env, RunAtLoad=true (fires once at every user login), KeepAlive=false (does NOT respawn — steady-state restart is owned by service_interface::self_deployment_service::restart_with_manifest blue-green). Idempotent: a pre-existing loaded LaunchAgent is unloaded first, the plist is rewritten, then re-loaded so an in-flight in-memory definition cannot go stale against a refreshed plist. The verb is sync. Omitting dry_run performs no action; dry_run=true plans the actions without writing the plist or invoking launchctl. Malformed dry_run values are refused before any plist write or launchctl invocation. Operator runs this once per machine post-birth (or via the macos_midwife runbook); the solet then boots automatically at every subsequent login. Backlog item #13 (operator-approved 2026-06-04).",
+  "embedding_description": "Install macOS LaunchAgent so solet auto-starts at user login. Wires launchd to invoke `python -m ananta.cli --app-home <root>/profile` with SOLET_NAME set. Idempotent unload-then-reload. KeepAlive={Crashed:true} — crash-recovery via LaunchAgent; steady-state restart via blue-green. Midwife birth does NOT install autostart. Returns AutostartResult: status, label, plist_path, prior_state.",
+  "result_processor_customizations": {
+    "action_label": "LaunchAgent installed + loaded",
+    "result_type": "macos_self_deployment_autostart_install_result",
+    "result_description": "AutostartResult frozen dataclass with status (success / dry_run / failed), verb='install_autostart', solet_name, label (local.solet.<name>), plist_path, prior_state (absent / present_already_current / present_but_stale / present_not_loaded), last_run_at (ISO-8601 UTC of last launchd invocation if known, empty otherwise), dry_run flag echo, and human-readable message.",
+    "presentation_guidance": "Lead with status. On status='success', surface the label + plist_path + message — the operator now has a solet that boots at next login. On status='dry_run', surface the planned action including prior_state. On status='failed', surface the message verbatim (launchctl stderr or filesystem error)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Install macOS LaunchAgent that boots the solet at user login.",
+    "error_interpretation": "launchctl_load_failed: the launchctl invocation rejected the plist (typically a malformed key, an already-loaded label not unloaded first, or insufficient permissions on the plist file). filesystem_error: could not create the LaunchAgents directory or write the plist file (permission denied, disk full, etc.).",
+    "recovery_guidance": "launchctl_load_failed: read the error message; if 'Already loaded' surfaces, re-run install_autostart — the idempotency path handles unload-then-reload. filesystem_error: check that ~/Library/LaunchAgents/ is writable by the operator's user."
+  }
+}

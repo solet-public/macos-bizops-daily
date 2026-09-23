@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::gmail_send",
+  "display_name": "Gmail: Send Message",
+  "description": "Send a plain-text email from the connected account. Optional 'attachments' is a list of blob ids (from blob storage) that are attached by filename + mime type. Runs as a background job: dispatch returns a job_id immediately, and the sent message id + thread id arrive via a follow-up message once delivery completes. Requires a connected account. This is a write action — it delivers real mail.",
+  "embedding_description": "Compose and send an outgoing email through the connected Gmail account as a background job: a recipient address, a subject, a plain-text body, and optionally files pulled from platform blob storage to attach. Dispatch returns a job_id for tracking; completion delivers the sent message id once Gmail accepts delivery. The outbound mail verb.",
+  "result_processor_customizations": {
+    "action_label": "Gmail send started",
+    "result_type": "g_suite_gmail_send_result",
+    "result_description": "Job queued for the message send; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to send an email from the connected Gmail account.",
+    "error_interpretation": "gsuite.invalid_params: missing 'to', an unresolvable attachment blob id, or missing session_id/flow_id context. gsuite.permission_denied: the granted scope does not allow sending. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.invalid_params: supply a 'to' address and valid attachment blob ids. gsuite.permission_denied: re-run connect_account so gmail.modify is granted. gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

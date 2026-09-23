@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_self_deployment_plugin::cutover_release",
+  "display_name": "Cut over to a reconciliation-approved release",
+  "description": "Build and activate an immutable release from bytes an approved reconciliation already refreshed, after compare-and-swap checks on the current release, the router-active instance and its start token, the manifest ETag, and both surface digests. Every check runs before any candidate is spawned, and the authorizing reconciliation is stamped into the new release VERSION.",
+  "embedding_description": "Perform the blue-green cutover half of an approved macOS target reconciliation on a solet that already exposes this interface, refusing on stale approval before anything is built. Use for an idempotent re-run or a cutover-only plan when the desired bytes are already on disk but the served release does not match them.",
+  "result_processor_customizations": {
+    "action_label": "reconciliation cutover",
+    "result_type": "local_reconciliation_cutover",
+    "result_description": "Cutover status with the prior release, instance and colour, and the provenance stamped into the candidate.",
+    "presentation_guidance": "Lead with status and reason_code. On a stale-approval refusal, show expected against observed and state plainly that nothing was built and nothing moved. Never describe a queued cutover as a completed one; only an independent attestation of the served candidate proves that."
+  },
+  "error_processor_customizations": {
+    "action_context": "Cut over to a release built from reconciliation-approved bytes.",
+    "error_interpretation": "A failure here means the cutover could not be proven safe. It is not evidence that the prior release stopped serving, and it is not evidence that the new bytes are live.",
+    "recovery_guidance": "Re-read the current release, active instance and start token, and manifest ETag, then request a fresh approval. Do not retry with the stale expected values; the refusal is telling you the target moved."
+  }
+}

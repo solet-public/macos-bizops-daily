@@ -1,0 +1,364 @@
+# Cited-path gate — tracked-debt register.
+#
+# Format: <check_id> <citing_file>::<raw citation, backticks stripped>
+#         ('#' starts a comment; blank lines ignored)
+#
+#   DEAD          the citation is grammar-resolvable but the path it names is
+#                 absent from the bundle's own on-disk census (repo-root
+#                 absolute lookup only — see cited_path_gate.py's module
+#                 docstring for why no relative fallback is tried).
+#   UNPARSEABLE   the citation is path-shaped but contains a character outside
+#                 the parseable set.
+#
+# Allowlisted findings are still LOGGED by validate_cited_paths() — the gate
+# stays honest — they just do not block the seal. Removing an entry is the
+# unit of remediation; the correct fix is almost always "rewrite the citation
+# to a full repo-relative path," never a new resolution rule in the gate
+# itself (coordinator ruling, 2026-08-14, workbench brief
+# 2026-08-14_assemble_time_cited_path_gate_brief_lane_c.md).
+#
+# PROVENANCE NOTE: this starter set was measured READ-ONLY — a direct grep of
+# the current checkout's tracked files, cross-checked against the last
+# assembled bundle on disk (~/.ananta/seed-scratch/bizops_standard-019398a5ef4a,
+# 2026-08-12) to confirm the cited target is genuinely absent from a real
+# bundle census (root `knowledge_bases/` does not exist in any bundle; only
+# `ananta/knowledge_bases/` does — the source-checkout symlink at the bare
+# root resolves in the CHECKOUT only, never in a clone, so a checkout-only
+# check would have missed all seven entries below). This lane ran no live
+# assemble/seal (out of scope, workbench brief). The first real live seal run
+# is the authoritative source for this file going forward — this set is not
+# claimed to be exhaustive, only individually verified.
+
+# 2026-08-14 — Lane W's W3b sweep (2026-08-13) fixed the root `knowledge_bases/`
+# dead-symlink-spelling class in the five ADOPTER-FACING runbooks it owned
+# (plugins/github_midwife_plugin/knowledge_base/{01,04,05,07,08}...). These
+# four origin-side `24_operator_communication` articles cross-reference each
+# other and were outside that fix's scope — same defect class
+# (reference_the_root_knowledge_bases_symlink_spelling_is_dead_in_scope_and_clones),
+# not yet repaired. Burn-down: rewrite each to the `ananta/knowledge_bases/...`
+# tracked spelling, as W3b already did for the runbooks it touched.
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/01_operator_decision_briefs.md::knowledge_bases/ananta_platform/24_operator_communication/02_solet_charter_template.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/01_operator_decision_briefs.md::knowledge_bases/ananta_platform/24_operator_communication/03_collaboration_craft.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/02_solet_charter_template.md::knowledge_bases/ananta_platform/24_operator_communication/01_operator_decision_briefs.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/02_solet_charter_template.md::knowledge_bases/ananta_platform/24_operator_communication/03_collaboration_craft.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/03_collaboration_craft.md::knowledge_bases/ananta_platform/24_operator_communication/01_operator_decision_briefs.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/03_collaboration_craft.md::knowledge_bases/ananta_platform/24_operator_communication/02_solet_charter_template.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/05_agent_instruction_bootstrap_contract.md::knowledge_bases/ananta_platform/14_knowledge_retrieval/04_recall_before_work.md  # legacy: 2026-09-03 W2-1
+
+# 2026-08-14 — never_copy by design: seed_manifest.yaml's own comment (line 62)
+# states .claude-plugin/marketplace.json is "deliberately NOT copied... clone-
+# local GENERATED... from hydration_templates/marketplace_json.template" at
+# hydration time. Same disposition as W3b's `profile/config/manifest.yaml`
+# case (genesis-generated, not shipped as static content — "checked and found
+# correct, no action" in workbench/2026-08-13_w3b_runbook_path_allowlist_sweep_lane_w.md).
+# Not a defect; RELEASE_NOTES.md's own surrounding prose already explains the
+# non-inclusion. No burn-down action — this entry is expected to stay.
+DEAD RELEASE_NOTES.md::.claude-plugin/marketplace.json  # legacy: 2026-09-03 W2-1
+
+# ============================================================================
+# 2026-08-14 -- FIRST LIVE SEAL RUN (bundle bizops_standard-aad4bce66910,
+# ref 839075196): the authoritative population this file's provenance note
+# promised. 124 entries, classified; every entry individually measured against
+# the real bundle census. Removing an entry is the unit of remediation.
+# ============================================================================
+
+
+# --- Class E: relative-dialect citation, TARGET EXISTS at its resolvable root (57) ---
+# Doc cites plugin-/KB-/src-relative; the file ships at its absolute path.
+# Burn-down: rewrite to full repo-root paths per the 2026-08-14
+# repo-root-absolute-only ruling; the spelling migration is CONSTRAINED by the
+# joseki-card dialect (Lane Y report s7.5) -- no bulk rewrite without that read.
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/07_business_data_retention_and_deletion.md::24_operator_communication/08_business_record_classification_convention.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/08_business_record_classification_convention.md::24_operator_communication/07_business_data_retention_and_deletion.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/02_platform_call_surface.md::processes/post_message.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/03_inter_agent_messaging.md::mcp_streamable/dispatch.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/03_inter_agent_messaging.md::mcp_streamable/tools.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/05_http_reference.md::processes/post_message.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/06_codex_homunculus_wake_runbook.md::mcp_bridge/forwarder.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/10_system_slots_and_claim_gate.md::mcp_bridge/__main__.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/11_tmux_host_driver_presentation_iterm2_cc.md::tmux_support/emit_role_tag.sh  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/claude_plugin/coordination-hooks/README.md::hooks/hooks.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/claude_plugin/coordination-hooks/README.md::tests/reminder_hooks_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/claude_plugin/coordination-hooks/SECURITY.md::hooks/hooks.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/README.md::tests/manifest_consistency_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/README.md::tests/reminder_hooks_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/SECURITY.md::hooks/hooks.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/SECURITY.md::tests/git_controller_gate_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/SECURITY.md::tests/manifest_consistency_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/SECURITY.md::tests/marketplace_consistency_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/SECURITY.md::tests/reminder_hooks_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::github_midwife_plugin/venv_provision.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/hydration_templates/TEMPLATE_VARS.md::../manifest.yaml  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/knowledge_base/01_marketo_overview.md::knowledge_base/hydration_guidance.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/knowledge_base/01_marketo_overview.md::src/marketo_plugin/app_config.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/knowledge_base/01_marketo_overview.md::src/marketo_plugin/constants.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/knowledge_base/01_marketo_overview.md::src/marketo_plugin/errors.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/knowledge_base/01_marketo_overview.md::src/marketo_plugin/export_containment.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/knowledge_base/01_marketo_overview.md::src/marketo_plugin/http_client.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/knowledge_base/01_marketo_overview.md::src/marketo_plugin/marketing_actions.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/knowledge_base/01_marketo_overview.md::src/marketo_plugin/plugin.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/salesforce_plugin/knowledge_base/01_salesforce_overview.md::src/salesforce_plugin/app_config.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/salesforce_plugin/knowledge_base/01_salesforce_overview.md::src/salesforce_plugin/client.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/salesforce_plugin/knowledge_base/01_salesforce_overview.md::src/salesforce_plugin/constants.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/salesforce_plugin/knowledge_base/01_salesforce_overview.md::src/salesforce_plugin/errors.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/salesforce_plugin/knowledge_base/01_salesforce_overview.md::src/salesforce_plugin/plugin.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/salesforce_plugin/knowledge_base/01_salesforce_overview.md::src/salesforce_plugin/record_actions.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/salesforce_plugin/knowledge_base/01_salesforce_overview.md::src/salesforce_plugin/soql_actions.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/knowledge_base/01_snowflake_overview.md::src/snowflake_plugin/app_config.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/knowledge_base/01_snowflake_overview.md::src/snowflake_plugin/async_jobs.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/knowledge_base/01_snowflake_overview.md::src/snowflake_plugin/completion_templates.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/knowledge_base/01_snowflake_overview.md::src/snowflake_plugin/connection.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/knowledge_base/01_snowflake_overview.md::src/snowflake_plugin/constants.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/knowledge_base/01_snowflake_overview.md::src/snowflake_plugin/plugin.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/knowledge_base/01_snowflake_overview.md::src/snowflake_plugin/query_actions.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/knowledge_base/01_snowflake_overview.md::src/snowflake_plugin/statement_guard.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::src/zuora_plugin/app_config.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::src/zuora_plugin/billing_actions.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::src/zuora_plugin/constants.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::src/zuora_plugin/errors.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::src/zuora_plugin/export_containment.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::src/zuora_plugin/http_client.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::src/zuora_plugin/plugin.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::tests/smoke_data_query.py  # legacy: 2026-09-03 W2-1
+
+# --- Class H: cross-root dialect / profile-excluded / origin-tooling / filtered tests (26) ---
+# Individually read 2026-08-14: coordination-hooks-dir-relative and
+# cross-plugin-src citations (target ships elsewhere); targets excluded from
+# THIS profile by design (audio_processing + codex session sources not in
+# macos-bizops; seed_factory via the NO-FACTORY invariant; initialization cloud
+# profile via the AWS exclusion); origin tooling under tools/ and
+# deployment/scripts/setup_clone.sh (burn-down: reword the two citing docs);
+# shipped_smoke_register_filtered tests. Burn-down per-entry, favoring
+# rewording the citing doc.
+DEAD ananta/knowledge_base/in_session_reload_ergonomics.md::plugins/audio_processing_plugin/knowledge_base/audio_analysis_overview.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_base/in_session_reload_ergonomics.md::plugins/audio_processing_plugin/knowledge_base/processes/welch_psd.json  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_base/in_session_reload_ergonomics.md::plugins/audio_processing_plugin/src/audio_processing_plugin/audio_analysis.py  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_base/in_session_reload_ergonomics.md::plugins/default_knowledge_plugin/tools/reload_knowledge_bases.py  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/05_agent_instruction_bootstrap_contract.md::plugins/default_knowledge_plugin/tools/query_knowledge_base.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/claude_code_filesystem_session_source_plugin/knowledge_base/hydration_guidance.md::plugins/codex_filesystem_session_source_plugin/knowledge_base/hydration_guidance.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/g_suite_plugin/knowledge_base/01_g_suite_overview.md::03_writing_plugins/PLUGIN_AUTHORING_TRAPS.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/README.md::agent_messaging_plugin/peer_dispatch.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/SECURITY.md::agent_messaging_plugin/peer_dispatch.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::24_operator_communication/08_business_record_classification_convention.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::deployment/scripts/setup_clone.sh  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::hooks/_git_policy.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::hooks/git_controller_gate.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::hooks/hooks.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::tests/run_all.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/05_seed_update_runbook.md::24_operator_communication/09_maintenance_verbs_joseki_cards.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/05_seed_update_runbook.md::coordination-hooks/.claude-plugin/plugin.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/05_seed_update_runbook.md::plugins/seed_factory_plugin/knowledge_base/02_seed_publish_runbook.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/hydration_templates/TEMPLATE_VARS.md::agent_messaging_plugin/env_contract.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/hydration_templates/TEMPLATE_VARS.md::hooks/hooks.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/hydration_templates/TEMPLATE_VARS.md::mcp_bridge/__main__.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/profile_baseline/README.md::config/prompts/thinking_system_prompt.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/profile_baseline/README.md::initialization/profiles/cloud.yaml  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_vault_plugin/knowledge_base/articles/secret_transfer_protocol.md::plugins/macos_vault_plugin/tests/secret_transfer_protocol_smoke.py  # legacy: 2026-09-03 W2-1
+
+# --- Class D: workbench provenance citations (workbench never ships) (25) ---
+# Origin-side records cited as provenance from shipped docs. Burn-down:
+# promote operative content to KB articles and cite those (the D0.3 doctrine
+# promotion in flight is one), or mark citations origin-side.
+DEAD ananta/knowledge_base/processes/thinking_service/.archive/README.md::workbench/2026-07-02_dep01_qwen_thinking_path_retirement_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/09_maintenance_verbs_joseki_cards.md::workbench/2026-08-09_context_gauge_seat_wiring_design_note_mverbs-impl.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_bases/ananta_platform/24_operator_communication/09_maintenance_verbs_joseki_cards.md::workbench/2026-08-09_maintenance_verbs_m0_design_mverbs-impl.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/01_bridge_overview.md::workbench/2026-07-13_d11_bridge_port_discovery_routerless_ruling.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/05_http_reference.md::workbench/2026-07-13_d11_bridge_port_discovery_routerless_ruling.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/05_http_reference.md::workbench/2026-07-15_result_error_processing_architecture_deep_dive.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/09_role_model_act_time_recheck.md::workbench/2026-07-02_first_class_role_model_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/10_system_slots_and_claim_gate.md::workbench/2026-07-02_inf01_autonomic_inference_spec.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/knowledge_base/10_system_slots_and_claim_gate.md::workbench/2026-07-03_inf01_slicec_seam_boundary.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/code_vetting_plugin/knowledge_base/report_format_convention.md::workbench/archive/2026-07-21_vetting_report_format_spec.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/external_postgres_plugin/knowledge_base/01_external_postgres_overview.md::workbench/2026-07-15_result_error_processing_architecture_deep_dive.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/external_postgres_plugin/knowledge_base/01_external_postgres_overview.md::workbench/2026-08-09_sync_verb_d03_deferred_completion_doctrine_syncverb-doctrine.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/g_suite_plugin/knowledge_base/01_g_suite_overview.md::workbench/2026-08-02_business_data_limits_and_spill_floor_design_coordinator_day.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::workbench/2026-07-28_fleet_transport_parity_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/jira_plugin/knowledge_base/01_jira_overview.md::workbench/2026-07-15_result_error_processing_architecture_deep_dive.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/jira_plugin/knowledge_base/01_jira_overview.md::workbench/2026-08-02_business_data_limits_and_spill_floor_design_coordinator_day.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_vault_plugin/knowledge_base/articles/secret_transfer_protocol.md::workbench/2026-05-17_homunculus_aws_deployment_plan.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/knowledge_base/01_marketo_overview.md::workbench/2026-08-02_business_data_limits_and_spill_floor_design_coordinator_day.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/knowledge_base/01_snowflake_overview.md::workbench/2026-07-15_result_error_processing_architecture_deep_dive.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::workbench/2026-06-20_zuora_plugin_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::workbench/2026-07-09_enterprise_connectors_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::workbench/2026-07-15_result_error_processing_architecture_deep_dive.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/knowledge_base/01_zuora_overview.md::workbench/2026-08-02_business_data_limits_and_spill_floor_design_coordinator_day.md  # legacy: 2026-09-03 W2-1
+
+# --- Class G: hydration-created or user-scope paths (10) ---
+# Rendered at hydration (.claude-plugin/, .agents/) or user-side
+# (.claude/settings*, .claude/hooks/) -- real in every hydrated deployment,
+# absent from bundles by design. Expected to stay.
+DEAD plugins/github_midwife_plugin/claude_plugin/coordination-hooks/SECURITY.md::.claude/hooks/tests/coordination_hook_ports_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/claude_plugin/coordination-hooks/SECURITY.md::.claude/hooks/tests/memory_passthrough_origin_ladder_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/claude_plugin/coordination-hooks/tests/README.md::.claude/hooks/tests/git_controller_gate_smoke.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/claude_plugin/coordination-hooks/tests/README.md::.claude/settings.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/codex_plugin/coordination-hooks/README.md::.agents/plugins/marketplace.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::.agents/plugins/marketplace.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::.claude-plugin/marketplace.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::.claude/hooks/git_controller_gate.py  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/01_hydration_runbook.md::.claude/settings.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/05_seed_update_runbook.md::.claude/settings.local.json  # legacy: 2026-09-03 W2-1
+
+# --- Class B: genesis-created runtime paths (profile/) (4) ---
+# Created at birth; real in every born clone. Expected to stay.
+DEAD README.md::profile/config/manifest.yaml  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_base/in_session_reload_ergonomics.md::profile/config/platform.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/claude_code_filesystem_session_source_plugin/knowledge_base/hydration_guidance.md::profile/config/service_bindings.json  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/knowledge_base/05_seed_update_runbook.md::profile/config/manifest.yaml  # legacy: 2026-09-03 W2-1
+
+# --- Class A: bare knowledge_bases symlink dialect (2) ---
+# Same class as the 7 starter entries. Burn-down with them.
+DEAD ananta/knowledge_base/coordinator_dispatch_discipline.md::knowledge_bases/agent_messaging_plugin/03_inter_agent_messaging.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/knowledge_base/coordinator_dispatch_discipline.md::knowledge_bases/ananta_platform/14_knowledge_retrieval/04_recall_before_work.md  # legacy: 2026-09-03 W2-1
+
+# --- GTE-11 (2026-08-18, lane-gate-tooling): pre-existing workbench/ citations
+# in shipped .py docstrings, surfaced by extending the cited-path walk beyond
+# markdown (backlog GTE-11; ananta/src/ananta/core/actions/action_path_liveness.py
+# is the fixed instance and is deliberately NOT in this list). Registered as
+# tracked debt via the same mechanism as the starter set above, not fixed
+# file-by-file in this lane — 205 keys across dozens of plugin owners, an
+# unrelated-scope sweep this lane does not take on. Burn-down is per-file:
+# rewrite the docstring to drop the workbench/ citation (prose without a
+# backtick-quoted path, matching the fixed instance), then remove its line here.
+DEAD ananta/src/ananta/core/actions/action_queue_poller.py::workbench/2026-06-13_coding_agent_inference_interface_design_v3.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/config/config_manager.py::workbench/2026-05-30_plugin_config_defaults_unification.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/config/plugin_yaml_loader.py::workbench/2026-05-30_plugin_config_defaults_unification.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/process_registry/builder.py::workbench/2026-05-25_plugin_god_class_remediation.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/process_registry/invocation_schema_generator.py::workbench/2026-05-25_plugin_god_class_remediation.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/process_registry/kb_overlay_loader.py::workbench/2026-05-25_plugin_god_class_remediation.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/process_registry/plugin_process_scanner.py::workbench/2026-05-25_plugin_god_class_remediation.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/process_registry/plugin_registration_validator.py::workbench/2026-05-25_plugin_god_class_remediation.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/process_registry/service_interface_metadata_generator.py::workbench/2026-05-25_plugin_god_class_remediation.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/process_registry/service_interface_scanner.py::workbench/2026-05-25_plugin_god_class_remediation.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/result_processing/contracts.py::workbench/2026-05-03_codex_deterministic_result_processor.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/root_manifest/__init__.py::workbench/2026-06-16_root_manifest_yaml_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/root_manifest/classifier.py::workbench/2026-06-16_root_manifest_yaml_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/core/root_manifest/types.py::workbench/2026-06-16_root_manifest_yaml_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/interfaces/agent_messaging_service_interface.py::workbench/2026-05-10_codex_inter_agent_messaging.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/interfaces/coding_agent_session_result_types.py::workbench/2026-06-07_slice5_implementation_readiness.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/interfaces/coding_agent_session_service_interface.py::workbench/2026-06-05_bridge_port_routing_and_session_lifecycle_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/interfaces/midwife_service_interface.py::workbench/2026-06-02_aws_midwife_plugin_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/interfaces/quality_service_interface.py::workbench/2026-07-05_b3_repo_and_gates_primitives_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/interfaces/repo_service_interface.py::workbench/2026-07-05_b3_repo_and_gates_primitives_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/interfaces/undertaker_service_interface.py::workbench/2026-06-02_aws_undertaker_plugin_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/llm/agent_messaging/__init__.py::workbench/2026-05-16_codex_mcp_channel_and_inter_agent_outstanding_work.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/llm/session_ledger/base.py::workbench/2026-06-13_w5o_session_ledger_repository_decomposition_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/llm/session_ledger/duplicate_source_repair.py::workbench/2026-08-06_schema_debt_external_id_findings_schema-debt-impl.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/llm/session_ledger/importer.py::workbench/2026-06-14_secretgate_full_eradication_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/llm/session_ledger/ingest.py::workbench/2026-06-13_w5o_session_ledger_repository_decomposition_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/llm/session_ledger/read.py::workbench/2026-06-13_w5o_session_ledger_repository_decomposition_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/llm/session_ledger/repository.py::workbench/2026-06-14_secretgate_full_eradication_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/llm/session_ledger/shared.py::workbench/2026-06-13_w5o_session_ledger_repository_decomposition_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/llm/session_ledger/summarization.py::workbench/2026-06-14_secretgate_full_eradication_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/services/knowledge_service/interfaces/lifecycle.py::workbench/2026-06-13_w5q_knowledge_service_api_decomposition_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/services/lifecycle_management_service/binding_validator.py::workbench/2026-05-30_plugin_lifecycle_architect_pass.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/services/lifecycle_management_service/plugin_inventory.py::workbench/2026-05-30_plugin_lifecycle_codex_review.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/services/lifecycle_management_service/preflight_probe.py::workbench/2026-07-06_gte06_fresh_source_preflight_probe_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/services/session_ledger_service/duplicate_source_repair.py::workbench/2026-08-06_schema_debt_external_id_findings_schema-debt-impl.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/services/session_ledger_service/summarize.py::workbench/2026-08-06_schema_debt_external_id_findings_schema-debt-impl.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/services/state_service/read_bounds.py::workbench/2026-08-14_action_queue_stall_incident/INCIDENT.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/services/vault_service/enforcement.py::workbench/2026-06-07_state_service_consolidation_master_plan.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/src/ananta/services/vault_service/tests/w_vault_caller_enforce_smoke.py::workbench/2026-06-07_tier_2_w_vault_caller_enforce_brief.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/actions/async_job_manager_completion_handler_smoke.py::workbench/2026-08-09_sync_verb_d03_deferred_completion_doctrine_syncverb-doctrine.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/actions/oversized_payload_guard_smoke.py::workbench/2026-08-14_action_queue_stall_incident/INCIDENT.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/plugins/set_active_smoke.py::workbench/2026-06-01_local_blue_green_L3_implementation_plan.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/process_registry/edge_definition_customizations_smoke.py::workbench/2026-07-15_frontier_first_result_processing_consolidation.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/substrate_contracts/deterministic_continuation_single_step_smoke.py::workbench/2026-07-01_claude_coding_agent_substrate_architecture_and_planning_v2.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/substrate_contracts/pre_dispatch_validation_smoke.py::workbench/2026-07-01_claude_coding_agent_substrate_architecture_and_planning_v2.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/substrate_contracts/queue_completion_is_dispatch_smoke.py::workbench/2026-07-01_claude_coding_agent_substrate_architecture_and_planning_v2.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/substrate_contracts/substrate_contract_fixtures.py::workbench/2026-07-01_claude_coding_agent_substrate_architecture_and_planning_v2.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/substrate_contracts/swap_window_terminated_flow_guard_smoke.py::workbench/2026-07-01_incident_green_release_error_routing_storm.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/core/substrate_contracts/wbs_result_processor_kind_required_smoke.py::workbench/2026-07-01_claude_coding_agent_substrate_architecture_and_planning_v2.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/lifecycle_management_service/set_plugin_enabled_reenable_smoke.py::workbench/2026-07-31_architect_four_item_dispatch_designs.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/llm/session_ledger/cross_source_dedupe_smoke.py::workbench/2026-06-14_w5b_cross_source_dedupe_design.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/llm/session_ledger/event_sequence_walk_smoke.py::workbench/2026-08-16_event_walk_live_reconciliation.py  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/llm/session_ledger/integration_smoke.py::workbench/2026-06-13_pre_existing_broken_smokes_cleanup.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/llm/session_ledger/inverted_bounds_repair_live_smoke.py::workbench/2026-06-20_ledger_migration_slice_plan.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/platform/install_plugin_from_path_smoke.py::workbench/2026-06-16_phase_a_planning.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/platform/process_registry_builder_wiring_smoke.py::workbench/2026-05-25_plugin_god_class_remediation.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/services/inference_service/create_inference_error_response_smoke.py::workbench/2026-06-13_coding_agent_inference_interface_design_v3.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/services/state_service/schema_management_service_external_id_pin_smoke.py::workbench/2026-08-06_schema_debt_external_id_findings_schema-debt-impl.md  # legacy: 2026-09-03 W2-1
+DEAD ananta/tests/session_ledger_service/interfaces_split_no_god_class_smoke.py::workbench/2026-06-11_session_ledger_api_god_class_split_v1.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/actr_memory_plugin/src/actr_memory_plugin/export_containment.py::workbench/2026-07-15_architect_connector_rollout_rulings.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/actr_memory_plugin/src/actr_memory_plugin/plugin.py::workbench/2026-06-17_cron_action_contract_inventory.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/actr_memory_plugin/tests/cron_remediation_smoke.py::workbench/2026-06-17_scheduler_cron_action_contract_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/actr_memory_plugin/tests/setup_schedules_canonical_smoke.py::workbench/2026-06-17_scheduler_cron_action_contract_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/bridge_sessions.py::workbench/2026-05-16_codex_mcp_channel_and_inter_agent_outstanding_work.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/choreography_verbs.py::workbench/2026-08-09_sync_verb_d03_deferred_completion_doctrine_syncverb-doctrine.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/http_routes.py::workbench/2026-05-16_codex_mcp_channel_and_inter_agent_outstanding_work.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/http_routes.py::workbench/2026-06-12_aws_swap_smoke_run_report.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/local_cli/__init__.py::workbench/2026-07-18_mcp_free_local_invocation_cli_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/local_cli/__init__.py::workbench/2026-07-21_homunculus_cli_no_mcp_first_interaction_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/mcp_streamable/auth.py::workbench/2026-05-24_hmac_bearer_tokens_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/memory_curation_verbs.py::workbench/2026-08-10_m2_memory_curation_design_questions_mverbs-impl.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/models.py::workbench/2026-05-16_codex_mcp_channel_and_inter_agent_outstanding_work.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/peer_dispatch.py::workbench/2026-08-04_marker_retirement_architect_memo_architect.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/peer_registry.py::workbench/2026-05-16_codex_mcp_channel_and_inter_agent_outstanding_work.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/peer_registry.py::workbench/2026-05-19_unified_store_abstraction.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/peer_registry.py::workbench/2026-06-01_local_reconnect_ux_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/peer_role_management.py::workbench/2026-05-29_address_book_driven_peer_addressing.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/platform_surface.py::workbench/2026-05-16_codex_mcp_channel_and_inter_agent_outstanding_work.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/plugin.py::workbench/2026-05-24_hmac_bearer_tokens_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/plugin.py::workbench/2026-05-29_address_book_driven_peer_addressing.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/plugin.py::workbench/2026-06-05_bridge_port_routing_and_session_lifecycle_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/plugin.py::workbench/2026-06-06_openai_tunnel_client_setup.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/plugin.py::workbench/2026-06-12_aws_swap_smoke_run_report.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/process_exposure.py::workbench/2026-05-16_codex_mcp_channel_and_inter_agent_outstanding_work.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/role_claim.py::workbench/2026-07-29_role_claim_route_classification_architect_ruling.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/role_claim.py::workbench/2026-08-07_rotation_systematization_findings_rotation-impl.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/rotation_thresholds.py::workbench/2026-08-07_rotation_systematization_findings_rotation-impl.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/schema.py::workbench/2026-06-01_local_reconnect_ux_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/seat_idle_watcher.py::workbench/2026-08-07_rotation_systematization_findings_rotation-impl.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/session_inference_provider.py::workbench/2026-06-13_coding_agent_inference_interface_design_v4.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/solet_cli.py::workbench/2026-08-13_registration_loss_rca_lane_r_report.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/system_slots.py::workbench/2026-07-03_inf01_slicec_seam_boundary.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/tmux_adapter.py::workbench/2026-08-03_r1_tmux_single_substrate_spike/FINDINGS.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/src/agent_messaging_plugin/tmux_adapter.py::workbench/2026-08-09_choreography_live_verify_mverbs-impl.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/tests/bridge_health_readiness_probe_smoke.py::workbench/2026-06-12_aws_swap_smoke_run_report.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/tests/d11_routerless_bridge_port_discovery_smoke.py::workbench/2026-07-13_d11_bridge_port_discovery_routerless_ruling.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/tests/deaf_wake_naive_datetime_smoke.py::workbench/2026-08-04_marker_retirement_architect_memo_architect.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/tests/forwarder_reconnect_announcement_smoke.py::workbench/2026-06-01_local_reconnect_ux_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/tests/peer_registry_preserve_label_smoke.py::workbench/2026-06-01_local_reconnect_ux_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/tests/plugin_config_defaults_smoke.py::workbench/2026-05-30_plugin_config_defaults_unification.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/tests/spawned_worker_registration_smoke.py::workbench/2026-08-13_presence_liveness_independence_smoke_report_lane_s.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/tests/v10_live_smoke_driver.py::workbench/2026-06-19_v10_live_smoke_runbook.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/agent_messaging_plugin/tests/wake_footer_and_pairing_smoke.py::workbench/2026-07-31_ws2d_unknown_issue_discovery_census_claude_c.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/chatgpt_export_session_source_plugin/src/chatgpt_export_session_source_plugin/ingest_verb.py::workbench/2026-06-14_unified_url_walker_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/claude_ai_export_session_source_plugin/src/claude_ai_export_session_source_plugin/ingest_verb.py::workbench/2026-06-14_unified_url_walker_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/claude_code_cloud_session_source_plugin/src/claude_code_cloud_session_source_plugin/plugin.py::workbench/2026-06-13_claude_code_web_phase_a_discovery.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/claude_code_cloud_session_source_plugin/src/claude_code_cloud_session_source_plugin/walker.py::workbench/2026-06-13_claude_code_web_phase_a_discovery.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/claude_code_filesystem_session_source_plugin/tests/claude_code_metadata_promotion_smoke.py::workbench/2026-05-31_ledger_per_peer_distinction_ruling.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/code_vetting_plugin/src/code_vetting_plugin/__init__.py::workbench/2026-07-19_vetting_finding_schema_v1.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/code_vetting_plugin/src/code_vetting_plugin/l1_register.py::workbench/2026-07-19_vetting_finding_schema_v1.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/code_vetting_plugin/src/code_vetting_plugin/models.py::workbench/2026-07-19_vetting_finding_schema_v1.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/code_vetting_plugin/src/code_vetting_plugin/scanners/prior_pass.py::workbench/2026-07-19_codex_seed_review.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/default_knowledge_plugin/src/default_knowledge_plugin/chunking.py::workbench/2026-04-29_claude_knowledge_architecture_plan.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/default_knowledge_plugin/src/default_knowledge_plugin/retrieval_test.py::workbench/2026-05-26_coordinator_workflow_strategy.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/default_scheduling_plugin/tests/cron_action_contract_validator_smoke.py::workbench/2026-06-17_scheduler_cron_action_contract_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/default_thinking_plugin/src/default_thinking_plugin/authored_validation.py::workbench/2026-07-01_claude_coding_agent_substrate_architecture_and_planning_v2.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/default_thinking_plugin/src/default_thinking_plugin/grammar.py::workbench/2026-06-03_inference_substrate_strategy_design_v2.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/default_thinking_plugin/src/default_thinking_plugin/joseki_instantiation.py::workbench/2026-07-05_run_joseki_driver_design_spec.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/default_thinking_plugin/src/default_thinking_plugin/joseki_run_store.py::workbench/2026-07-05_run_joseki_driver_design_spec.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/external_postgres_plugin/src/external_postgres_plugin/export_containment.py::workbench/2026-07-15_architect_connector_rollout_rulings.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/sync.py::workbench/2026-08-09_maintenance_verbs_m0_design_mverbs-impl.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/src/github_midwife_plugin/credential_seed.py::workbench/2026-07-12_per_homunculus_db_role_isolation_ruling.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/github_midwife_plugin/tests/git_policy_clause_consistency_smoke.py::workbench/2026-08-01_architect_solo_session_exemption_mechanism_ruling.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_coding_agent_session_plugin/src/macos_coding_agent_session_plugin/plugin.py::workbench/2026-06-05_bridge_port_routing_and_session_lifecycle_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_coding_agent_session_plugin/tests/coding_agent_session_smoke.py::workbench/2026-06-07_slice5_implementation_readiness.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/blue_green_router/router.py::workbench/2026-06-16_bridge_port_three_color_split_brain_followon.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/blue_green_router/uninstall_router.py::workbench/2026-06-01_local_blue_green_L3_implementation_plan.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/constants.py::workbench/2026-06-07_plugin_namespace_callsite_sweep.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/drain_sentinel.py::workbench/2026-06-05_bridge_port_routing_and_session_lifecycle_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/heartbeat_lifecycle.py::workbench/2026-06-05_bridge_port_routing_and_session_lifecycle_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/plugin.py::workbench/2026-06-01_local_blue_green_L3_implementation_plan.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/preflight_probe_runner.py::workbench/2026-07-06_gte06_fresh_source_preflight_probe_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/release_manager.py::workbench/2026-06-27_true_local_blue_green_materialized_artifacts_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/schema_preflight.py::workbench/2026-06-27_true_local_blue_green_materialized_artifacts_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/stale_runtime_cleanup.py::workbench/2026-06-05_bridge_port_routing_and_session_lifecycle_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/stop_self_runner.py::workbench/2026-06-05_bridge_port_routing_and_session_lifecycle_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_self_deployment_plugin/src/macos_self_deployment_plugin/stop_self_watchdog.py::workbench/2026-06-05_bridge_port_routing_and_session_lifecycle_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/macos_vault_plugin/src/macos_vault_plugin/plugin.py::workbench/2026-06-09_p0a_overnight_progress.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/marketo_plugin/src/marketo_plugin/export_containment.py::workbench/2026-07-15_architect_connector_rollout_rulings.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/salesforce_plugin/src/salesforce_plugin/export_containment.py::workbench/2026-07-15_architect_connector_rollout_rulings.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/session_bridge_plugin/src/session_bridge_plugin/plugin.py::workbench/2026-05-27_w4_hook_bridge_design.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/snowflake_plugin/src/snowflake_plugin/export_containment.py::workbench/2026-07-15_architect_connector_rollout_rulings.md  # legacy: 2026-09-03 W2-1
+DEAD plugins/zuora_plugin/src/zuora_plugin/export_containment.py::workbench/2026-07-15_architect_connector_rollout_rulings.md  # legacy: 2026-09-03 W2-1

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::rename",
+  "display_name": "Rename Secret",
+  "description": "Rename a secret server-side without exposing plaintext. Reads value+metadata under old_key, writes under new_key, deletes old_key. Use instead of retrieve+store+delete when the plaintext must not cross the process boundary (e.g., MCP / coding-agent contexts).",
+  "embedding_description": "Vault: rename a secret server-side without exposing plaintext. Moves credential / password / OAuth client_secret / API key / refresh/bearer token from one vault key to another, preserving value + version/tags/metadata. Plaintext never leaves the vault — callers see only key identifiers. Use instead of retrieve+store+delete when round trip would leak plaintext into agent transcript / MCP log.",
+  "result_processor_customizations": {
+    "action_label": "Secret renamed",
+    "result_type": "secret_renamed",
+    "result_description": "Confirmation that secret was renamed from old_key to new_key. Contains old_key, new_key, and message (status). NEVER contains secret values.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Renames a secret server-side. Reads value+metadata under old_key, writes under new_key, deletes old_key — atomic within the vault process.",
+    "error_interpretation": "VaultLocked: Vault must be unlocked before renaming secrets. KeyNotFound: No secret exists with old_key. KeyAlreadyExists: A secret already exists under new_key — refuse to overwrite. AccessDenied: Caller principal lacks operator privileges (rename is operator-only).",
+    "recovery_guidance": "For VaultLocked: Prompt user to unlock vault first. For KeyNotFound: Verify old_key spelling; the secret may already have been renamed in a prior cycle. For KeyAlreadyExists: Either delete the new_key target first or pick a fresh target. For AccessDenied: Re-issue from an operator-principal context."
+  }
+}

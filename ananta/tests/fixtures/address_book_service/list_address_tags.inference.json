@@ -1,0 +1,5 @@
+{
+  "natural_language_query": "What tags are used in my address book?",
+  "expected_process_key": "service_interface::address_book_service::list_tags",
+  "expected_arguments_structure": {}
+}

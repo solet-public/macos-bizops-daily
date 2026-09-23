@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::sheets_get_values",
+  "display_name": "Sheets: Get Values",
+  "description": "Read a cell range (A1 notation, e.g. 'Sheet1!A1:C10') from a spreadsheet as a 2D grid of values. Runs as a background job: dispatch returns a job_id immediately, and the grid arrives via a follow-up message once the read completes. Defaults to a 500-row effective limit -- a range returning more rows fails loud (gsuite.result_too_large) rather than truncating; raise via acknowledge_default_limit_override=true with an explicit row_limit (up to 1000). Requires a connected account.",
+  "embedding_description": "Read cell values out of an existing Google Sheets spreadsheet by spreadsheet id and A1-notation range, as a background job. Dispatch returns a job_id for tracking; completion delivers a grid of row values, capped at a 500-row effective limit (raise via acknowledge_default_limit_override + row_limit, up to 1000).",
+  "result_processor_customizations": {
+    "action_label": "Spreadsheet read started",
+    "result_type": "g_suite_sheets_get_values_result",
+    "result_description": "Job queued for the spreadsheet read; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to read a cell range from a Google Sheets spreadsheet.",
+    "error_interpretation": "gsuite.invalid_params: missing id or range, the override/row_limit pair was only half-given, or missing session_id/flow_id context. gsuite.result_too_large: the range returned more rows than the effective limit (default 500, or the acknowledged override up to 1000) -- never silently truncated. gsuite.not_found: the spreadsheet id or range's sheet name does not exist. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.invalid_params: supply both id and an A1-notation range, and pass acknowledge_default_limit_override + row_limit together if overriding. gsuite.result_too_large: narrow the requested range, or pass acknowledge_default_limit_override=true with an explicit row_limit (up to 1000). gsuite.not_found: verify the spreadsheet id and sheet/tab name. gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

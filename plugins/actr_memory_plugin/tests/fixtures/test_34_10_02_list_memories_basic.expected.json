@@ -1,0 +1,12 @@
+{
+  "action_status": "completed",
+  "data_contains": {
+    "memories": true,
+    "total": true,
+    "showing": true
+  },
+  "output_not_contains": [
+    "error"
+  ],
+  "timeout_seconds": 60
+}

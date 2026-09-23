@@ -1,0 +1,25 @@
+{
+  "name": "test_execute_in_seconds_negative",
+  "description": "Attempt to schedule with negative seconds delay (should fail)",
+  "process_key": "plugin::default_scheduling_plugin::execute_in_seconds",
+  "arguments": {
+    "params": {
+      "seconds": -10,
+      "label": "Negative Delay",
+      "tags": "test",
+      "actions": [
+        {
+          "process_key": "plugin::discord_plugin::post_message",
+          "arguments": {
+            "message": "This should not work"
+          }
+        }
+      ]
+    },
+    "state": {
+      "session_id": "test-session-106",
+      "flow_id": "test-flow-106"
+    }
+  },
+  "timeout_seconds": 30
+}

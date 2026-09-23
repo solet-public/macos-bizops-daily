@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::lifecycle_management_service::list_plugins",
+  "display_name": "List Plugins",
+  "description": "Enumerate every plugin loaded into the live orchestrator and return per-plugin metadata: name, version, readiness status, enabled flag (from the per-plugin config), load priority, count of registered platform processes, whether the plugin implements the LifecycleManaged protocol, whether its services are currently running, and (when present) the last readiness error string. An optional filter narrows the roster to 'enabled' (config enabled != false), 'loaded' (plugins that finished readiness preparation), or 'lifecycle_managed' (plugins that participate in start/stop). Filtering is applied after every row is materialised, so the response shape is the same whether the filter is set or omitted. Use this verb to take inventory before any plugin-mutating action (set_plugin_enabled, reload_plugin_config, install_plugin_from_path, apply_manifest), to confirm a plugin is actually loaded when a process key is missing, to read the live priority order before changing it, or to check whether a known LifecycleManaged plugin is currently running. No side effects; the call is purely introspective and does not touch the registry, configs, or plugin code.",
+  "embedding_description": "List every plugin loaded in the live orchestrator. Per-plugin record: name, version, status (uninitialized/ready/error), enabled, priority, process_count, lifecycle_managed, is_running, last_error. Optional filter ('enabled' / 'loaded' / 'lifecycle_managed'). Distinct from list_available_plugins (which enumerates installable + uninstalled). Read-only introspection; no side effects.",
+  "result_processor_customizations": {
+    "action_label": "Plugin roster fetched",
+    "result_type": "plugin_roster",
+    "result_description": "Roster dict with one key 'plugins' whose value is a list of per-plugin records. Each record has: name (str), version (str), status (uninitialized|ready|error), enabled (bool), priority (int), process_count (int), lifecycle_managed (bool), is_running (bool), and optionally last_error (str).",
+    "presentation_guidance": "If the caller asked for an inventory, render the list compactly: one line per plugin with name, status, enabled, priority, and process_count. If a plugin reports status='error' or last_error, surface that prominently. If the roster is empty, say so explicitly rather than implying success.",
+    "output_action_guidance": "Treat the response as a snapshot for the next decision. If the caller is preparing a plugin-mutating verb, confirm the target plugin is in the list and that is_running matches expectations. Do NOT call list_plugins again immediately afterwards to verify; one read is authoritative for the current tick."
+  },
+  "error_processor_customizations": {
+    "action_context": "Read-only enumeration of plugins loaded into the live orchestrator with status, config flags, priority, and process counts",
+    "error_interpretation": "ValidationError: filter was set to a value other than 'enabled', 'loaded', or 'lifecycle_managed'. OrchestratorAccessError: the orchestrator's plugin_manager attribute is missing or None (indicates startup did not complete or the service was wired before the plugin manager). StateServiceUnavailable: not raised by this verb (it is purely introspective).",
+    "recovery_guidance": "For invalid filter: re-call with one of the three accepted values or omit the parameter to get the full roster. For orchestrator access errors: do not retry — the platform is in an inconsistent startup state and the caller should escalate; restarting the solet is the correct recovery."
+  }
+}

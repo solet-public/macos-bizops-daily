@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "profile_version": "openai-gpt-5.6-capabilities-v1",
+  "provider": "openai",
+  "runtime": "codex",
+  "effective_at": "2026-08-22T00:00:00+00:00",
+  "effort_order": ["none", "low", "medium", "high", "xhigh", "max"],
+  "provenance": {
+    "source_url": "https://developers.openai.com/api/docs/models",
+    "fetched_at": "2026-08-22T19:45:00+00:00",
+    "refresh_status": "current"
+  },
+  "models": [
+    {
+      "canonical_model_id": "gpt-5.6-sol",
+      "aliases": ["gpt-5.6"],
+      "context_ceiling": 1050000,
+      "max_output_tokens": 128000,
+      "supported_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+      "default_effort": "medium",
+      "supported_usage_counters": ["input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens", "model_context_window"],
+      "compaction_observability": "transcript context_compacted event plus first subsequent positive token_count",
+      "clear_observability": "fresh SessionStart plus first subsequent positive token_count"
+    },
+    {
+      "canonical_model_id": "gpt-5.6-terra",
+      "aliases": ["gpt-5.6-terra-latest"],
+      "context_ceiling": 1050000,
+      "max_output_tokens": 128000,
+      "supported_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+      "default_effort": "medium",
+      "supported_usage_counters": ["input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens", "model_context_window"],
+      "compaction_observability": "transcript context_compacted event plus first subsequent positive token_count",
+      "clear_observability": "fresh SessionStart plus first subsequent positive token_count"
+    },
+    {
+      "canonical_model_id": "gpt-5.6-luna",
+      "aliases": ["gpt-5.6-luna-latest"],
+      "context_ceiling": 1050000,
+      "max_output_tokens": 128000,
+      "supported_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+      "default_effort": "medium",
+      "supported_usage_counters": ["input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens", "model_context_window"],
+      "compaction_observability": "transcript context_compacted event plus first subsequent positive token_count",
+      "clear_observability": "fresh SessionStart plus first subsequent positive token_count"
+    }
+  ]
+}

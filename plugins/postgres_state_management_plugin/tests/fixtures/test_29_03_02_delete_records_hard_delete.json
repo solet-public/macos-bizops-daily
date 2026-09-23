@@ -1,0 +1,19 @@
+{
+  "name": "test_delete_records_hard_delete",
+  "description": "Verify delete_records can perform hard delete when soft_delete is false",
+  "process_key": "plugin::postgres_state_management_plugin::delete_records",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "query": {
+        "table": "key_value_store",
+        "filters": {
+          "namespace": "test_hard_delete"
+        },
+        "soft_delete": false
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

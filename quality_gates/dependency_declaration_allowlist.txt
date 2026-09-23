@@ -1,0 +1,79 @@
+# GTE-15 dependency-declaration gate tracked-debt allowlist.
+# Authored by lane-gte15-campaign, 2026-08-24, per operator ruling 5
+# (workbench/2026-08-24_operator_rulings_test_seed_dependencies_codex_deafness.md):
+# entries earn their place through a documented skeptical review by whoever
+# adds them, not operator sign-off. That review is recorded at
+# workbench/2026-08-24_lane_gte15_campaign_plan.md section 1d.
+#
+# Format: <package>::<import_root>  # migrate-with: <wave-ref> — <note>
+# Content-anchored (package + import root), never a line number — an import
+# moving within its file does not change which package is missing which
+# declaration. Every line below is a genuine missing_required_dependency
+# finding measured 2026-08-24 by:
+#   .venv/bin/python3 quality_gates/dependency_declaration_gate.py --repo-root .
+# Removing an entry is the unit of remediation progress (add the import root's
+# distribution to that package's project.dependencies and drop the line).
+# Adding an entry without operator ratification defeats the gate — see the
+# platform's Gate Allowlist Conventions article.
+#
+# 48 entries cover all 360 findings measured at registration (most plugins
+# are missing exactly one declaration — commonly "ananta" itself, the host
+# package every plugin runs inside but does not always declare).
+#
+# D-3-structural migration (2026-09-20, iss_23fa51b5/iss_9b0ad3d5): this
+# file was already the cited "one good model" for its migrate-with: tag,
+# but had no expiry. Every entry now also carries the mandatory
+# owner/reason/expires schema (see quality_gates/allowlist_schema.py);
+# owner is the same lane-gte15-campaign already named above, reason
+# preserves the original migrate-with/sweep provenance, and expires
+# (2027-03-20) is a uniform 180-day migration default -- a real, finite
+# life where before there was none.
+
+plugins/actr_memory_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/agent_messaging_plugin::pydantic  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/agent_messaging_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/audio_processing_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/audio_separation_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/aws_midwife_plugin::yaml  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/aws_self_deployment_plugin::botocore  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/aws_undertaker_plugin::botocore  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/chatgpt_export_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/claude_ai_export_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/claude_code_cloud_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/claude_code_cloud_session_source_plugin::httpx  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/claude_code_filesystem_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/claude_code_history_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/claude_code_pushed_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/claude_code_tasks_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/codex_ambient_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/codex_cloud_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/codex_cloud_session_source_plugin::httpx  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/codex_filesystem_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/codex_goals_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/codex_history_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/codex_memories_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/codex_pushed_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/codex_state_session_source_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/default_inference_plugin::requests  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/default_knowledge_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/default_scheduling_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/default_scheduling_plugin::pydantic  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/default_thinking_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/default_thinking_plugin::default_knowledge_plugin  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/generative_composition_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/generative_composition_plugin::music21  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/macos_vault_plugin::postgres_state_management_plugin  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/musical_synthesis_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/pedalboard_effects_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/pgvector_service_plugin::psycopg  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/postgres_state_management_plugin::psycopg_pool  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/rds_pgvector_service_plugin::psycopg  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/rds_postgres_state_management_plugin::psycopg_pool  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/secrets_manager_vault_plugin::rds_postgres_state_management_plugin  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/session_bridge_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/session_shipper_bootstrap_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/session_shipper_bootstrap_plugin::pydantic  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/snowflake_plugin::cryptography  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/sound_effects_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/titanv2_embeddings_plugin::botocore  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20
+plugins/whisper_asr_plugin::ananta  # owner: lane-gte15-campaign reason: migrate-with lane-gte15-campaign, 2026-09-03 W2-1 sweep; tracked missing dependency declaration expires: 2027-03-20

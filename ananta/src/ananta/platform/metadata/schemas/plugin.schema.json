@@ -1,0 +1,267 @@
+{
+  "title": "Plugin Metadata Schema",
+  "description": "Schema for plugin metadata in the Ananta platform",
+  "type": "object",
+  "required": ["plugin_id", "name", "version", "entry_point"],
+  "properties": {
+    "plugin_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*[a-z0-9]$",
+      "minLength": 2,
+      "maxLength": 50,
+      "description": "Unique identifier for the plugin (snake_case)"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Human-readable name for the plugin"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version number (e.g., '1.0.0')"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Brief description of the plugin's functionality"
+    },
+    "entry_point": {
+      "type": "string",
+      "description": "Python module path to the main plugin class"
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Author or organization that created this plugin"
+    },
+    "license": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "License under which this plugin is distributed"
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "Homepage URL for this plugin"
+    },
+    "repository": {
+      "type": "string",
+      "format": "uri",
+      "description": "Source code repository URL"
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "console",
+          "messaging",
+          "blob_storage",
+          "state_management",
+          "ai_inference",
+          "image_generation",
+          "scheduling",
+          "langchain_tools",
+          "data_processing",
+          "integration",
+          "utility"
+        ]
+      },
+      "uniqueItems": true,
+      "description": "Categories this plugin belongs to"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "description"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the capability"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what this capability provides"
+          },
+          "functions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Function names that provide this capability"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Capabilities provided by this plugin"
+    },
+    "dependencies": {
+      "type": "object",
+      "properties": {
+        "python_packages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required Python packages"
+        },
+        "system_packages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required system packages"
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Other plugins this plugin depends on"
+        },
+        "minimum_ananta_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Minimum required Ananta framework version"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Dependencies required by this plugin"
+    },
+    "configuration": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "object",
+          "description": "JSON schema for plugin configuration"
+        },
+        "default_config": {
+          "type": "object",
+          "description": "Default configuration values"
+        },
+        "required_config": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required configuration parameters"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Configuration schema and defaults for this plugin"
+    },
+    "process_registry": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["function_name", "description"],
+        "properties": {
+          "function_name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*[a-z0-9]$",
+            "description": "Name of the function"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what this function does"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Parameter schema for this function"
+          },
+          "return_value_schema": {
+            "type": "object",
+            "description": "Schema for the value returned by this function"
+          },
+          "is_inference_capable": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this function has inference/AI capabilities"
+          },
+          "inference_capable": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this function provides AI inference capabilities"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Functions this plugin registers in the process registry"
+    },
+    "validation_hooks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["phase", "function"],
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": ["PRE_STRUCTURE", "POST_STRUCTURE", "PARAMETER", "POST_PARAMETER", "FINAL"]
+          },
+          "function": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Validation hooks provided by this plugin"
+    },
+    "resource_requirements": {
+      "type": "object",
+      "properties": {
+        "min_memory_mb": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum memory required in MB"
+        },
+        "min_cpu_cores": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum CPU cores required"
+        },
+        "network_access": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this plugin requires network access"
+        },
+        "file_system_access": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this plugin requires file system access"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Resource requirements for this plugin"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "download_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rating": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        }
+      },
+      "additionalProperties": true,
+      "description": "Additional metadata about the plugin"
+    }
+  },
+  "additionalProperties": false
+}

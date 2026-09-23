@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::quality_service::predict_gate_smokes_merge",
+  "display_name": "Predict Gate-Smoke Register Merge",
+  "description": "Read a base revision, a lane worktree's current register file, and current master to predict the three-way merge of quality_gates/gate_smokes.txt or another named append-only tracked-debt register. Reports master drift, the lane's appended hunk, registrations already duplicated on master, registrations absent from master, and the exact git merge-file -p candidate content with a clean/conflict verdict. It reads Git only; it never stages, commits, merges, creates branches, or changes any Git state.",
+  "embedding_description": "Predict whether a lane's gate_smokes or tracked-debt register addition merges cleanly with current master. Return the exact candidate content, append-only hunk, duplicate and missing registrations, and clean/conflict result without running a Git merge or mutating a worktree.",
+  "result_processor_customizations": {
+    "action_label": "Gate-smoke register merge predicted",
+    "result_type": "gc_gate_smokes_merge_prediction",
+    "result_description": "Object with refs, drift/append-only flags, lane hunk/registrations, duplicate and missing registrations, merged_candidate_content, merge_verdict, and git_merge_file_exit_code.",
+    "presentation_guidance": "Lead with merge_verdict and master_drifted_since_base. On conflict, surface the candidate conflict markers. On clean, name duplicate registrations already present on master and registrations still missing there.",
+    "output_action_guidance": "This is a report-only prediction. Git-Controller decides whether and how to stage or merge."
+  },
+  "error_processor_customizations": {
+    "action_context": "Read-only git show and git merge-file -p against a declared lane worktree and register.",
+    "error_interpretation": "ValueError means an absolute root, revision, or confined register path was invalid, the register was absent, or the read-only Git command could not resolve a declared revision/path. A merge conflict is a normal result with merge_verdict=conflict.",
+    "recovery_guidance": "Provide an existing lane root, valid non-option revisions, and a tracked repo-relative register path. Resolve an actual conflict in the lane content and rerun; do not treat a clean prediction as authorization to mutate Git."
+  }
+}

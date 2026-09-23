@@ -1,0 +1,11 @@
+{
+  "action_status": "completed",
+  "data_contains": {
+    "candidates_found": true,
+    "dry_run": true
+  },
+  "output_not_contains": [
+    "error"
+  ],
+  "timeout_seconds": 180
+}

@@ -1,0 +1,26 @@
+{
+  "process_key": "service_interface::thinking_service::assemble_work_breakdown_structure",
+  "display_name": "Assemble Work Breakdown Structure",
+  "description": "Assemble the final WBS document from the outline and all work item detail artifacts. Deterministic — no thinking model call. Validates coverage and stores the assembled WBS.",
+  "embedding_description": "Assemble a complete Work Breakdown Structure from outline and detail artifacts. Deterministic assembly operation that validates all work items have detail, renumbers steps globally, checks process coverage, and stores the final document. Final step of detailed WBS authoring.",
+  "result_processor_customizations": {
+    "action_label": "Work Breakdown Structure assembled",
+    "result_type": "wbs_assembly_result",
+    "result_description": "Assembled WBS with full coverage",
+    "presentation_guidance": "",
+    "output_action_guidance": "The Work Breakdown Structure has been assembled and is now available as working context. Continue executing the current step as shown in the updated ACTIVE_PLAN.",
+    "message_rendering": {
+      "renderer_key": "artifact_result_compact",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Assembling a WBS from outline and detail artifacts. assemble_work_breakdown_structure accepts {outline_id, wbs_id}.",
+    "error_interpretation": "MissingDetail: one or more work items lack detail artifacts. ProcessCoverageError: required process not covered. AssemblyError: step renumbering or validation failed."
+  }
+}

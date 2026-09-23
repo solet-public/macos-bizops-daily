@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_scheduling_plugin::create_cron_schedule",
+  "display_name": "Create Cron Schedule",
+  "description": "[NON-TERMINAL REGISTRATION] Create a recurring UTC cron schedule. Provide exactly one execution mode: a non-empty action_definitions list of syntactically valid {process_key, arguments} objects, or memory_tag for a terminal get_memories_by_tag read whose result is written only to the action row and does not start a model turn. Registration validates entry shape and scheduled-action policy; execution resolves process_key against processes registered at fire time. For scheduled peer notifications, use action_definitions with plugin::agent_messaging_plugin::peer_send_by_name.",
+  "embedding_description": "Create recurring UTC work using exactly one mode: non-empty, syntactically valid action_definitions whose process keys resolve against registered processes at fire time, or memory_tag for a terminal get_memories_by_tag read that records its result and starts no model turn. Cancel with clear_scheduled_actions_by_tag.",
+  "result_processor_customizations": {
+    "action_label": "Cron schedule created",
+    "result_type": "schedule_created",
+    "result_description": "Schedule ID with confirmation message",
+    "presentation_guidance": "",
+    "output_action_guidance": "A recurring schedule has been created. Retain the schedule_id or tags so you can cancel the schedule once it is no longer needed."
+  },
+  "error_processor_customizations": {
+    "action_context": "Creating a recurring schedule using a cron expression and exactly one execution mode",
+    "error_interpretation": "default_scheduling_plugin.invalid_cron_expression: invalid cron expression syntax. default_scheduling_plugin.parameter_error: malformed or inference-bearing action definition, empty action list, invalid memory_tag, or an execution-mode conflict. default_scheduling_plugin.schedule_create_error: persistence or scheduler registration failed after valid parameters.",
+    "recovery_guidance": "Choose exactly one mode. For deterministic work, provide non-empty action_definitions using {process_key, arguments}. Use memory_tag only for a terminal memory read. For cron expression errors, validate the five-field syntax. For scheduler errors, verify the scheduling and state services."
+  }
+}

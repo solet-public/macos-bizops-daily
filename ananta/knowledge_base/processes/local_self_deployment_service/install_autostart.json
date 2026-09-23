@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::local_self_deployment_service::install_autostart",
+  "display_name": "Install solet LaunchAgent",
+  "description": "Install and load the per-solet macOS LaunchAgent so the solet starts at user login. The bound local self-deployment plugin renders the plist under ~/Library/LaunchAgents, unloads any stale loaded definition first, writes the fresh plist, and loads it through launchctl. dry_run reports the planned actions without writing or invoking launchctl.",
+  "embedding_description": "Install macOS LaunchAgent autostart for the local solet. Writes and loads ~/Library/LaunchAgents/local.solet.<name>.plist, idempotently unloads stale definitions first, KeepAlive=false, RunAtLoad=true. Returns status, verb, solet_name, label, plist_path, prior_state, last_run_at, dry_run, and message.",
+  "result_processor_customizations": {
+    "action_label": "LaunchAgent installed",
+    "result_type": "macos_self_deployment_autostart_install_result",
+    "result_description": "AutostartResult envelope with status, verb, solet_name, label, plist_path, prior_state, last_run_at, dry_run, and message.",
+    "presentation_guidance": "Lead with status. On success, surface label and plist_path. On dry_run, surface the planned action and prior_state. On failure, surface message verbatim."
+  },
+  "error_processor_customizations": {
+    "action_context": "Install and load a macOS LaunchAgent for solet autostart.",
+    "error_interpretation": "launchctl errors usually mean malformed plist, stale loaded state, or file permission issues. filesystem errors mean the LaunchAgents directory or plist could not be written.",
+    "recovery_guidance": "Rerun install_autostart after correcting permissions. If launchctl reports stale loaded state, rerun because the implementation unloads before loading."
+  }
+}

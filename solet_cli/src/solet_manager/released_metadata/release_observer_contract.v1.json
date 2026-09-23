@@ -1,0 +1,1 @@
+{"archive":"append_only_exact_replay","installed_binding_receipt":"immutable_manager_seed_pin_and_installed_module_provenance","limits":{"max_bytes":16777216,"remaining_deadline_required":true},"modes":["capabilities","binding","execute","observe","read-observation"],"owner":"manager","schema_version":"release_observer.v1","supported_phases":["INSTALL","SETUP","DOCTOR","HEALTH"]}

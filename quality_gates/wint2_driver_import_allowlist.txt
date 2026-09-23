@@ -1,0 +1,145 @@
+# W-INT Cycle 2 driver-import gate (W-WINT2-EARLY) tracked-debt register.
+#
+# Format: <check_id>::<scope_qualifier>::<specifier>
+#   check_id        — "D1.1" (driver-import outside state plugins)
+#   scope_qualifier — repo-relative POSIX path to the offending file
+#   specifier       — "<lineno>::<module-root>" OR "*" wildcard
+#
+# Allowlisted findings are STILL printed (with `[allowlisted]`) so the gate
+# stays honest. They do NOT contribute to the blocking verdict.
+#
+# Per the KB "Gate Allowlist Conventions": adding entries without operator
+# approval defeats the gate's purpose. Removing an entry is the unit of
+# remediation progress.
+#
+# D-3-structural migration (2026-09-20, iss_23fa51b5/iss_9b0ad3d5): every
+# entry carries the mandatory owner/reason/expires schema enforced by
+# quality_gates/allowlist_schema.py. The W2-1 entries use the same finite
+# migration default as the sibling W-INT2 vault-key register.
+#
+# Initial population (2026-06-07) from `workbench/2026-06-07_postgres_drift_inventory.md` §1
+# + master plan §1.7 retained sites. Four classes of entries:
+#
+# (1) STATE PLUGIN SOURCE — permanent. The state plugins ARE the
+#     state_service; they OWN runtime psycopg / psycopg_pool. Wildcard.
+# (2) STATE PLUGIN TESTS — permanent. Fixtures that exercise the
+#     postgres backend's Store abstraction.
+# (3) RETAINED RUNTIME SITES per master plan §1.7 + §3.7 — permanent
+#     until the architecture changes. Specifically: midwife
+#     `postgres_init.py` role-DDL thin-call caller (state plugin owns
+#     the implementation; midwife owns the invocation per §3.7.5).
+# (4) CURRENT BYPASS SITES — tracked debt. Each cleanup workstream
+#     removes its entry as work lands. Per-file remediation note keys
+#     each entry to the workstream that closes it.
+#
+# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# (1) STATE PLUGIN SOURCE — postgres_state_management_plugin (local)
+# ===========================================================================
+# W2-1 (2026-09-03): former whole-file exemptions enumerated from current imports.
+D1.1::plugins/external_postgres_plugin/src/external_postgres_plugin/connection.py::29::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/pgvector_service_plugin/src/pgvector_service_plugin/postgres_backend/vector/provider.py::17::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/pgvector_service_plugin/src/pgvector_service_plugin/postgres_backend/vector/provider.py::20::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/pgvector_service_plugin/src/pgvector_service_plugin/postgres_backend/vector/provider.py::21::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/pgvector_service_plugin/src/pgvector_service_plugin/postgres_backend/vector/provider.py::22::psycopg_pool  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/key_value_ops.py::7::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/plugin.py::15::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/adoption.py::45::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/adoption.py::46::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/database_setup.py::8::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/ddl_renderer.py::35::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/lifecycle.py::43::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/provider.py::15::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/provider.py::22::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/provider.py::23::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/provider.py::24::psycopg_pool  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/schema_diff.py::40::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/postgres_backend/store_factory.py::53::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/postgres_state_management_plugin/tests/store_abstraction_smoke.py::61::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_pgvector_service_plugin/src/rds_pgvector_service_plugin/postgres_backend/rds_pool.py::26::psycopg_pool  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_pgvector_service_plugin/src/rds_pgvector_service_plugin/postgres_backend/vector/provider.py::17::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_pgvector_service_plugin/src/rds_pgvector_service_plugin/postgres_backend/vector/provider.py::20::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_pgvector_service_plugin/src/rds_pgvector_service_plugin/postgres_backend/vector/provider.py::21::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_pgvector_service_plugin/src/rds_pgvector_service_plugin/postgres_backend/vector/provider.py::22::psycopg_pool  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/plugin.py::29::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/adoption.py::44::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/adoption.py::45::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/ddl_renderer.py::35::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/lifecycle.py::43::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/provider.py::15::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/provider.py::22::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/provider.py::23::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/provider.py::24::psycopg_pool  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/rds_pool.py::26::psycopg_pool  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/schema_diff.py::40::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/postgres_backend/store_factory.py::55::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/rds_crud.py::13::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/rds_db_init.py::13::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/rds_schema_ops.py::10::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+D1.1::plugins/rds_postgres_state_management_plugin/src/rds_postgres_state_management_plugin/rds_transaction.py::9::psycopg  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# ===========================================================================
+# (1) STATE PLUGIN SOURCE — rds_postgres_state_management_plugin (cloud)
+# ===========================================================================
+
+# ===========================================================================
+# (2) STATE PLUGIN TESTS — postgres_state_management_plugin/tests
+# ===========================================================================
+
+# ===========================================================================
+# (3) RETAINED runtime site per master plan §1.7 + §3.7
+# ===========================================================================
+# Midwife's role-DDL thin-call caller. State plugin owns the
+# `setup_database_with_roles(...)` implementation; midwife owns the
+# birth-time invocation. Master plan §3.7.5 spec'd this retention; the
+# allowlist captures it from day 1 so W-WINT2-FINAL doesn't need a
+# scope-change at flip time.
+
+# Note: `ananta/src/ananta/platform/code_generator.py` emits sqlalchemy
+# imports as STRING LITERALS inside generated code; the file itself
+# contains no `import sqlalchemy` / `from sqlalchemy ...` AST node, so
+# no D1.1 finding fires here today. Master plan §1.7 + §6 SC-2 names
+# this site as a permanent exclusion; the allowlist entry future-proofs
+# against a code-gen rewrite that would introduce an inline import.
+
+# ===========================================================================
+# (4) CURRENT BYPASS sites — tracked debt; removed by named workstreams
+# ===========================================================================
+
+# NOTE (2026-06-20, dead-code sweep): macos_vault + secrets_manager_vault postgres_backend/provider.py
+# entries removed here — macos_vault's provider.py was already deleted (stale entry); secrets_manager_vault's
+# is deleted in this same commit (confirmed-dead, plugin routes through the rds store_factory shim). Both
+# plugins now carry no `import psycopg`. Drops the direct-driver own-backend breaks-at-flip surface (plan §c).
+
+# pgvector_service_plugin postgres_backend — removed by W-VECTOR-LOCAL (Tier 6)
+
+# rds_pgvector_service_plugin postgres_backend — removed by W-VECTOR-CLOUD (Tier 6)
+
+# external_postgres_plugin — the "super Datagrip" read-only connector to FOREIGN
+# Postgres DBs (operator-ratified RATIFY-1, 2026-07-09). psycopg targets external_pg::*
+# address-book DSNs only; assert_foreign_target refuses the platform's own instance
+# (role-independent host+port+dbname) — red-first smoke_containment.py. NOT owner-exempt.
+
+# WINT2 driver-import dark-gate triage (2026-09-20, iss_d0dcc9c9):
+# - postgres_authorization_guard must import the two driver modules in order
+#   to patch their connection entry points; routing that guard through the
+#   state service would make it unable to enforce the direct-driver boundary.
+# - its smoke imports psycopg to exercise the patched entry point directly.
+# - the remaining entries are env-gated live integration smokes. Their direct
+#   imports create throwaway schemas, seed/read back fixtures, or catch driver
+#   errors while proving a state-service migration; they are not runtime plugin
+#   bypasses. All entries are exact line-and-module pins and expire for review.
+D1.1::ananta/src/ananta/core/orchestration/postgres_authorization_guard.py::80::psycopg  # owner: iss_d0dcc9c9 reason: authorization guard patches psycopg.connect to reject non-substrate callers expires: 2026-12-20
+D1.1::ananta/src/ananta/core/orchestration/postgres_authorization_guard.py::81::psycopg_pool  # owner: iss_d0dcc9c9 reason: authorization guard patches ConnectionPool construction to reject non-substrate callers expires: 2026-12-20
+D1.1::ananta/src/ananta/core/orchestration/tests/postgres_authorization_guard_smoke.py::40::psycopg  # owner: iss_d0dcc9c9 reason: guard smoke must inspect the patched psycopg.connect entry point directly expires: 2026-12-20
+D1.1::ananta/src/ananta/core/orchestration/tests/postgres_authorization_guard_smoke.py::86::psycopg  # owner: iss_d0dcc9c9 reason: guard smoke invokes a synthetic authorized caller through psycopg.connect expires: 2026-12-20
+D1.1::plugins/postgres_state_management_plugin/src/postgres_state_management_plugin/aggregate_ops.py::10::psycopg  # owner: iss_d0dcc9c9 reason: canonical state-service substrate owns this aggregate-query driver import expires: 2026-12-20
+D1.1::plugins/actr_memory_plugin/tests/actr_memory_clear_session_migration_live_smoke.py::48::psycopg  # owner: iss_d0dcc9c9 reason: env-gated migration smoke catches driver errors while verifying a real state-service delete expires: 2026-12-20
+D1.1::plugins/actr_memory_plugin/tests/actr_orphan_reconcile_migration_live_smoke.py::47::psycopg  # owner: iss_d0dcc9c9 reason: env-gated migration smoke uses a throwaway Postgres schema for behavioral readback expires: 2026-12-20
+D1.1::plugins/actr_memory_plugin/tests/actr_vector_rebuild_live_smoke.py::55::psycopg  # owner: iss_d0dcc9c9 reason: env-gated migration smoke uses a throwaway Postgres schema for behavioral readback expires: 2026-12-20
+D1.1::plugins/agent_messaging_session_source_plugin/tests/read_events_read_thread_messages_live_smoke.py::94::psycopg  # owner: iss_d0dcc9c9 reason: env-gated migration smoke seeds and verifies a live Postgres fixture expires: 2026-12-20
+D1.1::plugins/macos_vault_plugin/tests/secret_transfer_protocol_live_smoke.py::46::psycopg  # owner: iss_d0dcc9c9 reason: env-gated protocol smoke creates a throwaway Postgres fixture expires: 2026-12-20
+D1.1::plugins/macos_vault_plugin/tests/secret_transfer_protocol_live_smoke.py::47::psycopg  # owner: iss_d0dcc9c9 reason: env-gated protocol smoke catches psycopg errors from its throwaway fixture expires: 2026-12-20
+D1.1::plugins/pgvector_service_plugin/tests/find_missing_external_ids_live_smoke.py::49::psycopg  # owner: iss_d0dcc9c9 reason: env-gated vector-service smoke performs direct fixture setup and readback expires: 2026-12-20
+D1.1::plugins/postgres_state_management_plugin/tests/conflict_predicate_upsert_smoke.py::63::psycopg  # owner: iss_d0dcc9c9 reason: state substrate smoke uses psycopg to seed its transactional fixture expires: 2026-12-20

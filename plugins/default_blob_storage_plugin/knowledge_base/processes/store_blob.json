@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_blob_storage_plugin::store_blob",
+  "display_name": "Store Blob",
+  "description": "Store binary content with metadata in blob storage. Returns unique blob_id for later retrieval.",
+  "embedding_description": "Store binary content in blob storage with optional metadata. Provide namespace and content (bytes or base64), and get back a blob_id for later retrieval. Use for files, generated assets, or large binary payloads.",
+  "result_processor_customizations": {
+    "action_label": "Blob Stored",
+    "result_type": "blob_stored",
+    "result_description": "Confirmation that blob was stored with its unique ID",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Storing binary content in blob storage with associated metadata",
+    "error_interpretation": "StorageError: Failed to write blob to filesystem. ValidationError: Invalid content or missing required parameters. PermissionError: Insufficient permissions to write to storage directory.",
+    "recovery_guidance": "For storage errors: check disk space and storage path. For validation errors: ensure content is valid bytes and namespace is provided. For permission errors: verify storage directory permissions."
+  }
+}

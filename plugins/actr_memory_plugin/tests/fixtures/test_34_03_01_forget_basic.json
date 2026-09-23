@@ -1,0 +1,14 @@
+{
+  "name": "test_forget_basic",
+  "description": "Verify archiving (soft delete) of a memory by its ID",
+  "process_key": "plugin::actr_memory_plugin::forget_action",
+  "arguments": {
+    "params": {
+      "memory_id": "test-memory-uuid-001"
+    },
+    "state": {
+      "session_id": "test-session-020"
+    }
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,632 @@
+{
+  "entries": [
+    {
+      "denial_behavior": "disable_capability",
+      "entry_type": "permission",
+      "grant_actor": "user",
+      "id": "background_items_permission",
+      "source": {
+        "grant_operation_ref": "open_background_items_settings",
+        "kind": "background_items",
+        "platform": "macos",
+        "probe_ref": "launchagent_running",
+        "required_when": null
+      },
+      "system_settings_pane": "General > Login Items & Extensions",
+      "what": "Background items",
+      "when": "Always required.",
+      "why": "Allow the reviewed main per-user LaunchAgent at ~/Library/LaunchAgents/local.solet.<name>.plist to run after login."
+    },
+    {
+      "denial_behavior": "disable_capability",
+      "entry_type": "permission",
+      "grant_actor": "user",
+      "id": "blue_green_router_background_items_permission",
+      "source": {
+        "grant_operation_ref": "open_background_items_settings",
+        "kind": "background_items",
+        "platform": "macos",
+        "probe_ref": "router_ready",
+        "required_when": {
+          "decision_ref": "setup_profile",
+          "operator": "equals",
+          "value": "macos-bizops"
+        }
+      },
+      "system_settings_pane": "General > Login Items & Extensions",
+      "what": "Blue-green router background item",
+      "when": "When `setup_profile` equals `macos-bizops`.",
+      "why": "Allow the reviewed blue-green router LaunchAgent at ~/Library/LaunchAgents/local.solet.<name>.router.plist to bootout, bootstrap, kickstart, and run after login."
+    },
+    {
+      "denial_behavior": "disable_capability",
+      "entry_type": "permission",
+      "grant_actor": "user",
+      "id": "claude_plugin_configuration_permission",
+      "source": {
+        "grant_operation_ref": "open_files_permissions_settings",
+        "kind": "files_and_folders",
+        "platform": "macos",
+        "probe_ref": "claude_plugin_visible",
+        "required_when": {
+          "decision_ref": "coding_agents",
+          "operator": "contains",
+          "value": "claude_code"
+        }
+      },
+      "system_settings_pane": "Privacy & Security > Files and Folders",
+      "what": "Claude Code plugin configuration",
+      "when": "When `coding_agents` contains `claude_code`.",
+      "why": "Allow the selected Claude Code CLI to register the repository marketplace, install the coordination plugin, and read ~/.claude/plugins/installed_plugins.json for verification."
+    },
+    {
+      "denial_behavior": "disable_capability",
+      "entry_type": "permission",
+      "grant_actor": "user",
+      "id": "claude_session_files_permission",
+      "source": {
+        "grant_operation_ref": "open_files_permissions_settings",
+        "kind": "files_and_folders",
+        "platform": "macos",
+        "probe_ref": "claude_session_roots_readable",
+        "required_when": {
+          "decision_ref": "session_sources",
+          "operator": "contains",
+          "value": "claude_local"
+        }
+      },
+      "system_settings_pane": "Privacy & Security > Files and Folders",
+      "what": "Claude Code session files",
+      "when": "When `session_sources` contains `claude_local`.",
+      "why": "Read only the user-approved Claude projects, history, and tasks roots for ingestion."
+    },
+    {
+      "denial_behavior": "disable_capability",
+      "entry_type": "permission",
+      "grant_actor": "user",
+      "id": "codex_plugin_configuration_permission",
+      "source": {
+        "grant_operation_ref": "open_files_permissions_settings",
+        "kind": "files_and_folders",
+        "platform": "macos",
+        "probe_ref": "codex_plugin_visible",
+        "required_when": {
+          "decision_ref": "coding_agents",
+          "operator": "contains",
+          "value": "codex"
+        }
+      },
+      "system_settings_pane": "Privacy & Security > Files and Folders",
+      "what": "Codex plugin configuration",
+      "when": "When `coding_agents` contains `codex`.",
+      "why": "Allow the selected Codex CLI to register the repository marketplace and install the coordination plugin in its user-owned configuration."
+    },
+    {
+      "denial_behavior": "disable_capability",
+      "entry_type": "permission",
+      "grant_actor": "user",
+      "id": "codex_session_files_permission",
+      "source": {
+        "grant_operation_ref": "open_files_permissions_settings",
+        "kind": "files_and_folders",
+        "platform": "macos",
+        "probe_ref": "codex_session_roots_readable",
+        "required_when": {
+          "decision_ref": "session_sources",
+          "operator": "contains",
+          "value": "codex_local"
+        }
+      },
+      "system_settings_pane": "Privacy & Security > Files and Folders",
+      "what": "Codex session files",
+      "when": "When `session_sources` contains `codex_local`.",
+      "why": "Read only the user-approved Codex session roots for ingestion."
+    },
+    {
+      "denial_behavior": "block",
+      "entry_type": "permission",
+      "grant_actor": "user",
+      "id": "keychain_permission",
+      "source": {
+        "grant_operation_ref": null,
+        "kind": "keychain",
+        "platform": "macos",
+        "probe_ref": "keychain_available",
+        "required_when": null
+      },
+      "system_settings_pane": "Not applicable (no System Settings path declared).",
+      "what": "macOS Keychain",
+      "when": "Always required.",
+      "why": "Store the platform vault passphrase and provider-owned client sessions without placing secrets in the repository."
+    },
+    {
+      "denial_behavior": "Decline state: `declined`. The solet remains manual-start only.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "background_service_consent",
+      "source": {
+        "category": "background_service",
+        "decline": {
+          "allowed": true,
+          "consequence": "The solet remains manual-start only.",
+          "reoffer": "settings_only",
+          "state": "declined"
+        },
+        "required": false,
+        "required_when": {
+          "decision_ref": "autostart",
+          "operator": "equals",
+          "value": "enabled"
+        },
+        "scope": [
+          "Main per-user LaunchAgent: ~/Library/LaunchAgents/local.solet.<name>.plist",
+          "Generated service PATH and executable"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Run after login",
+      "when": "When `autostart` equals `enabled`.",
+      "why": "Authorize the reviewed main per-user LaunchAgent and background item."
+    },
+    {
+      "denial_behavior": "Decline state: `declined`. Claude Code remains installed without the repository coordination plugin or fresh-session hook proof.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "claude_plugin_install_consent",
+      "source": {
+        "category": "system_change",
+        "decline": {
+          "allowed": true,
+          "consequence": "Claude Code remains installed without the repository coordination plugin or fresh-session hook proof.",
+          "reoffer": "settings_only",
+          "state": "declined"
+        },
+        "required": false,
+        "required_when": {
+          "decision_ref": "coding_agents",
+          "operator": "contains",
+          "value": "claude_code"
+        },
+        "scope": [
+          "Claude Code plugin marketplace registration for the selected repository",
+          "Claude Code coordination plugin installation and enablement",
+          "Read ~/.claude/plugins/installed_plugins.json to verify the installed plugin"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Install the Claude Code coordination plugin",
+      "when": "When `coding_agents` contains `claude_code`.",
+      "why": "Authorize Claude Code to register the repository marketplace, install the coordination plugin, and read its installed-plugin registry for verification."
+    },
+    {
+      "denial_behavior": "Decline state: `dormant`. Claude history remains local and unindexed.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "claude_session_ingestion_consent",
+      "source": {
+        "category": "session_history_ingestion",
+        "decline": {
+          "allowed": true,
+          "consequence": "Claude history remains local and unindexed.",
+          "reoffer": "settings_only",
+          "state": "dormant"
+        },
+        "required": false,
+        "required_when": null,
+        "scope": [
+          "Approved Claude projects root",
+          "Approved Claude history root",
+          "Approved Claude tasks root"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Index Claude Code session history",
+      "when": "Optional; no required_when condition is declared.",
+      "why": "Authorize read-only ingestion of the displayed Claude projects, history, and tasks roots. No source files will be moved, deleted, or modified."
+    },
+    {
+      "denial_behavior": "Decline state: `blocked`. Genesis does not run because every profile installs the named no-MCP launcher and its Codex MCP configuration together.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "codex_mcp_configuration_consent",
+      "source": {
+        "category": "system_change",
+        "decline": {
+          "allowed": true,
+          "consequence": "Genesis does not run because every profile installs the named no-MCP launcher and its Codex MCP configuration together.",
+          "reoffer": "settings_only",
+          "state": "blocked"
+        },
+        "required": true,
+        "required_when": null,
+        "scope": [
+          "~/.codex/config.toml",
+          "Append [mcp_servers.<name>] and [mcp_servers.<name>.env] tables that point Codex at the newborn solet"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Configure Codex MCP access",
+      "when": "Always required.",
+      "why": "Authorize the Genesis append to ~/.codex/config.toml that registers this solet as a Codex MCP server."
+    },
+    {
+      "denial_behavior": "Decline state: `declined`. Codex remains installed without the repository coordination plugin or fresh-session hook proof.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "codex_plugin_install_consent",
+      "source": {
+        "category": "system_change",
+        "decline": {
+          "allowed": true,
+          "consequence": "Codex remains installed without the repository coordination plugin or fresh-session hook proof.",
+          "reoffer": "settings_only",
+          "state": "declined"
+        },
+        "required": false,
+        "required_when": {
+          "decision_ref": "coding_agents",
+          "operator": "contains",
+          "value": "codex"
+        },
+        "scope": [
+          "Codex plugin marketplace registration for the selected repository",
+          "Codex coordination plugin installation and enablement"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Install the Codex coordination plugin",
+      "when": "When `coding_agents` contains `codex`.",
+      "why": "Authorize Codex to register the repository marketplace and install the selected coordination plugin."
+    },
+    {
+      "denial_behavior": "Decline state: `dormant`. Codex history remains local and unindexed.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "codex_session_ingestion_consent",
+      "source": {
+        "category": "session_history_ingestion",
+        "decline": {
+          "allowed": true,
+          "consequence": "Codex history remains local and unindexed.",
+          "reoffer": "settings_only",
+          "state": "dormant"
+        },
+        "required": false,
+        "required_when": null,
+        "scope": [
+          "Approved Codex sessions root",
+          "Approved Codex archived_sessions root"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Index Codex session history",
+      "when": "Optional; no required_when condition is declared.",
+      "why": "Authorize read-only ingestion of the displayed Codex session and archived-session roots. No source files will be moved, deleted, or modified."
+    },
+    {
+      "denial_behavior": "Decline state: `dormant`. Google Workspace remains not connected.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "google_workspace_account_consent",
+      "source": {
+        "category": "account_access",
+        "decline": {
+          "allowed": true,
+          "consequence": "Google Workspace remains not connected.",
+          "reoffer": "first_use",
+          "state": "dormant"
+        },
+        "required": false,
+        "required_when": null,
+        "scope": [
+          "Gmail modify",
+          "Drive",
+          "Docs",
+          "Sheets",
+          "Slides"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Authorize Google Workspace account",
+      "when": "Optional; no required_when condition is declared.",
+      "why": "Review the five requested Google scopes and authorize the selected account."
+    },
+    {
+      "denial_behavior": "Decline state: `dormant`. Jira remains not connected.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "jira_destructive_access_consent",
+      "source": {
+        "category": "destructive_write",
+        "decline": {
+          "allowed": true,
+          "consequence": "Jira remains not connected.",
+          "reoffer": "first_use",
+          "state": "dormant"
+        },
+        "required": false,
+        "required_when": null,
+        "scope": [
+          "Create and update Jira content",
+          "Permanent issue deletion"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Authorize Jira write and delete capability",
+      "when": "Optional; no required_when condition is declared.",
+      "why": "Acknowledge that the Jira token inherits user permissions and the plugin includes permanent deletion."
+    },
+    {
+      "denial_behavior": "Decline state: `dormant`. Marketo remains not connected.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "marketo_destructive_access_consent",
+      "source": {
+        "category": "destructive_write",
+        "decline": {
+          "allowed": true,
+          "consequence": "Marketo remains not connected.",
+          "reoffer": "first_use",
+          "state": "dormant"
+        },
+        "required": false,
+        "required_when": null,
+        "scope": [
+          "Marketing asset changes",
+          "Delete operations",
+          "Person merge"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Authorize Marketo write, delete, and merge capability",
+      "when": "Optional; no required_when condition is declared.",
+      "why": "Review the selected Marketo API Role and acknowledge delete and merge capabilities."
+    },
+    {
+      "denial_behavior": "Decline state: `blocked`. The installation cannot claim fresh-shell command or hook readiness.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "shell_modification_consent",
+      "source": {
+        "category": "shell_modification",
+        "decline": {
+          "allowed": true,
+          "consequence": "The installation cannot claim fresh-shell command or hook readiness.",
+          "reoffer": "settings_only",
+          "state": "blocked"
+        },
+        "required": true,
+        "required_when": null,
+        "scope": [
+          "Managed marker block in .zshrc",
+          "Per-solet launcher directory"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Install shell integration",
+      "when": "Always required.",
+      "why": "Authorize the reviewed PATH and launcher block in the selected shell startup file."
+    },
+    {
+      "denial_behavior": "Decline state: `dormant`. Snowflake remains not connected.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "snowflake_write_access_consent",
+      "source": {
+        "category": "destructive_write",
+        "decline": {
+          "allowed": true,
+          "consequence": "Snowflake remains not connected.",
+          "reoffer": "first_use",
+          "state": "dormant"
+        },
+        "required": false,
+        "required_when": null,
+        "scope": [
+          "All objects visible to the configured role",
+          "Statement execution permitted by the role"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Authorize Snowflake role",
+      "when": "Optional; no required_when condition is declared.",
+      "why": "Review the selected Snowflake role and acknowledge that run_statement can write wherever that role permits."
+    },
+    {
+      "denial_behavior": "Decline state: `blocked`. Setup remains at the reviewed-plan checkpoint and performs no system mutation.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "system_change_consent",
+      "source": {
+        "category": "system_change",
+        "decline": {
+          "allowed": true,
+          "consequence": "Setup remains at the reviewed-plan checkpoint and performs no system mutation.",
+          "reoffer": "settings_only",
+          "state": "blocked"
+        },
+        "required": true,
+        "required_when": null,
+        "scope": [
+          "Homebrew packages selected by the plan",
+          "PostgreSQL service",
+          "Per-solet database, role, schema, and SCRAM policy",
+          "Project virtual environment"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Install system dependencies",
+      "when": "Always required.",
+      "why": "Review and authorize the exact package, service, database-role, and filesystem changes in the generated plan."
+    },
+    {
+      "denial_behavior": "Not declared by this authentication-flow entry.",
+      "entry_type": "auth_flow",
+      "grant_actor": "operator (authentication presence: required_once).",
+      "id": "external_postgres_credentials",
+      "source": {
+        "credential_owner": "platform_vault",
+        "mode": "database_credentials",
+        "required_when": null,
+        "start_operation_refs": [
+          "configure_external_postgres"
+        ],
+        "verification_probe_refs": [
+          "external_postgres_connection_valid"
+        ]
+      },
+      "system_settings_pane": "Not applicable (authentication flow, not a macOS permission entry).",
+      "what": "External PostgreSQL credentials",
+      "when": "No required_when condition is declared; starts through `configure_external_postgres`.",
+      "why": "Repeatable on-demand connection credentials; zero configured connections is a normal steady state."
+    },
+    {
+      "denial_behavior": "Not declared by this authentication-flow entry.",
+      "entry_type": "auth_flow",
+      "grant_actor": "operator (authentication presence: required_once).",
+      "id": "google_workspace_oauth",
+      "source": {
+        "credential_owner": "platform_vault",
+        "mode": "oauth_browser",
+        "required_when": null,
+        "start_operation_refs": [
+          "configure_google_workspace"
+        ],
+        "verification_probe_refs": [
+          "google_workspace_connection_valid"
+        ]
+      },
+      "system_settings_pane": "Not applicable (authentication flow, not a macOS permission entry).",
+      "what": "Google Workspace OAuth",
+      "when": "No required_when condition is declared; starts through `configure_google_workspace`.",
+      "why": "Browser OAuth for Gmail, Drive, Docs, Sheets, and Slides using a local loopback or web callback selected by deployment topology."
+    },
+    {
+      "denial_behavior": "Not declared by this authentication-flow entry.",
+      "entry_type": "auth_flow",
+      "grant_actor": "operator (authentication presence: required_once).",
+      "id": "jira_api_token",
+      "source": {
+        "credential_owner": "platform_vault",
+        "mode": "api_token",
+        "required_when": null,
+        "start_operation_refs": [],
+        "verification_probe_refs": [
+          "jira_connection_valid"
+        ]
+      },
+      "system_settings_pane": "Not applicable (authentication flow, not a macOS permission entry).",
+      "what": "Jira API token",
+      "when": "No required_when condition is declared; starts through no declared operation.",
+      "why": "Jira account email plus API token; no OAuth callback."
+    },
+    {
+      "denial_behavior": "Not declared by this authentication-flow entry.",
+      "entry_type": "auth_flow",
+      "grant_actor": "operator (authentication presence: required_once).",
+      "id": "marketo_client_credentials",
+      "source": {
+        "credential_owner": "platform_vault",
+        "mode": "oauth_client_credentials",
+        "required_when": null,
+        "start_operation_refs": [
+          "configure_marketo"
+        ],
+        "verification_probe_refs": [
+          "marketo_connection_valid"
+        ]
+      },
+      "system_settings_pane": "Not applicable (authentication flow, not a macOS permission entry).",
+      "what": "Marketo LaunchPoint credentials",
+      "when": "No required_when condition is declared; starts through `configure_marketo`.",
+      "why": "OAuth client-credentials flow backed by a Marketo API Role, API User, and LaunchPoint service."
+    },
+    {
+      "denial_behavior": "Not declared by this authentication-flow entry.",
+      "entry_type": "auth_flow",
+      "grant_actor": "operator (authentication presence: required_once).",
+      "id": "salesforce_cli_login",
+      "source": {
+        "credential_owner": "provider_cli",
+        "mode": "cli_session",
+        "required_when": null,
+        "start_operation_refs": [
+          "configure_salesforce"
+        ],
+        "verification_probe_refs": [
+          "salesforce_connection_valid"
+        ]
+      },
+      "system_settings_pane": "Not applicable (authentication flow, not a macOS permission entry).",
+      "what": "Salesforce CLI browser login",
+      "when": "No required_when condition is declared; starts through `configure_salesforce`.",
+      "why": "The standalone sf CLI performs browser login and owns the resulting credential in its auth store or macOS Keychain."
+    },
+    {
+      "denial_behavior": "Not declared by this authentication-flow entry.",
+      "entry_type": "auth_flow",
+      "grant_actor": "operator (authentication presence: required_each_renewal).",
+      "id": "schwab_oauth",
+      "source": {
+        "credential_owner": "platform_vault",
+        "mode": "oauth_browser",
+        "required_when": null,
+        "start_operation_refs": [
+          "configure_schwab"
+        ],
+        "verification_probe_refs": [
+          "schwab_connection_valid"
+        ]
+      },
+      "system_settings_pane": "Not applicable (authentication flow, not a macOS permission entry).",
+      "what": "Schwab browser OAuth",
+      "when": "No required_when condition is declared; starts through `configure_schwab`.",
+      "why": "Browser OAuth using a registered HTTPS callback whose final redirect is replayed to the local HTTP listener."
+    },
+    {
+      "denial_behavior": "Not declared by this authentication-flow entry.",
+      "entry_type": "auth_flow",
+      "grant_actor": "operator (authentication presence: required_once).",
+      "id": "snowflake_rsa",
+      "source": {
+        "credential_owner": "platform_vault",
+        "mode": "rsa_key_pair",
+        "required_when": null,
+        "start_operation_refs": [
+          "configure_snowflake"
+        ],
+        "verification_probe_refs": [
+          "snowflake_connection_valid"
+        ]
+      },
+      "system_settings_pane": "Not applicable (authentication flow, not a macOS permission entry).",
+      "what": "Snowflake RSA key pair",
+      "when": "No required_when condition is declared; starts through `configure_snowflake`.",
+      "why": "4096-bit RSA key-pair authentication; the selected user and role define the effective authorization boundary."
+    },
+    {
+      "denial_behavior": "Not declared by this authentication-flow entry.",
+      "entry_type": "auth_flow",
+      "grant_actor": "operator (authentication presence: required_once).",
+      "id": "zuora_client_credentials",
+      "source": {
+        "credential_owner": "platform_vault",
+        "mode": "oauth_client_credentials",
+        "required_when": null,
+        "start_operation_refs": [
+          "configure_zuora"
+        ],
+        "verification_probe_refs": [
+          "zuora_connection_valid"
+        ]
+      },
+      "system_settings_pane": "Not applicable (authentication flow, not a macOS permission entry).",
+      "what": "Zuora OAuth client credentials",
+      "when": "No required_when condition is declared; starts through `configure_zuora`.",
+      "why": "OAuth client-credentials flow scoped to the tenant selected by base URL."
+    }
+  ],
+  "manifest_schema_version": 1,
+  "source_contract": "macos_setup_flow.json",
+  "source_contract_schema_version": 1
+}

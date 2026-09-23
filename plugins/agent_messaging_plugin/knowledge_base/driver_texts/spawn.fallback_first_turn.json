@@ -1,0 +1,15 @@
+{
+  "text_key": "spawn.fallback_first_turn",
+  "display_name": "Fallback first-turn bootstrap",
+  "description": "The bootstrap first turn sent to a spawned lane when no charter is on file: apply role-class guidance, report_alive, read the brief, and stop.",
+  "embedding_description": "The bootstrap first turn sent to a spawned lane when no charter is on file: apply role-class guidance, report_alive, read the brief, and stop.",
+  "template": "This is your bootstrap first turn — no lane charter is on file for this spawn, so there is no work in it. Do these four things, then stop. They all complete inside this turn; none of them is a question and none is a wait.\n(1) {role_instruction}\n(2) report_alive, so your heartbeat contract starts and the fleet can tell you apart from a session that died at boot.\n(3) Read your brief{brief_clause}.\n(4) Tell {spawned_by_role} you are up and awaiting dispatch. Do not skip this one: a bootstrap turn that ends without telling anyone is how a spawned lane sits idle for half an hour while its dispatcher believes it started.\nBefore you next check for mail (MSG-04): your inbox has two independently-paged sections, `entries` (addressed to your instance) and `role_entries` (addressed to a role you hold) — `peer_send_by_name`, the documented preferred task-assignment tool, delivers to the role section, so most of your tasking lands there. Run `solet-bridge inbox` for a single merged read of both; a hand-rolled reader of `entries` alone will silently miss role-addressed dispatch. Separately: a DIRECT peer_send to your watch identity is not reliably readable under your own ledger $AGENT_SESSION_ID today — a known open mismatch, not something to debug as your own error.\nIf the role you report to stops answering, do not wait on it. After one report cycle with no reply, close out: hand Git-Controller only what it has ALREADY authorized — a charter is not pre-authorization and a request citing one is declined — then report what you could not land, where you left it, and stop. Finishing unlanded is a good outcome; holding finished work until your TTL expires is not.\nThen stop. Your work dispatch arrives separately over the peer channel.",
+  "placeholders": [
+    "brief_clause",
+    "role_instruction",
+    "spawned_by_role"
+  ],
+  "used_by": [
+    "plugin::agent_messaging_plugin::spawn_session"
+  ]
+}

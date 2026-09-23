@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::retire_session",
+  "display_name": "Retire a managed session (lane-landing verb)",
+  "description": "Fleet session-management Phase B, D1 (§4). The lane-landing verb: composes FOUR steps in fixed order, each idempotent, with no cross-table transaction — (1) terminate_session, which kills the real host process (headless workers: SIGTERM then SIGKILL after grace; operator-hosted rows: no-op by design) BEFORE the ledger write, and tolerates an already-terminal row; (2) prune this session's session_role_claim cardinality row if one still names a role bound to it (best-effort cleanup, not role_binding release itself); (3) fire every armed session_terminal dependency edge waiting on this agent_instance_id, guarded by fired_at IS NULL so a re-run never double-fires; (4) a predicated ledger write terminated -> retired. A crash mid-retire leaves the row 'terminated'-but-not-'retired'; re-running retire_session on the same agent_instance_id skips completed steps and drives it home — re-drivable by construction, never wedged.",
+  "embedding_description": "Retire a managed session permanently: terminate it, clean up its role-claim bookkeeping, fire any 'wake me when this session ends' dependency edges, and mark the ledger row retired — composable, idempotent, safely re-runnable after a crash. The terminal step beyond terminate_session.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Session retired",
+    "result_type": "retire_session_result",
+    "result_description": "already_retired (true if the row was already retired and this call changed nothing) and dependencies_fired (the count of session_terminal dependency edges fired by THIS call — zero on a re-run, since firing is guarded and never repeats).",
+    "presentation_guidance": "If dependencies_fired is greater than zero, note that other waiting sessions have now been woken — this is a real side effect, not just a bookkeeping update."
+  },
+  "error_processor_customizations": {
+    "action_context": "Composes terminate_session's predicated transition, a best-effort session_role_claim prune, a guarded dependency-edge fire, and a final predicated terminated->retired write. No step spans a transaction with another; each is individually idempotent so a partial failure is safely re-drivable by calling this verb again with the same agent_instance_id.",
+    "error_interpretation": "session_not_found: no managed_session row exists for the given agent_instance_id. stale_lifecycle_state: the final terminated->retired write lost a race with another writer between this call's read and its write (rare — nothing else legitimately writes a terminated row's state except this verb).",
+    "recovery_guidance": "For stale_lifecycle_state, simply re-request retire_session with the same agent_instance_id — the composed steps are idempotent and the row will converge to retired."
+  }
+}

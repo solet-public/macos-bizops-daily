@@ -1,0 +1,5 @@
+{
+  "query": "Recalculate memory strengths",
+  "expected_process_key": "service_interface::memory_service::recompute_strengths",
+  "expected_arguments": {}
+}

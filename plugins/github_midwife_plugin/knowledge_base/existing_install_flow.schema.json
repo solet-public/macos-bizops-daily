@@ -1,0 +1,276 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Existing-install transition bundle",
+  "description": "The candidate-committed executable authority for updating an already-born Solet. Every runtime action the Manager may take after the source fast-forward is declared here as one closed existing:: operation; the Manager selects from this set and never invents an action. Closed everywhere: an unknown key anywhere is a refusal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "flow_id",
+    "schema_version",
+    "supported_predecessors",
+    "source_operation",
+    "runtime_operations",
+    "managed_artifacts",
+    "dependency_closure",
+    "knowledge_removals",
+    "lifecycle"
+  ],
+  "properties": {
+    "flow_id": {"const": "existing-install"},
+    "schema_version": {"const": 1},
+    "supported_predecessors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/definitions/supported_predecessor"}
+    },
+    "source_operation": {"$ref": "#/definitions/source_operation"},
+    "runtime_operations": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/runtime_operation"}
+    },
+    "managed_artifacts": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/managed_artifact"}
+    },
+    "dependency_closure": {"$ref": "#/definitions/dependency_closure"},
+    "knowledge_removals": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/identifier"},
+      "uniqueItems": true
+    },
+    "lifecycle": {"$ref": "#/definitions/lifecycle"}
+  },
+  "definitions": {
+    "sha256_hex": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,127}$"},
+    "existing_operation_ref": {
+      "type": "string",
+      "enum": [
+        "existing::dependencies.reconcile",
+        "existing::migration.solet_rename",
+        "existing::migration.export_root_containment",
+        "existing::hydration.reconcile",
+        "existing::autostart.reconcile",
+        "existing::runtime.platform_migration",
+        "existing::runtime.plugin_cache_refresh"
+      ]
+    },
+    "supported_predecessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "tree",
+        "provenance_sha256",
+        "seed_id",
+        "origin_id",
+        "manifest_sha256",
+        "legacy_anchor_id"
+      ],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^https://github\\.com/[^/]+/[^/]+\\.git$"},
+        "commit": {"$ref": "#/definitions/commit"},
+        "tree": {"$ref": "#/definitions/commit"},
+        "provenance_sha256": {"$ref": "#/definitions/sha256_hex"},
+        "seed_id": {"$ref": "#/definitions/uuid"},
+        "origin_id": {"$ref": "#/definitions/uuid"},
+        "manifest_sha256": {"$ref": "#/definitions/sha256_hex"},
+        "legacy_anchor_id": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "source_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_ref", "runner", "planned_actions"],
+      "properties": {
+        "operation_ref": {"const": "existing::source.fast_forward"},
+        "runner": {"const": "manager"},
+        "planned_actions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "manager.acquire_update_candidate",
+              "target.fetch_exact_candidate",
+              "target.fast_forward_exact_candidate"
+            ]
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true
+        }
+      }
+    },
+    "applies_when": {
+      "oneOf": [
+        {"const": "any"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["predecessor_commits"],
+          "properties": {
+            "predecessor_commits": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/commit"},
+              "uniqueItems": true
+            }
+          }
+        }
+      ]
+    },
+    "runtime_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "operation_ref",
+        "runner",
+        "stage",
+        "mutation_class",
+        "rollback_class",
+        "retry_policy",
+        "idempotency_key",
+        "applies_when",
+        "precondition_probe_refs",
+        "postcondition_probe_refs",
+        "public_inputs",
+        "requires_confirmation"
+      ],
+      "properties": {
+        "operation_id": {"$ref": "#/definitions/identifier"},
+        "operation_ref": {"$ref": "#/definitions/existing_operation_ref"},
+        "runner": {"enum": ["bootstrap", "target_adapter", "reconciliation", "instance_bridge", "launchctl"]},
+        "stage": {"enum": ["dependencies", "migrations_pre", "hydration", "lifecycle", "runtime_reconcile"]},
+        "mutation_class": {
+          "enum": [
+            "venv",
+            "filesystem_managed_artifact",
+            "launchd",
+            "shell_startup",
+            "coding_agent_config",
+            "plugin_cache",
+            "knowledge_index",
+            "process_lifecycle",
+            "database_additive",
+            "database_forward_only"
+          ]
+        },
+        "rollback_class": {"enum": ["reversible", "runtime_previous_release", "backup_required", "forward_only"]},
+        "retry_policy": {"enum": ["retry_safe", "manual"]},
+        "idempotency_key": {"const": "sha256(candidate_commit, operation_id, instance_id)"},
+        "applies_when": {"$ref": "#/definitions/applies_when"},
+        "precondition_probe_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/definitions/identifier"},
+          "uniqueItems": true
+        },
+        "postcondition_probe_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/definitions/identifier"},
+          "uniqueItems": true
+        },
+        "public_inputs": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/identifier"},
+          "uniqueItems": true
+        },
+        "requires_confirmation": {"type": "boolean"}
+      }
+    },
+    "managed_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "kind",
+        "logical_destination",
+        "preservation_class",
+        "marker",
+        "stamp",
+        "template_ref",
+        "template_digest",
+        "previous_template_digests"
+      ],
+      "properties": {
+        "artifact_id": {"$ref": "#/definitions/identifier"},
+        "kind": {"enum": ["managed_block", "rendered_whole", "launchd_plist"]},
+        "logical_destination": {"type": "string", "pattern": "^\\{(HOME|TARGET|PROFILE_HOME)\\}/"},
+        "preservation_class": {
+          "enum": ["operator_owned_with_managed_block", "manager_generated_whole", "preserved_never"]
+        },
+        "marker": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["begin", "end"],
+              "properties": {
+                "begin": {"type": "string", "pattern": "SOLET \\{NAME\\} v\\{TEMPLATE_DIGEST8\\}"},
+                "end": {"type": "string", "pattern": "SOLET \\{NAME\\}"}
+              }
+            }
+          ]
+        },
+        "stamp": {
+          "type": ["string", "null"],
+          "pattern": "rendered-from: \\{TEMPLATE_REF\\}@\\{TEMPLATE_DIGEST\\}"
+        },
+        "template_ref": {"type": "string", "pattern": "^plugins/github_midwife_plugin/knowledge_base/hydration_templates/[A-Za-z0-9_.-]+$"},
+        "template_digest": {"$ref": "#/definitions/digest"},
+        "previous_template_digests": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/digest"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "dependency_piece": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["distribution", "relative_path"],
+      "properties": {
+        "distribution": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+        "relative_path": {"type": "string", "pattern": "^(plugins/[a-z][a-z0-9_]*|ananta|solet_setup_contracts)$"}
+      }
+    },
+    "dependency_closure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["additions", "removals"],
+      "properties": {
+        "additions": {"type": "array", "items": {"$ref": "#/definitions/dependency_piece"}},
+        "removals": {"type": "array", "items": {"$ref": "#/definitions/dependency_piece"}}
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "readiness_budget_seconds",
+        "readiness_release_signal",
+        "verification_modules"
+      ],
+      "properties": {
+        "strategy": {"enum": ["router_preferred", "single_color_required"]},
+        "readiness_budget_seconds": {"type": "integer", "minimum": 1, "maximum": 900},
+        "readiness_release_signal": {"const": "bridge_health_healthy"},
+        "verification_modules": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*$"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "test_delete_blob_not_found",
+  "description": "Attempt to delete a non-existent blob",
+  "process_key": "plugin::default_blob_storage_plugin::delete_blob",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "blob_id": "gen-nonexistent123"
+    },
+    "state": {
+      "current_session_id": "test-delete-notfound-001"
+    },
+    "timeout_seconds": 30
+  }
+}

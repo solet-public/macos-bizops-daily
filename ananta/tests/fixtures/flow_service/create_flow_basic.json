@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::flow_service::create_flow",
+  "arguments": {
+    "session_id": "test_session_001",
+    "trigger_type": "user_input",
+    "trigger_data": {
+      "user_input": "Hello world"
+    }
+  }
+}

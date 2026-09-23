@@ -1,0 +1,29 @@
+{
+  "process_key": "service_interface::thinking_service::create_work_breakdown_structure_outline",
+  "display_name": "Create WBS Outline",
+  "description": "Create a WBS outline skeleton for a specific phase via the thinking model. Returns the outline record with work item IDs and count.",
+  "embedding_description": "Create work breakdown structure outline skeleton for a specific phase. Produces a high-level outline with numbered work items, their titles, and metadata. One thinking model call. First step of detailed WBS authoring.",
+  "prompt_contract": {
+    "kind": "delegated_artifact_creation"
+  },
+  "result_processor_customizations": {
+    "action_label": "WBS outline created",
+    "result_type": "wbs_outline_create_result",
+    "result_description": "WBS outline with work item structure",
+    "presentation_guidance": "",
+    "output_action_guidance": "The WBS outline has been created. Continue executing the current step to graft detail authoring steps into the plan.",
+    "message_rendering": {
+      "renderer_key": "artifact_result_compact",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Creating a WBS outline. create_work_breakdown_structure_outline accepts {wbs_id, manifest_id, phase_number, phase_name, directive, support_articles}.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. StorageError: knowledge base write failed. MissingDependency: required manifest or sketch not found."
+  }
+}

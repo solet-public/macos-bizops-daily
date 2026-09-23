@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_self_deployment_plugin::status_autostart",
+  "display_name": "Read solet LaunchAgent status",
+  "description": "Read-only introspection of the per-solet macOS LaunchAgent state. Inspects ~/Library/LaunchAgents/local.solet.<name>.plist on disk AND queries launchctl list <label> to determine whether the LaunchAgent is registered with launchd. Returns one of: not_installed (no plist + launchctl unaware), installed_not_loaded (plist on disk + launchctl unaware — typically operator manually launchctl-unloaded without removing the plist), installed_loaded (plist on disk + launchctl knows — EXPECTED steady state under KeepAlive=false: the LaunchAgent ran once at login, booted the solet, and exited cleanly; absent live PID is correct, not a failure), failed (could not introspect, typically permissions or launchctl unavailable). No side effects; safe to call on any cadence. Operators run this for diagnostic checks before/after install/uninstall verbs or when investigating cold-start behavior. Backlog item #13 (operator-approved 2026-06-04).",
+  "embedding_description": "Check whether macOS LaunchAgent autostart is installed. Read-only: inspects plist on disk + launchctl list. INSTALLED_LOADED is expected steady state — LaunchAgent fires at login and exits; absent live PID is correct. INSTALLED_NOT_LOADED = operator drift (plist present, launchd unaware). NOT_INSTALLED = install_autostart hasn't run. Returns AutostartResult: status, label, plist_path, last_run_at.",
+  "result_processor_customizations": {
+    "action_label": "LaunchAgent status snapshot",
+    "result_type": "macos_self_deployment_autostart_status_result",
+    "result_description": "AutostartResult frozen dataclass with status (not_installed / installed_not_loaded / installed_loaded / failed), verb='status_autostart', solet_name, label, plist_path, prior_state (mirrors status — read-only verb), last_run_at (ISO-8601 UTC if available, empty otherwise — launchctl limitation, not a bug), dry_run=false (never dry_run for a read-only verb), and a human-readable message describing the observed state.",
+    "presentation_guidance": "Lead with status. On status='installed_loaded' with empty last_run_at, do NOT flag this as a problem — that IS the steady state under KeepAlive=false. The LaunchAgent fired at login, booted the solet, and exited cleanly; the solet runs as its own process tree. On status='installed_not_loaded', flag potential operator drift (manual launchctl unload without plist removal) and recommend re-running install_autostart to reconcile. On status='not_installed', surface that autostart hasn't been wired and recommend install_autostart."
+  },
+  "error_processor_customizations": {
+    "action_context": "Read whether the macOS LaunchAgent autostart is installed for this solet.",
+    "error_interpretation": "launchctl_unavailable: /bin/launchctl could not be invoked (almost never happens on macOS but possible on a stripped chroot or under unusual sandbox conditions). filesystem_error: could not stat the plist path (typically a permission anomaly on ~/Library/LaunchAgents/).",
+    "recovery_guidance": "launchctl_unavailable: verify the host is running macOS with default tooling intact. filesystem_error: check permissions on ~/Library/LaunchAgents/."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "action_status",
+    "error",
+    "openai_embeddings.invalid_inputs"
+  ],
+  "output_not_contains": [
+    "completed",
+    "embeddings"
+  ],
+  "timeout_seconds": 30
+}

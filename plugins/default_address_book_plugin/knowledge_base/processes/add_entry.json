@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::default_address_book_plugin::add_entry",
+  "display_name": "Add Entry",
+  "description": "Add an entry to an existing address.",
+  "embedding_description": "Add an entry to an existing address with field_type, description, and value. Use to append host, port, url, token reference, or notes. Returns entry_id for the new entry. Entries can include vault:: references for secure values.",
+  "result_processor_customizations": {
+    "action_label": "Add Entry",
+    "result_type": "entry_added",
+    "result_description": "New entry added to address with entry_id",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

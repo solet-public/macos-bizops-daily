@@ -1,0 +1,41 @@
+# Retrieval-test companion for the coordinator dispatch discipline article.
+# Gated by service_interface::knowledge_service::test_retrieval (W7).
+# Semantics: rank is 1-indexed, smaller is better. A target query passes when
+# the article ranks at or above min_rank; a forbidden query passes when the
+# article is absent or ranks no better than forbidden_min_rank; a process_key
+# assertion passes when the key resolves in the live process registry.
+
+article_path: knowledge_bases/ananta_service/coordinator_dispatch_discipline.md
+consumer_profile: both
+
+target_queries:
+  - "how do I track an in-flight dispatch to a peer session"
+  - "coordinator dispatch watchdog pattern"
+  - "what should I declare when dispatching work to a peer"
+  - "how do I schedule a status check on a peer dispatch"
+  - "dispatch reliability watchdog memory tag"
+  - "expected_path expected_completion_signal coordinator"
+  - "20 minute coordinator interrupt cron active management sweep"
+  - "IMPORTANT marker dispatch ACK milestone discipline"
+  - "demand IMPORTANT acknowledgment when assigning work to a peer"
+  - "request IMPORTANT back from delegatee on completion milestones blockers"
+  - "coordinator session level cadence cron handoff"
+  - "silent peer_send when is it correct"
+  - "what recall searches must a dispatch brief require a peer to run"
+
+forbidden_queries:
+  - "how do I author a knowledge base article"           # kb_article_authoring_rubric should win this
+  - "how do I write a plugin from scratch"               # plugin-authoring should win this
+  - "how does memory-driven scheduling work"             # scheduling_memory_driven should win this
+  - "which search surface do I use knowledge base memory or ledger"  # 04_recall_before_work should win this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions:
+  - service_interface::scheduling_service::execute_in_seconds
+  - service_interface::scheduling_service::create_cron_schedule
+  - service_interface::memory_service::get_memories_by_tag
+  - service_interface::scheduling_service::clear_scheduled_actions_by_tag
+  - service_interface::session_ledger_service::search_event_content
+  - service_interface::session_ledger_service::search_sessions

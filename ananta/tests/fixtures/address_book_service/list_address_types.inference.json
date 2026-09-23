@@ -1,0 +1,5 @@
+{
+  "natural_language_query": "What types of addresses do I have?",
+  "expected_process_key": "service_interface::address_book_service::list_types",
+  "expected_arguments_structure": {}
+}

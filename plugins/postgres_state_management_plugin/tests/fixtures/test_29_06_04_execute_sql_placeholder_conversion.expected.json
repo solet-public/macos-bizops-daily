@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "action_status",
+    "completed",
+    "records"
+  ],
+  "output_not_contains": [
+    "error",
+    "failed"
+  ],
+  "timeout_seconds": 60
+}

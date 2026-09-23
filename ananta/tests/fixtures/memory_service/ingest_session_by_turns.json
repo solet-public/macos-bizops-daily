@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::ingest_session",
+  "arguments": {
+    "transcript": "User: Tell me about Python.\nAssistant: Python is a high-level programming language known for readability.\nUser: What about type hints?\nAssistant: Type hints were added in Python 3.5 and help with static analysis.",
+    "session_id": "test_session_002",
+    "chunk_by_turns": true
+  }
+}

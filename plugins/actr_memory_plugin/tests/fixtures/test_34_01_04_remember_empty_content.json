@@ -1,0 +1,14 @@
+{
+  "name": "test_remember_empty_content",
+  "description": "Verify that attempting to remember empty content returns an appropriate error",
+  "process_key": "plugin::actr_memory_plugin::remember_action",
+  "arguments": {
+    "params": {
+      "content": ""
+    },
+    "state": {
+      "session_id": "test-session-004"
+    }
+  },
+  "timeout_seconds": 30
+}

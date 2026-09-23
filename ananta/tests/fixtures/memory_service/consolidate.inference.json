@@ -1,0 +1,5 @@
+{
+  "query": "Consolidate my old memories",
+  "expected_process_key": "service_interface::memory_service::consolidate",
+  "expected_arguments": {}
+}

@@ -1,0 +1,10 @@
+{
+  "name": "test_generate_embeddings_empty_inputs",
+  "description": "Verify error handling when inputs array is empty",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": [],
+    "input_type": "text"
+  },
+  "timeout_seconds": 30
+}

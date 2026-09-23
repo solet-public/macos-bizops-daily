@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_blob_storage_plugin::get_blob",
+  "display_name": "Get Blob",
+  "description": "Get a file from blob storage by name. Returns attachment info ready for post_message. Accepts filename (e.g., 'tremolo_announce.wav'), name without extension (e.g., 'tremolo_announce'), or blob_id (e.g., 'bmd-xxxx'). Use this to retrieve files for sharing with the user.",
+  "embedding_description": "Retrieve a blob from local-filesystem store at APP_HOME/data/blobs/<blob_id> by name (filename, stem, or blob_id; resolved via resolve_file_by_name). Namespace is metadata, not a filesystem subdirectory. Returns attachment metadata (blob_id, namespace, artifact_type, media_type, filename, size_bytes) for post_message. Local-profile counterpart of s3_blob_storage_plugin.",
+  "result_processor_customizations": {
+    "action_label": "File Retrieved",
+    "result_type": "file_retrieved",
+    "result_description": "File attachment ready for sharing",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving file from blob storage by name",
+    "error_interpretation": "NotFoundError: No file found with that name. StorageError: Failed to access blob storage.",
+    "recovery_guidance": "For not found: check the filename is correct, use file_command('ls') to list available files. For storage errors: check storage accessibility."
+  }
+}

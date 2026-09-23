@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::zuora_plugin::get_object",
+  "display_name": "Zuora: Get Object",
+  "description": "Fetch one Account/Subscription/Invoice/Payment/Product object by type + id. Requires type and id. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; the object's fields are delivered when the job completes.",
+  "embedding_description": "Read one Zuora billing record of any supported type by id - Account, Subscription, Invoice, Payment, or Product. Dispatches asynchronously: a job_id comes back at once, the object's fields land moments later. The general-purpose single-record read for Zuora; the dedicated invoice and subscription verbs serve the common billing lookups more directly.",
+  "result_processor_customizations": {
+    "action_label": "Zuora object fetch queued",
+    "result_type": "zuora_get_object_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the object -- its fields arrive separately, as their own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the fetch was queued -- do not present job_id/status as the object itself. Acknowledge the lookup is in flight; the fields land in a follow-up message when the job completes. Once delivered, show the requested fields; object data reflects sensitive billing/financial content (data_sensitivity 0.5) — surface for downstream use but never treat as public."
+  },
+  "error_processor_customizations": {
+    "action_context": "Fetch one Zuora object by type and id.",
+    "error_interpretation": "zuora.invalid_params: missing or unsupported type, or missing id. zuora.object_not_found: no object with that id exists for that type. zuora.auth_failed: the OAuth client credentials were rejected.",
+    "recovery_guidance": "zuora.object_not_found: verify the id and type are correct, e.g. via data_query. zuora.invalid_params: type must be one of Account, Subscription, Invoice, Payment, Product."
+  }
+}

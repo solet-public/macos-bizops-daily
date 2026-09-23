@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "platform_health_plugin"
+version = "1.0.0"
+description = "Process-registry sweep gate — invokes every registered platform / service-interface process with sentinel arguments to surface registration, schema, and SQL type errors."
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+]
+
+[project.entry-points."ananta.plugins"]
+platform_health_plugin = "platform_health_plugin.plugin:PlatformHealthPlugin"

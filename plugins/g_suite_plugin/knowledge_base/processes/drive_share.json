@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::drive_share",
+  "display_name": "Drive: Share File",
+  "description": "Share a Google Drive file or folder with an email address at a given permission role (reader, commenter, writer). No notification email is sent. Runs as a background job: dispatch returns a job_id immediately, and confirmation plus the new permission id arrive via a follow-up message once it completes. Requires a connected account.",
+  "embedding_description": "Share Drive access on one file or folder id with a single email address at exactly one role, as a background job: reader for view, commenter for view and comment, or writer for edit. Dispatch returns a job_id for tracking; completion delivers the new permission id. An access-control write against Drive, and the grantee receives no notification mail.",
+  "result_processor_customizations": {
+    "action_label": "Drive permission grant started",
+    "result_type": "g_suite_drive_share_result",
+    "result_description": "Job queued for the Drive permission grant; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to grant Drive sharing access to an email address.",
+    "error_interpretation": "gsuite.invalid_params: missing id/email/role, role is not reader/commenter/writer, or missing session_id/flow_id context. gsuite.not_found: the file id does not exist. gsuite.permission_denied: the connected account cannot share this file. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.invalid_params: pass role as one of reader/commenter/writer. gsuite.not_found: verify the file id. gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

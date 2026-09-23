@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_scheduling_plugin::clear_scheduled_actions_by_tag",
+  "display_name": "Clear Scheduled Actions by Tag",
+  "description": "Cancel and remove all scheduled jobs matching a specific tag",
+  "embedding_description": "Cancel and remove all scheduled jobs that match a tag. Use for bulk cleanup (for example, cancel all monitor jobs tagged with a workflow id). Returns cleared_count and cleared_ids for verification and audit.",
+  "result_processor_customizations": {
+    "action_label": "Schedules cleared by tag",
+    "result_type": "schedules_cleared",
+    "result_description": "Count of schedules removed matching the tag",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Batch canceling and removing all scheduled jobs that match a specific tag",
+    "error_interpretation": "ParameterError: tag parameter is missing or empty. ExecutionError: scheduler service error during bulk removal or partial failure where some jobs couldn't be deleted.",
+    "recovery_guidance": "For parameter errors: ensure tag parameter is provided and non-empty. For Pattern 6a: use consistent tag format like 'monitor_<job_id>' when creating schedules to enable reliable bulk cancellation. Verify tags were correctly assigned during schedule creation (use same tag format). Check cleared_count in response - 0 count indicates no matches, which may be expected if jobs already executed. For partial failures: review scheduler and state service status."
+  }
+}

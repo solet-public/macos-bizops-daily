@@ -1,0 +1,23 @@
+# Retrieval-test companion for the agent-instruction-bootstrap contract article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+
+article_path: knowledge_bases/ananta_platform/24_operator_communication/05_agent_instruction_bootstrap_contract.md
+consumer_profile: both
+
+target_queries:
+  - "AGENTS.md versus CLAUDE.md which file does Claude Code read automatically as project instructions"
+  - "does finding an MCP registration override the no-MCP local-command default access profile"
+  - "is an empty knowledge base search result the same thing as a failed search call"
+  - "exact local command and optional MCP knowledge-search examples plus seed versus development source-artifact recovery"
+
+forbidden_queries:
+  - "operator decision brief format"                      # 01_operator_decision_briefs owns this
+  - "session start orientation standing governance documents"  # 04_session_start_orientation owns this
+  - "recall before work search the conversation record"   # 14_knowledge_retrieval/04_recall_before_work owns this
+  - "seed hydration runbook operator environment setup after genesis"  # github_midwife_plugin/01_hydration_runbook owns this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions:
+  - "service_interface::knowledge_service::search"

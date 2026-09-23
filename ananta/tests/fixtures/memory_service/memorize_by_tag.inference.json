@@ -1,0 +1,7 @@
+{
+  "query": "Memorize all memories tagged 'important'",
+  "expected_process_key": "service_interface::memory_service::memorize_by_tag",
+  "expected_arguments": {
+    "tag": "important"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::sheets_create",
+  "display_name": "Sheets: Create Spreadsheet",
+  "description": "Create a new Google Sheets spreadsheet with the given title. Runs as a background job: dispatch returns a job_id immediately, and the new spreadsheet's id arrives via a follow-up message once creation completes. Requires a connected account.",
+  "embedding_description": "Create a brand-new, empty Google Sheets spreadsheet with a given title, as a background job. Dispatch returns a job_id for tracking; completion delivers the spreadsheet id, which is then the 'id' argument for every other Sheets verb (sheets_get_values, sheets_update_values, sheets_append_values, sheets_export).",
+  "result_processor_customizations": {
+    "action_label": "Spreadsheet creation started",
+    "result_type": "g_suite_sheets_create_result",
+    "result_description": "Job queued for the spreadsheet creation; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to create a new Google Sheets spreadsheet.",
+    "error_interpretation": "gsuite.invalid_params: missing title, or missing session_id/flow_id context. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.invalid_params: supply a title. gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::audit_pinned_notes",
+  "display_name": "Audit Pinned Notes",
+  "description": "Audit memories in the memorization queue (pinned notes). Shows all memorized items with their strength, review schedule, and content preview. Use this to identify stale or no-longer-needed pinned memories.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Audit Pinned Notes",
+    "result_type": "pinned_notes_audit",
+    "result_description": "Audit of memories in the memorization queue with strength and schedule info",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Auditing pinned notes in the memorization queue",
+    "error_interpretation": "DatabaseError: failed to query memorization records.",
+    "recovery_guidance": "Verify state storage is accessible."
+  }
+}

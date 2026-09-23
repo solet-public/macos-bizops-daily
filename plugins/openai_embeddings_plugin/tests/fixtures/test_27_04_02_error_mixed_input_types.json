@@ -1,0 +1,10 @@
+{
+  "name": "test_error_mixed_input_types",
+  "description": "Verify error when inputs list contains non-string elements",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": ["valid string", 12345, "another string"],
+    "input_type": "text"
+  },
+  "timeout_seconds": 30
+}

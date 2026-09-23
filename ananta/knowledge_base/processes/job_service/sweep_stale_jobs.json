@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::job_service::sweep_stale_jobs",
+  "display_name": "Sweep Stale Jobs",
+  "description": "Fail background jobs that have sat in 'processing' without reporting progress for longer than a window the caller supplies. When a worker dies mid-run there is no watchdog: the row stays 'processing' forever and the flow it belongs to never closes. This verb terminates those rows through the job manager's own update path, so each one's error continuation fires and its flow token resolves — closing the flow is the point. MUTATING, and deliberately narrow: only 'processing' is swept (a queued job may simply be waiting for a worker, which is a backlog, not a death), max_age_minutes is required because no platform-wide window can be honest across a two-second write and a forty-minute export, and each swept job records a status_reason naming the sweep so it is never mistaken for a failure a worker actually reported.",
+  "embedding_description": "Clean up background jobs stuck processing forever after their worker died, marking them failed so the flows waiting on them can finally close. Terminate abandoned or hung async work for one plugin after a crash or restart, using an explicit staleness window.",
+  "result_processor_customizations": {
+    "action_label": "Stale jobs swept",
+    "result_type": "stale_jobs_swept",
+    "result_description": "A swept array with one entry per terminated job — job_id, provider_name, last_updated_at, the recorded status_reason, and update_accepted (whether the job manager accepted the terminal transition) — plus a count. An empty array means nothing was stale enough to sweep.",
+    "presentation_guidance": "State how many jobs were swept and the window that was applied, so the reader can judge whether the window was right. Name these jobs as terminated by the sweep, never as jobs that failed — their work may have partly succeeded, and what is actually known is only that nobody reported on them. Flag any entry with update_accepted false: that job was NOT swept and is still stuck.",
+    "output_action_guidance": "If the count is unexpectedly high, question the window before sweeping again — too short a window terminates live work. Each swept job fires its error continuation, so a large sweep is a burst of follow-up actions; page through with limit rather than raising it. Re-running is safe: already-terminal jobs are not eligible and will not be swept twice."
+  },
+  "error_processor_customizations": {
+    "action_context": "Fails jobs stuck in 'processing' past a caller-supplied staleness window",
+    "error_interpretation": "The verb refuses rather than guesses: a max_age_minutes below 1, or a limit outside 1-100, raises and returns an error envelope instead of being clamped. It also refuses outright when no job manager is wired, rather than writing a terminal status directly — a direct ledger write would skip completion routing and leave the flow token unresolved, which is the very condition the sweep exists to clear. Other errors are the underlying query or update failing, surfaced as the stringified exception.",
+    "recovery_guidance": "On a validation error: supply max_age_minutes of at least 1 and a limit between 1 and 100. On the no-manager refusal: this is a wiring fault, not a caller mistake — report it rather than retrying, since no argument will satisfy it. On a query or update error: re-invoke after checking job-service health; jobs already swept are terminal and will not be picked up again."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "test_recall_basic",
+  "description": "Verify basic semantic search retrieval of stored memories",
+  "process_key": "plugin::actr_memory_plugin::recall_action",
+  "arguments": {
+    "params": {
+      "query": "what is the powerhouse of the cell"
+    },
+    "state": {
+      "session_id": "test-session-010"
+    }
+  },
+  "timeout_seconds": 30
+}

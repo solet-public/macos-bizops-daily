@@ -1,0 +1,25 @@
+{
+  "name": "test_execute_in_seconds_zero",
+  "description": "Attempt to schedule with zero seconds delay (should fail)",
+  "process_key": "plugin::default_scheduling_plugin::execute_in_seconds",
+  "arguments": {
+    "params": {
+      "seconds": 0,
+      "label": "Zero Delay",
+      "tags": "test",
+      "actions": [
+        {
+          "process_key": "plugin::discord_plugin::post_message",
+          "arguments": {
+            "message": "This should not work"
+          }
+        }
+      ]
+    },
+    "state": {
+      "session_id": "test-session-105",
+      "flow_id": "test-flow-105"
+    }
+  },
+  "timeout_seconds": 30
+}

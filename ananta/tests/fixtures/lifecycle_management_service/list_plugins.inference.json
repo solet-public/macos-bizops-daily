@@ -1,0 +1,7 @@
+{
+  "natural_language_query": "Show me every plugin currently loaded with status, enabled flag, priority, and process count",
+  "expected_process_key": "service_interface::lifecycle_management_service::list_plugins",
+  "expected_arguments_structure": {
+    "filter": "string?"
+  }
+}

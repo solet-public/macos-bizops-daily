@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::purge_memories_action",
+  "display_name": "Purge Memories",
+  "description": "Delete all memories and memorizations (destructive, cannot be undone)",
+  "embedding_description": "Permanently delete all memories, memorizations, and vectors (destructive). Requires confirm true; returns deletion counts. Use for full reset or cleanup when data must be cleared. Use only when you intend to wipe the entire memory store.",
+  "result_processor_customizations": {
+    "action_label": "Memories purged",
+    "result_type": "memories_purged",
+    "result_description": "Purge results with deleted counts for memories, memorizations, and vectors",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

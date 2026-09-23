@@ -1,0 +1,10 @@
+{
+  "action_status": "COMPLETED",
+  "data_contains": {
+    "cleared_count": true,
+    "cleared_ids": true,
+    "tag": "daily_reports"
+  },
+  "error": null,
+  "timeout_seconds": 30
+}

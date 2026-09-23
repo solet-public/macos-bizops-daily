@@ -1,0 +1,11 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::start_interface",
+  "display_name": "Start Agent Messaging Bridge",
+  "description": "Start the localhost FastAPI bridge that backs every mcp__<server-name>__* tool. Allocates a port dynamically via PortManager('bridge'), writes the runtime port file ~/.ananta/runtime/<solet>.bridge.port, starts FastAPI on a background thread under the /api/v1/bridge prefix, registers the bridge-session manager, peer registry, and platform-call surface, and self-registers the claude_code native wake adapter. Required before any MCP client (Claude Code, Codex) can open a bridge. IO interface lifecycle entry point — paired with stop_interface.",
+  "embedding_description": "Start the agent messaging bridge for live MCP-connected agents. Allocate a dynamic localhost port, write the runtime port file, start FastAPI on a background thread, mount the consolidated /api/v1/bridge route table (bridge lifecycle, submit, process_*, download, peer_*, agent_*), and self-register the claude_code native wake adapter so IMPORTANT peer messages can wake live Claude Code sessions.",
+  "error_processor_customizations": {
+    "action_context": "Starts the agent_messaging FastAPI bridge for live MCP-connected agents.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. session_not_bound: orchestrator session context missing at start time. APIError: port could not be reserved by PortManager, the FastAPI background thread did not become healthy, or required platform services (action_factory, flow_manager, memory_service) were not injected.",
+    "recovery_guidance": "If the interface is already running, reuse it or stop it before starting again. If port allocation failed, check for orphan FastAPI processes holding ports on the bridge PortManager range. If startup failed, inspect bridge logs and verify all platform-injected services are present before retry — the plugin requires action_factory, flow_manager, memory_service, at_command_processor, and compilation_context_builder."
+  }
+}

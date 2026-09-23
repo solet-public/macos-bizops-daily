@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::create_record",
+  "display_name": "Salesforce: Create Record",
+  "description": "Create a record of the given sobject type with the given fields. Requires sobject and a non-empty fields object. This is a write action. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the record being created; the new id is delivered when the job completes.",
+  "embedding_description": "Create a new Salesforce record (e.g. a new Contact, Opportunity, or custom object row) with the supplied field values. Requires sobject (the object API name) and a non-empty fields object. A write action, dispatched asynchronously: the job_id returns at once, the new record's id follows in a later message.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce record creation queued",
+    "result_type": "salesforce_create_record_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the created record -- its id and success flag arrive separately, as their own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the create was queued -- do not present job_id/status as confirmation the record exists. Acknowledge the request is in flight; the new record's id lands in a follow-up message when the job completes. Once delivered, confirm creation and report the new id; low sensitivity (id only, data_sensitivity 0.0)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Create a Salesforce record.",
+    "error_interpretation": "sf.invalid_params: missing sobject or an empty/missing fields object. sf.malformed_query: a field value or combination was rejected (e.g. a required field missing, an invalid picklist value). sf.permission_denied: the CLI's authenticated user cannot create this object.",
+    "recovery_guidance": "sf.malformed_query: check required fields and valid values via describe_sobject. sf.permission_denied: ask the operator to check create permission for this object."
+  }
+}

@@ -1,0 +1,19 @@
+name: session_shipper_bootstrap_plugin
+description: |
+  Shipper bootstrap + pairing routes for the LLM session ledger. Owns
+  the umbrella ``register_session_ledger_pairing_routes`` function that
+  the bridge plugin imports (spec §13.6 one-time exception); widens M4's
+  chatgpt-export route module by ALSO mounting the pairing routes:
+
+    - POST /api/v1/ledger/pairing/initiate (unauthenticated)
+    - POST /api/v1/ledger/pairing/poll     (authenticated by pairing_token)
+
+  The shipper itself is operator-side per [[client-deployment-plugin-pattern]]:
+  Claude Code installs scripts via filesystem + shell tools under user
+  approval. This plugin handles the solet-side RECEIPT of pairing
+  requests + the bridge edit grants paired shippers a session policy.
+
+  Per [[one-plugin-per-scenario]] — shipper bootstrap is its own plugin.
+  Per [[no-shared-plugin-base-class]] — no subclassing of M1 source plugins.
+implements: []
+optional: true

@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::list_memories",
+  "arguments": {
+    "tag": "test",
+    "limit": 20
+  }
+}

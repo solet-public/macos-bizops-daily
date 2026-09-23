@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::exists",
+  "display_name": "Secret Exists",
+  "description": "Check if a secret exists without retrieving it. Does not require vault to be unlocked.",
+  "embedding_description": "Vault: check whether a secret exists. Returns a boolean for a given vault key without revealing the secret value (credential, password, OAuth client_secret, API key, refresh token, bearer token). Does NOT require unlocking — only metadata is consulted, not the encrypted bytes. Use to gate workflows that should run only when a credential is already provisioned.",
+  "result_processor_customizations": {
+    "action_label": "Secret existence checked",
+    "result_type": "secret_existence_checked",
+    "result_description": "Boolean existence check result. Contains key (identifier) and exists (true/false). Does not expose any secret data.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Checks if a secret key exists in the vault. Does not require unlocking - only checks metadata.",
+    "error_interpretation": "VaultNotInitialized: Vault has not been set up yet. StorageError: Unable to read from vault storage backend.",
+    "recovery_guidance": "For VaultNotInitialized: Guide user through vault initialization. For StorageError: Check storage backend health and permissions."
+  }
+}

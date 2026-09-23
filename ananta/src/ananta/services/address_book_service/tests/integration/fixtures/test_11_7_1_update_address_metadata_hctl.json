@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::address_book_service::update",
+  "arguments": {
+    "name": "test_11_1_2_tagged_endpoint",
+    "description": "Updated description for test 11.7.1"
+  }
+}

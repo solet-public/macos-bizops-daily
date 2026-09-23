@@ -1,0 +1,5 @@
+{
+  "query": "What database namespaces exist?",
+  "expected_process_key": "service_interface::state_service::list_namespaces",
+  "expected_arguments": {}
+}

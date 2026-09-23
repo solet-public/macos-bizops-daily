@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::lifecycle_management_service::reload_python_module",
+  "display_name": "Reload Python Module",
+  "description": "Reload a single Python module currently loaded into sys.modules, gated by an explicit RELOAD_SAFE = True marker at the module top level. Use this to apply a code edit in a pure-DSP or pure-orchestration module mid-session without restarting the solet and without losing blob storage. The safety gate refuses to reload modules that do not declare RELOAD_SAFE = True — stateful modules (plugin classes that hold blob storage references or background threads, action queue, schema manager, etc.) MUST NOT be marked safe, so the gate keeps reload from corrupting platform state. The reload uses importlib.reload semantics: existing module objects are updated in place, references already held by other modules to specific functions or classes from the reloaded module are NOT swapped — only fresh imports see the new code. For class-body edits, decorator additions, or any change to a stateful module, restart via apply_manifest + the bound self_deployment_service plugin; reload_python_module is the narrow single-module form.",
+  "embedding_description": "Reload a Python module without restarting. Apply a code edit live. Pick up changes to a DSP module without losing blob state. Hot reload a pure-function module. Avoid full restart for a single-file fix. Refresh module bytecode in sys.modules. Skip the restart cycle for safe modules. importlib reload via service.",
+  "result_processor_customizations": {
+    "action_label": "Module reloaded",
+    "result_type": "module_reload_result",
+    "result_description": "Reload result with keys: success (bool), module_name (str), message (status or refusal detail).",
+    "presentation_guidance": "If success is true, briefly confirm the reload and remind the caller that already-imported references to specific functions/classes are NOT updated by importlib.reload — only fresh imports see the new code. If success is false, surface the refusal message verbatim so the caller knows whether to add a RELOAD_SAFE marker, name a different module, or accept that a full restart is needed.",
+    "output_action_guidance": "On success, the next plan step can re-run whichever process the reloaded module backs. On refusal due to a missing RELOAD_SAFE marker, do not retry — either edit the module to add the marker (with care: stateful modules must not be marked) or fall back to a full solet restart."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reload a single Python module marked RELOAD_SAFE without restarting the solet",
+    "error_interpretation": "ValidationError: module_name was empty. ModuleNotLoadedError: the named module is not in sys.modules (only already-imported modules can be reloaded). NotReloadSafeError: the module exists but lacks the RELOAD_SAFE = True marker. ImportError or syntax error during reload: the new source has a defect; the module is now in a partial-reload state and the platform should be restarted to recover cleanly.",
+    "recovery_guidance": "For missing module_name: provide the fully-qualified name as it appears in sys.modules. For not-loaded module: import it once first via any process that uses it, then retry. For missing RELOAD_SAFE marker: add RELOAD_SAFE = True at module top level only if the module is truly stateless / pure-function. For ImportError during reload: restart the solet with the corrected source; the partial-reload state is not recoverable from within the running process."
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "process_key": "plugin::pgvector_service_plugin::list_namespaces_action",
+  "display_name": "List Vector Namespaces",
+  "description": "List all vector namespaces in the database",
+  "embedding_description": "List all vector namespaces stored in the database. Returns namespace names and count. Use to discover available indexes or verify storage layout across plugins and tenants. Helps pick a target namespace for queries.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Namespaces listed",
+    "result_type": "namespaces_listed",
+    "result_description": "List of vector namespaces",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result.",
+    "field_sensitivities": {
+      "namespaces": 0.2,
+      "count": 0.1
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Returns the distinct set of namespaces currently present in the pgvector embeddings table.",
+    "error_interpretation": "DatabaseError: the underlying query failed (connection lost, pool exhausted, schema missing).",
+    "recovery_guidance": "list_namespaces takes no arguments — any failure originates in the database layer rather than the call site. Retry once for transient connection issues; if the failure persists, the pgvector service is unhealthy and the operator should be notified rather than further retrying.",
+    "retryable": true
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "test_delete_blob",
+  "description": "Store a blob and ensure delete_blob removes it successfully.",
+  "sequence": [
+    {
+      "step": "store_blob",
+      "process_key": "service_interface::blob_storage_service::store_blob",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "content": "QmxvYiBzdG9yYWdlIGRlbGV0ZSB2YWxpZGF0aW9uIHBheWxvYWQu",
+        "metadata": {
+          "original_name": "integration_delete_blob.txt",
+          "mime_type": "text/plain",
+          "description": "Blob storage integration payload for delete test",
+          "tags": "blob-tests,delete"
+        }
+      },
+      "capture": {
+        "blob_id": {
+          "source": "output",
+          "key": "blob_id"
+        }
+      }
+    },
+    {
+      "step": "delete_blob",
+      "process_key": "service_interface::blob_storage_service::delete_blob",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "blob_id": "${blob_id}"
+      }
+    }
+  ]
+}

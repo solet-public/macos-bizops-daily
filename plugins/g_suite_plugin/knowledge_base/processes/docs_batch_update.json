@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::docs_batch_update",
+  "display_name": "Docs: Batch Update",
+  "description": "Apply a list of raw Google Docs API batchUpdate request objects (insert/replace text, formatting, etc.) to a document. Runs as a background job: dispatch returns a job_id immediately, and the replies arrive via a follow-up message once it completes. Requires a connected account.",
+  "embedding_description": "Apply raw Google Docs API batchUpdate requests to an existing document by id as a background job - insertText, replaceAllText, updateTextStyle, insertTable and the rest - passed through verbatim. Dispatch returns a job_id for tracking; completion delivers the batchUpdate replies array. The low-level structural edit surface for documents.",
+  "result_processor_customizations": {
+    "action_label": "Document batch-update started",
+    "result_type": "g_suite_docs_batch_update_result",
+    "result_description": "Job queued for the batch update; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to apply structural edit requests to a Google Docs document.",
+    "error_interpretation": "gsuite.invalid_params: missing id, requests is empty/not a list of dicts, a request object is malformed per the Docs API, or missing session_id/flow_id context. gsuite.not_found: the document id does not exist. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.invalid_params: supply a non-empty list of valid Docs API request objects. gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

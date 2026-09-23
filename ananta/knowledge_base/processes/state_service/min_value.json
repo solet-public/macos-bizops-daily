@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::state_service::min_value",
+  "display_name": "Min Column Value",
+  "description": "Return the smallest value of a single column over rows matching table + filter criteria. The SQL MIN runs inside the owner plugin and returns only the scalar at data.result.value (column-typed, or null over an empty set). No rows are materialized or shipped.",
+  "embedding_description": "Find the minimum value of one column across a filtered set of rows -- the smallest number, the earliest timestamp, or the lowest-sorting value -- returned as a single scalar at data.result.value.",
+  "result_processor_customizations": {
+    "action_label": "Min Column Value",
+    "result_type": "min_value_result",
+    "result_description": "Column minimum at data.result.value (column-typed scalar, or null over an empty set; a TIMESTAMP column yields a naive datetime the caller normalizes)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Computing the minimum of a column in a state table using table, column, and filter criteria",
+    "error_interpretation": "Error with 'table': missing or invalid table name. Error with 'column': min_value requires a column to aggregate. Error with 'filters': invalid filter format.",
+    "recovery_guidance": "For table or column errors: provide a valid table name and a column to aggregate. For filter errors: verify the filter matches the query_state grammar (equality / list = ANY / is_null / is_not_null / range)."
+  }
+}

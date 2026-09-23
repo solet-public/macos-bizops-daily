@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::list_transitions",
+  "display_name": "Jira: List Transitions",
+  "description": "List the workflow transitions available from a Jira issue's current status (id/name/to_status). Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the list finishing; the available transitions are delivered when the job completes. Read action.",
+  "embedding_description": "Discover which workflow moves are currently available for a Jira issue, given its present state and project workflow -- each transition's id, name, and target status. Returns a job_id right away and lands the options list once the background lookup completes. Call it to choose a transition id before moving an issue.",
+  "result_processor_customizations": {
+    "action_label": "Jira transitions listing queued",
+    "result_type": "jira_list_transitions_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the transitions list -- that arrives separately when the job completes and is delivered as its own message.",
+    "presentation_guidance": "This call only confirms the listing was queued -- do not present job_id/status as the answer to 'what transitions are available'. Acknowledge the request is in flight; the transitions list lands in a follow-up message when the job completes. Once delivered, list the available moves and their target statuses so the caller can pick a transition id for transition_issue. This is workflow metadata (low sensitivity)."
+  },
+  "error_processor_customizations": {
+    "action_context": "List the transitions available from a Jira issue's current status.",
+    "error_interpretation": "jira.not_found: the issue key does not exist. jira.permission_denied: the account cannot view the issue. jira.invalid_params: the key was missing.",
+    "recovery_guidance": "jira.not_found: verify the issue key. jira.permission_denied: grant the service account browse permission. jira.invalid_params: supply the issue key."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "memories_created",
+    "files_processed"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Ingest all markdown files from a directory recursively"
+}

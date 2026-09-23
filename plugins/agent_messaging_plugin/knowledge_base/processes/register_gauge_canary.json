@@ -1,0 +1,19 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::register_gauge_canary",
+  "display_name": "Mark an identity as a gauge canary",
+  "description": "GAU-15 item 4 (2026-08-19). Registers one synthetic identity as a gauge canary, recording why it exists and who created it. The mark lives at the store plane in its OWN table, deliberately never as a column on the gauge row: the staleness detector reads that row, and a mark there would be a flag the detection path could come to read, at which point the detector can tell it is being tested and has stopped being the thing under test. Operational consumers -- rotation notices, steward interrupts, economics -- filter canaries out of fleet decisions by joining this registry deliberately, so a synthetic session never costs real attention or distorts real numbers; the detector never joins it. A canary is stood down by retiring it rather than deleting it, because a retired canary still has to explain the alarms it produced while it ran, and a registry that forgets makes its own history unattributable. Re-registering an already-registered identity is REFUSED rather than upserted: a second registration under a different owner would silently rewrite who is answerable for a synthetic identity in the fleet, and provenance that can be overwritten without trace is not provenance. Note for whoever deploys one: the canary must be indistinguishable from a real session in every field the detector can echo -- the staleness notice quotes both the subject's instance id and its lane label, so an identity or lane named for what it is will announce itself in every alarm it provokes.",
+  "embedding_description": "Setting up a deliberately fake session used to test whether the fleet's monitoring really notices when a session stops reporting, and marking that identity in its own registry so real dashboards, rotation decisions and cost accounting all exclude it from their totals.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Canary registered",
+    "result_type": "register_gauge_canary_result",
+    "result_description": "agent_instance_id, purpose, registered_at, registered_by, retired_at (null while active).",
+    "presentation_guidance": "State plainly that the identity is synthetic and now excluded from operational filters, and name who registered it. Do not describe it as a session that is doing work; it exists to be broken on purpose.",
+    "output_action_guidance": "Registration alone changes nothing observable -- the canary must then report on a schedule and be arrested through the audited tamper verb before it proves anything."
+  },
+  "error_processor_customizations": {
+    "action_context": "One existence check plus one insert into the canary registry, through the state interface.",
+    "error_interpretation": "already_registered: this identity is already a canary; the registration was refused rather than overwriting who owns it. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "For already_registered, read the existing registration first; if ownership genuinely needs to change, retire the canary and register it again so the change is on the record rather than silent."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_self_deployment_plugin::attest_runtime_code",
+  "display_name": "Attest router-served runtime code",
+  "description": "Read the router-served local self-deployment process identity, immutable release identity, deterministic source and release surface digests, and already-loaded module origins. This verb is read-only and never imports a requested module.",
+  "embedding_description": "Verify which immutable macOS blue-green release is serving and whether its already-loaded Python modules came from that release. Use for reconciliation verification or doctor diagnostics of shipped-but-unread code.",
+  "result_processor_customizations": {
+    "action_label": "runtime code attestation",
+    "result_type": "local_runtime_code_attestation",
+    "result_description": "Router and process identity, immutable release digests, and requested module load origins.",
+    "presentation_guidance": "Lead with served_by_self, release_id, current_release_id, and the two surface digests. Call out any unloaded module or module origin outside the immutable release root."
+  },
+  "error_processor_customizations": {
+    "action_context": "Read router-served runtime code provenance.",
+    "error_interpretation": "A failed attestation means the serving process, its immutable release metadata, or router state could not be measured safely; it is not evidence that the requested code is serving.",
+    "recovery_guidance": "Do not treat an unreadable attestation as a mismatch. Inspect the named release and router state, then retry the read-only verb after the cause is resolved."
+  }
+}

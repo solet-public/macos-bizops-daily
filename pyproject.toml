@@ -1,0 +1,259 @@
+[tool.black]
+line-length = 320
+
+[tool.isort]
+profile = "black"
+line_length = 320
+
+[tool.ruff]
+line-length = 320
+target-version = "py313"
+extend-exclude = [
+    # RULING (reviewing seat, 2026-08-08):
+    # stays OUT — gates protect code that runs or ships, and disabled code
+    # does neither. CONDITION, the exemption's only exit: re-enabling ANY
+    # disabled plugin requires bringing it into scope and landing it CLEAN
+    # as part of the re-enable, not as a follow-up. Stands on category, not
+    # on being clean — measured 2026-08-08: 76 files, 2 ruff / 195 pyright
+    # errors (workbench/2026-08-08_gate_scope_widening_measurement_d3-impl.md).
+    "disabled_plugins",
+    "dev_tools",
+    ".venv",
+    # Bundled per-plugin venvs (.venv_cosyvoice, .venv_cosyvoice2, etc.)
+    # ship vendored library code (Cython, torch internals, networkx
+    # examples, etc.) under `plugins/<X>/src/.venv_<name>/`. Per
+    # `quality_gates/code_quality_check.py:74` `_BUNDLED_VENV_PREFIX =
+    # ".venv"` they're not part of the platform's quality surface; ruff
+    # invoked directly (outside the gate wrapper) was picking them up
+    # because the top-level `.venv` exact-match pattern didn't catch the
+    # nested bundled-venv naming convention. Glob handles every depth.
+    "**/.venv_*/**",
+    # Vendored third-party instrument library scripts (Sonatina Symphonic,
+    # vcsl, salamander, karoryfer, ixox flute, etc.) — not our code.
+    "plugins/musical_synthesis_plugin/instruments",
+    "**/instruments/**",
+    # Operator-tooling at plugin scope — the blanket 2026-05-26 exemption
+    # below is NARROWED by the operator ruling of 2026-08-08 ("quality
+    # gates apply to everything, boy scout rules"). `tools/` (8 plugins, 26
+    # files) and `parity_tests/` (musical_synthesis_plugin, 12 files) both
+    # landed CC-clean 2026-08-09 (ruff+pyright+radon_cc) and are off this
+    # list entirely — see
+    # workbench/2026-08-08_gate_scope_widening_measurement_d3-impl.md.
+    # `migrations/` (3 files across 3 plugins) was not addressed by either
+    # the in-scope ruling or the research-stays-out ruling below — status
+    # OPEN, left excluded pending a ruling, not a decision.
+    #
+    # RULING (reviewing seat, 2026-08-08):
+    # `research/` stays OUT — scratch is not shipped code, and 1,071
+    # pyright errors would block every writer for weeks to protect code
+    # that never runs. CONDITION, the exemption's only exit: anything
+    # PROMOTED from research/ into src/ comes in clean AT PROMOTION TIME —
+    # cleanup is not deferred as a sidecar to the structural move.
+    "plugins/*/research/**",
+    "plugins/*/migrations/**",
+]
+force-exclude = true
+
+# ⚠️  IMPORTANT: `ruff check <path>` without `--config` silently discovers
+# plugin-local pyproject.toml files instead of this root config, applying
+# weak defaults instead of the explicit select = [...] below. Always use
+# quality_gates/ruff_repo.sh (which pins the repo's interpreter and config)
+# for ad hoc ruff checks, regardless of cwd or file path.
+# See iss_d2d0cda4.
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+]
+ignore = [
+    "E501",  # line length — no constraint, AI agents don't care
+    "N803",  # argument name should be lowercase (APP_HOME is convention)
+    "N806",  # variable in function should be lowercase (APP_HOME is convention)
+    "UP047", # generic function type parameters (intentional design)
+]
+
+[tool.ruff.lint.isort]
+# When ruff is invoked WITHOUT --config from inside a plugin tree, it
+# picks up that plugin's own pyproject.toml (which has its own
+# `[tool.ruff.lint]` but no `[tool.ruff.lint.isort]`), and ruff
+# auto-detects the plugin's own package as first-party. To keep the
+# root-config invocation in agreement, mirror that auto-detection
+# here for cross-plugin test files that exercise multi-package
+# surfaces. Other in-repo plugins import each other from their own
+# trees (where they remain "third-party" under the same auto-detection
+# rule), so we deliberately do NOT add them. Add a plugin here ONLY
+# when a test under it imports both ananta and the plugin's own
+# package and the import-block ordering trips ruff isort under the
+# root-config invocation.
+known-first-party = ["agent_messaging_plugin", "default_blob_storage_plugin", "default_inference_plugin", "secrets_manager_vault_plugin"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = false  # Too noisy for dict returns
+warn_unused_configs = true
+warn_unused_ignores = false  # Allow outdated type: ignore comments temporarily
+ignore_missing_imports = true
+show_error_codes = true
+exclude = [
+    "setup\\.py$",
+    "conftest\\.py$",
+    "tests/",
+    "disabled_plugins/",
+]
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+
+# CRITICAL: Lock pyright to project venv - prevents using system Python
+venvPath = "."
+venv = ".venv"
+
+# Allow plugins to resolve ananta.* imports
+extraPaths = [
+    "ananta/src",
+    "solet_setup_contracts/src",
+    "plugins/actr_memory_plugin/src",
+    "plugins/agent_messaging_plugin/src",
+    "plugins/agent_messaging_session_source_plugin/src",
+    "plugins/audio_processing_plugin/src",
+    "plugins/audio_separation_plugin/src",
+    "plugins/aws_account_admin_plugin/src",
+    "plugins/aws_midwife_plugin/src",
+    "plugins/aws_self_deployment_plugin/src",
+    "plugins/aws_undertaker_plugin/src",
+    "plugins/chatgpt_export_session_source_plugin/src",
+    "plugins/claude_ai_export_session_source_plugin/src",
+    "plugins/claude_code_cloud_session_source_plugin/src",
+    "plugins/claude_code_filesystem_session_source_plugin/src",
+    "plugins/claude_code_history_session_source_plugin/src",
+    "plugins/claude_code_pushed_session_source_plugin/src",
+    "plugins/claude_code_tasks_session_source_plugin/src",
+    "plugins/code_vetting_plugin/src",
+    "plugins/codex_ambient_session_source_plugin/src",
+    "plugins/codex_cloud_session_source_plugin/src",
+    "plugins/codex_filesystem_session_source_plugin/src",
+    "plugins/codex_goals_session_source_plugin/src",
+    "plugins/codex_history_session_source_plugin/src",
+    "plugins/codex_memories_session_source_plugin/src",
+    "plugins/codex_pushed_session_source_plugin/src",
+    "plugins/codex_state_session_source_plugin/src",
+    "plugins/comfyui_image_generation_plugin/src",
+    "plugins/cosyvoice2_tts_plugin/src",
+    "plugins/default_address_book_plugin/src",
+    "plugins/default_blob_storage_plugin/src",
+    "plugins/default_inference_plugin/src",
+    "plugins/default_knowledge_plugin/src",
+    "plugins/default_scheduling_plugin/src",
+    "plugins/default_thinking_plugin/src",
+    "plugins/demo_canary_plugin/src",
+    "plugins/discord_plugin/src",
+    "plugins/external_postgres_plugin/src",
+    "plugins/external_app_client_plugin/src",
+    "plugins/fleet_maintenance_plugin/src",
+    "plugins/g_suite_plugin/src",
+    "plugins/generative_composition_plugin/src",
+    "plugins/github_midwife_plugin/src",
+    "plugins/iterm2_coding_agent_management_plugin/src",
+    "plugins/jira_plugin/src",
+    "plugins/macos_coding_agent_session_plugin/src",
+    "plugins/macos_midwife_plugin/src",
+    "plugins/macos_self_deployment_plugin/src",
+    "plugins/macos_vault_plugin/src",
+    "plugins/marketo_plugin/src",
+    "plugins/musical_synthesis_plugin/src",
+    "plugins/openai_embeddings_plugin/src",
+    "plugins/pedalboard_effects_plugin/src",
+    "plugins/pgvector_service_plugin/src",
+    "plugins/platform_dev_surface_plugin/src",
+    "plugins/platform_health_plugin/src",
+    "plugins/postgres_state_management_plugin/src",
+    "plugins/probe_smoke_broken_plugin/src",
+    "plugins/rds_pgvector_service_plugin/src",
+    "plugins/rds_postgres_state_management_plugin/src",
+    "plugins/s3_blob_storage_plugin/src",
+    "plugins/salesforce_plugin/src",
+    "plugins/schwab_market_data_plugin/src",
+    "plugins/secrets_manager_vault_plugin/src",
+    "plugins/seed_factory_plugin/src",
+    "plugins/session_bridge_plugin/src",
+    "plugins/session_shipper_bootstrap_plugin/src",
+    "plugins/signal_plugin/src",
+    "plugins/snowflake_plugin/src",
+    "plugins/sound_effects_plugin/src",
+    "plugins/soundcloud_artist_studio_plugin/src",
+    "plugins/ssml_plugin/src",
+    "plugins/titanv2_embeddings_plugin/src",
+    "plugins/voice_embeddings_plugin/src",
+    "plugins/whisper_asr_plugin/src",
+    "plugins/zuora_plugin/src",
+]
+
+include = ["ananta/src", "plugins", "initialization/src", "quality_gates", "bootstrap_adapter"]
+exclude = [
+    "**/tests",
+    # RULING (reviewing seat, 2026-08-08):
+    # stays OUT — gates protect code that runs or ships, and disabled code
+    # does neither. CONDITION, the exemption's only exit: re-enabling ANY
+    # disabled plugin requires bringing it into scope and landing it CLEAN
+    # as part of the re-enable, not as a follow-up. Stands on category, not
+    # on being clean — measured 2026-08-08: 76 files, 2 ruff / 195 pyright
+    # errors (workbench/2026-08-08_gate_scope_widening_measurement_d3-impl.md).
+    "disabled_plugins",
+    "dev_tools",
+    "**/.venv",
+    "**/.venv_*",
+    "**/venv",
+    "**/venv_*",
+    "**/node_modules",
+    # Vendored third-party instrument library scripts — not our code
+    "**/instruments/**",
+    "plugins/musical_synthesis_plugin/instruments",
+    # Operator-tooling at plugin scope — the blanket 2026-05-26 exemption
+    # below is NARROWED by the operator ruling of 2026-08-08 ("quality
+    # gates apply to everything, boy scout rules"). See pyproject.toml
+    # [tool.ruff] extend-exclude for the full note (tools/ and
+    # parity_tests/ both landed CC-clean 2026-08-09 and are off this list
+    # entirely; migrations/ is unaddressed and OPEN; research/ stays OUT
+    # with a promotion-clean condition, mirrored below).
+    #
+    # RULING (reviewing seat, 2026-08-08):
+    # `research/` stays OUT — scratch is not shipped code, and 1,071
+    # pyright errors would block every writer for weeks to protect code
+    # that never runs. CONDITION, the exemption's only exit: anything
+    # PROMOTED from research/ into src/ comes in clean AT PROMOTION TIME —
+    # cleanup is not deferred as a sidecar to the structural move.
+    "plugins/*/research/**",
+    "plugins/*/migrations/**",
+]
+# Relaxed only for third-party library type inference (not defensive programming):
+reportUnknownVariableType = "none"      # third-party libs without stubs
+reportUnknownMemberType = "none"        # third-party libs without stubs
+reportUnknownArgumentType = "none"      # third-party libs without stubs
+reportUnknownLambdaType = "none"        # third-party libs without stubs
+reportUnknownParameterType = "none"     # third-party libs without stubs
+reportMissingParameterType = "none"     # third-party libs without stubs
+reportMissingTypeStubs = "none"         # third-party libs without stubs (mido, soundfile, etc.)
+reportAttributeAccessIssue = "none"     # third-party libs without stubs (mido, tinysoundfont, pedalboard)
+reportPrivateUsage = "none"             # internal access across modules is ok
+reportUnsupportedDunderAll = "none"     # __all__ exports pattern
+
+[tool.vulture]
+min_confidence = 80
+paths = ["ananta/src", "plugins"]
+# Without this exclude, bare `vulture` crashes trying to parse the bundled
+# py3.10 third-party venv under cosyvoice2_tts_plugin (+ any stray site-packages
+# / node_modules). Mirrors the invocation used in the 2026-06-20 dead-code sweep.
+exclude = ["*/.venv_cosyvoice/*", "*/site-packages/*", "*/.venv/*", "*/node_modules/*"]
+# `state` is part of the @platform_process action contract (params, state); the
+# framework hands the second positional argument in even when individual actions
+# don't read it. Excluding it stops vulture from flagging every action handler.
+ignore_names = ["state"]

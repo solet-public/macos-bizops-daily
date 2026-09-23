@@ -1,0 +1,28 @@
+# Retrieval-test companion for the business-record classification convention.
+# Gated by service_interface::knowledge_service::test_retrieval. Until the gate
+# is live, run each query through service_interface::knowledge_service::search
+# and confirm this article ranks at or above min_rank for targets and no
+# better than forbidden_min_rank for forbidden queries.
+
+article_path: knowledge_bases/ananta_platform/24_operator_communication/08_business_record_classification_convention.md
+consumer_profile: both
+
+target_queries:
+  - "how do I keep customer data out of git"
+  - "gitignore convention for business connector staging data"
+  - "stable identifiers vs values in logs and reports"
+  - "classification convention for committed artifacts"
+  - "where should address and value data go in a project directory"
+  - "synthetic records for destructive verb testing"
+  - "why does the newborn solet gitignore have a staging entry"
+  - "what goes in a checkpoint file vs a staging file"
+
+forbidden_queries:
+  - "how long are blobs retained on this platform"                # 07_business_data_retention_and_deletion should win
+  - "what does my solet capture and embed from my sessions"  # 01_hydration_runbook ingestion disclosure should win
+  - "caller supplies the destination path for business connector reads"  # the wider data-boundary architecture ruling itself should win a design-detail query, not this convention summary
+
+min_rank: 1
+forbidden_min_rank: 3
+
+process_key_assertions: []

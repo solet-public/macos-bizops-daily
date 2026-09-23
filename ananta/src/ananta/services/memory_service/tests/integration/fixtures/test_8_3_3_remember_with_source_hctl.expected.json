@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "Memory ID:"
+  ],
+  "output_not_contains": [
+    "ERROR"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "plugin::actr_memory_plugin::stop_memorizing_action",
+  "display_name": "Stop Memorizing",
+  "description": "Remove a memory from the memorization queue",
+  "embedding_description": "Remove a memory from the memorization queue to stop spaced repetition reviews. Provide memory_id; returns confirmation. Use when a memory no longer needs scheduled review. This does not delete the underlying memory record."
+}

@@ -1,0 +1,45 @@
+# Retrieval-test companion for the maintenance-verbs joseki cards article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+article_path: knowledge_bases/ananta_platform/24_operator_communication/09_maintenance_verbs_joseki_cards.md
+consumer_profile: both
+
+# Every target below was MEASURED rank 1 live on 2026-08-14 (post-reindex,
+# cross-KB knowledge_service::search). Candidate queries that measured a loss
+# to a legitimate owner are recorded here, NOT declared and NOT tuned against
+# (tuning the card until it outranks the owner games the instrument):
+#   - "mid-turn injection race clear consumed the queued resume prompt" ->
+#     1=06 (carries the same trap prose, fuller), 2=this article.
+#   - "iterm2 python api inject clear into the seat's own pane" ->
+#     agent_messaging_plugin/11_tmux_host_driver_presentation_iterm2_cc owns
+#     iterm2+pane vocabulary; this article absent from top ranks.
+#   - "restart a dead worker session and reclaim its role" ->
+#     1=authored_joseki/dispatch_managed_worker, 2=this article.
+#   - "curate the ambient memory index head back under budget" -> the word
+#     "ambient" collides with the neuro_ambient KB (ranks 1-4); rank 5 here.
+#   - "refresh a plugin's knowledge base process registry after editing
+#     process json" -> developer_operations + ananta_platform process-registry
+#     reference articles own the how-to (ranks 1-3); the card ranks 4.
+target_queries:
+  - "joseki card rotate a managed worker session clear and drive"
+  - "seat self-rotation delegated helper drives the seat terminal"
+  - "hydrate or drain the local memory passthrough projection"
+  - "check how close a session is to its context window ceiling"
+
+# forbidden_min_rank is 2, not the platform-conventional 4, for the same reason
+# as 06_fleet_launcher_session_configuration.retrieval_test.yaml: the delegated
+# self-clear PROCEDURE lives in 06 (the launcher/session-configuration article)
+# and this article carries the seat self-rotation CARD for the same mechanism --
+# ranking 2nd behind the owning article for its generic phrasing is the correct
+# shape, not overreach. The invariant enforced: this article must never OUTRANK
+# 06 for 06's own self-clear queries (must not reach rank 1).
+forbidden_queries:
+  - "how does a session clear its own context and keep working"     # 06_fleet_launcher_session_configuration owns this; adjacent-card exception, see above
+  - "session start orientation standing governance documents"       # 04_session_start_orientation owns this
+  - "seed hydration runbook operator environment setup fleet coordination offer" # github_midwife_plugin/01_hydration_runbook owns this
+
+# This article must rank #1 for its own card-shaped queries (the cards exist so
+# a session follows the sequence instead of re-deriving it).
+min_rank: 1
+forbidden_min_rank: 2
+
+process_key_assertions: []

@@ -1,0 +1,8 @@
+{
+  "name": "test_get_embedding_dimension",
+  "description": "Get the vector dimension for an embedding model.",
+  "process_key": "service_interface::embedding_service::get_embedding_dimension",
+  "arguments": {
+    "model": "all-MiniLM-L6-v2"
+  }
+}

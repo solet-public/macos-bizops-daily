@@ -1,0 +1,10 @@
+{
+  "name": "test_error_whitespace_only_input",
+  "description": "Test behavior with whitespace-only string in inputs",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": ["   ", "\t\n"],
+    "input_type": "text"
+  },
+  "timeout_seconds": 60
+}

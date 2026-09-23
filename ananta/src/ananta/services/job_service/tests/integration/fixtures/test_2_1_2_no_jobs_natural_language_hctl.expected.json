@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "No job",
+    "N/A",
+    "None",
+    "null",
+    "not available",
+    "not yet",
+    "no recent",
+    "Job retrieved"
+  ]
+}

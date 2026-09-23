@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::address_book_service::update",
+  "arguments": {
+    "name": "openai_api",
+    "address_type": "api_endpoint",
+    "tags": ["ai", "llm", "production"]
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "plugin::actr_memory_plugin::get_focused_action",
+  "display_name": "Get Focused Memories",
+  "description": "Return all memories currently in the focus buffer (0-3) with full content",
+  "embedding_description": "READ-ONLY enumeration of all memories pinned in the actr_memory focus buffer. Returns full memory content per pinned item (memory_id guaranteed). Use as working-memory diagnostic to see what content the system is currently injecting into every prompt before adding/removing pins. EDGE verb. Sibling to focus (add) and unfocus_action (remove)."
+}

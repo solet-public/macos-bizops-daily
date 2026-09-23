@@ -1,0 +1,9 @@
+{
+  "action_status_any": ["error", "completed"],
+  "output_contains_any": [
+    "not found",
+    "error",
+    "Memory not found"
+  ],
+  "timeout_seconds": 60
+}

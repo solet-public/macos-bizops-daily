@@ -1,0 +1,9 @@
+{
+  "process_key": "service_interface::address_book_service::add_entry",
+  "arguments": {
+    "name": "test_11_1_2_tagged_endpoint",
+    "field_type": "api_key",
+    "description": "Test API key vault reference",
+    "value": "vault::api_keys/test_key"
+  }
+}

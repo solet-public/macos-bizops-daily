@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::memorize",
+  "arguments": {
+    "content": "New content for memorization: The speed of light is approximately 299,792 km/s."
+  }
+}

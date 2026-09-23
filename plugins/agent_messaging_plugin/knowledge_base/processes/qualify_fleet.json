@@ -1,0 +1,8 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::qualify_fleet",
+  "display_name": "Qualify fleet lifecycle plumbing",
+  "description": "Runs a bounded real no-worktree qualification worker through the qualification host. It proves fleet plumbing, not an LLM runtime.",
+  "embedding_description": "Run an internal, bounded fleet lifecycle qualification that creates a synthetic no-worktree worker through the declared qualification host, waits for its real watch bridge registration, claims its durable role using the registered identity, verifies role-addressed watcher delivery to that same instance, releases the role, and retires the worker without leaving a branch or worktree.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {"result_type": "fleet_qualification"}
+}

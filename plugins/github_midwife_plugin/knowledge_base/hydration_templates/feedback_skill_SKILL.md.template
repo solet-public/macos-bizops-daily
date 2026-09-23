@@ -1,0 +1,207 @@
+---
+name: feedback
+description: File a round of upstream feedback to the maintainers of the seed this solet was born from — defects, questions, feature requests, closure confirmations, and RFC-shaped design proposals, every one of them as a GitHub issue through the repository's issue forms. The seed accepts bug reports and does not accept pull requests or patches. Runs the evidence discipline and the content gate before anything is published. Use on /feedback, and when the operator asks to report a bug, ask upstream a question, request a capability, propose a design, or confirm a fix.
+---
+
+You are filing upstream feedback on the operator's behalf. The operator should
+never have to write the report themselves; they should only have to say yes to
+sending it.
+
+The full procedure, the conventions, and the reasoning behind them live in the
+seed update and upstream-feedback runbooks. Read the feedback runbook before
+your first round rather than working from this skill alone — this skill is the
+procedure, that article is the why:
+
+```bash
+{{SOLET_NAME}} call service_interface::knowledge_service::search '{"query": "upstream feedback runbook filing issues to seed maintainers", "top_k": 5}'
+```
+
+## Step 1 — decide the shape
+
+| What you have | What to file |
+|---|---|
+| A defect, a question, a feature request, or a closure confirmation | One GitHub issue per item, through the repository's issue form for that class |
+| A worked-through design with alternatives considered and a recommendation | A **feature-request issue carrying the design in its body** |
+| A security vulnerability | **Not an issue** — the private channel in `.github/SECURITY.md` |
+
+Everything goes through an issue. **Never open a pull request and never attach a
+patch**: this repository does not accept them, so one would sit unanswered while
+the same content in an issue gets a disposition. The reason is what a solet does
+to the machine that installs it — provisions a database, writes keychain
+credentials, installs a background service, edits the shell — which makes
+unreviewed merged code a supply-chain path into every downstream install. The
+description is the part the maintainers can act on, and it is wanted.
+
+If you are unsure, file an issue. An implementation sketch that has outgrown an
+appendix is the signal that you have a design offer rather than a feature
+request — same form either way, so this is a framing question, not a routing
+one.
+
+## Step 2 — find the channel
+
+The repository this clone was born from is the channel. Resolve it, never
+hardcode it:
+
+```bash
+git remote get-url origin
+```
+
+If that command fails or returns something that is not the seed repository,
+stop and tell the operator. Do not guess at a destination.
+
+## Step 3 — gather the evidence
+
+Per item, before drafting anything. A report without this costs a round-trip; a
+report with it is often fixable the day it arrives.
+
+- **Defect**: the exact command or action, the observed output, the expected
+  behavior, and the release measured against — the clone's HEAD commit, plus
+  the version named in `RELEASE_NOTES.md` when one is present. Any diagnosis
+  you offer is marked as inference.
+- **Question**: the question, the task the answer unblocks, what you would do
+  under each plausible answer, and where you already looked.
+- **Feature request**: the outcome needed, the workflow that hit the gap, what
+  it costs today, and the current workaround.
+- **Closure confirmation**: which item you are confirming, the verified
+  outcome, and the command and output that verify it.
+
+Number the round and the items. Rounds are `Part N`, monotonically increasing
+for this deployment and never reused; items within a round are `§N.M`. The item
+number goes at the front of the issue title.
+
+## Step 4 — draft to a file first
+
+Draft each item into a working file under `workbench/` in the clone (create the
+directory if it does not exist). Draft first, publish second: an issue is
+published the moment it is submitted, and editing it afterwards does not
+unpublish what was there.
+
+## Step 5 — run the content gate as a checklist
+
+Read each drafted item once more, against each line. This is a read, not a
+recollection — check the text in front of you, not your memory of writing it.
+
+- No personal identifiers: no names of people, no email addresses, no GitHub
+  handles beyond this deployment's own.
+- No employer or business specifics: no company names, no tenant URLs, no
+  internal project names, no business-record data from any connector. Findings
+  are described generically — "a business-connector read of ~40k rows", never
+  the rows or whose they are.
+- No credentials or secret-looking values: nothing from a keychain, a config
+  file, or the environment. If evidence output contains one, redact it and say
+  that you did.
+- No transcript excerpts carrying any of the above. **Re-read pasted command
+  output specifically — that is where identifiers hide**, and it is the field
+  most likely to have been pasted rather than written.
+
+If an item cannot be reported without violating this gate, report the generic
+shape of it and offer the detail through whatever private channel the operator
+and the maintainers separately share, if any.
+
+## Step 6 — get the operator's yes
+
+Filing is external publication. Show the operator what is about to be sent and
+get an explicit yes before anything leaves the machine. An operator may grant
+standing approval for feedback that passes the content gate; until they do, ask
+every time.
+
+## Step 7 — file
+
+**File non-interactively.** Issue forms are a browser UI, not an API: `gh issue
+create --title` and `--body-file` create the equivalent labeled issue without
+opening a chooser. Preserve the form's evidence discipline by structuring the
+draft with the exact visible labels of every required field in the matching
+form, followed by the content-gate acknowledgement. Complete the required
+fields before sending; the API does not enforce them for you.
+
+For example, a defect draft has these headings in this order (the other forms'
+required headings are in `.github/ISSUE_TEMPLATE/`):
+
+```markdown
+## Item number
+§N.M
+
+## The exact command or action
+...
+
+## Observed output
+...
+
+## Expected behavior
+...
+
+## Release measured against
+...
+
+## Content gate
+- [x] I re-read this issue and it contains no personal identifiers, no employer or business specifics, and no credentials or secret-looking values — including inside pasted output.
+```
+
+This step needs the GitHub CLI and non-interactive GitHub authentication: probe
+both first. If `gh` is absent, offer `brew install gh` (the seed-hydration
+ladder normally installs it; a machine hydrated before that step, or where the
+offer was declined, will land here without it). If `gh auth status` fails, stop
+and ask the operator to arrange an approved token-backed CLI login; do not open
+a browser or start an interactive login flow.
+
+```bash
+gh --version
+gh auth status
+REPOSITORY="$(gh repo view "$(git remote get-url origin)" --json nameWithOwner --jq .nameWithOwner)"
+gh issue create --repo "$REPOSITORY" --title "§N.M — concise summary" \
+  --label defect --body-file workbench/part-N-item-M.md
+```
+
+Use the label matching the form: `defect`, `question`, `feature-request`,
+`closure-confirmation`, or `feedback-round`. The checked Markdown content-gate
+line is the non-interactive equivalent of ticking the form checkbox: include it
+only because the gate was actually run in Step 5.
+
+Do not use an unstructured `--body` as a shortcut: the API does not render or
+enforce issue forms, so the draft itself must visibly carry every required
+field and the checked content-gate acknowledgement. No disclosure or fallback
+is needed merely because it was filed non-interactively; this is the normal
+path.
+
+For a **multi-item round**, file the round's parent issue first using the
+feedback-round structure, then file each item and attach it to the parent as a
+sub-issue without opening a browser:
+
+```bash
+CHILD_ID="$(gh api "repos/$REPOSITORY/issues/$CHILD_NUMBER" --jq .id)"
+gh api --method POST "repos/$REPOSITORY/issues/$PARENT_NUMBER/sub_issues" \
+  -F sub_issue_id="$CHILD_ID"
+```
+
+A single-item round needs no parent — file the one issue.
+
+For a **design proposal**, use the feature-request form and put the design in
+its body — the outcome needed, the alternatives considered, the tradeoffs, the
+recommendation. Draft it under `workbench/` first if that helps you think, then
+paste it in. Do not push a branch and do not open a pull request: the
+maintainers cannot merge one. A design offer is accepted as information, not as
+a roadmap commitment.
+
+## Step 8 — tell the operator what to expect
+
+- An item is answered when its issue closes; the closing comment or linked
+  commit says whether it was fixed, declined with a reason, already fixed since
+  their release, or answered.
+- Releases are the primary response surface. Subscribing to the repository's
+  releases — not polling it — is how this deployment learns a round was
+  answered, and how it learns a new release exists at all.
+- Silence is not a disposition. Open items with no response by the next adopted
+  re-mint get re-raised by number in the next round, briefly, as a list, not
+  re-argued, referencing the still-open issues rather than filing duplicates.
+
+## Rules
+
+- **Never file without the operator's explicit yes.** Publication is
+  irreversible in the way that matters: the content is out, and editing does
+  not retract it.
+- **Never hardcode the repository.** Resolve it from `origin` every time. The
+  seed's home can move, and a hardcoded target sends the report nowhere.
+- **One issue per item.** Each item needs its own disposition, and a merged
+  issue can only be closed once.
+- **Never fabricate an item number, an issue number, or a release identifier.**
+  If a number is not known, look it up or leave it out and say so.

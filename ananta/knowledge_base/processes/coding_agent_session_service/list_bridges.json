@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::coding_agent_session_service::list_bridges",
+  "display_name": "List every tracked MCP bridge subprocess",
+  "description": "Read-only enumeration of the tracker's registry — one row per tracked agent_instance_id with the recorded pid, an `alive` boolean (kill -0 probe at list time), and the original spawn timestamp. Used by the iTerm2 plugin's `terminate_session` joseki resolvers to disambiguate tabs, by the FSEvents watcher when `<solet>.bridge.port` changes (iterate + restart each), and by operator-side diagnostics. Touches no state. Empty bridges tuple is a valid steady state — no tabs open means no bridges tracked.",
+  "embedding_description": "Inspect the live MCP bridge subprocess registry to discover which agent_instance_id values are tracked + whether each bridge is alive. Returns BridgeListResult: tuple of BridgeStatus rows (agent_instance_id, solet_name, pid, alive, started_at) + count summary. Use before terminate_bridge/restart_bridge to confirm target exists; also for operator debug to spot orphaned entries (alive=false).",
+  "result_processor_customizations": {
+    "action_label": "Tracked MCP bridges enumerated",
+    "result_type": "coding_agent_session_bridge_list_result",
+    "result_description": "BridgeListResult frozen dataclass carrying a tuple of BridgeStatus rows (agent_instance_id, solet_name, pid, alive, started_at) plus a count summary in the message field.",
+    "presentation_guidance": "Lead with the row count. For each row surface agent_instance_id + pid + alive + started_at. When alive=false on a row, call that out — the tracking entry is stale and the operator may want to clean it via terminate_bridge (which is idempotent against not_running)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Enumerate every tracked MCP bridge subprocess.",
+    "error_interpretation": "tracker_unavailable: the plugin is not in the ready state yet (prepare_for_readiness has not completed). This is a transient startup-window error.",
+    "recovery_guidance": "tracker_unavailable: wait for solet startup to finish (poll list_plugins for status=ready on the macos_coding_agent_session_plugin entry) and retry."
+  }
+}

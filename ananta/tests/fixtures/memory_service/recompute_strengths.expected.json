@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "\"action_status\": \"completed\"",
+    "total_memories",
+    "updated"
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "description": "Recalculate ACT-R activation strengths for all memories"
+}

@@ -1,0 +1,12 @@
+{
+  "action_status": "COMPLETED",
+  "data_contains": {
+    "schedule_id": true,
+    "message": true
+  },
+  "data_matches": {
+    "message": "Created cron schedule"
+  },
+  "error": null,
+  "timeout_seconds": 30
+}

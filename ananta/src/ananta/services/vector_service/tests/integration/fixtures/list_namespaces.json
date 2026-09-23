@@ -1,0 +1,71 @@
+{
+  "name": "test_list_namespaces",
+  "description": "Ensure namespace exists and list all vector namespaces.",
+  "sequence": [
+    {
+      "step": "precleanup_vector_namespace_list",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_namespace_list"
+          },
+          "soft_delete": false
+        }
+      }
+    },
+    {
+      "step": "store_vector",
+      "process_key": "service_interface::vector_service::store_vectors",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vectors": [
+          {
+            "id": "vector_namespace_list",
+            "vector": [
+              0.05,
+              0.15,
+              0.25
+            ],
+            "dimension": 3,
+            "metadata": {
+              "label": "namespace_stub",
+              "category": "namespaces"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step": "list_namespaces",
+      "process_key": "service_interface::vector_service::list_namespaces",
+      "arguments": {}
+    },
+    {
+      "step": "cleanup_delete_vector",
+      "process_key": "service_interface::vector_service::delete_vectors",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vector_ids": [
+          "vector_namespace_list"
+        ]
+      }
+    },
+    {
+      "step": "cleanup_vector_namespace_list",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_namespace_list"
+          },
+          "soft_delete": false
+        }
+      }
+    }
+  ]
+}

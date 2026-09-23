@@ -1,0 +1,25 @@
+{
+  "name": "test_create_cron_hourly",
+  "description": "Create a cron schedule that runs every hour at minute 0",
+  "process_key": "plugin::default_scheduling_plugin::create_cron_schedule",
+  "arguments": {
+    "params": {
+      "cron_expression": "0 * * * *",
+      "label": "Hourly System Check",
+      "tags": "monitoring,hourly,system",
+      "actions": [
+        {
+          "process_key": "plugin::monitoring_plugin::check_system_health",
+          "arguments": {
+            "check_type": "full"
+          }
+        }
+      ]
+    },
+    "state": {
+      "session_id": "test-session-003",
+      "flow_id": "test-flow-003"
+    }
+  },
+  "timeout_seconds": 30
+}

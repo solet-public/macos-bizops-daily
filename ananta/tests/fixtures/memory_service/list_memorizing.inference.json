@@ -1,0 +1,5 @@
+{
+  "query": "What am I currently memorizing?",
+  "expected_process_key": "service_interface::memory_service::list_memorizing",
+  "expected_arguments": {}
+}

@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::list_sobjects",
+  "display_name": "Salesforce: List SObjects",
+  "description": "List the org's sobjects (API name and label). No parameters. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; the sobject list is delivered when the job completes.",
+  "embedding_description": "List every Salesforce object visible to the authenticated user, standard and custom alike, with their API names. The discovery step before querying or describing a particular object, for when you need to know what the org actually contains. Dispatches asynchronously -- a job_id comes back immediately, the full listing follows moments later.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce sobject listing queued",
+    "result_type": "salesforce_list_sobjects_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the sobject listing -- it arrives separately, as its own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the listing was queued -- do not present job_id/status as the object list. Acknowledge the request is in flight; the sobjects land in a follow-up message when the job completes. Once delivered, list the object names and labels plainly; low sensitivity (metadata only, data_sensitivity 0.1)."
+  },
+  "error_processor_customizations": {
+    "action_context": "List the Salesforce org's sobjects.",
+    "error_interpretation": "sf.auth_failed: the sf CLI has no live session for the registered org. sf.api_error: an unexpected org error.",
+    "recovery_guidance": "sf.auth_failed: ask the operator to re-establish the org session with: sf org login web."
+  }
+}

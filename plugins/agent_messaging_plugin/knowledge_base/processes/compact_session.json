@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::compact_session",
+  "display_name": "Compact a managed session's context",
+  "description": "Fleet session-management Phase B, D1 (AMEND 5b). Sends '/compact' over the resolved host driver's driver channel (stream-json stdin) to the running Claude Code process behind agent_instance_id -- fire-and-forget, this call does not read or await the resulting turn. Unlike clear_session, compact_session has no park mode and performs no lifecycle_state transition of any kind -- it is pure context hygiene. Only available on hosts whose driver provides a driver channel (currently 'headless' and 'tmux'); the degenerate 'operator' driver, and a headless/tmux process this build's memory no longer tracks (e.g. after a restart), both refuse with unsupported_on_host rather than silently doing nothing.",
+  "embedding_description": "Trim token bloat on a chatty long-lived fleet session via '/compact' -- the model re-summarizes its own history in place as a digest instead of throwing it away, never touching the lifecycle row. Run this proactively before the context window fills up, not as an emergency reset -- for that, see clear_session. terminate_session is different: it ends the process.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Session context compacted",
+    "result_type": "compact_session_result",
+    "result_description": "lifecycle_state -- the row's lifecycle_state at call time, unchanged by this verb (compact_session never transitions state).",
+    "presentation_guidance": "This call is fire-and-forget: a clean result confirms the command was sent over the driver channel, not that the target session has finished compacting."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads the managed_session ledger row, refuses on a terminal lifecycle_state, resolves the row's host driver, and sends '/compact' over its driver_channel() -- a fixed sequence, no retry loop, no state write.",
+    "error_interpretation": "session_not_found: no managed_session row exists for the given agent_instance_id. lifecycle_state_conflict: the row is already terminated/retired -- terminal rows never receive driver-channel commands. unsupported_on_host: the row's host has no driver in this build, or its driver has no live driver channel for this host_ref (the degenerate 'operator' driver, or a headless process spawned before a restart wiped this build's in-memory tracking).",
+    "recovery_guidance": "For unsupported_on_host, use the manual equivalent for that session (e.g. typing /compact directly if it is an operator-attended session) -- this verb has no fallback path, by design, to avoid a silent no-op."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::ingest_session",
+  "arguments": {
+    "transcript": "User: Hello!\nAssistant: Hi there!\nUser: How are you?\nAssistant: I am doing well, thank you!",
+    "session_id": "test-chunk-turns-001",
+    "chunk_by_turns": true
+  }
+}

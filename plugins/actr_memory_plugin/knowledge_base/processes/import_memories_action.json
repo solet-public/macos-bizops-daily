@@ -1,0 +1,6 @@
+{
+  "process_key": "plugin::actr_memory_plugin::import_memories_action",
+  "display_name": "Import Memories",
+  "description": "Import memories from JSON file",
+  "embedding_description": "Import memories from a JSON file. Provide file_path; returns imported_count and skipped_count. Use to restore backups or migrate memory data into the ACT-R store. Skips duplicates when appropriate and reports skipped items."
+}

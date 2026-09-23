@@ -1,0 +1,11 @@
+{
+  "process_key": "service_interface::thinking_service::upsert_plan",
+  "display_name": "Upsert Plan",
+  "description": "commit/update the active plan record when you are changing the plan text itself (plan document write; does not execute tools).",
+  "embedding_description": "Commit / update the active plan record. Writes plan content to focused memory + the knowledge base. Accepts {content} only — the platform derives the current step from the existing focused plan automatically. Does NOT execute tools (plan document write only). Distinct from create_plan (which accepts {goal, topic?, context?} and creates a NEW plan).",
+  "processor_policy_category": "edge_sink",
+  "error_processor_customizations": {
+    "action_context": "Writing plan content to focused memory and the knowledge base. upsert_plan accepts {content}. The platform derives the current step from the existing focused plan automatically. Do not confuse with create_plan (which accepts {goal, topic?, context?}).",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. Common mistake: passing 'goal' (belongs to create_plan) instead of 'content'. FocusBufferFull: 3 items already focused — a prior plan must be completed or abandoned first. StorageError: database write failed."
+  }
+}

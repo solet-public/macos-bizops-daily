@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vector_service::store_vectors",
+  "display_name": "Store Vectors",
+  "description": "Store vector embeddings with metadata for semantic search.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Vectors stored",
+    "result_type": "vectors_stored",
+    "result_description": "Storage confirmation with count of vectors stored, namespace, and any IDs that were assigned or updated",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Stores vector embeddings with metadata into a namespace for later similarity search retrieval",
+    "error_interpretation": "ValidationError with 'vectors': malformed vector data or missing required fields (id, embedding). ValidationError with 'dimension': vector dimensions don't match namespace. NamespaceError: namespace doesn't exist or can't be created. StorageError: database connection or write failure.",
+    "recovery_guidance": "For dimension errors: verify embedding model output matches namespace configuration. For validation errors: check vector data format includes 'id' and 'embedding' fields. For storage errors: retry or check database status."
+  }
+}

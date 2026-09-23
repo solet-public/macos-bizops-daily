@@ -1,0 +1,9 @@
+{
+  "name": "test_remember_direct_plugin_blocked",
+  "description": "Verify that direct plugin invocation is blocked when plugin is bound to a service interface. Must use service_interface::memory_service::remember instead.",
+  "process_key": "plugin::actr_memory_plugin::remember",
+  "arguments": {
+    "content": "The sky is blue because of Rayleigh scattering of sunlight",
+    "tags": ["science", "physics", "optics"]
+  }
+}

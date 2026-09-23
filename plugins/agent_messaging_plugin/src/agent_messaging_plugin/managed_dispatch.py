@@ -1,0 +1,1536 @@
+"""Durable managed-work dispatch state machine and composite primitives.
+
+The dispatch is the work contract; ``managed_session`` remains one host
+attempt.  Transport evidence is persisted but cannot activate or complete a
+dispatch.  Every authoritative transition is causal-versioned and every
+worker/coordinator event is append-only, including rejected race losers.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import secrets
+from collections.abc import Callable, Mapping
+from dataclasses import asdict, dataclass, replace
+from dataclasses import field as dataclass_field
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal, Never
+
+from ananta.llm.agent_messaging.role_binding import AGENT_ROLE_BINDING_NAMESPACE
+from ananta.llm.agent_messaging.state_results import (
+    require_completed,
+    require_records,
+    require_updated,
+)
+
+from .role_binding_store import holds_role
+from .schema import (
+    TABLE_MANAGED_DISPATCH,
+    TABLE_MANAGED_DISPATCH_EVENT,
+)
+from .spawn_capability_floors import contract_scope_tags
+
+if TYPE_CHECKING:
+    from ananta.interfaces.state_management_interface import StateManagementInterface
+
+    from .bridge_sessions import BridgeSessionManager
+    from .peer_registry import PeerRegistry
+
+logger = logging.getLogger(__name__)
+
+DISPATCH_PREPARING = "preparing"
+DISPATCH_UPTAKE_PENDING = "uptake_pending"
+DISPATCH_UPTAKE_UNCERTAIN = "uptake_uncertain"
+DISPATCH_ACTIVE = "active"
+DISPATCH_BLOCKED_INTERNAL = "blocked_internal"
+DISPATCH_BLOCKED_OPERATOR = "blocked_operator"
+DISPATCH_COMPLETION_REPORTED = "completion_reported"
+DISPATCH_COMPLETED = "completed"
+DISPATCH_FAILED_START = "failed_start"
+DISPATCH_WORKER_LOST = "worker_lost"
+DISPATCH_CANCELLED = "cancelled"
+DISPATCH_REJECTED = "rejected"
+DISPATCH_EXPIRED = "expired"
+
+DISPATCH_TERMINAL_STATES = frozenset(
+    {
+        DISPATCH_COMPLETED,
+        DISPATCH_FAILED_START,
+        DISPATCH_WORKER_LOST,
+        DISPATCH_CANCELLED,
+        DISPATCH_REJECTED,
+        DISPATCH_EXPIRED,
+    },
+)
+DISPATCH_NONTERMINAL_STATES = frozenset(
+    {
+        DISPATCH_PREPARING,
+        DISPATCH_UPTAKE_PENDING,
+        DISPATCH_UPTAKE_UNCERTAIN,
+        DISPATCH_ACTIVE,
+        DISPATCH_BLOCKED_INTERNAL,
+        DISPATCH_BLOCKED_OPERATOR,
+        DISPATCH_COMPLETION_REPORTED,
+    },
+)
+
+EVENT_MANAGED_DISPATCH_NOTICE = "managed_dispatch_notice"
+UNKNOWN_LIVENESS_REPROBE_SECONDS = 30
+UNKNOWN_LIVENESS_ESCALATION_SECONDS = 120
+
+
+class DispatchError(RuntimeError):
+    """Stable fail-loud error from a managed-dispatch operation."""
+
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        data: Mapping[str, Any] | None = None,
+    ) -> None:
+        self.code = code
+        self.message = message
+        self.data = dict(data or {})
+        super().__init__(f"{code}: {message}")
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchActor:
+    """Server-derived caller identity used for dispatch authorization.
+
+    The public process adapter builds this from an OAuth principal or a
+    server-stamped local bridge identity, then verifies its live peer binding.
+    Caller parameters never construct this type. The state machine still
+    re-checks the durable role binding at act time.
+    """
+
+    agent_instance_id: str
+    agent_session_id: str
+    authority_source: Literal["oauth_principal", "live_peer_binding"]
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchSpec:
+    """Validated durable contract written before any host side effect."""
+
+    dispatch_id: str
+    lane_id: str
+    role_name: str
+    role_class: str
+    work_class: str
+    budget_line: str
+    brief_ref: str
+    brief_sha256: str
+    expected_path: str
+    completion_contract: Mapping[str, Any]
+    model: str
+    effort: str
+    agent_runtime: str
+    allowed_hosts: list[str]
+    host: str
+    visibility: str
+    local_name: str
+    report_by_seconds: int
+    ttl_seconds: int
+    allowed_tools: tuple[str, ...]
+    permission_mode: str
+    transport: str
+    allow_askuserquestion: bool
+    degraded_hooks_acknowledged: bool
+    spawned_by_instance_id: str
+    spawned_by_role: str
+    directed_by: str
+    uptake_due_at: str
+    report_by: str
+    watchdog_due_at: str
+    expires_at: str
+    unit_id: str = ""
+    repository_root: str = ""
+    dispatch_kind: str = ""
+    reviewed_report_vendor: str = ""
+    pair_id: str = ""
+    # Declared capability-floor scopes (iss_63d91ca9); part of the immutable
+    # contract so a retry cannot drop the declaration that floored the model.
+    scope_tags: tuple[str, ...] = ()
+    difficulty_score: float = 0.0
+    selection_receipt: Mapping[str, Any] = dataclass_field(default_factory=dict)
+    selection_receipt_enforced: bool = False
+
+
+def _canonical_sha256(value: Mapping[str, Any]) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _parse_aware_utc(value: str, field: str) -> datetime:
+    """Parse a public deadline; callers must always provide its timezone."""
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise DispatchError(f"{field}_invalid", f"{field} must be ISO-8601.") from exc
+    if parsed.tzinfo is None:
+        raise DispatchError(f"{field}_invalid", f"{field} must include a timezone.")
+    return parsed.astimezone(UTC)
+
+
+def _parse_persisted_utc(value: object, field: str) -> datetime:
+    """Decode a trusted state-service timestamp, whose ``DATETIME`` is naive UTC.
+
+    This is deliberately separate from :func:`_parse_aware_utc`: public spec and
+    worker-event values retain their timezone requirement, while a value read
+    from the house state service may have lost its UTC offset during DATETIME
+    serialization.  Malformed or absent persisted values remain errors.
+    """
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise DispatchError(f"{field}_invalid", f"{field} must be ISO-8601.") from exc
+    else:
+        raise DispatchError(f"{field}_invalid", f"{field} must be an ISO-8601 timestamp.")
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+_PERSISTED_UTC_FIELDS = (
+    "uptake_due_at",
+    "report_by",
+    "watchdog_due_at",
+    "expires_at",
+    "decision_due_at",
+    "next_liveness_probe_at",
+    "liveness_escalation_due_at",
+    "first_turn_at",
+    "last_ack_at",
+    "last_milestone_at",
+    "completion_reported_at",
+    "completion_accepted_at",
+    "host_liveness_observed_at",
+    "last_reconciled_at",
+    "watchdog_fired_at",
+)
+
+
+def _decode_persisted_dispatch_times(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a JSON-safe UTC view of one persisted dispatch row.
+
+    State-service ``DATETIME`` columns can materialize as Python datetimes as
+    well as strings.  Normalizing the returned projection keeps accepted-event
+    receipts serializable while retaining the original stored bytes untouched.
+    """
+    decoded = dict(row)
+    for field in _PERSISTED_UTC_FIELDS:
+        value = decoded.get(field)
+        if value in (None, ""):
+            continue
+        decoded[field] = _parse_persisted_utc(value, field).isoformat()
+    return decoded
+
+
+def _require_text(value: object, field: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise DispatchError(f"{field}_required", f"{field} is required.")
+    return text
+
+
+def _validate_completion_evidence(
+    contract: Mapping[str, Any],
+    evidence: object,
+    verdict: object,
+    *,
+    prefix: str,
+) -> dict[str, Any]:
+    from .session_lifecycle_store import (  # noqa: PLC0415
+        validate_completion_evidence,
+    )
+
+    return validate_completion_evidence(
+        contract,
+        evidence,
+        verdict,
+        prefix=prefix,
+    )
+
+def _deadline_windows(deadlines: Mapping[str, datetime], now: datetime) -> dict[str, int]:
+    return {
+        f"{name}_window_seconds": max(1, int((value - now).total_seconds()))
+        for name, value in deadlines.items()
+    }
+
+
+def _validate_spec(spec: DispatchSpec, now: datetime) -> tuple[Path, str]:
+    from .session_lifecycle_store import validate_dispatch_spec  # noqa: PLC0415
+
+    return validate_dispatch_spec(spec, now)
+
+def prepare_managed_dispatch(
+    state: StateManagementInterface,
+    spec: DispatchSpec,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Validate and insert one ``preparing`` dispatch before host spawn."""
+    clock = (now or datetime.now(UTC)).astimezone(UTC)
+    _validate_spec(spec, clock)
+    existing = _find_dispatch(state, spec.dispatch_id)
+    if existing is not None:
+        raise DispatchError(
+            "dispatch_id_conflict", f"dispatch_id already exists: {spec.dispatch_id}"
+        )
+    record = asdict(spec)
+    record["allowed_tools"] = list(spec.allowed_tools)
+    record["scope_tags"] = list(spec.scope_tags)
+    record["selection_receipt"] = dict(spec.selection_receipt)
+    record.update(
+        {
+            "external_id": f"managed-dispatch:{spec.dispatch_id}",
+            "completion_contract": dict(spec.completion_contract),
+            "completion_contract_sha256": _canonical_sha256(spec.completion_contract),
+            "state": DISPATCH_PREPARING,
+            "attempt_number": 1,
+            "current_agent_instance_id": "",
+            "version": 0,
+            "created_at": clock.isoformat(),
+            "next_required_action": "spawn_current_attempt",
+            "responsible_role": spec.spawned_by_role,
+            **_deadline_windows(
+                {
+                    field: _parse_aware_utc(str(getattr(spec, field)), field)
+                    for field in (
+                        "uptake_due_at",
+                        "report_by",
+                        "watchdog_due_at",
+                        "expires_at",
+                    )
+                },
+                clock,
+            ),
+        },
+    )
+    require_completed(
+        state.write_state(
+            AGENT_ROLE_BINDING_NAMESPACE,
+            {"table": TABLE_MANAGED_DISPATCH, "record": record},
+        ),
+        "insert managed_dispatch",
+    )
+    return read_managed_dispatch(state, spec.dispatch_id)
+
+
+def mint_dispatch_id() -> str:
+    """Mint the server-issued identity raw spawn requires."""
+    return f"mdp-{secrets.token_hex(16)}"
+
+
+def dispatch_managed_work(
+    state: StateManagementInterface,
+    spec: DispatchSpec,
+    spawn_request: object,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Atomically prepare supervision truth, then create one linked attempt.
+
+    The import is deliberately local: the lifecycle layer validates the
+    prepared row by calling this module, so a module-level mutual import would
+    make initialization order authoritative.  The call-time graph is acyclic.
+    """
+    from .session_lifecycle_verbs import (  # noqa: PLC0415
+        SpawnSessionRequest,
+        VerbError,
+        spawn_session,
+    )
+
+    if not isinstance(spawn_request, SpawnSessionRequest):
+        raise DispatchError("spawn_request_invalid", "A SpawnSessionRequest is required.")
+    prepared = prepare_managed_dispatch(state, spec, now=now)
+    request = replace(spawn_request, dispatch_id=spec.dispatch_id)
+    try:
+        attempt = spawn_session(state, request)
+    except VerbError as exc:
+        failed = _update_dispatch(
+            state,
+            prepared,
+            {
+                "state": DISPATCH_FAILED_START,
+                "terminal_reason": f"{exc.code}: {exc.message}",
+                "next_required_action": "decide_retry_or_cancel",
+                "responsible_role": spec.spawned_by_role,
+            },
+        )
+        raise DispatchError(
+            exc.code,
+            exc.message,
+            data={
+                "dispatch_id": spec.dispatch_id,
+                "state": DISPATCH_FAILED_START,
+                "version": int(failed["version"]),
+                "next_required_action": str(failed["next_required_action"]),
+            },
+        ) from exc
+    return {
+        "dispatch": read_managed_dispatch(state, spec.dispatch_id),
+        "attempt": attempt,
+    }
+
+
+def _find_dispatch(
+    state: StateManagementInterface,
+    dispatch_id: str,
+) -> dict[str, Any] | None:
+    result = state.query_state(
+        AGENT_ROLE_BINDING_NAMESPACE,
+        {
+            "table": TABLE_MANAGED_DISPATCH,
+            "filters": {"dispatch_id": dispatch_id, "is_deleted": 0},
+        },
+    )
+    rows = require_records(result)
+    return dict(rows[0]) if rows else None
+
+
+def read_managed_dispatch(
+    state: StateManagementInterface,
+    dispatch_id: str,
+) -> dict[str, Any]:
+    row = _find_dispatch(state, dispatch_id)
+    if row is None:
+        raise DispatchError("dispatch_not_found", f"No managed dispatch {dispatch_id!r}.")
+    return _decode_persisted_dispatch_times(row)
+
+
+def _event_external_id(dispatch_id: str, event_id: str) -> str:
+    digest = hashlib.sha256(f"{dispatch_id}\0{event_id}".encode()).hexdigest()
+    return f"managed-dispatch-event:{digest}"
+
+
+_ACCEPTED_OUTCOME_PAYLOAD_KEY = "_managed_dispatch_accepted_outcome"
+
+
+def _find_event(
+    state: StateManagementInterface,
+    dispatch_id: str,
+    event_id: str,
+) -> dict[str, Any] | None:
+    result = state.query_state(
+        AGENT_ROLE_BINDING_NAMESPACE,
+        {
+            "table": TABLE_MANAGED_DISPATCH_EVENT,
+            "filters": {
+                "dispatch_id": dispatch_id,
+                "event_id": event_id,
+                "is_deleted": 0,
+            },
+        },
+    )
+    rows = require_records(result)
+    return dict(rows[0]) if rows else None
+
+
+def _write_event(
+    state: StateManagementInterface,
+    *,
+    dispatch_id: str,
+    event_id: str,
+    event_kind: str,
+    attempt_agent_instance_id: str,
+    actor_role: str,
+    actor_instance_id: str,
+    prior_version: int,
+    observed_at: datetime,
+    payload: Mapping[str, Any],
+    accepted: bool,
+    rejection_code: str = "",
+    accepted_outcome: Mapping[str, Any] | None = None,
+) -> None:
+    stored_payload = dict(payload)
+    if accepted_outcome is not None:
+        stored_payload[_ACCEPTED_OUTCOME_PAYLOAD_KEY] = dict(accepted_outcome)
+    require_completed(
+        state.write_state(
+            AGENT_ROLE_BINDING_NAMESPACE,
+            {
+                "table": TABLE_MANAGED_DISPATCH_EVENT,
+                "record": {
+                    "external_id": _event_external_id(dispatch_id, event_id),
+                    "event_id": event_id,
+                    "dispatch_id": dispatch_id,
+                    "attempt_agent_instance_id": attempt_agent_instance_id,
+                    "event_kind": event_kind,
+                    "actor_role": actor_role,
+                    "actor_instance_id": actor_instance_id,
+                    "event_at": observed_at.astimezone(UTC).isoformat(),
+                    "prior_version": prior_version,
+                    "payload": stored_payload,
+                    "payload_sha256": _canonical_sha256(stored_payload),
+                    "accepted": accepted,
+                    "rejection_code": rejection_code,
+                },
+            },
+        ),
+        "insert managed_dispatch_event",
+    )
+
+
+def _replay_event(event: Mapping[str, Any]) -> dict[str, Any]:
+    if not bool(event.get("accepted")):
+        rejection_code = str(event.get("rejection_code") or "event_rejected")
+        raise DispatchError(
+            rejection_code,
+            f"Event id was already rejected with {rejection_code}.",
+        )
+    payload = event.get("payload")
+    if not isinstance(payload, Mapping):
+        raise DispatchError(
+            "event_replay_outcome_missing",
+            "Accepted event has no structured payload to replay.",
+        )
+    outcome = payload.get(_ACCEPTED_OUTCOME_PAYLOAD_KEY)
+    if not isinstance(outcome, Mapping):
+        raise DispatchError(
+            "event_replay_outcome_missing",
+            "Accepted event has no durable accepted projection to replay.",
+        )
+    return dict(outcome)
+
+
+def _require_unreserved_event_payload(payload: Mapping[str, Any]) -> None:
+    if _ACCEPTED_OUTCOME_PAYLOAD_KEY in payload:
+        raise DispatchError(
+            "event_payload_reserved",
+            f"Payload field {_ACCEPTED_OUTCOME_PAYLOAD_KEY!r} is platform-owned.",
+        )
+
+
+def _update_dispatch(
+    state: StateManagementInterface,
+    row: Mapping[str, Any],
+    updates: Mapping[str, Any],
+) -> dict[str, Any]:
+    dispatch_id = str(row["dispatch_id"])
+    prior_version = int(row["version"])
+    mutation = dict(updates)
+    mutation["version"] = prior_version + 1
+    updated = require_updated(
+        state.update_state(
+            AGENT_ROLE_BINDING_NAMESPACE,
+            {
+                "table": TABLE_MANAGED_DISPATCH,
+                "filters": {
+                    "dispatch_id": dispatch_id,
+                    "version": prior_version,
+                    "is_deleted": 0,
+                },
+            },
+            mutation,
+        ),
+    )
+    if updated != 1:
+        raise DispatchError("stale_dispatch_version", "Dispatch transition lost its CAS race.")
+    return read_managed_dispatch(state, dispatch_id)
+
+
+def record_first_turn_evidence(
+    state: StateManagementInterface,
+    *,
+    dispatch_id: str,
+    agent_instance_id: str,
+    source: str,
+    delivered: bool,
+    error: str,
+    host: str,
+    host_ref: str,
+    agent_runtime: str,
+    observed_at: datetime,
+) -> dict[str, Any]:
+    """Link an attempt and durably record submission evidence without ACK."""
+    row = read_managed_dispatch(state, dispatch_id)
+    current = str(row.get("current_agent_instance_id") or "")
+    if current == agent_instance_id and row.get("first_turn_at"):
+        return row
+    if current and current != agent_instance_id:
+        raise DispatchError("attempt_conflict", "A different current attempt already exists.")
+    if str(row["state"]) != DISPATCH_PREPARING:
+        raise DispatchError("dispatch_not_preparing", "First-turn evidence requires preparing.")
+    next_state = DISPATCH_UPTAKE_PENDING if delivered else DISPATCH_UPTAKE_UNCERTAIN
+    result = _update_dispatch(
+        state,
+        row,
+        {
+            "state": next_state,
+            "current_agent_instance_id": agent_instance_id,
+            "first_turn_source": source,
+            "first_turn_delivered": delivered,
+            "first_turn_error": error,
+            "first_turn_at": observed_at.astimezone(UTC).isoformat(),
+            "current_host": host,
+            "current_host_ref": host_ref,
+            "current_agent_runtime": agent_runtime,
+            "next_required_action": "await_worker_ack" if delivered else "decide_start_recovery",
+            "responsible_role": str(row["spawned_by_role"]),
+        },
+    )
+    _write_event(
+        state,
+        dispatch_id=dispatch_id,
+        event_id=f"first-turn:{int(row['attempt_number'])}",
+        event_kind="first_turn",
+        attempt_agent_instance_id=agent_instance_id,
+        actor_role=str(row["spawned_by_role"]),
+        actor_instance_id=str(row["spawned_by_instance_id"]),
+        prior_version=int(row["version"]),
+        observed_at=observed_at,
+        payload={
+            "source": source,
+            "delivered": delivered,
+            "error": error,
+            "host": host,
+            "host_ref": host_ref,
+            "agent_runtime": agent_runtime,
+        },
+        accepted=True,
+    )
+    return result
+
+
+def _audit_rejected_event(
+    state: StateManagementInterface,
+    *,
+    row: Mapping[str, Any],
+    event_id: str,
+    event_kind: str,
+    attempt_agent_instance_id: str,
+    actor_role: str,
+    actor_instance_id: str,
+    prior_version: int,
+    payload: Mapping[str, Any],
+    observed_at: datetime,
+    error: DispatchError,
+) -> Never:
+    _write_event(
+        state,
+        dispatch_id=str(row["dispatch_id"]),
+        event_id=event_id,
+        event_kind=event_kind,
+        attempt_agent_instance_id=attempt_agent_instance_id,
+        actor_role=actor_role,
+        actor_instance_id=actor_instance_id,
+        prior_version=prior_version,
+        observed_at=observed_at,
+        payload=payload,
+        accepted=False,
+        rejection_code=error.code,
+    )
+    raise error
+
+
+def _require_worker_authority(
+    state: StateManagementInterface,
+    row: Mapping[str, Any],
+    actor: DispatchActor,
+) -> None:
+    current = str(row.get("current_agent_instance_id") or "")
+    role = str(row["role_name"])
+    if (
+        not actor.agent_instance_id
+        or actor.agent_instance_id != current
+        or not holds_role(state, role, actor.agent_session_id)
+    ):
+        raise DispatchError(
+            "worker_authority_denied",
+            "Caller is not the current attempt holding the dispatch worker role.",
+        )
+
+
+def _require_coordinator_authority(
+    state: StateManagementInterface,
+    row: Mapping[str, Any],
+    actor: DispatchActor,
+) -> None:
+    role = str(row["spawned_by_role"])
+    if (
+        not actor.agent_instance_id
+        or actor.agent_instance_id != str(row["spawned_by_instance_id"])
+        or not holds_role(state, role, actor.agent_session_id)
+    ):
+        raise DispatchError(
+            "coordinator_authority_denied",
+            "Caller is not the immutable spawning coordinator holding its durable role.",
+        )
+
+
+def _ack_updates(
+    row: Mapping[str, Any], payload: Mapping[str, Any], at: datetime
+) -> dict[str, Any]:
+    required = ("brief_sha256", "role_binding", "scope_readback_sha256", "plan_sha256")
+    for field in required:
+        _require_text(payload.get(field), field)
+    if str(payload["brief_sha256"]) != str(row["brief_sha256"]):
+        raise DispatchError("ack_brief_mismatch", "ACK brief digest does not match dispatch.")
+    if str(payload["role_binding"]) != str(row["role_name"]):
+        raise DispatchError("ack_role_mismatch", "ACK role binding does not match dispatch.")
+    return {
+        "state": DISPATCH_ACTIVE,
+        "last_ack_at": at.isoformat(),
+        "next_required_action": "worker_execute_and_report",
+        "responsible_role": str(row["role_name"]),
+    }
+
+
+def _validate_common_blocker_payload(payload: Mapping[str, Any]) -> tuple[str, str]:
+    owner = _require_text(payload.get("blocker_owner"), "blocker_owner")
+    question = _require_text(payload.get("question"), "question")
+    safe_options = payload.get("safe_options")
+    evidence = payload.get("evidence")
+    if not isinstance(safe_options, list) or not safe_options or not all(
+        isinstance(value, str) and value.strip() for value in safe_options
+    ):
+        raise DispatchError("safe_options_invalid", "Blocker safe_options must be non-empty.")
+    if not isinstance(evidence, Mapping) or not evidence:
+        raise DispatchError("blocker_evidence_required", "Blocker evidence is required.")
+    return owner, question
+
+
+def _validate_internal_blocker(
+    row: Mapping[str, Any],
+    payload: Mapping[str, Any],
+    *,
+    owner: str,
+    observed_at: datetime,
+) -> None:
+    if owner != str(row["spawned_by_role"]):
+        raise DispatchError(
+            "blocker_owner_invalid",
+            "Internal blocker owner must be the immutable coordinator role.",
+        )
+    deadline = _parse_aware_utc(
+        _require_text(payload.get("decision_due_at"), "decision_due_at"),
+        "decision_due_at",
+    )
+    if deadline <= observed_at.astimezone(UTC):
+        raise DispatchError(
+            "decision_due_at_not_future",
+            "Internal blocker decision deadline must be future.",
+        )
+    if deadline >= _parse_persisted_utc(row["expires_at"], "expires_at"):
+        raise DispatchError(
+            "decision_due_at_after_ttl",
+            "Internal blocker decision deadline must precede TTL.",
+        )
+
+
+def _validate_operator_blocker(payload: Mapping[str, Any], *, owner: str) -> None:
+    if owner != "operator":
+        raise DispatchError(
+            "blocker_owner_invalid",
+            "Operator blocker owner must be exactly 'operator'.",
+        )
+    _require_text(payload.get("authority_gap"), "authority_gap")
+
+
+def _blocked_updates(
+    row: Mapping[str, Any], payload: Mapping[str, Any], at: datetime
+) -> dict[str, Any]:
+    blocker_class = _require_text(payload.get("blocker_class"), "blocker_class")
+    if blocker_class not in {"internal", "operator"}:
+        raise DispatchError("blocker_class_invalid", "blocker_class must be internal or operator.")
+    state = DISPATCH_BLOCKED_INTERNAL if blocker_class == "internal" else DISPATCH_BLOCKED_OPERATOR
+    owner, question = _validate_common_blocker_payload(payload)
+    if blocker_class == "internal":
+        _validate_internal_blocker(
+            row,
+            payload,
+            owner=owner,
+            observed_at=at,
+        )
+    else:
+        _validate_operator_blocker(payload, owner=owner)
+    return {
+        "state": state,
+        "blocked_at": at.isoformat(),
+        "decision_due_at": payload.get("decision_due_at") or None,
+        "blocker_class": blocker_class,
+        "blocker_owner": owner,
+        "blocker_question": question,
+        "blocker_evidence": dict(payload),
+        "next_required_action": "resolve_internal_blocker"
+        if blocker_class == "internal"
+        else "await_operator_ruling",
+        "responsible_role": owner,
+    }
+
+
+def _completion_updates(
+    row: Mapping[str, Any],
+    payload: Mapping[str, Any],
+    at: datetime,
+) -> dict[str, Any]:
+    artifact = Path(_require_text(payload.get("artifact_path"), "artifact_path"))
+    artifact_sha256 = _require_text(payload.get("artifact_sha256"), "artifact_sha256")
+    contract_sha256 = _require_text(
+        payload.get("completion_contract_sha256"),
+        "completion_contract_sha256",
+    )
+    if str(artifact) != str(row["expected_path"]):
+        raise DispatchError("completion_path_mismatch", "Completion path is not expected_path.")
+    if not artifact.is_file():
+        raise DispatchError("completion_artifact_missing", "Completion artifact does not exist.")
+    if _file_sha256(artifact) != artifact_sha256:
+        raise DispatchError("completion_hash_mismatch", "Completion artifact hash is wrong.")
+    if contract_sha256 != str(row["completion_contract_sha256"]):
+        raise DispatchError("completion_contract_mismatch", "Completion contract digest is wrong.")
+    contract = row.get("completion_contract")
+    if not isinstance(contract, Mapping):
+        raise DispatchError("completion_contract_invalid", "Stored completion contract is invalid.")
+    evidence = _validate_completion_evidence(
+        contract,
+        payload.get("evidence"),
+        payload.get("verdict"),
+        prefix="completion",
+    )
+    return {
+        "state": DISPATCH_COMPLETION_REPORTED,
+        "completion_reported_at": at.isoformat(),
+        "reported_artifact_sha256": artifact_sha256,
+        "reported_completion_evidence": evidence,
+        "reported_completion_verdict": str(payload["verdict"]),
+        "next_required_action": "validate_and_accept_completion",
+        "responsible_role": str(row["spawned_by_role"]),
+    }
+
+
+def _milestone_updates(
+    row: Mapping[str, Any], payload: Mapping[str, Any], at: datetime
+) -> dict[str, Any]:
+    if not payload.get("completed_work"):
+        raise DispatchError("completed_work_required", "Milestone completed_work is required.")
+    evidence = payload.get("current_evidence")
+    if not isinstance(evidence, Mapping) or not evidence:
+        raise DispatchError("current_evidence_required", "Milestone evidence is required.")
+    next_action = _require_text(payload.get("next_action"), "next_action")
+    next_report = _parse_aware_utc(
+        _require_text(payload.get("next_report_deadline"), "next_report_deadline"),
+        "next_report_deadline",
+    )
+    if next_report <= at.astimezone(UTC):
+        raise DispatchError("next_report_deadline_not_future", "Next report deadline must be future.")
+    if next_report >= _parse_persisted_utc(row["expires_at"], "expires_at"):
+        raise DispatchError("next_report_after_ttl", "Next report deadline must precede TTL.")
+    return {
+        "last_milestone_at": at.isoformat(),
+        "report_by": next_report.isoformat(),
+        "next_required_action": next_action,
+    }
+
+
+_WorkerUpdateBuilder = Callable[
+    [Mapping[str, Any], Mapping[str, Any], datetime],
+    dict[str, Any],
+]
+_WORKER_EVENT_RULES: dict[str, tuple[frozenset[str], str, _WorkerUpdateBuilder]] = {
+    "ack": (
+        frozenset({DISPATCH_UPTAKE_PENDING, DISPATCH_UPTAKE_UNCERTAIN}),
+        "ack_not_allowed",
+        _ack_updates,
+    ),
+    "milestone": (frozenset({DISPATCH_ACTIVE}), "milestone_not_allowed", _milestone_updates),
+    "blocked": (frozenset({DISPATCH_ACTIVE}), "blocker_not_allowed", _blocked_updates),
+    "completion": (frozenset({DISPATCH_ACTIVE}), "completion_not_allowed", _completion_updates),
+}
+
+
+def _worker_event_updates(
+    row: Mapping[str, Any],
+    event_kind: str,
+    payload: Mapping[str, Any],
+    observed_at: datetime,
+) -> dict[str, Any]:
+    rule = _WORKER_EVENT_RULES.get(event_kind)
+    if rule is None:
+        raise DispatchError("event_kind_invalid", f"Unknown worker event kind {event_kind!r}.")
+    allowed_states, rejection_code, builder = rule
+    state_name = str(row["state"])
+    if state_name not in allowed_states:
+        raise DispatchError(
+            rejection_code,
+            f"Worker event {event_kind!r} is not legal from {state_name}.",
+        )
+    return builder(row, payload, observed_at)
+
+
+def report_managed_dispatch(
+    state: StateManagementInterface,
+    *,
+    dispatch_id: str,
+    event_id: str,
+    event_kind: str,
+    attempt_agent_instance_id: str,
+    actor: DispatchActor,
+    prior_version: int,
+    payload: Mapping[str, Any],
+    observed_at: datetime,
+) -> dict[str, Any]:
+    """Append a worker event and apply its one legal projection transition."""
+    _require_text(event_id, "event_id")
+    row = read_managed_dispatch(state, dispatch_id)
+    existing = _find_event(state, dispatch_id, event_id)
+    if existing is not None:
+        _require_worker_authority(state, row, actor)
+        return _replay_event(existing)
+    try:
+        _require_worker_authority(state, row, actor)
+        _require_unreserved_event_payload(payload)
+        if prior_version != int(row["version"]):
+            raise DispatchError("stale_dispatch_version", "Event causal version is stale.")
+        if attempt_agent_instance_id != actor.agent_instance_id:
+            raise DispatchError("stale_attempt", "Event is not from the current attempt.")
+        updates = _worker_event_updates(row, event_kind, payload, observed_at)
+        result = _update_dispatch(state, row, updates)
+    except DispatchError as exc:
+        _audit_rejected_event(
+            state,
+            row=row,
+            event_id=event_id,
+            event_kind=event_kind,
+            attempt_agent_instance_id=attempt_agent_instance_id,
+            actor_role=str(row["role_name"]),
+            actor_instance_id=actor.agent_instance_id,
+            prior_version=prior_version,
+            payload=payload,
+            observed_at=observed_at,
+            error=exc,
+        )
+    _write_event(
+        state,
+        dispatch_id=dispatch_id,
+        event_id=event_id,
+        event_kind=event_kind,
+        attempt_agent_instance_id=attempt_agent_instance_id,
+        actor_role=str(row["role_name"]),
+        actor_instance_id=actor.agent_instance_id,
+        prior_version=prior_version,
+        observed_at=observed_at,
+        payload=payload,
+        accepted=True,
+        accepted_outcome=result,
+    )
+    return result
+
+
+def _accept_completion_updates(
+    row: Mapping[str, Any],
+    payload: Mapping[str, Any],
+    observed_at: datetime,
+) -> dict[str, Any]:
+    artifact = Path(str(row["expected_path"]))
+    if not artifact.is_file():
+        raise DispatchError("completion_artifact_missing", "Expected artifact vanished.")
+    measured = _file_sha256(artifact)
+    if measured != str(row.get("reported_artifact_sha256") or ""):
+        raise DispatchError("completion_hash_changed", "Artifact changed after worker report.")
+    if measured != _require_text(payload.get("artifact_sha256"), "artifact_sha256"):
+        raise DispatchError("acceptance_hash_mismatch", "Coordinator hash does not match artifact.")
+    contract = row.get("completion_contract")
+    if not isinstance(contract, Mapping):
+        raise DispatchError("completion_contract_invalid", "Stored completion contract is invalid.")
+    acceptance = payload.get("acceptance_evidence")
+    if not isinstance(acceptance, Mapping):
+        raise DispatchError("acceptance_evidence_required", "Acceptance evidence is required.")
+    evidence = _validate_completion_evidence(
+        contract,
+        acceptance.get("evidence"),
+        acceptance.get("verdict"),
+        prefix="acceptance",
+    )
+    worker_evidence = row.get("reported_completion_evidence")
+    if not isinstance(worker_evidence, Mapping):
+        raise DispatchError("reported_evidence_invalid", "Worker evidence projection is invalid.")
+    worker_digest = _canonical_sha256(worker_evidence)
+    if _require_text(
+        acceptance.get("worker_evidence_sha256"),
+        "worker_evidence_sha256",
+    ) != worker_digest:
+        raise DispatchError(
+            "acceptance_worker_evidence_mismatch",
+            "Acceptance did not bind the exact worker evidence projection.",
+        )
+    return {
+        "state": DISPATCH_COMPLETED,
+        "completion_accepted_at": observed_at.isoformat(),
+        "acceptance_evidence": {
+            "evidence": evidence,
+            "verdict": str(acceptance["verdict"]),
+            "worker_evidence_sha256": worker_digest,
+        },
+        "terminal_reason": "coordinator_accepted",
+        "next_required_action": "none",
+        "responsible_role": "",
+    }
+
+
+def _require_resolution_state(
+    row: Mapping[str, Any], allowed: frozenset[str], code: str, action: str
+) -> None:
+    state_name = str(row["state"])
+    if state_name not in allowed:
+        raise DispatchError(code, f"{action} is not legal from {state_name}.")
+
+
+def _retry_updates(
+    row: Mapping[str, Any],
+    _payload: Mapping[str, Any],
+    observed_at: datetime,
+    actor_role: str,
+) -> dict[str, Any]:
+    _require_resolution_state(
+        row,
+        frozenset(
+            {
+                DISPATCH_UPTAKE_UNCERTAIN,
+                DISPATCH_WORKER_LOST,
+                DISPATCH_FAILED_START,
+                DISPATCH_EXPIRED,
+            }
+        ),
+        "retry_not_allowed",
+        "Retry",
+    )
+    clock = observed_at.astimezone(UTC)
+    deadline_updates: dict[str, str] = {}
+    for field in ("uptake_due_at", "report_by", "watchdog_due_at", "expires_at"):
+        window_field = f"{field}_window_seconds"
+        try:
+            seconds = int(row[window_field])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise DispatchError(
+                "retry_window_invalid",
+                f"Dispatch has no immutable positive {window_field}.",
+            ) from exc
+        if seconds <= 0:
+            raise DispatchError(
+                "retry_window_invalid",
+                f"Dispatch has no immutable positive {window_field}.",
+            )
+        deadline_updates[field] = (clock + timedelta(seconds=seconds)).isoformat()
+    if _parse_aware_utc(deadline_updates["expires_at"], "expires_at") <= max(
+        _parse_aware_utc(deadline_updates[name], name)
+        for name in ("uptake_due_at", "report_by", "watchdog_due_at")
+    ):
+        raise DispatchError("retry_deadlines_invalid", "Fresh retry TTL must be last.")
+    return {
+        "state": DISPATCH_PREPARING,
+        "attempt_number": int(row["attempt_number"]) + 1,
+        "current_agent_instance_id": "",
+        "first_turn_source": "",
+        "first_turn_delivered": False,
+        "first_turn_error": "",
+        "first_turn_at": None,
+        "last_ack_at": None,
+        "last_milestone_at": None,
+        "completion_reported_at": None,
+        "completion_accepted_at": None,
+        "reported_artifact_sha256": "",
+        "reported_completion_evidence": {},
+        "reported_completion_verdict": "",
+        "acceptance_evidence": {},
+        "blocked_at": None,
+        "decision_due_at": None,
+        "blocker_class": "",
+        "blocker_owner": "",
+        "blocker_question": "",
+        "blocker_evidence": {},
+        "current_host": "",
+        "current_host_ref": "",
+        "current_agent_runtime": "",
+        "host_liveness": "",
+        "host_liveness_observed_at": None,
+        "host_liveness_detail": "",
+        "liveness_unknown_count": 0,
+        "next_liveness_probe_at": None,
+        "liveness_escalation_due_at": None,
+        "watchdog_fired_at": None,
+        "terminal_reason": "",
+        "next_required_action": "spawn_current_attempt",
+        "responsible_role": actor_role,
+        **deadline_updates,
+    }
+
+
+def _resolve_blocker_updates(
+    row: Mapping[str, Any],
+    _payload: Mapping[str, Any],
+    _observed_at: datetime,
+    _actor_role: str,
+) -> dict[str, Any]:
+    _require_resolution_state(
+        row,
+        frozenset({DISPATCH_BLOCKED_INTERNAL, DISPATCH_BLOCKED_OPERATOR}),
+        "resolve_not_allowed",
+        "Blocker resolution",
+    )
+    return {
+        "state": DISPATCH_ACTIVE,
+        "blocker_class": "",
+        "blocker_owner": "",
+        "blocker_question": "",
+        "decision_due_at": None,
+        "next_required_action": "worker_execute_and_report",
+        "responsible_role": str(row["role_name"]),
+    }
+
+
+def _accept_resolution_updates(
+    row: Mapping[str, Any],
+    payload: Mapping[str, Any],
+    observed_at: datetime,
+    _actor_role: str,
+) -> dict[str, Any]:
+    _require_resolution_state(
+        row,
+        frozenset({DISPATCH_COMPLETION_REPORTED}),
+        "acceptance_not_allowed",
+        "Acceptance",
+    )
+    return _accept_completion_updates(row, payload, observed_at)
+
+
+def _reject_completion_updates(
+    row: Mapping[str, Any],
+    _payload: Mapping[str, Any],
+    _observed_at: datetime,
+    _actor_role: str,
+) -> dict[str, Any]:
+    _require_resolution_state(
+        row,
+        frozenset({DISPATCH_COMPLETION_REPORTED}),
+        "rejection_not_allowed",
+        "Rejection",
+    )
+    return {
+        "state": DISPATCH_ACTIVE,
+        "next_required_action": "repair_completion_evidence",
+        "responsible_role": str(row["role_name"]),
+    }
+
+
+def _cancel_updates(
+    row: Mapping[str, Any],
+    payload: Mapping[str, Any],
+    _observed_at: datetime,
+    _actor_role: str,
+) -> dict[str, Any]:
+    state_name = str(row["state"])
+    if state_name in DISPATCH_TERMINAL_STATES:
+        raise DispatchError(
+            "cancel_not_allowed", f"Dispatch is already terminal: {state_name}."
+        )
+    return {
+        "state": DISPATCH_CANCELLED,
+        "terminal_reason": _require_text(payload.get("reason"), "reason"),
+        "next_required_action": "none",
+        "responsible_role": "",
+    }
+
+
+_ResolutionUpdateBuilder = Callable[
+    [Mapping[str, Any], Mapping[str, Any], datetime, str],
+    dict[str, Any],
+]
+_RESOLUTION_RULES: dict[str, _ResolutionUpdateBuilder] = {
+    "request_retry": _retry_updates,
+    "resolve_blocker": _resolve_blocker_updates,
+    "accept_completion": _accept_resolution_updates,
+    "reject_completion": _reject_completion_updates,
+    "cancel": _cancel_updates,
+}
+
+
+def _resolution_updates(
+    row: Mapping[str, Any],
+    *,
+    action: str,
+    payload: Mapping[str, Any],
+    observed_at: datetime,
+    actor_role: str,
+) -> dict[str, Any]:
+    builder = _RESOLUTION_RULES.get(action)
+    if builder is None:
+        raise DispatchError("resolve_action_invalid", f"Unknown resolve action {action!r}.")
+    return builder(row, payload, observed_at, actor_role)
+
+
+def resolve_managed_dispatch(
+    state: StateManagementInterface,
+    *,
+    dispatch_id: str,
+    event_id: str,
+    action: str,
+    actor: DispatchActor,
+    prior_version: int,
+    payload: Mapping[str, Any],
+    observed_at: datetime,
+) -> dict[str, Any]:
+    """Apply one coordinator decision; retries are idempotent by event id."""
+    _require_text(event_id, "event_id")
+    row = read_managed_dispatch(state, dispatch_id)
+    actor_role = str(row["spawned_by_role"])
+    existing = _find_event(state, dispatch_id, event_id)
+    if existing is not None:
+        _require_coordinator_authority(state, row, actor)
+        return _replay_event(existing)
+    try:
+        _require_coordinator_authority(state, row, actor)
+        _require_unreserved_event_payload(payload)
+        if prior_version != int(row["version"]):
+            raise DispatchError("stale_dispatch_version", "Event causal version is stale.")
+        updates = _resolution_updates(
+            row,
+            action=action,
+            payload=payload,
+            observed_at=observed_at,
+            actor_role=actor_role,
+        )
+        result = _update_dispatch(state, row, updates)
+        if action == "request_retry":
+            result = _spawn_retry_attempt(state, result)
+    except DispatchError as exc:
+        _audit_rejected_event(
+            state,
+            row=row,
+            event_id=event_id,
+            event_kind=f"resolve:{action}",
+            attempt_agent_instance_id=str(row.get("current_agent_instance_id") or ""),
+            actor_role=actor_role,
+            actor_instance_id=actor.agent_instance_id,
+            prior_version=prior_version,
+            payload=payload,
+            observed_at=observed_at,
+            error=exc,
+        )
+    _write_event(
+        state,
+        dispatch_id=dispatch_id,
+        event_id=event_id,
+        event_kind=f"resolve:{action}",
+        attempt_agent_instance_id=str(row.get("current_agent_instance_id") or ""),
+        actor_role=actor_role,
+        actor_instance_id=actor.agent_instance_id,
+        prior_version=prior_version,
+        observed_at=observed_at,
+        payload=payload,
+        accepted=True,
+        accepted_outcome=result,
+    )
+    return result
+
+
+def _spawn_retry_attempt(
+    state: StateManagementInterface,
+    row: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Create the explicit replacement attempt from the immutable contract."""
+    from .session_lifecycle_verbs import (  # noqa: PLC0415
+        SpawnSessionRequest,
+        VerbError,
+        spawn_session,
+    )
+
+    raw_tools = row.get("allowed_tools")
+    if not isinstance(raw_tools, (list, tuple)):
+        raise DispatchError("dispatch_contract_invalid", "allowed_tools is not a list.")
+    difficulty_score, selection_receipt, enforce_selection_receipt = _selection_fields_from_dispatch(row)
+    request = SpawnSessionRequest(
+        role_class=str(row["role_class"]),
+        lane_id=str(row["lane_id"]),
+        brief_ref=str(row["brief_ref"]),
+        work_class=str(row["work_class"]),
+        budget_line=str(row["budget_line"]),
+        unit_id=str(row.get("unit_id") or ""),
+        repository_root=str(row.get("repository_root") or ""),
+        dispatch_id=str(row["dispatch_id"]),
+        agent_runtime=str(row["agent_runtime"]),
+        role_name=str(row["role_name"]),
+        host=str(row["host"]),
+        visibility=str(row["visibility"]),
+        model=str(row["model"]),
+        effort=str(row["effort"]),
+        report_by_seconds=int(row["report_by_seconds"]),
+        ttl_seconds=int(row["ttl_seconds"]),
+        spawned_by_instance_id=str(row["spawned_by_instance_id"]),
+        spawned_by_role=str(row["spawned_by_role"]),
+        directed_by=str(row["directed_by"]),
+        allowed_tools=tuple(str(value) for value in raw_tools),
+        permission_mode=str(row["permission_mode"]),
+        transport=str(row["transport"]),
+        allow_askuserquestion=bool(row["allow_askuserquestion"]),
+        local_name=str(row["local_name"]),
+        degraded_hooks_acknowledged=bool(row["degraded_hooks_acknowledged"]),
+        dispatch_kind=str(row.get("dispatch_kind") or ""),
+        reviewed_report_vendor=str(row.get("reviewed_report_vendor") or ""),
+        pair_id=str(row.get("pair_id") or ""),
+        scope_tags=contract_scope_tags(row),
+        difficulty_score=difficulty_score,
+        selection_receipt=selection_receipt,
+        enforce_selection_receipt=enforce_selection_receipt,
+    )
+    try:
+        spawn_session(state, request)
+    except VerbError as exc:
+        current = read_managed_dispatch(state, str(row["dispatch_id"]))
+        return _update_dispatch(
+            state,
+            current,
+            {
+                "state": DISPATCH_FAILED_START,
+                "terminal_reason": f"{exc.code}: {exc.message}",
+                "next_required_action": "decide_retry_or_cancel",
+                "responsible_role": str(row["spawned_by_role"]),
+            },
+        )
+    return read_managed_dispatch(state, str(row["dispatch_id"]))
+
+
+def _selection_fields_from_dispatch(
+    row: Mapping[str, Any],
+) -> tuple[float, Mapping[str, Any] | None, bool]:
+    receipt = row.get("selection_receipt")
+    return (
+        float(row.get("difficulty_score") or 0.0),
+        receipt if isinstance(receipt, dict) else None,
+        bool(row.get("selection_receipt_enforced")),
+    )
+
+
+def mark_dispatch_worker_lost(
+    state: StateManagementInterface,
+    *,
+    dispatch_id: str,
+    agent_instance_id: str,
+    observed_at: datetime,
+    detail: str,
+) -> dict[str, Any]:
+    """Converge a confirmed-dead current attempt without respawning it."""
+    row = read_managed_dispatch(state, dispatch_id)
+    if str(row.get("current_agent_instance_id") or "") != agent_instance_id:
+        raise DispatchError("stale_attempt", "Dead-host evidence is not for current attempt.")
+    if str(row["state"]) in DISPATCH_TERMINAL_STATES:
+        return row
+    result = _update_dispatch(
+        state,
+        row,
+        {
+            "state": DISPATCH_WORKER_LOST,
+            "terminal_reason": "confirmed_host_dead",
+            "host_liveness": "dead",
+            "host_liveness_observed_at": observed_at.isoformat(),
+            "host_liveness_detail": detail,
+            "next_required_action": "decide_retry_or_cancel",
+            "responsible_role": str(row["spawned_by_role"]),
+        },
+    )
+    _write_event(
+        state,
+        dispatch_id=dispatch_id,
+        event_id=f"host-dead:{int(row['version'])}",
+        event_kind="host_dead",
+        attempt_agent_instance_id=agent_instance_id,
+        actor_role="platform-supervisor",
+        actor_instance_id="",
+        prior_version=int(row["version"]),
+        observed_at=observed_at,
+        payload={"detail": detail},
+        accepted=True,
+    )
+    return result
+
+
+def record_dispatch_liveness(
+    state: StateManagementInterface,
+    *,
+    dispatch_id: str,
+    liveness: str,
+    observed_at: datetime,
+    detail: str,
+) -> dict[str, Any]:
+    """Persist honest alive/dead/unknown evidence without folding unknown."""
+    if liveness not in {"alive", "dead", "unknown"}:
+        raise DispatchError("host_liveness_invalid", f"Unknown liveness {liveness!r}.")
+    row = read_managed_dispatch(state, dispatch_id)
+    updates: dict[str, Any] = {
+        "host_liveness": liveness,
+        "host_liveness_observed_at": observed_at.isoformat(),
+        "host_liveness_detail": detail,
+        "last_reconciled_at": observed_at.isoformat(),
+    }
+    if liveness == "unknown":
+        unknown_count = int(row.get("liveness_unknown_count") or 0) + 1
+        existing_escalation = str(row.get("liveness_escalation_due_at") or "")
+        updates.update(
+            {
+                "liveness_unknown_count": unknown_count,
+                "next_liveness_probe_at": (
+                    observed_at.astimezone(UTC)
+                    + timedelta(seconds=UNKNOWN_LIVENESS_REPROBE_SECONDS)
+                ).isoformat(),
+                "liveness_escalation_due_at": existing_escalation
+                or (
+                    observed_at.astimezone(UTC)
+                    + timedelta(seconds=UNKNOWN_LIVENESS_ESCALATION_SECONDS)
+                ).isoformat(),
+            },
+        )
+    else:
+        updates.update(
+            {
+                "liveness_unknown_count": 0,
+                "next_liveness_probe_at": None,
+                "liveness_escalation_due_at": None,
+            },
+        )
+    require_updated(
+        state.update_state(
+            AGENT_ROLE_BINDING_NAMESPACE,
+            {
+                "table": TABLE_MANAGED_DISPATCH,
+                "filters": {"dispatch_id": dispatch_id, "is_deleted": 0},
+            },
+            updates,
+        ),
+    )
+    return read_managed_dispatch(state, dispatch_id)
+
+
+def _condition_for(
+    row: Mapping[str, Any], now: datetime
+) -> tuple[str, str, str] | None:
+    from .session_lifecycle_store import managed_dispatch_condition  # noqa: PLC0415
+
+    return managed_dispatch_condition(row, now)
+
+
+def supervise_managed_dispatches(
+    state: StateManagementInterface,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    from .session_lifecycle_store import (  # noqa: PLC0415
+        supervise_managed_dispatches as supervise,
+    )
+
+    return supervise(state, now=now)
+
+
+def sweep_managed_dispatches(
+    state: StateManagementInterface,
+    *,
+    peer_registry: PeerRegistry | None = None,
+    bridge_manager: BridgeSessionManager | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    from .session_lifecycle_store import (  # noqa: PLC0415
+        sweep_managed_dispatches as sweep,
+    )
+
+    return sweep(
+        state,
+        peer_registry=peer_registry,
+        bridge_manager=bridge_manager,
+        now=now,
+    )
+def managed_dispatch_status(
+    state: StateManagementInterface,
+    dispatch_id: str,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Return one decision-oriented aggregate, with receipts subordinate."""
+    from .session_lifecycle_verbs import dispatch_event_age_seconds
+
+    clock = (now or datetime.now(UTC)).astimezone(UTC)
+    row = read_managed_dispatch(state, dispatch_id)
+    result = state.query_state(
+        AGENT_ROLE_BINDING_NAMESPACE,
+        {
+            "table": TABLE_MANAGED_DISPATCH_EVENT,
+            "filters": {"dispatch_id": dispatch_id, "is_deleted": 0},
+        },
+    )
+    events = [dict(event) for event in require_records(result)]
+    condition = _condition_for(row, clock)
+    aggregate = dict(row)
+    deadline_overdue = {
+        name: clock >= _parse_persisted_utc(row[name], name)
+        for name in ("uptake_due_at", "report_by", "watchdog_due_at", "expires_at")
+    }
+    aggregate.update(
+        {
+            "state": str(row["state"]),
+            "ledger_state": str(row["state"]),
+            "state_consistent": str(row.get("host_liveness") or "unknown") != "dead"
+            or str(row["state"]) in DISPATCH_TERMINAL_STATES,
+            "rejected_event_count": sum(not bool(event.get("accepted")) for event in events),
+            "event_count": len(events),
+            "raw_receipts": [event for event in events if event.get("event_kind") == "first_turn"],
+            "deadline_overdue": deadline_overdue,
+            "last_ack_age_seconds": dispatch_event_age_seconds(row.get("last_ack_at"), clock),
+            "last_milestone_age_seconds": dispatch_event_age_seconds(
+                row.get("last_milestone_at"), clock
+            ),
+            "plan_projection_warning": (
+                "human coordinator plans are unverified projections; durable dispatch state "
+                "and append-only events remain authoritative"
+            ),
+        },
+    )
+    if condition is not None:
+        aggregate["overdue_condition"] = condition[0]
+        aggregate["next_required_action"] = condition[1]
+        aggregate["responsible_role"] = condition[2]
+    return aggregate
+
+
+__all__ = [
+    "DISPATCH_ACTIVE",
+    "DISPATCH_BLOCKED_INTERNAL",
+    "DISPATCH_BLOCKED_OPERATOR",
+    "DISPATCH_CANCELLED",
+    "DISPATCH_COMPLETED",
+    "DISPATCH_COMPLETION_REPORTED",
+    "DISPATCH_EXPIRED",
+    "DISPATCH_FAILED_START",
+    "DISPATCH_NONTERMINAL_STATES",
+    "DISPATCH_PREPARING",
+    "DISPATCH_REJECTED",
+    "DISPATCH_TERMINAL_STATES",
+    "DISPATCH_UPTAKE_PENDING",
+    "DISPATCH_UPTAKE_UNCERTAIN",
+    "DISPATCH_WORKER_LOST",
+    "DispatchActor",
+    "DispatchError",
+    "DispatchSpec",
+    "EVENT_MANAGED_DISPATCH_NOTICE",
+    "managed_dispatch_status",
+    "dispatch_managed_work",
+    "mark_dispatch_worker_lost",
+    "mint_dispatch_id",
+    "prepare_managed_dispatch",
+    "read_managed_dispatch",
+    "record_dispatch_liveness",
+    "record_first_turn_evidence",
+    "report_managed_dispatch",
+    "resolve_managed_dispatch",
+    "supervise_managed_dispatches",
+    "sweep_managed_dispatches",
+]

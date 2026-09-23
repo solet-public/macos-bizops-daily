@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::state_service::execute_sql",
+  "arguments": {
+    "sql_query": "SELECT * FORM nonexistent_table WHERE xyz"
+  }
+}

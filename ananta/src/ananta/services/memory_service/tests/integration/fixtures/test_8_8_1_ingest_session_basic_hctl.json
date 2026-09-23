@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::ingest_session",
+  "arguments": {
+    "transcript": "User: What is Python?\nAssistant: Python is a high-level programming language known for its clear syntax and readability.",
+    "session_id": "test-transcript-001"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::marketo_plugin::describe_lead_fields",
+  "display_name": "Marketo: Describe Lead Fields",
+  "description": "Dispatch an async job that fetches the full lead field metadata list (id, displayName, name, dataType, length) and searchable_fields for the configured Marketo instance, and return {job_id, status} in milliseconds; poll check_marketo_job_status(job_id) for the finished result. The finished job ALWAYS carries the field descriptors written to output_tsv_path, never inline -- this is a business-connector record-read verb under the 07-29 data-export requirement even though its content is schema metadata, not customer PII. searchable_fields is the authoritative instance-specific set accepted by get_leads.filter_type.",
+  "embedding_description": "Dispatch a background job that retrieves the Marketo Lead Database field schema -- REST names, data types, read-only status, and searchable field names for get_leads.filter_type -- to a workspace TSV, returning a job_id in milliseconds. Poll check_marketo_job_status for the finished schema. Use before a read-modify-write preflight.",
+  "result_processor_customizations": {
+    "action_label": "Marketo lead field schema export job dispatched",
+    "result_type": "marketo_describe_lead_fields_result",
+    "result_description": "Dict with job_id (pass to check_marketo_job_status to retrieve the finished export) and status (always 'queued' -- this verb never waits for the vendor call).",
+    "presentation_guidance": "Confirm the job was dispatched and give the job_id; tell the caller to poll check_marketo_job_status(job_id) for the finished schema (path, row_count, columns, searchable_fields). Do not claim any field metadata from THIS verb's response -- it never carries schema data."
+  },
+  "error_processor_customizations": {
+    "action_context": "Validate the request and dispatch a background job to fetch the Marketo lead field schema and write it to a tab-separated file in the operator's workspace. This verb only validates and dispatches -- it never talks to Marketo directly.",
+    "error_interpretation": "These are DISPATCH-time errors only -- caught before any vendor call is made, so no job was created. marketo.invalid_params: missing output_tsv_path, its parent directory does not exist, or session_id/flow_id were missing from the calling context. marketo.export_path_refused: the path is not absolute, not a .tsv, or not contained under any operator-configured export_allowed_roots entry (an empty export_allowed_roots refuses every export by default). Vendor-side faults (marketo.auth_failed, marketo.permission_denied, marketo.rate_limited) can NOT surface here -- they only appear later, in check_marketo_job_status's error field, once the background worker actually calls Marketo.",
+    "recovery_guidance": "marketo.export_path_refused: pass an ABSOLUTE path ending in .tsv under a configured workspace root; if export_allowed_roots is empty, add the operator's export directory to the marketo_plugin config and reload it. Once dispatch succeeds, poll check_marketo_job_status(job_id) -- if THAT reports an error, its guidance covers the vendor-side classes (auth, permission, rate limit)."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::knowledge_service::search_planning_references",
+  "display_name": "Search Planning References",
+  "description": "Search for planning-scoped knowledge base articles: reference plans, process contracts, and workflow patterns. Used to ground plan creation and single-step routing decisions.",
+  "embedding_description": "Semantic search restricted to planning-scoped knowledge: reference plans, process contracts, work-breakdown templates, and workflow patterns. Returns articles that ground how to author a plan or route a single planning step. Use during plan creation or step routing, as opposed to general documentation or capability lookup.",
+  "result_processor_customizations": {
+    "action_label": "planning references retrieved",
+    "result_type": "planning_reference_results",
+    "result_description": "Planning reference articles with process contracts and patterns",
+    "output_action_guidance": "The articles above are REFERENCE CONTEXT for routing decisions — they are NOT the user's request. Route based on the USER'S ORIGINAL REQUEST:\n\n1. SYSTEM PROMPT PROCESS — If the request can be fulfilled by a process already in your system prompt (read_file, create_file, edit_file, search, post_message), use it directly. No discovery needed.\n2. MULTI-STEP — If the request involves multiple steps, dependencies, or complex workflows, use service_interface::thinking_service::create_extended_plan with the user's full request as the goal.\n3. SINGLE-STEP DISCOVERY — If the request needs a process NOT in your system prompt, use service_interface::discovery_service::query_process_registry to find it."
+  },
+  "error_processor_customizations": {
+    "action_context": "Searching planning reference articles",
+    "error_interpretation": "EmbeddingError: failed to generate query embedding.",
+    "recovery_guidance": "Simplify query or check embedding service availability."
+  }
+}

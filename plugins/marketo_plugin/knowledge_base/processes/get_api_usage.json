@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::marketo_plugin::get_api_usage",
+  "display_name": "Marketo: Get Current API Usage",
+  "description": "Dispatch an async job that reads current-day REST API consumption for the configured Marketo subscription (date, total calls_today, per-API-user breakdown), and return {job_id, status} in milliseconds; poll check_marketo_job_status(job_id) for the finished result. Compare the finished job's calls_today with the operator-confirmed subscription quota before starting a large batch; this verb reports consumption and does not assume the account's quota limit.",
+  "embedding_description": "Dispatch a background job that reads the configured Marketo subscription's current-day REST API call consumption -- subscription-wide total plus per-user breakdown -- returning a job_id in milliseconds. Poll check_marketo_job_status with that job_id for the finished usage data. Use to budget a large batch or check remaining daily quota headroom before a bulk read or write.",
+  "result_processor_customizations": {
+    "action_label": "Marketo API usage read job dispatched",
+    "result_type": "marketo_get_api_usage_result",
+    "result_description": "Dict with job_id (pass to check_marketo_job_status to retrieve the finished usage data) and status (always 'queued' -- this verb never waits for the vendor call).",
+    "presentation_guidance": "Confirm the job was dispatched and give the job_id; tell the caller to poll check_marketo_job_status(job_id) for the finished usage data (date, calls_today, users). Do not claim any usage numbers from THIS verb's response -- it never carries them."
+  },
+  "error_processor_customizations": {
+    "action_context": "Validate the request and dispatch a background job to read the configured Marketo subscription's current-day API usage. This verb only validates and dispatches -- it never talks to Marketo directly.",
+    "error_interpretation": "This is a DISPATCH-time error only -- caught before any vendor call is made, so no job was created. marketo.invalid_params: session_id/flow_id were missing from the calling context. Vendor-side faults (marketo.auth_failed, marketo.permission_denied, marketo.rate_limited, marketo.daily_quota_exceeded) can NOT surface here -- they only appear later, in check_marketo_job_status's error field, once the background worker actually calls Marketo.",
+    "recovery_guidance": "Once dispatch succeeds, poll check_marketo_job_status(job_id) -- if THAT reports an error: marketo.permission_denied means the API user's Access API role cannot read subscription usage; marketo.rate_limited means retry after the rate window; marketo.daily_quota_exceeded means stop the batch and wait for the subscription quota reset."
+  }
+}

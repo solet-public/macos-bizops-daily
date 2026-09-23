@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_blob_storage_plugin::update_blob_metadata",
+  "display_name": "Update Blob Metadata",
+  "description": "Update metadata for an existing blob without modifying content.",
+  "embedding_description": "Update metadata for an existing blob without changing content. Provide namespace, blob_id, and metadata to merge. Use to add tags, labels, descriptions, or classification fields on stored files using merge semantics.",
+  "result_processor_customizations": {
+    "action_label": "Blob Metadata Updated",
+    "result_type": "metadata_updated",
+    "result_description": "Confirmation that blob metadata was updated",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Updating metadata for an existing blob without modifying content",
+    "error_interpretation": "NotFoundError: Blob with given ID does not exist. ValidationError: Invalid metadata format. StorageError: Failed to write metadata to filesystem. PermissionError: Insufficient permissions to write to storage.",
+    "recovery_guidance": "For not found: verify blob_id is correct. For validation errors: ensure metadata is a valid object. For storage/permission errors: check filesystem and permissions."
+  }
+}

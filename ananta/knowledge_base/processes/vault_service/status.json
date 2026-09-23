@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::status",
+  "display_name": "Vault Status",
+  "description": "Get vault status including initialized state, lock state, and backend info.",
+  "embedding_description": "Vault: status. Reports initialized (setup complete), unlocked (ready to read/write secrets), backend (which vault plugin is bound — default file vault, AWS Secrets Manager, etc.), recovery_key_exists (backup master key minted). Use to confirm the vault is ready before store / retrieve / rotate / delete operations.",
+  "result_processor_customizations": {
+    "action_label": "Vault status retrieved",
+    "result_type": "vault_status",
+    "result_description": "Vault operational status. Contains initialized (setup complete), unlocked (ready for operations), backend (storage type), and recovery_key_exists (backup available).",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves vault operational status. Does not require unlocking - reads metadata only.",
+    "error_interpretation": "StorageError: Unable to read vault configuration. ConfigurationError: Vault configuration is corrupted.",
+    "recovery_guidance": "For StorageError: Check file system permissions and disk space. For ConfigurationError: May need to reinitialize vault (data loss warning)."
+  }
+}

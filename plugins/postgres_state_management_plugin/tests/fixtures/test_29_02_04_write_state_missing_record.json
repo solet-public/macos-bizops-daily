@@ -1,0 +1,15 @@
+{
+  "name": "test_write_state_missing_record",
+  "description": "Verify write_state returns error when both record and records are missing",
+  "process_key": "plugin::postgres_state_management_plugin::write_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "data": {
+        "table": "key_value_store"
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "{{MARKETPLACE_NAME}}": {
+      "source": {
+        "source": "directory",
+        "path": "{{CLONE_DIR}}"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "coordination-hooks@{{MARKETPLACE_NAME}}": true
+  }
+}

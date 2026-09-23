@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::check_choreography_job_status",
+  "display_name": "Check a rotate_session/restart_session/generate_curation_report job's outcome",
+  "description": "maintenance-verbs M1+M2.2. Reads back a rotate_session, restart_session, or generate_curation_report job's ledger status (queued/processing/completed/error), its progress_percent (one update per leg), and on a terminal status the worker's own result or error payload. A generic AsyncJobManager job-row reader, not scoped to any one action name. These jobs configure no completion_handlers, so this poll is the ONLY way a direct caller learns the outcome — the dispatch verb's own return value only confirms the job was queued, never that the work finished.",
+  "embedding_description": "Poll the outcome of a rotate_session, restart_session, or generate_curation_report job by job_id — the caller-side status check for an async fleet-management or memory-curation job, the same pattern as ComfyUI's check_generation_status for image jobs. Use this after any of those three dispatch verbs, never assume their own dispatch response means the work is done.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Choreography job status read",
+    "result_type": "choreography_job_status_result",
+    "result_description": "job_id, status, progress_percent, and (on a terminal status) result or error — result carries action-specific fields: turn_observed/new_claude_session_ids for a rotation; old_agent_instance_id/new_agent_instance_id/role_reclaim_verified for a restart; demotion_candidates/unresolved_lines/head_bytes/head_lines/byte_budget/line_budget/over_budget for a curation report.",
+    "presentation_guidance": "Lead with status. If still queued/processing, say so plainly and suggest polling again rather than treating silence as failure. If error, surface the error code/message verbatim — a verify_timeout error means the choreography ran but could not confirm its own outcome (ARMED, not necessarily FIRED), which is different from a hard failure earlier in the sequence."
+  },
+  "error_processor_customizations": {
+    "action_context": "A read of one AsyncJobManager job row by job_id, plus its terminal result/error payload if the status warrants it.",
+    "error_interpretation": "missing_argument: job_id was empty. job_not_found: no job exists for that id (typo, or the job predates this solet's current job table). async_job_manager_unavailable: the platform's AsyncJobManager is not bound on this solet.",
+    "recovery_guidance": "For job_not_found, confirm the job_id came from a real rotate_session/restart_session/generate_curation_report dispatch response, not a guessed or reconstructed value."
+  }
+}

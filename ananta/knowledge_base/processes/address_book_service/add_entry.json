@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::add_entry",
+  "display_name": "Add Entry",
+  "description": "Add a new entry to an existing address. Returns entry_id.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Entry added",
+    "result_type": "entry_created",
+    "result_description": "New entry creation result with keys: entry_id (database ID of created entry), message (confirmation)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Adds a new entry (field_type, description, value) to an existing address",
+    "error_interpretation": "NotFoundError: no address exists with the given name. ValidationError: missing or invalid entry fields. DuplicateError: entry with same field_type may already exist.",
+    "recovery_guidance": "For not found: use 'register' to create the address first, or 'search' to find the correct name. For validation errors: ensure field_type, description, and value are provided. For duplicates: use 'update_entry' to modify existing entries."
+  }
+}

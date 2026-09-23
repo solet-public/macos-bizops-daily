@@ -1,0 +1,13 @@
+name: actr_memory_plugin
+description: ACT-R cognitive architecture memory system
+optional: false
+
+implements:
+  - interface: MemoryServiceInterface
+
+config:
+  enable_scheduled_operations:
+    type: boolean
+    required: false
+    default: true
+    description: Enable scheduled memory operations

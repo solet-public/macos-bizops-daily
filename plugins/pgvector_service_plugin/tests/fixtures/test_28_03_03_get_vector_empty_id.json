@@ -1,0 +1,15 @@
+{
+  "name": "test_get_vector_empty_id",
+  "description": "Attempt to retrieve vector with empty ID - should return error",
+  "process_key": "plugin::pgvector_service_plugin::get_vector_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vector_id": ""
+    },
+    "state": {
+      "current_session_id": "test-get-emptyid-001"
+    },
+    "timeout_seconds": 30
+  }
+}

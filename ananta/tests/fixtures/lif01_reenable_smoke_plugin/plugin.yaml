@@ -1,0 +1,7 @@
+name: lif01_reenable_smoke_plugin
+description: >
+  Test fixture for the LIF-01 set_plugin_enabled disable->enable smoke.
+  LifecycleManaged; prepare_for_readiness raises RuntimeError unless
+  orchestrator_ref was injected first -- reproduces the exact re-enable
+  failure mode when the legacy clear-and-rebuild path drops it.
+optional: true

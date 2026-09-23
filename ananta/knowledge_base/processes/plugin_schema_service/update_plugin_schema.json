@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::plugin_schema_service::update_plugin_schema",
+  "display_name": "Update Plugin Schema",
+  "description": "Diff a plugin's declared schema against the recorded ownership snapshot and apply the resulting DDL in one transaction. Adds new tables and columns; swaps indexes (drop-then-create on resolved physical names). Refuses table removal — operator must call uninstall_plugin_schema (logical) or purge_plugin_schema (destructive) for that. Refuses column type changes, with_history toggles, id_prefix changes (out of v1 scope).",
+  "embedding_description": "Apply additive schema changes for an installed plugin namespace: new tables, added or removed columns, added or removed indexes. All DDL plus ownership-snapshot updates happen atomically in a single Postgres transaction.",
+  "result_processor_customizations": {
+    "action_label": "Plugin schema updated",
+    "result_type": "plugin_schema_updated",
+    "result_description": "Lifecycle outcome with status (updated | no_op), namespace, tables touched, and the count of DDL ops applied.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Diffs the declared schema for a plugin namespace against the recorded ownership snapshot and applies the additive DDL in one transaction.",
+    "error_interpretation": "ValueError: namespace not installed, or its tables are all uninstalled (status=inactive — call install_plugin_schema first to reactivate). NotImplementedError: declared shape requires a refused transition (table removal, column type change, check-constraint mutation, with_history toggle, id_prefix change). Postgres errors propagate from the transactional apply.",
+    "recovery_guidance": "For 'not installed': call install_plugin_schema first. For 'inactive': call install_plugin_schema to reactivate. For NotImplementedError on table removal: call uninstall_plugin_schema (preserves data) or purge_plugin_schema (destructive). For column type changes: drop and re-add the column manually."
+  }
+}

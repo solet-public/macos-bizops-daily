@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::blob_storage_service::search_blobs",
+  "display_name": "Search Blobs",
+  "description": "Search for blobs by metadata filters. Returns matching blob_ids and their metadata.",
+  "embedding_description": "Search blobs by metadata filters. Query files matching specific criteria. Find blobs with particular tags properties attributes. Filter by content type. Locate specific files by metadata. Advanced blob query with filter conditions.",
+  "result_processor_customizations": {
+    "action_label": "Blob search completed",
+    "result_type": "blob_search_results",
+    "result_description": "Search results with list of matching blobs, each containing blob_id, metadata, size, content_type, and created_at. Includes total_count and pagination info.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Searches for blobs by metadata filters within a namespace",
+    "error_interpretation": "ValidationError: invalid filter format or unsupported filter keys. AccessError: namespace access denied. StorageError: blob storage service unavailable.",
+    "recovery_guidance": "For validation errors: check filter syntax and supported filter keys. For access errors: verify namespace permissions. For storage errors: retry or check service status."
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "test_execute_in_seconds_basic",
+  "description": "Schedule a one-time execution 30 seconds in the future",
+  "process_key": "plugin::default_scheduling_plugin::execute_in_seconds",
+  "arguments": {
+    "params": {
+      "seconds": 30,
+      "label": "Delayed Status Check",
+      "tags": "monitoring,async",
+      "actions": [
+        {
+          "process_key": "service_interface::asynchronous_jobs::get_job_status",
+          "arguments": {
+            "job_id": "inference_job_12345",
+            "session_id": "session_abc",
+            "flow_id": "flow_xyz"
+          }
+        }
+      ]
+    },
+    "state": {
+      "session_id": "test-session-101",
+      "flow_id": "test-flow-101"
+    }
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,77 @@
+{
+  "name": "test_multiple_memories_recall",
+  "description": "Create multiple related memories and verify recall returns them ranked",
+  "sequence": [
+    {
+      "step": "remember_memory_1",
+      "process_key": "service_interface::memory_service::remember",
+      "arguments": {
+        "content": "Machine learning is a subset of artificial intelligence focused on pattern recognition.",
+        "tags": ["ai", "ml", "test-batch"]
+      },
+      "capture": {
+        "memory_id_1": {
+          "source": "output",
+          "output_key": "Memory ID"
+        }
+      }
+    },
+    {
+      "step": "remember_memory_2",
+      "process_key": "service_interface::memory_service::remember",
+      "arguments": {
+        "content": "Deep learning uses neural networks with many layers to learn complex patterns in data.",
+        "tags": ["ai", "deep-learning", "test-batch"]
+      },
+      "capture": {
+        "memory_id_2": {
+          "source": "output",
+          "output_key": "Memory ID"
+        }
+      }
+    },
+    {
+      "step": "remember_memory_3",
+      "process_key": "service_interface::memory_service::remember",
+      "arguments": {
+        "content": "Natural language processing enables computers to understand human language.",
+        "tags": ["ai", "nlp", "test-batch"]
+      },
+      "capture": {
+        "memory_id_3": {
+          "source": "output",
+          "output_key": "Memory ID"
+        }
+      }
+    },
+    {
+      "step": "recall_ai_memories",
+      "process_key": "service_interface::memory_service::recall",
+      "arguments": {
+        "query": "artificial intelligence and neural networks",
+        "top_k": 5
+      }
+    },
+    {
+      "step": "cleanup_forget_1",
+      "process_key": "service_interface::memory_service::forget",
+      "arguments": {
+        "memory_id": "${memory_id_1}"
+      }
+    },
+    {
+      "step": "cleanup_forget_2",
+      "process_key": "service_interface::memory_service::forget",
+      "arguments": {
+        "memory_id": "${memory_id_2}"
+      }
+    },
+    {
+      "step": "cleanup_forget_3",
+      "process_key": "service_interface::memory_service::forget",
+      "arguments": {
+        "memory_id": "${memory_id_3}"
+      }
+    }
+  ]
+}

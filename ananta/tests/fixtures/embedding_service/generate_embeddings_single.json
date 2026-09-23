@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::embedding_service::generate_embeddings",
+  "arguments": {
+    "texts": ["The quick brown fox jumps over the lazy dog"]
+  }
+}

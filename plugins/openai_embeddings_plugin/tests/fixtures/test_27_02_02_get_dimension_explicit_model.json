@@ -1,0 +1,9 @@
+{
+  "name": "test_get_dimension_explicit_model",
+  "description": "Get embedding dimension for explicitly specified model",
+  "process_key": "plugin::openai_embeddings_plugin::get_embedding_dimension_action",
+  "arguments": {
+    "model": "text-embedding-nomic-embed-text-v1.5-embedding"
+  },
+  "timeout_seconds": 60
+}

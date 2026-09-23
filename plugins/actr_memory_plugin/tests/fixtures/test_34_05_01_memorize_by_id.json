@@ -1,0 +1,14 @@
+{
+  "name": "test_memorize_by_id",
+  "description": "Verify adding an existing memory to the spaced repetition queue by memory_id",
+  "process_key": "plugin::actr_memory_plugin::memorize_action",
+  "arguments": {
+    "params": {
+      "memory_id": "test-memory-uuid-003"
+    },
+    "state": {
+      "session_id": "test-session-040"
+    }
+  },
+  "timeout_seconds": 30
+}

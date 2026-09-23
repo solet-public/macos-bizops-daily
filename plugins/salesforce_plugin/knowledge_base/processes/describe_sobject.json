@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::describe_sobject",
+  "display_name": "Salesforce: Describe SObject",
+  "description": "Describe an sobject's fields (name, type, label, nillable, updateable). Requires sobject. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; the field metadata is delivered when the job completes.",
+  "embedding_description": "Get the field schema of a specific Salesforce object (e.g. Account, Contact, a custom object), for understanding what fields exist and whether they're required/editable before querying or writing. Requires sobject. Dispatches asynchronously: a job_id returns right away, the trimmed field metadata follows in a later message.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce sobject describe queued",
+    "result_type": "salesforce_describe_sobject_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the field metadata -- the fields list arrives separately, as its own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the describe was queued -- do not present job_id/status as the schema itself. Acknowledge the request is in flight; the field list lands in a follow-up message when the job completes. Once delivered, list the field names and types plainly; low sensitivity (metadata only, data_sensitivity 0.1)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Describe a Salesforce sobject's fields.",
+    "error_interpretation": "sf.invalid_params: missing sobject. sf.not_found: the sobject API name does not exist. sf.permission_denied: the CLI's authenticated user cannot access this object's metadata.",
+    "recovery_guidance": "sf.not_found: verify the sobject API name (use list_sobjects). sf.permission_denied: ask the operator to check object-level security."
+  }
+}

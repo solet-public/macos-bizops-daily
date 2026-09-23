@@ -1,0 +1,14 @@
+{
+  "name": "test_memorize_new_content",
+  "description": "Verify creating a new memory and immediately adding it to memorization queue",
+  "process_key": "plugin::actr_memory_plugin::memorize_action",
+  "arguments": {
+    "params": {
+      "content": "The capital of France is Paris"
+    },
+    "state": {
+      "session_id": "test-session-041"
+    }
+  },
+  "timeout_seconds": 30
+}

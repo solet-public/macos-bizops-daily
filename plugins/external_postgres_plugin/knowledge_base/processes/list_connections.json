@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::external_postgres_plugin::list_connections",
+  "display_name": "External Postgres: List Connections",
+  "description": "List the registered foreign-Postgres connection names (the external_pg::* address-book entries). Returns names only — never hosts, users, or passwords. Use a returned name as the connection_name argument to the other verbs.",
+  "embedding_description": "List the external Postgres databases registered for this platform, returning the connection names the operator assigned. Hosts, ports, usernames and passwords stay out of the response. The catalog verb for foreign databases: call it first to discover which ones are reachable, then address any of them by name.",
+  "result_processor_customizations": {
+    "action_label": "Foreign Postgres connections listed",
+    "result_type": "external_postgres_list_connections_result",
+    "result_description": "Dict with a connections list of registered connection names (strings only).",
+    "presentation_guidance": "List the available connection names. These are non-secret labels (data_sensitivity 0.1); if none are present, tell the operator no external_pg::* connections are registered yet."
+  },
+  "error_processor_customizations": {
+    "action_context": "List the registered foreign Postgres connection names.",
+    "error_interpretation": "external_pg.not_configured: the plugin is not ready (no address-book binding). external_pg.api_error: the connection registry could not be read.",
+    "recovery_guidance": "external_pg.not_configured: confirm the plugin loaded with an address_book_service. external_pg.api_error: retry; if it persists, ask the operator to check the address book."
+  }
+}

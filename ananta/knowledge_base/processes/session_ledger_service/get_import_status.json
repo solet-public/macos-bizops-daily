@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::session_ledger_service::get_import_status",
+  "display_name": "get_import_status",
+  "description": "STUB: session_ledger_service::get_import_status — implementation deferred post-AWS-solet per coordinator_plan.md P2. Stub JSON allows the process registry to start; the method is registered but the service is not wired.",
+  "embedding_description": "Read the import batch row for a given batch_id from the LLM session ledger. Returns the repository row dict or raises LedgerRepositoryError(\"no import batch with id ...\") when batch_id is unknown. Row fields: id, source_id, started_at, finished_at, status, event_count, error_message, error_kind. Used after trigger_poll (or shipper-driven ingest) to inspect a specific batch's outcome."
+}

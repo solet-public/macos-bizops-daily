@@ -1,0 +1,25 @@
+{
+  "name": "test_create_cron_empty_expression",
+  "description": "Attempt to create a cron schedule with an empty cron expression",
+  "process_key": "plugin::default_scheduling_plugin::create_cron_schedule",
+  "arguments": {
+    "params": {
+      "cron_expression": "",
+      "label": "Empty Expression Schedule",
+      "tags": "test",
+      "actions": [
+        {
+          "process_key": "plugin::discord_plugin::post_message",
+          "arguments": {
+            "message": "Test message"
+          }
+        }
+      ]
+    },
+    "state": {
+      "session_id": "test-session-007",
+      "flow_id": "test-flow-007"
+    }
+  },
+  "timeout_seconds": 30
+}

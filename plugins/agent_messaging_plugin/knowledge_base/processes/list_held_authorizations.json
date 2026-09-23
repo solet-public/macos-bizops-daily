@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::list_held_authorizations",
+  "display_name": "List held authorizations — what is blocked on a role right now",
+  "description": "R1 held-authorization queue (2026-08-17). Read-only answer to \"what is blocked on <role>?\" for a session with zero memory of a prior seat — a freshly-booted or freshly-rotated coordinator, an operator checking status, or any peer wondering why a request has gone quiet. Returns open entries (retired_at unset) by default; pass include_retired for the full history. Optional owed_by_role / requesting_peer filters compose with AND. Never filters or flags by age itself — this queue has no silent TTL by design (a queue that silently forgets is worse than no queue), so created_at is returned as-is and the caller judges staleness directly.",
+  "embedding_description": "Checking whether any commit request is stuck waiting on a first-party authorization Git-Controller has not received yet, and who it is waiting on. The read a fresh session runs instead of scrolling a transcript to answer 'what's blocked on the coordinator' or 'what's blocked on Git-Controller'. Every entry carries when the refusal happened so staleness is visible, never hidden by an expiry timer.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Held authorizations listed",
+    "result_type": "list_held_authorizations_result",
+    "result_description": "{\"entries\": [{entry_id, requesting_peer, owed_by_role, branch_or_request_ref, reason, created_at, retired_at, retired_reason, retired_by}, ...], \"count\": N}.",
+    "presentation_guidance": "An empty list is good news (nothing blocked) and should read as such. A non-empty list — especially one with an old created_at — is worth calling out plainly: name who is blocked and who it is waiting on, do not just report the count."
+  },
+  "error_processor_customizations": {
+    "action_context": "A plain state read of held_authorization, filtered by the optional owed_by_role / requesting_peer and by retired_at IS NULL unless include_retired is set.",
+    "error_interpretation": "state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "state_service_unavailable is worth a retry once the platform is up. This verb issues no writes and is always safe to retry."
+  }
+}

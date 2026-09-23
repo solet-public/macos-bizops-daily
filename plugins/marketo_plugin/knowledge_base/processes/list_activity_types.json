@@ -1,0 +1,16 @@
+{
+  "process_key": "plugin::marketo_plugin::list_activity_types",
+  "display_name": "Marketo: List Activity Types",
+  "description": "Dispatch an async job that lists the configured Marketo instance's available activity type ids and metadata, and return {job_id, status} in milliseconds; poll check_marketo_job_status(job_id) for the finished result. The finished job ALWAYS carries the catalog written to output_tsv_path, never inline -- this is a business-connector record-read verb under the 07-29 data-export requirement even though its content is instance metadata, not customer PII. Use these authoritative per-instance ids as the mandatory activity_type_ids for get_activities; do not rely on ids copied from another subscription.",
+  "embedding_description": "Dispatch a background job that enumerates the configured Marketo subscription's activity type catalog -- numeric activity type ids, names, descriptions, attribute definitions -- to a workspace TSV, returning a job_id in milliseconds. Poll check_marketo_job_status with that job_id for the finished catalog. Call it to discover which type ids this subscription accepts before get_activities.",
+  "result_processor_customizations": {
+    "action_label": "Marketo activity type catalog export job dispatched",
+    "result_type": "marketo_list_activity_types_result",
+    "result_description": "Dict with job_id (pass to check_marketo_job_status to retrieve the finished export) and status (always 'queued' -- this verb never waits for the vendor call)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Validate the request and dispatch a background job to list the configured Marketo instance's activity type catalog and write it to a tab-separated file in the operator's workspace. This verb only validates and dispatches -- it never talks to Marketo directly.",
+    "error_interpretation": "These are DISPATCH-time errors only -- caught before any vendor call is made, so no job was created. marketo.invalid_params: missing output_tsv_path, its parent directory does not exist, or session_id/flow_id were missing from the calling context. marketo.export_path_refused: the path is not absolute, not a .tsv, or not contained under any operator-configured export_allowed_roots entry (an empty export_allowed_roots refuses every export by default). Vendor-side faults (marketo.auth_failed, marketo.permission_denied, marketo.rate_limited) can NOT surface here -- they only appear later, in check_marketo_job_status's error field, once the background worker actually calls Marketo.",
+    "recovery_guidance": "marketo.export_path_refused: pass an ABSOLUTE path ending in .tsv under a configured workspace root; if export_allowed_roots is empty, add the operator's export directory to the marketo_plugin config and reload it. Once dispatch succeeds, poll check_marketo_job_status(job_id) -- if THAT reports an error, its guidance covers the vendor-side classes (auth, permission Read-Only Activity, rate limit)."
+  }
+}

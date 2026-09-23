@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::coding_agent_session_service::terminate_bridge",
+  "display_name": "Terminate a tracked MCP bridge subprocess",
+  "description": "Send SIGTERM to the bridge subprocess tracked under the supplied agent_instance_id, wait up to the configured grace window (5 seconds default), then SIGKILL if the process is still alive. Removes the tracking entry on success. Idempotent: when no subprocess is tracked under the supplied id, returns status=not_running without error. Called by the iTerm2 coding-agent management plugin's `terminate_session(agent_instance_id)` verb BEFORE the tab is closed so the bridge dies in a defined order rather than being orphaned to the OS reaper.",
+  "embedding_description": "Send SIGTERM to a tracked MCP bridge subprocess + remove its tracking entry. Idempotent so repeated teardown calls are safe. Returns BridgeTerminateResult: status (success/not_running/failed), agent_instance_id, terminated pid (0 when not_running), terminated_at, message. Grace window matches bridge's SIGTERM-to-clean-exit budget (~5s). SIGKILL escape-valve when SIGTERM ignored.",
+  "result_processor_customizations": {
+    "action_label": "MCP bridge terminated",
+    "result_type": "coding_agent_session_bridge_terminate_result",
+    "result_description": "BridgeTerminateResult frozen dataclass with status (success / not_running / failed), agent_instance_id, terminated pid (0 when not_running), terminated_at ISO-8601 UTC, and human-readable message.",
+    "presentation_guidance": "Lead with status. On status='success', state the terminated pid plainly. On status='not_running', state that no bridge was tracked under that id — the operator should not panic. On status='failed', surface the message verbatim (a kill() denied error or a tracker corruption)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Terminate a tracked MCP bridge subprocess.",
+    "error_interpretation": "sigterm_denied: os.kill returned PermissionError, meaning the bridge subprocess is owned by a different user. tracker_corruption: the tracking entry pointed at a pid the OS no longer recognises AND the tracker's removal step failed.",
+    "recovery_guidance": "sigterm_denied: confirm the solet is running as the operator's user account; cross-user bridge ownership is not supported. tracker_corruption: re-issue list_bridges to inspect the tracker state; if the entry persists, restart the plugin via apply_manifest."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "total"
+  ],
+  "output_not_contains": [
+    "ERROR",
+    "error"
+  ]
+}

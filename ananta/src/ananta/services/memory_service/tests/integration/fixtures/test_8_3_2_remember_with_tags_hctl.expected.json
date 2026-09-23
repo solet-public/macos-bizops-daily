@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "Memory ID",
+    "gen-",
+    "stored",
+    "Confirmed"
+  ],
+  "output_not_contains": [
+    "ERROR",
+    "error occurred"
+  ]
+}

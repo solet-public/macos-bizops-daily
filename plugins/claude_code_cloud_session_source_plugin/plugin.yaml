@@ -1,0 +1,71 @@
+name: claude_code_cloud_session_source_plugin
+description: |
+  LLM session ledger source for Claude Code on the web (cloud-VM sessions
+  created at https://claude.ai/code). The verb
+  ``plugin::claude_code_cloud_session_source_plugin::backfill_from_cloud``
+  walks the operator's cloud session surface via three documented endpoints
+  on ``api.anthropic.com``:
+
+    GET /v1/sessions?beta=true&limit=100 (paginated via ``next_page``)
+    GET /v1/sessions/<session_id>?beta=true (per-session metadata)
+    GET /v1/session_ingress/session/<session_id> (full transcript loglines)
+
+  Auth: ``claude.ai`` OAuth full-scope bearer (the ``claude auth login`` flow)
+  cached on macOS Keychain under generic-password service
+  ``Claude Code-credentials``, JSON envelope path ``claudeAiOauth.accessToken``.
+  Headers ``anthropic-version: 2023-06-01`` + ``anthropic-beta:
+  managed-agents-2026-04-01`` per the current Managed Agents API surface
+  (CLI 2.1.153 + binary-string evidence).
+
+  Lifecycle: one-shot ``@platform_process`` verb invoked by the operator or
+  coordinator. SET DIFFERENCE against ``list_sessions(vendor='claude_code')``
+  skips sessions already in the ledger; steady-state ingest of new sessions
+  is handled by ``claude_code_filesystem_session_source_plugin`` via the
+  ``claude --teleport`` local-rollout sync path. ``force=True`` overrides the
+  SET DIFFERENCE for diagnostic/repair runs.
+
+  Vendor parser reuse: per design v3 §2.3a the transcript loglines fed by
+  ``/v1/session_ingress/session/<id>`` are the same JSONL shape as local
+  ``~/.claude/projects/*.jsonl`` rollouts, so ``vendor.claude_code`` parses
+  them as-is — no new vendor module needed. Cross-source dedupe via the
+  W5.B canonical-pointer pattern at
+  ``(vendor='claude_code', external_session_id=session_id)`` collapses
+  overlap with ``claude_code_local`` once a cloud session has been
+  teleported to disk.
+
+  Phase A discovery: ``workbench/2026-06-13_claude_code_web_phase_a_discovery.md``.
+  Design v3 (§2.3a bearer-cell): ``workbench/2026-06-14_unified_url_walker_design.md``.
+
+  Per ``[[one-plugin-per-scenario]]`` this is the ONE plugin for the
+  Claude Code Cloud cell. Per ``[[no-shared-plugin-base-class]]`` the
+  parser machinery is reused from ``ananta.llm.session_ledger.vendor.claude_code``
+  via direct import — this plugin is a thin adapter.
+
+implements:
+  - interface: LLMSessionSourceInterface
+  - interface: PushedSourceMixin
+  - interface: EdgeProcessProvider
+
+config:
+  keychain_service:
+    default: "Claude Code-credentials"
+  keychain_envelope_path:
+    default: "claudeAiOauth.accessToken"
+  api_base_url:
+    default: "https://api.anthropic.com"
+  anthropic_version:
+    default: "2023-06-01"
+  anthropic_beta:
+    default: "managed-agents-2026-04-01"
+  list_page_limit:
+    default: 100
+  events_page_limit:
+    default: 100
+  walker_concurrency:
+    default: 5
+  fetch_timeout_seconds:
+    default: 60
+  rate_limit_backoff_seconds:
+    default: [1, 2, 4, 8, 16]
+
+optional: true

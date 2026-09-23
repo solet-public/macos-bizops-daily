@@ -1,0 +1,11 @@
+{
+  "name": "test_execute_in_seconds",
+  "description": "Schedule one-time execution of actions after specified delay in seconds",
+  "process_key": "plugin::default_scheduling_plugin::execute_in_seconds",
+  "arguments": {
+    "seconds": 1,
+    "actions": [],
+    "label": "test_value",
+    "tags": "test_value"
+  }
+}

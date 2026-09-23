@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "marketo_plugin"
+version = "1.0.0"
+description = "Marketo Engage marketing-automation connector (lead CRUD/query, campaigns, list membership) for Ananta"
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    # No official Marketo SDK — a plain synchronous REST client is the executor.
+    "httpx>=0.27",
+]
+
+[project.entry-points."ananta.plugins"]
+marketo_plugin = "marketo_plugin.plugin:MarketoPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["marketo_plugin*"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::zuora_plugin::create_object",
+  "display_name": "Zuora: Create Object",
+  "description": "Create an Account/Subscription/Invoice/Payment/Product object with the given fields. Requires type and a non-empty fields object. This is a write action. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the object being created; the new object id is delivered when the job completes.",
+  "embedding_description": "Create a new Zuora billing object (e.g. a new Account or Subscription) with the supplied field values. Requires type (Account, Subscription, Invoice, Payment, Product) and a non-empty fields object. Dispatches asynchronously: a job_id comes back at once, the new object id lands moments later.",
+  "result_processor_customizations": {
+    "action_label": "Zuora object creation queued",
+    "result_type": "zuora_create_object_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT confirmation the object exists -- id and success arrive separately, as their own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the create was queued -- do not present job_id/status as proof the object exists. Acknowledge the request is in flight; the confirmation lands in a follow-up message when the job completes. Once delivered, confirm creation and report the new object id; low sensitivity (id only, data_sensitivity 0.0)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Create a Zuora object.",
+    "error_interpretation": "zuora.invalid_params: missing/unsupported type or an empty/missing fields object. zuora.validation_failed: a field value or combination was rejected. zuora.auth_failed: the OAuth client credentials were rejected.",
+    "recovery_guidance": "zuora.validation_failed: check required fields and valid values for that object type. zuora.invalid_params: type must be one of Account, Subscription, Invoice, Payment, Product."
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "natural_language_query": "Remove that address entry",
+  "expected_process_key": "service_interface::address_book_service::delete",
+  "expected_arguments_structure": {
+    "name": "string"
+  }
+}

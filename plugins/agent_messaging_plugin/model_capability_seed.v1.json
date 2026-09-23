@@ -1,0 +1,300 @@
+{
+  "schema_version": 1,
+  "seed_version": "model-capability-seed-v1",
+  "measured_at": "2026-09-19T00:00:00+00:00",
+  "provenance": {
+    "source_ref": "project-solet register iss_f452fe5e schema_version-2 ticket header (2026-09-19); numbers hand-reconciled by the operator from two direct Artificial Analysis fetches (Intelligence Index + cost-per-task) cross-checked against OpenAI per-model docs and claude.com/pricing for effort support",
+    "fetch_method": "hand-reconciled seed; NOT a mechanical fetch. Every cell seeded from here carries acceptance=pending_crosscheck and is never served until a real refresh run cross-checks it.",
+    "acceptance_on_seed": "pending_crosscheck"
+  },
+  "cells": [
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-haiku-4.5",
+      "effort": "non_reasoning",
+      "capability_score": 15,
+      "cost_per_task_usd": null
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-sonnet-5",
+      "effort": "low",
+      "capability_score": 24,
+      "cost_per_task_usd": 0.51
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-sonnet-5",
+      "effort": "medium",
+      "capability_score": 28,
+      "cost_per_task_usd": 1.0
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "capability_score": 32,
+      "cost_per_task_usd": 1.79
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-sonnet-5",
+      "effort": "xhigh",
+      "capability_score": 34,
+      "cost_per_task_usd": 2.87
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-sonnet-5",
+      "effort": "max",
+      "capability_score": 38,
+      "cost_per_task_usd": 5.09
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-opus-5",
+      "effort": "low",
+      "capability_score": 39,
+      "cost_per_task_usd": 1.1
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-opus-5",
+      "effort": "medium",
+      "capability_score": 45,
+      "cost_per_task_usd": 2.19
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-opus-5",
+      "effort": "high",
+      "capability_score": 48,
+      "cost_per_task_usd": 3.61
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-opus-5",
+      "effort": "xhigh",
+      "capability_score": 50,
+      "cost_per_task_usd": 4.88
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-opus-5",
+      "effort": "max",
+      "capability_score": 51,
+      "cost_per_task_usd": 5.86
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-fable-5-1",
+      "effort": "low",
+      "capability_score": 47,
+      "cost_per_task_usd": 2.37
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-fable-5-1",
+      "effort": "medium",
+      "capability_score": 49,
+      "cost_per_task_usd": 2.98
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-fable-5-1",
+      "effort": "high",
+      "capability_score": 51,
+      "cost_per_task_usd": 3.91
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-fable-5-1",
+      "effort": "xhigh",
+      "capability_score": 53,
+      "cost_per_task_usd": 5.98
+    },
+    {
+      "provider": "anthropic",
+      "runtime": "claude_code",
+      "model": "claude-fable-5-1",
+      "effort": "max",
+      "capability_score": 53,
+      "cost_per_task_usd": 7.63
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-sol",
+      "effort": "low",
+      "capability_score": 33,
+      "cost_per_task_usd": 0.26
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "capability_score": 39,
+      "cost_per_task_usd": 0.5
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "capability_score": 42,
+      "cost_per_task_usd": 0.81
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-sol",
+      "effort": "xhigh",
+      "capability_score": 44,
+      "cost_per_task_usd": 1.18
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-sol",
+      "effort": "max",
+      "capability_score": 47,
+      "cost_per_task_usd": 1.99
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-terra",
+      "effort": "low",
+      "capability_score": 27,
+      "cost_per_task_usd": 0.14
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-terra",
+      "effort": "medium",
+      "capability_score": 30,
+      "cost_per_task_usd": 0.18
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-terra",
+      "effort": "high",
+      "capability_score": 34,
+      "cost_per_task_usd": 0.34
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-terra",
+      "effort": "xhigh",
+      "capability_score": 38,
+      "cost_per_task_usd": 0.63
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-terra",
+      "effort": "max",
+      "capability_score": 42,
+      "cost_per_task_usd": 1.4
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "capability_score": 21,
+      "cost_per_task_usd": 0.01
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "medium",
+      "capability_score": 25,
+      "cost_per_task_usd": 0.02
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "high",
+      "capability_score": 32,
+      "cost_per_task_usd": 0.04
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "xhigh",
+      "capability_score": 35,
+      "cost_per_task_usd": 0.09
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "max",
+      "capability_score": 37,
+      "cost_per_task_usd": 0.18
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-6-astra",
+      "effort": "low",
+      "capability_score": 46,
+      "cost_per_task_usd": 0.82
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-6-astra",
+      "effort": "medium",
+      "capability_score": 50,
+      "cost_per_task_usd": 1.54
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "capability_score": 51,
+      "cost_per_task_usd": 1.73
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "capability_score": 52,
+      "cost_per_task_usd": 2.31
+    },
+    {
+      "provider": "openai",
+      "runtime": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "capability_score": 53,
+      "cost_per_task_usd": 3.26
+    }
+  ]
+}

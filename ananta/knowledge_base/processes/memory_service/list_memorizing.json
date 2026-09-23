@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::list_memorizing",
+  "display_name": "List Memorizing",
+  "description": "Show all memories currently in the memorization queue.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "List Memorizing",
+    "result_type": "memorization_queue",
+    "result_description": "List of memories currently in the memorization queue with review status",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing memories in the spaced repetition memorization queue",
+    "error_interpretation": "DatabaseError: failed to query memorization records from storage.",
+    "recovery_guidance": "For database errors: verify state storage is accessible."
+  }
+}

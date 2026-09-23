@@ -1,0 +1,11 @@
+{
+  "action_status_any": ["completed", "error"],
+  "output_contains_any": [
+    "memory_id",
+    "new_strength",
+    "retrieval_count",
+    "not found",
+    "Memory not found"
+  ],
+  "timeout_seconds": 60
+}

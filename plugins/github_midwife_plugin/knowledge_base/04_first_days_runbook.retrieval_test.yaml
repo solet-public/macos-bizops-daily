@@ -1,0 +1,23 @@
+# Retrieval-test companion for the first-days runbook article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+
+article_path: knowledge_bases/github_midwife_plugin/04_first_days_runbook.md
+consumer_profile: both
+
+target_queries:
+  - "first days onboarding a new owner"
+  - "what to do in the first sessions after hydration completes"
+  - "how does a newborn solet establish the owner relationship"
+  - "first autonomy grant and autonomy grant record"
+  - "how to interview a new owner without a questionnaire"
+  - "when to offer the reflection loop to the owner"
+
+forbidden_queries:
+  - "seed hydration environment setup postgres launchers"    # 01_hydration_runbook owns this
+  - "operator decision brief format"                         # the 24_operator_communication article owns this
+  - "solet charter template platform constant sections"  # the charter template article owns this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions: []

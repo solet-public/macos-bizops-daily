@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::get_recent_memory_structured",
+  "display_name": "Get Recent Memory Structured",
+  "description": "Retrieve recent interaction history as structured records. Unlike get_recent_memory which returns formatted text, this returns individual event records with metadata for programmatic access. Returns an envelope object with 'events' (the event records) and 'count'.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Get Recent Memory Structured",
+    "result_type": "structured_memory",
+    "result_description": "Envelope with the recent interaction events as structured records ('events' list) and their 'count'",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving structured recent memory events",
+    "error_interpretation": "DatabaseError: failed to query events from storage.",
+    "recovery_guidance": "For database errors: verify state storage is accessible."
+  }
+}

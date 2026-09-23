@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_scheduling_plugin::execute_in_seconds",
+  "display_name": "Execute in Seconds",
+  "description": "[NON-TERMINAL REGISTRATION] Schedule one-time execution after a delay. Provide exactly one mode: a non-empty action_definitions list of syntactically valid {process_key, arguments} objects, or memory_tag for a terminal get_memories_by_tag read whose result is written only to the action row and does not start a model turn. Registration validates entry shape and scheduled-action policy; execution resolves process_key against processes registered at fire time. Content is valid only with memory_tag. For scheduled peer notifications, use action_definitions with plugin::agent_messaging_plugin::peer_send_by_name.",
+  "embedding_description": "Schedule one-time delayed work using exactly one mode: non-empty, syntactically valid action_definitions whose process keys resolve against registered processes at fire time, or memory_tag for a terminal get_memories_by_tag read that records its result and starts no model turn. Content is valid only with memory_tag. Returns schedule_id and run_at.",
+  "result_processor_customizations": {
+    "action_label": "Delayed execution scheduled",
+    "result_type": "schedule_created",
+    "result_description": "Schedule ID with delay_seconds and run_at timestamp",
+    "presentation_guidance": "",
+    "output_action_guidance": "A delayed execution schedule has been created. Consider whether you should inform the requester when the check-in will occur, and retain the schedule_id or tags so it can be cancelled once work completes."
+  },
+  "error_processor_customizations": {
+    "action_context": "Scheduling one-time delayed execution with exactly one execution mode",
+    "error_interpretation": "default_scheduling_plugin.parameter_error: non-positive seconds, malformed or inference-bearing action definition, empty action list, invalid memory_tag, content outside memory_tag mode, or an execution-mode conflict. default_scheduling_plugin.schedule_create_error: persistence or scheduler registration failed after valid parameters.",
+    "recovery_guidance": "Use a positive seconds value and choose exactly one mode. For deterministic work, provide non-empty action_definitions using {process_key, arguments}. Use memory_tag only for a terminal memory read. For scheduler errors, verify the scheduling and state services."
+  }
+}

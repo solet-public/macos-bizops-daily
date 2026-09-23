@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "inserted_ids",
+    "count"
+  ],
+  "output_not_contains": [
+    "ERROR",
+    "exception",
+    "failed"
+  ],
+  "action_status": "completed"
+}

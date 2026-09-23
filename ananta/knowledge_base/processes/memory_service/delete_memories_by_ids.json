@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::delete_memories_by_ids",
+  "display_name": "Delete Memories By Ids",
+  "description": "Hard-delete a specific set of memories by id, with their embeddings.\n\nUse cases:\n- Knowledge base lifecycle management (remove specific ingested chunks by id, e.g. a per-file re-index or a targeted sweep, without a tag round-trip).\n- Precise cleanup when the caller already holds the exact memory ids to remove.\n\nThe id-list counterpart of delete_memories_by_tag. Cascade vector-first: the embeddings are deleted before the memory records, so an interrupted delete leaves at most an orphan memory (reconcilable via reindex), never an orphan embedding. This is destructive and irreversible.",
+  "embedding_description": "Delete a specific list of memories by id (destructive), removing their vector embeddings too. The id counterpart of delete_memories_by_tag — use when you already hold the exact memory ids, e.g. knowledge-base per-file re-index or a targeted chunk sweep, rather than deleting by tag.",
+  "result_processor_customizations": {
+    "action_label": "Delete Memories By Ids",
+    "result_type": "memories_deleted",
+    "result_description": "Result of deleting the specified memories by id",
+    "presentation_guidance": "",
+    "output_action_guidance": "The specified memories were hard-deleted along with their embeddings. If these ids backed a knowledge-base corpus, the corresponding content is no longer retrievable; re-ingest if it should return."
+  },
+  "error_processor_customizations": {
+    "action_context": "Deleting specific memories by id",
+    "error_interpretation": "DatabaseError: failed to delete memory records. VectorStoreError: failed to delete associated embeddings.",
+    "recovery_guidance": "For database errors: verify state storage is accessible. For vector store errors: verify vector storage is accessible."
+  }
+}

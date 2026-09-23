@@ -1,0 +1,16 @@
+{
+  "process_key": "service_interface::thinking_service::create_playbook",
+  "display_name": "Create Playbook",
+  "description": "Create a phased execution playbook for a complex project. The playbook provides per-phase guidance (what to retrieve, what to decide, how to communicate) that is hydrated into the prompt at each plan step. Requires investigation findings and locked constraints from the user.",
+  "embedding_description": "Create a phased execution playbook for a complex project after investigation clarifies the goal, constraints, and likely direction. Use when work needs per-phase retrieval guidance, decision checkpoints, communication rules, and execution notes that will be hydrated into later plan prompts during multi-step execution.",
+  "result_processor_customizations": {
+    "action_label": "playbook created",
+    "result_type": "playbook_created",
+    "result_description": "Playbook written to knowledge base with plan focused in memory",
+    "output_action_guidance": "A playbook and execution plan have been created. The plan steps reference playbook sections that will be hydrated into prompts during execution. Begin executing the first plan step."
+  },
+  "error_processor_customizations": {
+    "action_context": "Creating a playbook from investigation context. create_playbook accepts {goal, constraints?, investigation_context?}.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. ConnectionError: thinking model not reachable."
+  }
+}

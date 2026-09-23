@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_regex": "(?i)(spaced repetition|memoriz|review)",
+  "output_not_contains": [
+    "ERROR",
+    "exception",
+    "failed"
+  ],
+  "timeout_seconds": 180
+}

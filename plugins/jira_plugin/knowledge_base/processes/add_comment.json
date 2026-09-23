@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::add_comment",
+  "display_name": "Jira: Add Comment",
+  "description": "Add a plain-text comment to a Jira issue. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the comment being posted; the new comment id is delivered when the job completes. Write action.",
+  "embedding_description": "Post a plain-text comment onto an existing Jira issue's comment thread - a status note, a question, a hand-off message - by giving the issue key and the comment body. Dispatches asynchronously, returning a job_id immediately; the new comment's id arrives via job completion. The write side of a ticket's discussion thread.",
+  "result_processor_customizations": {
+    "action_label": "Jira comment post queued",
+    "result_type": "jira_add_comment_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the comment id -- that arrives separately when the job completes and is delivered as its own message.",
+    "presentation_guidance": "This call only confirms the comment was queued -- do not present job_id/status as proof the comment posted. Acknowledge the request is in flight; the comment id lands in a follow-up message when the job completes. Once delivered, confirm the comment was posted to the named issue and give the comment id. This adds visible content to a real ticket."
+  },
+  "error_processor_customizations": {
+    "action_context": "Add a comment to a Jira issue.",
+    "error_interpretation": "jira.not_found: the issue key does not exist. jira.permission_denied: the account cannot comment on this issue. jira.invalid_params: key or body was missing or empty.",
+    "recovery_guidance": "jira.not_found: verify the issue key. jira.permission_denied: grant the service account comment permission on the project. jira.invalid_params: supply both key and a non-empty body."
+  }
+}

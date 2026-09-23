@@ -1,0 +1,7 @@
+{
+  "query": "What processes can generate audio?",
+  "expected_process_key": "service_interface::discovery_service::query_process_registry",
+  "expected_arguments": {
+    "query": "generate audio"
+  }
+}

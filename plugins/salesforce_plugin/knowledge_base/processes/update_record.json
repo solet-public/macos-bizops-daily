@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::update_record",
+  "display_name": "Salesforce: Update Record",
+  "description": "Apply a non-empty fields object to an existing record by sobject + id. This is a write action. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the update being applied; the confirmation is delivered when the job completes.",
+  "embedding_description": "Update fields on a Salesforce CRM record that already exists, using its object type, record id, and a non-empty field-value object. Applies the requested values in place to a known Account, Contact, Opportunity, or custom object -- the single-record field-maintenance write. Dispatched asynchronously: job_id first, applied-confirmation later.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce record update queued",
+    "result_type": "salesforce_update_record_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT confirmation the fields were applied -- the success flag arrives separately, as its own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the update was queued -- do not present job_id/status as proof the fields changed. Acknowledge the request is in flight; the applied-confirmation lands in a follow-up message when the job completes. Once delivered, confirm the update; low sensitivity (flag only, data_sensitivity 0.0)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Update a Salesforce record's fields.",
+    "error_interpretation": "sf.invalid_params: missing sobject, id, or an empty/missing fields object. sf.not_found: no record with that id exists. sf.malformed_query: a field value was rejected. sf.permission_denied: the CLI's authenticated user cannot update this record.",
+    "recovery_guidance": "sf.not_found: verify the id and sobject via soql_query or get_record. sf.malformed_query: check valid values via describe_sobject."
+  }
+}

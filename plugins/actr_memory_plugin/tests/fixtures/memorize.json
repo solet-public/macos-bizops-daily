@@ -1,0 +1,8 @@
+{
+  "name": "test_memorize_direct_plugin_blocked",
+  "description": "Verify that direct plugin invocation is blocked when plugin is bound to a service interface. Must use service_interface::memory_service::memorize instead.",
+  "process_key": "plugin::actr_memory_plugin::memorize",
+  "arguments": {
+    "content": "The ACT-R memory decay formula is B = ln(sum of t^-d)"
+  }
+}

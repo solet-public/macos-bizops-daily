@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::store_compaction_summary",
+  "display_name": "Store Compaction Summary",
+  "description": "Store a compaction summary from context management. Called when conversation history is compacted to preserve key information as a long-term memory. Not typically user-invoked.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Store Compaction Summary",
+    "result_type": "compaction_stored",
+    "result_description": "Confirmation that compaction summary was stored as a memory",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Storing a context compaction summary as a long-term memory",
+    "error_interpretation": "EmbeddingError: failed to generate embedding for summary. DatabaseError: failed to persist memory to storage.",
+    "recovery_guidance": "For embedding errors: verify embedding service is available. For database errors: verify state and vector storage are accessible."
+  }
+}

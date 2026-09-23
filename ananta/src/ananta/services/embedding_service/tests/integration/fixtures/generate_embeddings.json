@@ -1,0 +1,13 @@
+{
+  "name": "test_generate_embeddings",
+  "description": "Generate vector embeddings from text for semantic search and similarity matching.",
+  "process_key": "service_interface::embedding_service::generate_embeddings",
+  "arguments": {
+    "inputs": [
+      "Testing embeddings for the default model.",
+      "Second sentence for vector embedding."
+    ],
+    "model": "all-MiniLM-L6-v2",
+    "input_type": "text"
+  }
+}

@@ -1,0 +1,73 @@
+# W-INT Cycle 2 vault-key-declaration gate — tracked-debt allowlist
+#
+# Per master plan §3.3.7 + brief §5.2 + Codex correction #5: allowlist
+# is reserved for ADDRESS-BOOK-CHAIN consumers where the vault key
+# argument is sourced from an operator-authored address-book entry
+# rather than from a plugin-owned literal. Everything else MUST be
+# resolved by the gate's literal / prefix / annotation modes.
+#
+# Format: <check_id>::<scope_qualifier>::<specifier>
+#   check_id        — D1.2
+#   scope_qualifier — repo-relative POSIX path
+#   specifier       — "<lineno>::<verb>::<key-or-marker>" OR "*" wildcard
+#
+# Removing an entry is the unit of remediation progress. Adding entries
+# without operator approval defeats the gate's purpose (per the KB
+# "Gate Allowlist Conventions").
+#
+# D-3-structural migration (2026-09-20, iss_23fa51b5/iss_9b0ad3d5): every
+# entry now also carries the mandatory owner/reason/expires schema (see
+# quality_gates/allowlist_schema.py; key parsing is unchanged). None of
+# these 5 entries had per-entry justification beyond the 2026-09-03 W2-1
+# sweep date; expires (2027-03-20) is a uniform 180-day migration default.
+#
+# Initial seed (sub-1 landing 2026-06-07):
+#
+# - The address-book chain resolver itself reads a vault key whose
+#   identity flows from the address-book entry. The literal in the
+#   address-book entry is operator-authored; the plugin cannot declare
+#   it ahead of time. Wildcard to cover any verb the resolver invokes
+#   on the chain-sourced key.
+D1.2::plugins/default_address_book_plugin/src/default_address_book_plugin/address_ops.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# Sub-2 additions (W-VAULT-CALLER-ENFORCE, 2026-06-07):
+#
+# - Per-plugin token_store.py modules and direct callers use f-string-built
+#   scoped vault-key constants (e.g. ``f"{_SOLET}.<plugin>.<credential>"``)
+#   at the module-level Final[str] declaration. The static-gate's
+#   constant-resolution pass (Codex correction #5) only evaluates pure
+#   literal Final[str] constants — f-strings are deliberately out of scope
+#   because they require executing module-level code to materialize the
+#   value. Coordinator-Dawn release framing (2026-06-07 PT):
+#   "dynamic-helper construction is namespace-safe at runtime" — the
+#   runtime ``enforce_namespace`` call on the resolved key still catches
+#   any cross-namespace violation; the static gate just can't pre-verify
+#   the f-string-built key matches the plugin's declared prefix.
+#
+#   Tracked-debt remediation: either replace the f-string constant with
+#   a runtime-init Final[str] literal once SOLET_NAME is bound, OR
+#   add per-line ``# vault-key: <declared-prefix>`` annotations so the
+#   gate's annotation pass accepts them. Both routes remove an entry
+#   from this allowlist.
+#
+# - schwab_market_data_plugin/token_store.py — 5 call sites
+#   (store / rotate / retrieve / exists on VAULT_KEY_REFRESH_TOKEN +
+#   VAULT_KEY_ACCESS_TOKEN, f-string-built in constants.py).
+D1.2::plugins/schwab_market_data_plugin/src/schwab_market_data_plugin/token_store.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# - soundcloud_artist_studio_plugin/token_store.py — 8 call sites
+#   (delete / store / rotate / retrieve / exists on per-artist
+#   refresh_token__<urn> + access_token__<urn> scoped prefixes,
+#   f-string-built in constants.py).
+D1.2::plugins/soundcloud_artist_studio_plugin/src/soundcloud_artist_studio_plugin/token_store.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# - discord_plugin/plugin.py — 1 call site (retrieve on
+#   VAULT_KEY_BOT_TOKEN, f-string-built in constants.py per sub-1
+#   migration).
+D1.2::plugins/discord_plugin/src/discord_plugin/plugin.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20
+
+# - signal_plugin/result_helpers.py — 1 call site (retrieve on a
+#   per-account runtime-computed key; sub-1 migrated the constant
+#   to scoped form but the lookup happens via dynamic-helper
+#   construction rather than a static literal).
+D1.2::plugins/signal_plugin/src/signal_plugin/result_helpers.py::*  # owner: 2026-09-03-W2-1-sweep reason: pre-existing entry from the 2026-09-03 W2-1 sweep; migrated to mandatory schema, original per-entry justification not recovered, see iss_9b0ad3d5 expires: 2027-03-20

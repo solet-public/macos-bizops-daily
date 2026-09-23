@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "case_id": "selector_zero_destination",
+      "kind": "selector",
+      "source_fixture": "bizopsb15_postcutover_convergefail",
+      "transaction_identity": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:572552bdd63cf06c48b76c79dbcbd0d7eae6e8f15ed85646acf84d36e9e5c054"
+      },
+      "destination_identities": [
+        {"flow_id": "macos.repository_setup", "flow_contract_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      ],
+      "expected": {"outcome": "refuse_zero_destination"}
+    },
+    {
+      "case_id": "selector_many_destination",
+      "kind": "selector",
+      "source_fixture": "bizopsb15_postcutover_convergefail",
+      "transaction_identity": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:572552bdd63cf06c48b76c79dbcbd0d7eae6e8f15ed85646acf84d36e9e5c054"
+      },
+      "destination_identities": [
+        {"flow_id": "macos.repository_setup", "flow_contract_digest": "sha256:572552bdd63cf06c48b76c79dbcbd0d7eae6e8f15ed85646acf84d36e9e5c054"},
+        {"flow_id": "macos.repository_setup", "flow_contract_digest": "sha256:572552bdd63cf06c48b76c79dbcbd0d7eae6e8f15ed85646acf84d36e9e5c054"}
+      ],
+      "expected": {"outcome": "refuse_ambiguous_destination"}
+    },
+    {
+      "case_id": "destination_answer_tightening",
+      "kind": "answer_validation",
+      "source_fixture": "bizopsb15_postcutover_convergefail",
+      "destination_required_answer": "new_required_answer",
+      "answer_migration": null,
+      "expected": {"outcome": "refuse_before_fingerprint", "names": ["new_required_answer"]}
+    },
+    {
+      "case_id": "verified_resolution_stage_reopening",
+      "kind": "decision_disposition",
+      "source_fixture": "bizopsb15_postcutover_convergefail",
+      "prior_stage": {"stage_id": "models", "status": "verified"},
+      "introduced_decision": {"decision_id": "new_active_decision", "active_under_selected_ancestors": true, "answer": null},
+      "expected": {
+        "disposition": "pending_newly_introduced",
+        "frontier_contains": ["models"],
+        "accepted_red_contract": true
+      }
+    },
+    {
+      "case_id": "three_store_crash_boundary",
+      "kind": "recovery",
+      "source_fixture": "bizopsb15_postcutover_convergefail",
+      "stores": ["transaction", "registry", "install_state_projection"],
+      "boundary": "after_registry_before_install_state_projection",
+      "expected": {"outcome": "recover_all_before_or_all_after", "foreign_bytes": "refuse"}
+    },
+    {
+      "case_id": "managed_tree_drift",
+      "kind": "managed_tree",
+      "source_fixture": "bizopsb15_postcutover_convergefail",
+      "drifts": ["one_byte", "mode", "undeclared_tracked_path", "missing_overlay_receipt"],
+      "expected": {"outcome": "refuse_each_drift"}
+    }
+  ]
+}

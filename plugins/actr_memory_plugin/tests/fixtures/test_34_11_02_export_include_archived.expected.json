@@ -1,0 +1,11 @@
+{
+  "action_status": "completed",
+  "data_contains": {
+    "file_path": true,
+    "memory_count": true
+  },
+  "output_not_contains": [
+    "error"
+  ],
+  "timeout_seconds": 120
+}

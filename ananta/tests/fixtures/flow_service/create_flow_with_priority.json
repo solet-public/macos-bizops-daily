@@ -1,0 +1,11 @@
+{
+  "process_key": "service_interface::flow_service::create_flow",
+  "arguments": {
+    "session_id": "test_session_002",
+    "trigger_type": "scheduled_task",
+    "trigger_data": {
+      "task_name": "daily_backup"
+    },
+    "priority": 8
+  }
+}

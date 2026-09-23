@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::cleanup_orphaned_vectors",
+  "arguments": {
+    "dry_run": false
+  }
+}

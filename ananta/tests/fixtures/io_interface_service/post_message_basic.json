@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::io_interface_service::post_message",
+  "arguments": {
+    "message": "Processing your request...",
+    "session_id": "test_session_12345"
+  }
+}

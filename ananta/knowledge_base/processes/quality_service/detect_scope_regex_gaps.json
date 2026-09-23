@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::quality_service::detect_scope_regex_gaps",
+  "display_name": "Detect Static-Gate Scope Gaps",
+  "description": "Classify a list of repo-relative changed paths using the exact per-file static-gate predicate owned by quality_gates/code_quality_check.py. Returns the paths covered by the regular per-file quality surface and paths outside it, with manual_static_analysis_needed=true whenever an out-of-scope path needs a Git-Controller ruff, pyright, or radon supplement. This is a read-only classification and never runs or changes Git.",
+  "embedding_description": "Check whether changed paths are covered by the platform code_quality_check per-file static analysis surface. Identify out-of-scope files such as .claude hooks or other unlisted paths before a landing relies only on the whole-tree quality gate, so Git-Controller knows when to run manual ruff, pyright, and radon checks.",
+  "result_processor_customizations": {
+    "action_label": "Static-gate scope gaps detected",
+    "result_type": "gc_scope_regex_gap_result",
+    "result_description": "Object with normalized paths, in_scope, out_of_scope, manual_static_analysis_needed, and scope_source.",
+    "presentation_guidance": "Lead with manual_static_analysis_needed. If true, list every out_of_scope path and state that a manual static-analysis supplement is needed before relying on whole-tree evidence.",
+    "output_action_guidance": "Classification is advisory evidence only; it does not run gates or authorize a landing."
+  },
+  "error_processor_customizations": {
+    "action_context": "Normalizing repo-relative path strings and reading the code-quality scope predicate.",
+    "error_interpretation": "ValueError means the list was empty or a supplied path was absolute, empty, or attempted traversal. This does not indicate a Git or quality-gate failure.",
+    "recovery_guidance": "Pass one or more non-empty repo-relative changed paths exactly as Git tracks them, then use the returned out_of_scope list to choose any supplemental checks."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::repo_service::search",
+  "display_name": "Search Repository",
+  "description": "Ripgrep-backed content search across the platform git worktree, repo-root confined. Returns ranked hits as {path, line, snippet} where each snippet is secret-shape redacted. Denylisted locations (.git/, profile/ secrets, key material, bundled venvs, runtime dirs) are excluded from results, and every returned hit path is re-confirmed inside the repo root. Server bakes the rg flags; the caller passes only a query (regex/text), an optional include path_glob (e.g. '*.py'), and an optional max_results (hard-capped at 200). If ripgrep is not installed the verb fails LOUD — it never silently falls back to a slower scan.",
+  "embedding_description": "Full-text / regex code search across the platform repository worktree using ripgrep. Returns ranked file:line:snippet hits with secrets redacted; excludes .git, profile secrets, and vendored venvs. Use to find where a symbol, string, or pattern appears. Fails loud if rg is absent.",
+  "result_processor_customizations": {
+    "action_label": "Repository searched",
+    "result_type": "repo_search_result",
+    "result_description": "Object with 'query', 'hits' ([{path, line, snippet}] — snippets secret-redacted), 'truncated', 'hit_count'.",
+    "presentation_guidance": "Surface the hit paths + line numbers; if 'truncated' is true, note the result cap was reached and suggest a narrower query or path_glob.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Running a repo-root-confined ripgrep content search with server-fixed flags over the platform worktree.",
+    "error_interpretation": "RepoToolError: ripgrep (rg) is not installed, or the search timed out — the verb never silent-falls-back to a slower scan (B-N2). A search that finds nothing returns hit_count=0 (not an error).",
+    "recovery_guidance": "For RepoToolError (rg absent): install ripgrep on the solet host. For a timeout: narrow the query or scope with path_glob. For zero hits: broaden the query or check the path_glob."
+  }
+}

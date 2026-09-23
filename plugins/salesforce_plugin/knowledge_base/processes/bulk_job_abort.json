@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::bulk_job_abort",
+  "display_name": "Salesforce: Bulk Job Abort",
+  "description": "Abort a running Bulk API v2 ingest job -- the recovery lever for a job submitted in error or running against bad data. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the abort taking effect; the Salesforce job's resulting state is delivered when this dispatch's job completes. Records already processed before the abort are NOT rolled back -- check bulk_job_results for what landed.",
+  "embedding_description": "Stop a bulk load already running before it processes more records -- cancel a mass insert/update/upsert/delete that targeted the wrong CSV, object, or data. Use on a job from bulk_ingest_submit while still in progress; rows already committed are not undone, so check bulk_job_results after. Returns a job_id at once, then the resulting state.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce bulk job abort queued",
+    "result_type": "salesforce_bulk_job_abort_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT confirmation the job stopped -- the Salesforce job's resulting state arrives separately, as its own message, when this dispatch's job completes.",
+    "presentation_guidance": "This call only confirms the ABORT REQUEST was queued -- do not present job_id/status as proof the bulk job stopped. Once delivered, confirm the resulting state plainly and remind the user that records processed BEFORE the abort are not rolled back -- point them to bulk_job_results if they need to know exactly what landed."
+  },
+  "error_processor_customizations": {
+    "action_context": "Abort a running Bulk API v2 ingest job in the registered Salesforce org.",
+    "error_interpretation": "sf.invalid_params: missing job_id. sf.not_found: no bulk job with that id exists. sf.api_error: the job is already in a terminal state (JobComplete/Failed/Aborted) and cannot be aborted again. sf.permission_denied: the CLI's authenticated user cannot abort this job.",
+    "recovery_guidance": "sf.not_found: verify the job_id via bulk_job_status first. sf.api_error naming a terminal-state conflict: the job already finished -- use bulk_job_results to see the outcome instead of retrying the abort. sf.permission_denied: ask the operator to check bulk API job-management permission for this user."
+  }
+}

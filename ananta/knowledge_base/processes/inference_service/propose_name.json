@@ -1,0 +1,70 @@
+{
+  "process_key": "service_interface::inference_service::propose_name",
+  "display_name": "Propose Name",
+  "description": "Propose a human-friendly name for a file or artifact based on context. Used when user request is vague and a descriptive name must be derived.",
+  "embedding_description": "",
+  "action_definition_template_arguments": {
+    "model": {
+      "temperature": 0.3,
+      "max_tokens": 256
+    },
+    "prompt": {
+      "user": {
+        "instructions": [
+          "Generate a descriptive, human-friendly filename for the requested artifact.",
+          "",
+          "Rules:",
+          "- Name should reflect the content or purpose",
+          "- Use lowercase with underscores for spaces",
+          "- Keep names concise (1-4 words)",
+          "- Avoid generic names like 'output' or 'file'",
+          "- If input_filename is provided and acceptable, use it as-is",
+          "",
+          "Respond with a JSON object containing:",
+          "- display_name: The proposed base name (without extension)",
+          "- extension: File extension based on artifact_type (e.g., 'wav', 'png')",
+          "- confidence: 'high', 'medium', or 'low'",
+          "- flags: Array of any concerns (e.g., 'generic', 'ambiguous')"
+        ],
+        "output_schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "display_name",
+            "extension",
+            "confidence"
+          ],
+          "properties": {
+            "display_name": {
+              "type": "string",
+              "description": "Proposed base filename"
+            },
+            "extension": {
+              "type": "string",
+              "description": "File extension without dot"
+            },
+            "confidence": {
+              "type": "string",
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "description": "Confidence in the proposed name"
+            },
+            "flags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Flags for concerns about the name"
+            }
+          }
+        },
+        "intent_text": "<<INTENT_TEXT>>",
+        "artifact_type": "<<ARTIFACT_TYPE>>",
+        "input_filename": "<<INPUT_FILENAME>>"
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::list_tags",
+  "display_name": "List Tags",
+  "description": "List all tags with counts.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Tags listed",
+    "result_type": "tag_summary_retrieved",
+    "result_description": "Tag summary with keys: tags (list of {tag, count} records showing each tag and how many addresses use it)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Lists all tags in use with counts of how many addresses have each tag",
+    "error_interpretation": "DatabaseError: listing failed due to storage issues.",
+    "recovery_guidance": "For database errors: suggest retrying the operation or checking service status."
+  }
+}

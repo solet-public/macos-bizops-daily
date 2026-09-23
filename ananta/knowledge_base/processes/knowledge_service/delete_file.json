@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::delete_file",
+  "display_name": "Delete Knowledge Base File",
+  "description": "Delete a file from a knowledge base. For git KBs: commits deletion to managed branch. Forgets associated chunks.",
+  "embedding_description": "Remove a single file from a knowledge base and forget the chunks that were indexed from it. For git-backed KBs the deletion is committed to the managed branch. Use to permanently drop one document you no longer want stored or searchable in that KB.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge base file deleted",
+    "result_type": "knowledge_base_file_deleted",
+    "result_description": "File deleted and associated chunks forgotten",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Deleting a knowledge base file",
+    "error_interpretation": "NotFoundError: file not found.",
+    "recovery_guidance": "Use browse to verify the file path."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "process_key": "service_interface::inference_service::process_error",
+  "arguments": {
+    "error_message": "Invalid parameter: expected 'user_id' but got 'userid'",
+    "error_context": {
+      "process_key": "service_interface::user_service::get_user",
+      "attempted_arguments": {
+        "userid": "12345"
+      }
+    }
+  }
+}

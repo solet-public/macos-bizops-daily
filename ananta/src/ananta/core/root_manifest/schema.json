@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "the solet root_manifest.yaml schema",
+  "description": "Structural validation for <solet_root>/root_manifest.yaml. Validated by all three consumers (pre-commit, cutover preflight, startup diagnostic) before drift-detection logic runs. See workbench/2026-06-16_root_manifest_yaml_design.md §3 + §3.10.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "solet_name",
+    "universal",
+    "platform_managed",
+    "sanctioned",
+    "overrides",
+    "diagnostic"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "solet_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "universal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "directories"],
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "directories": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "platform_managed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directories"],
+      "properties": {
+        "directories": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "sanctioned": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "reason", "operator_approved"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "operator_approved": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "sunset_target": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "overrides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "reason", "operator_approved", "sunset_target"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "operator_approved": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "sunset_target": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["report_categories", "ignore_patterns"],
+      "properties": {
+        "report_categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "unknown_root_entries",
+              "missing_universal_entries",
+              "sunset_overdue",
+              "cleanup_overdue"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "ignore_patterns": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

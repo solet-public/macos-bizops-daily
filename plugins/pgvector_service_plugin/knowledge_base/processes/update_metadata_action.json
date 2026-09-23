@@ -1,0 +1,24 @@
+{
+  "process_key": "plugin::pgvector_service_plugin::update_metadata_action",
+  "display_name": "Update Vector Metadata",
+  "description": "Update metadata for an existing vector",
+  "embedding_description": "Update metadata for an existing vector by id. Provide namespace, vector_id, and new metadata values. Use to add tags or update attributes without changing embeddings. The embedding vector itself is not modified.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Metadata updated",
+    "result_type": "metadata_updated",
+    "result_description": "Update confirmation with vector_id",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result.",
+    "field_sensitivities": {
+      "vector_id": 0.3,
+      "updated": 0.1
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Replaces the metadata JSON for a single vector in a pgvector namespace; the embedding vector itself is untouched.",
+    "error_interpretation": "ValidationError: namespace, vector_id, or metadata is missing, or metadata is not JSON-serializable. NotFoundError: no row in the namespace matches the vector_id. DatabaseError: the underlying UPDATE failed.",
+    "recovery_guidance": "Confirm namespace, vector_id, and a JSON-serializable metadata dict are all supplied. A NotFoundError means the vector has been deleted or never existed; do not retry with the same arguments — re-fetch the id via search_similar_action or store_vectors_action first. Retry transient database errors once.",
+    "retryable": true
+  }
+}

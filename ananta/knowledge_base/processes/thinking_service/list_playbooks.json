@@ -1,0 +1,15 @@
+{
+  "process_key": "service_interface::thinking_service::list_playbooks",
+  "display_name": "List Playbooks",
+  "description": "List playbooks with optional status filter. Returns playbook metadata including IDs, titles, and lifecycle status.",
+  "embedding_description": "List available playbooks and their metadata, optionally filtered by lifecycle status. Use to inspect active, draft, or completed playbooks; discover candidate playbook_ids before retrieval or patching; review titles and timestamps; and understand which phased execution guides already exist for a project or workspace.",
+  "result_processor_customizations": {
+    "action_label": "playbooks listed",
+    "result_type": "playbook_list",
+    "result_description": "List of playbook objects with metadata"
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing playbooks. list_playbooks accepts {status?}.",
+    "error_interpretation": "ValidationError: invalid status filter value."
+  }
+}

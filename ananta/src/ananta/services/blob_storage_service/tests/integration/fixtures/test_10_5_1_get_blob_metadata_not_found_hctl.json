@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::blob_storage_service::get_blob_metadata",
+  "arguments": {
+    "namespace": "test_namespace",
+    "blob_id": "gen-nonexistent9"
+  }
+}

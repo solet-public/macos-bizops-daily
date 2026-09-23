@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::list_memorizing",
+  "arguments": {
+    "include_completed": true
+  }
+}

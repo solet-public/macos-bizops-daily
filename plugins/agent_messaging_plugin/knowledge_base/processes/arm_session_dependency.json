@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::arm_session_dependency",
+  "display_name": "Arm a session wake edge",
+  "description": "Drive-on-delivery lane, slice 2 rider verb (2026-08-04). The FIRST caller of the D1 session_dependency wake-edge machinery -- the schema (fired_at IS NULL = armed), the platform sweep's evaluation (sweep_deadline_dependencies / sweep_lane_closed_dependencies), and the wake delivery all already existed with nothing to arm a row until now. Writes one armed 'when X happens, wake Y' edge: waiter_instance_id (required, session-scoped only in v1 -- there is no waiter_lane_id parameter, so lane-scoped arming cannot even be expressed, let alone requested), condition_kind (lane_closed | session_terminal | deadline), and condition_ref shape-checked per kind (an 'agi-' prefixed agent_instance_id for session_terminal, a parseable ISO-8601 timestamp for deadline, a non-empty lane_id for lane_closed). No waiter-existence check -- an unmanaged waiter (no managed_session row, e.g. an operator-launched seat) is a legal arm target; the sweep's own fire-time resolution already handles an unresolvable waiter, logging rather than failing.",
+  "embedding_description": "Arm a wake edge so a platform sweep later fires it and notifies a waiting session -- distinct from drive_session (dispatches a work turn directly, no condition), peer_send/peer_send_by_name (immediate messaging, nothing deferred or conditional), and report_alive (a worker's own liveness heartbeat, not a registered wait condition).",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Session dependency armed",
+    "result_type": "arm_session_dependency_result",
+    "result_description": "waiter_instance_id, condition_kind, condition_ref (the armed edge's own fields, echoed back), and armed (always true on success -- a failed validation raises before any row exists).",
+    "presentation_guidance": "State which session is waiting on which condition. This verb only arms the edge -- it does not fire it; the platform sweep evaluates armed rows on its own tick and delivers the wake when the condition becomes true, which may be long after this call returns."
+  },
+  "error_processor_customizations": {
+    "action_context": "All validation runs BEFORE the state write, in order: waiter_instance_id non-empty, condition_kind recognised, then condition_ref shape-checked against that specific kind. A refused call never touches state.",
+    "error_interpretation": "invalid_waiter: waiter_instance_id was empty or whitespace-only -- v1 is session-scoped only, there is no lane-scoped fallback to accept instead. unknown_condition_kind: condition_kind was not one of lane_closed/session_terminal/deadline. invalid_condition_ref: condition_ref did not match its condition_kind's expected shape (not an 'agi-' id for session_terminal, not a parseable ISO-8601 timestamp for deadline, or empty for lane_closed).",
+    "recovery_guidance": "For invalid_condition_ref, re-check which kind was requested -- the three kinds expect three different referent shapes and the error names which one failed. For a genuinely lane-scoped wait, this verb cannot express it in v1; poll session/lane status directly instead, or escalate the lane-scoped gap if it becomes a recurring need."
+  }
+}

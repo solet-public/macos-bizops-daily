@@ -1,0 +1,33 @@
+# Retrieval-test companion for the Homebrew install troubleshooting runbook.
+# Gated by service_interface::knowledge_service::test_retrieval (W7). Until the
+# gate is live, run each query through service_interface::knowledge_service::search
+# and confirm this article ranks at or above min_rank for targets.
+
+article_path: knowledge_bases/github_midwife_plugin/09_homebrew_install_troubleshooting_runbook.md
+consumer_profile: both
+
+target_queries:
+  - "solet create stopped with awaiting_user exit code 3 what do I do"
+  - "brew install solet then solet create troubleshooting"
+  - "brew refusing to load formula solet from untrusted tap run brew trust"
+  - "solet create models stage model_discovery_failed no candidates"
+  - "install LM Studio and download the embedding and inference models for solet create"
+  - "which nomic embedding build does the solet installer expect"
+  - "lms get command for the qwen3 14b inference model"
+  - "solet create preview approval fingerprint how to approve the plan"
+  - "how to pass --decision embedding_model to solet create"
+  - "where is the solet create transaction journal"
+  - "solet manager stages in order preflight system_dependencies genesis models"
+  - "pgvector_ready false after solet create system dependencies stage"
+  - "genesis refuses stale keychain entries for a reused solet name"
+  - "LaunchAgent local.solet name crash loop after solet create"
+  - "minimum memory for a solet install 24 GB"
+  - "LM Studio server does not start after reboot solet cannot embed"
+  - "can I run bootstrap.py to finish a stalled solet create"
+  - "solet doctor reports probe failures after homebrew install"
+min_rank: 3
+
+forbidden_queries:
+  - "update a live solet from a newer seed release"
+  - "set up the shell launcher and named claude code session after genesis"
+forbidden_min_rank: 1

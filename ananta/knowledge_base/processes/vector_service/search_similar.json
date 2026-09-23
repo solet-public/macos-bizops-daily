@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vector_service::search_similar",
+  "display_name": "Search Similar Vectors",
+  "description": "Find vectors similar to a query vector using semantic similarity.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Similar vectors found",
+    "result_type": "similarity_search_results",
+    "result_description": "List of matching vectors ranked by similarity score, each containing vector ID, similarity score (0-1), and associated metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Performs semantic similarity search to find vectors most similar to a query vector within a namespace",
+    "error_interpretation": "ValidationError with 'query_vector': malformed or wrong dimension. NamespaceError: namespace not found. FilterError: invalid filter syntax or unsupported filter operation. TimeoutError: search took too long.",
+    "recovery_guidance": "For dimension errors: ensure query vector matches namespace dimension. For namespace errors: verify namespace exists with list_namespaces. For filter errors: check filter syntax and supported operators."
+  }
+}

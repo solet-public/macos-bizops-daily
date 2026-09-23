@@ -1,0 +1,5 @@
+{
+  "natural_language_query": "N/A - internal process",
+  "expected_process_key": "N/A",
+  "note": "This process should NOT be directly invocable via inference"
+}

@@ -1,0 +1,7 @@
+{
+  "query": "What's the status of flow XYZ?",
+  "expected_process_key": "service_interface::flow_service::get_flow_status",
+  "expected_arguments": {
+    "flow_id": "XYZ"
+  }
+}

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${LAUNCHD_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${PYTHON_BIN}</string>
+        <string>-m</string>
+        <string>macos_self_deployment_plugin.blue_green_router.router</string>
+        <string>--solet</string>
+        <string>${SOLET_NAME}</string>
+        <string>--public-port</string>
+        <string>${PUBLIC_PORT}</string>
+        <string>--socket-path</string>
+        <string>${SOCKET_PATH}</string>
+        <string>--runtime-dir</string>
+        <string>${RUNTIME_DIR}</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>${WORKING_DIR}</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${LOG_DIR}/router.log</string>
+    <key>StandardErrorPath</key>
+    <string>${LOG_DIR}/router.err</string>
+</dict>
+</plist>

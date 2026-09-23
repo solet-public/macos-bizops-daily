@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_scheduling_plugin::list_schedules",
+  "display_name": "List Schedules",
+  "description": "Enumerate every scheduled job (cron and one-time), optionally narrowed by status. Use when you need a schedule whose tag or id you do not already know — for example to locate and clear a stale recurring cron. Read-only introspection; does not modify state.",
+  "embedding_description": "Enumerate all scheduled jobs with no tag required, optionally filtered by status. Find a schedule whose tag or id is unknown, audit every cron and one-time job, or locate a stale recurring schedule before clearing it. Read-only; the tag-agnostic companion to get_schedules_by_tag.",
+  "result_processor_customizations": {
+    "action_label": "Schedules Listed",
+    "result_type": "schedule_list",
+    "result_description": "Every schedule (optionally status-filtered): each entry carries schedule_id, type, status, cron_expression/run_at, label, tags, and execution context (session_id/flow_id); plus a top-level count and the status_filter that was applied (null when unfiltered).",
+    "presentation_guidance": "",
+    "output_action_guidance": "All schedules were retrieved. To cancel one, call clear_scheduled_action with its schedule_id; to cancel a group, call clear_scheduled_actions_by_tag with a tag taken from the listing."
+  },
+  "error_processor_customizations": {
+    "action_context": "Enumerating all schedules for introspection or stale-schedule cleanup",
+    "error_interpretation": "ExecutionError: the scheduling service is unavailable or failed to query schedules.",
+    "recovery_guidance": "Verify the scheduling service is running and retry. To narrow a large result set, pass the optional status filter (scheduled, running, completed, cancelled, error, paused)."
+  }
+}

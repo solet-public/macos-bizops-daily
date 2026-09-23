@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::blob_storage_service::get_blob_metadata",
+  "display_name": "Get Blob Metadata",
+  "description": "Retrieve only metadata for a blob without downloading content. Useful for checking properties.",
+  "embedding_description": "Get file info without downloading. Check blob properties. Inspect file metadata. View file size type date. Get attachment details. Check stored file info. Examine file attributes. Query file properties.",
+  "result_processor_customizations": {
+    "action_label": "Blob metadata retrieved",
+    "result_type": "blob_metadata",
+    "result_description": "Blob metadata without content: blob_id, namespace, size, content_type, created_at, updated_at, and user-defined metadata key-value pairs",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves blob metadata without downloading the actual content",
+    "error_interpretation": "NotFoundError: blob_id does not exist in the specified namespace. AccessError: namespace access denied. StorageError: blob storage service unavailable.",
+    "recovery_guidance": "For not found errors: verify blob_id or use search_blobs to find correct ID. For access errors: check namespace permissions. For storage errors: retry or check service status."
+  }
+}

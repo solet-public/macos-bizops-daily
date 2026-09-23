@@ -1,0 +1,8 @@
+{
+  "natural_language_query": "Generate embeddings for this text",
+  "expected_process_key": "service_interface::embedding_service::generate_embeddings",
+  "expected_arguments_structure": {
+    "texts": "array of strings",
+    "model": "string (optional)"
+  }
+}

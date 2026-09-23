@@ -1,0 +1,15 @@
+{
+  "name": "test_clear_scheduled_action_basic",
+  "description": "Clear a scheduled action by its ID",
+  "process_key": "plugin::default_scheduling_plugin::clear_scheduled_action",
+  "arguments": {
+    "params": {
+      "schedule_id": "1001"
+    },
+    "state": {
+      "session_id": "test-session-201",
+      "flow_id": "test-flow-201"
+    }
+  },
+  "timeout_seconds": 30
+}

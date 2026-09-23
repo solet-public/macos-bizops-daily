@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_blob_storage_plugin::search_blobs",
+  "display_name": "Search Blobs",
+  "description": "Search for blobs by metadata filters. Filter on schema fields (tags, mime_type, original_name, external_id, plugin_namespace) or descend into the plugin_metadata JSON column with dotted paths like 'plugin_metadata.role' or 'plugin_metadata.params.frequency'. Tag values are OR-matched (comma-separated string); plugin_metadata scalars match exactly, lists OR-match, and multiple plugin_metadata.* filters AND together. Returns matching blob_ids and their metadata.",
+  "embedding_description": "Discover locally-stored blobs by metadata filters within a namespace. Bytes live on operator's filesystem at APP_HOME/data/blobs/<blob_id> (namespace is metadata, not a filesystem subdirectory); metadata index sits in local Postgres. Returns blob_id + per-row metadata for follow-on get_blob fetch. Find by tags, mime_type, filename, plugin_metadata dotted paths.",
+  "result_processor_customizations": {
+    "action_label": "Blob Search Complete",
+    "result_type": "blobs_found",
+    "result_description": "List of matching blobs with their metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Searching for blobs by metadata filters",
+    "error_interpretation": "ValidationError: Invalid metadata filter format. StorageError: Failed to read metadata index. PermissionError: Insufficient permissions to access storage.",
+    "recovery_guidance": "For validation errors: ensure metadata_filters is a valid object. For storage errors: check filesystem health. For permission errors: verify storage directory permissions."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::list_session_claude_mappings",
+  "display_name": "List one worker's Claude-session mapping history",
+  "description": "usage-capture-attribution D2 follow-on (2026-08-06). Lists every live session_claude_mapping row observed for one agent_instance_id -- the SessionStart-hook-captured (or headless init-event) record of which Claude Code claude_session_id(s) this worker has fired under over its whole lifetime, ONE-TO-MANY because a /clear or /resume rotates the Claude session UUID without touching the managed_session row. Each row carries agent_instance_id, claude_session_id, captured_at (the hook payload's own timestamp), and capture_source (hook:startup | hook:clear | hook:resume | init_event), plus the standard state-layer row fields every table carries (id, namespace, created_at, updated_at, created_by, updated_by, name, is_deleted, external_id). Read-only, issues no writes -- a thin wrapper over the same store-layer function budget_report's usage join already uses internally. An empty list means no mapping has EVER been observed for this worker, not an error -- that is itself diagnostic (the SessionStart hook never fired, or the worker predates the capture landing).",
+  "embedding_description": "List a worker's raw SessionStart-hook mapping rows by agent_instance_id -- which Claude Code session_id(s) it fired under, when, and via which capture path. Distinct from budget_report (aggregates this table, never exposes raw rows) and session_status (a different table, the lifecycle row) -- the diagnostic read a budget_report investigation needs when a session is unexpectedly uncovered.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Session-Claude mapping history listed",
+    "result_type": "session_claude_mapping_list_result",
+    "result_description": "mappings: an array of every live session_claude_mapping row for the given agent_instance_id. Each entry: agent_instance_id, claude_session_id, captured_at (ISO-8601), capture_source (hook:startup | hook:clear | hook:resume | init_event), plus the standard row fields (id, namespace, created_at, updated_at, created_by, updated_by, name, is_deleted, external_id). Order is not guaranteed -- sort by captured_at if chronological order matters.",
+    "presentation_guidance": "Lead with the count of rows and the distinct claude_session_id values -- that is the ONE-TO-MANY rotation history in one glance. An empty array is a legitimate, common answer (hook never fired for this worker, or it predates the capture landing) -- say so plainly rather than treating it as a failed lookup."
+  },
+  "error_processor_customizations": {
+    "action_context": "A single filtered read on agent_instance_id against the session_claude_mapping table (is_deleted=0). No writes, no host interaction.",
+    "error_interpretation": "missing_agent_instance_id: the caller passed an empty agent_instance_id. state_service_unavailable: the state service is not bound on this solet.",
+    "recovery_guidance": "For missing_agent_instance_id, supply a real agent_instance_id (from list_sessions or a spawn_session result) rather than retrying with an empty value. state_service_unavailable indicates a platform binding problem, not a caller error."
+  }
+}

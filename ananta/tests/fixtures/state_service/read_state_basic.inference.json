@@ -1,0 +1,10 @@
+{
+  "query": "Show me the records in the jobs table",
+  "expected_process_key": "service_interface::state_service::read_state",
+  "expected_arguments": {
+    "namespace": "core",
+    "query": {
+      "table": "jobs"
+    }
+  }
+}

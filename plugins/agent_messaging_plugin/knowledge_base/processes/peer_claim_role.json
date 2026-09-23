@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::peer_claim_role",
+  "display_name": "Claim or refresh an agent role",
+  "description": "Claim or refresh the role_binding row that binds an opaque role name (Coordinator, Architect, Git-Controller, etc.) to a peer session's current routing fields (agent_id, agent_instance_id, agent_session_id, session_label). v10 Control #2 makes role_binding the sole writable resolution and compare-and-swap authority; peer_send_by_name resolves it at send time. A vacant role, a dead-holder succession, or the current session's idempotent refresh proceeds normally. A different LIVE holder is protected by default: takeover=false returns role_held_live without mutation. Set takeover=true only after operator confirmation to authorize this one claim to displace the live holder; the authorization is never persisted, the displaced holder is notified, and the takeover is logged at WARNING with both identities. takeover=true with no live holder is an ordinary claim. The /rename skill calls this with identity fields obtained from peer_register; solet watch exposes the same one-shot escape hatch as --takeover.",
+  "embedding_description": "Claim or refresh a durable role binding for Coordinator, Architect, Git-Controller, or another opaque role. Live holders are protected by default with role_held_live. An explicit operator-confirmed takeover=true displaces the live holder for this claim only, emits the handover notices, and is never retained for reconnects.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Agent role claimed or refreshed",
+    "result_type": "peer_claim_role_result",
+    "result_description": "action ('claimed', 'updated', or 'displaced'), name (the role), agent_instance_id, and agent_session_id. 'displaced' occurs only when an explicit takeover replaces a different live holder or when normal dead-holder succession replaces a prior binding.",
+    "presentation_guidance": "Confirm the role and bound session. If action is 'displaced', state that the prior holder no longer receives role-addressed deliveries. Do not describe a queued handover notice as proof the prior model consumed it."
+  },
+  "error_processor_customizations": {
+    "action_context": "Uses StateManagementInterface-backed role and role_binding records. The live-holder gate runs before the claim CAS so a refusal mutates nothing. The stable agent_session_id is required for reconnect-safe ownership and may be sourced from the claimant's live peer_binding.",
+    "error_interpretation": "role_held_live: a different live session currently owns the role and takeover was not explicitly authorized. missing_argument or missing_role_name: required claim identity or role input is empty. missing_session_id: no stable logical-session key could be supplied or sourced. system_slot_claim_denied: this caller may not claim the reserved sys: role. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "For role_held_live, confirm the intended handover with the operator, then retry once with takeover=true (or use solet watch --takeover for the arm-time claim); otherwise wait for release or holder death. A displaced watcher's next plain re-claim is refused loudly and its watcher exits rather than silently stealing the role back. For missing_session_id, relaunch with AGENT_SESSION_ID and register before claiming. Correct malformed or reserved-role input rather than retrying it unchanged."
+  }
+}

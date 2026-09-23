@@ -1,0 +1,72 @@
+name: Question
+description: Something is unclear and you need an answer to proceed.
+title: "§N.M — "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        A question is a first-class item, not a lesser defect. If the platform's
+        behavior is defensible but the documentation did not tell you so, that is
+        worth knowing — the answer usually lands as a documentation change.
+
+  - type: input
+    id: item_number
+    attributes:
+      label: Item number
+      description: Your round and item number, as `§N.M`. Repeat it at the front of the issue title.
+      placeholder: "§42.5"
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: State it directly, then give the context underneath.
+    validations:
+      required: true
+
+  - type: textarea
+    id: blocked_on
+    attributes:
+      label: What you are trying to do
+      description: >-
+        The task the answer unblocks, and what you will do under each plausible
+        answer. This is what turns a question into something answerable in one
+        reply instead of three.
+    validations:
+      required: true
+
+  - type: textarea
+    id: looked
+    attributes:
+      label: Where you already looked
+      description: >-
+        The knowledge-base searches, runbooks, or source you checked first. An
+        empty search result is information: it tells the maintainers the answer
+        is missing from a place you correctly expected it.
+    validations:
+      required: true
+
+  - type: input
+    id: release
+    attributes:
+      label: Release you are on
+      description: Your seed repository's HEAD commit, and the version in RELEASE_NOTES.md when present.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: content_gate
+    attributes:
+      label: Content gate
+      description: >-
+        This issue is published the moment you submit it, and editing it
+        afterwards does not unpublish what was there.
+      options:
+        - label: >-
+            I re-read this issue and it contains no personal identifiers, no
+            employer or business specifics, and no credentials or secret-looking
+            values — including inside any pasted output.
+          required: true

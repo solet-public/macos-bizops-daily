@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::state_service::execute_sql",
+  "display_name": "Execute SQL",
+  "description": "Execute a raw SQL query for advanced data operations and diagnostics.\n\nThis is the most powerful (and riskiest) state introspection tool. Prefer safer, higher-level operations when available (read_state, or domain services like scheduling_service and memory_service). Use execute_sql when you need a query that cannot be expressed via read_state filters, or when performing controlled, read-only diagnostics.\n\nBest practices:\n- Prefer SELECT-only queries unless you are explicitly performing cleanup.\n- Always use parameterized SQL (sql_params) instead of string interpolation.\n- Keep result sets small (LIMIT) to avoid large prompt observations.",
+  "embedding_description": "Execute raw SQL against the state database (advanced; use with caution). Useful for complex diagnostics like checking schedule tables by tag membership, but prefer read_state or domain services when possible. Use parameterized queries and LIMIT to keep results small.",
+  "result_processor_customizations": {
+    "action_label": "Execute SQL",
+    "result_type": "sql_results",
+    "result_description": "Results from raw SQL query execution including rows affected or returned",
+    "presentation_guidance": "",
+    "output_action_guidance": "SQL results were returned. Use them as evidence for the next step (for example: decide whether a heartbeat schedule exists and should be created or repaired). Avoid treating SQL output as authoritative if the query is incomplete or unscoped."
+  },
+  "error_processor_customizations": {
+    "action_context": "Executing raw SQL query against the database",
+    "error_interpretation": "SyntaxError: SQL syntax is invalid. PermissionError: query not allowed for security reasons. ConnectionError: database connection failed.",
+    "recovery_guidance": "For syntax errors: verify SQL syntax is correct. For permission errors: use the high-level API methods instead of raw SQL. For connection errors: verify database is running and accessible."
+  }
+}

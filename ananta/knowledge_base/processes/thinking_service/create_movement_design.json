@@ -1,0 +1,26 @@
+{
+  "process_key": "service_interface::thinking_service::create_movement_design",
+  "display_name": "Create Movement Design",
+  "description": "persist an authored-by-value Movement Design Packet and Phrase Design Ledger for a specific movement. The calling agent authors both documents and passes them in `packet_content` and `ledger_content`.",
+  "embedding_description": "Persist an authored Movement Design Packet and Phrase Design Ledger for a baroque keyboard movement. The calling agent writes both documents and passes them by value. The packet commits movement-level formal argument, harmonic route, motif material, and texture plan. The ledger translates these into per-phrase continuity obligations (formal_function, cadence_type, motif_directive, entry/exit anchors) that the WBS binds into compose_baroque_phrase steps.",
+  "result_processor_customizations": {
+    "action_label": "Movement design created",
+    "result_type": "movement_design_create_result",
+    "result_description": "Movement Design Packet and Phrase Design Ledger stored",
+    "presentation_guidance": "",
+    "output_action_guidance": "The Movement Design Packet and Phrase Design Ledger have been stored and are now available as working context. Continue executing the current step as shown in the updated ACTIVE_PLAN.",
+    "message_rendering": {
+      "renderer_key": "raw_observation",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Persisting an authored-by-value Movement Design Packet and Phrase Design Ledger. create_movement_design accepts {manifest_id, movement_type, packet_content, ledger_content}. The calling agent must author both full documents and pass them by value — the platform never generates them. The platform generates packet and ledger ids.",
+    "error_interpretation": "authored_content_required: `packet_content` or `ledger_content` was missing or empty — the thinking-model authoring path was retired (DEP-01); author both full documents and pass them by value. ValidationError: arguments do not conform to the schema, or a `##` section exceeds the size limit. StorageError: knowledge base write failed. ParameterError: manifest_id or movement_type is missing."
+  }
+}

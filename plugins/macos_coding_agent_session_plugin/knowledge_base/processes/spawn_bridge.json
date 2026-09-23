@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_coding_agent_session_plugin::spawn_bridge",
+  "display_name": "Spawn MCP bridge subprocess (macOS coding-agent session plugin)",
+  "description": "macOS implementation of spawn_bridge: starts `python -m agent_messaging_plugin.mcp_bridge` as a child of the solet process and tracks it under the supplied agent_instance_id. See service_interface::coding_agent_session_service::spawn_bridge for the canonical contract; this plugin-side process key is the bound provider's surface and resolves to the same verb. Bound-provider skip semantics (per `0e72ac15`) mean callers route through the service_interface::* key, not this plugin::* key.",
+  "embedding_description": "macOS-scope implementation of spawn_bridge — starts an MCP bridge subprocess as a child of the solet process (not iTerm2) and records its pid keyed by agent_instance_id. Mirrors the canonical service_interface::coding_agent_session_service::spawn_bridge contract. Returns BridgeSpawnResult.",
+  "result_processor_customizations": {
+    "action_label": "MCP bridge spawned",
+    "result_type": "coding_agent_session_bridge_spawn_result",
+    "result_description": "BridgeSpawnResult frozen dataclass mirroring the canonical service interface return.",
+    "presentation_guidance": "See the canonical service_interface entry; the plugin-side surface mirrors it."
+  },
+  "error_processor_customizations": {
+    "action_context": "macOS-side spawn of an MCP bridge subprocess.",
+    "error_interpretation": "See the canonical service_interface entry; same error tokens.",
+    "recovery_guidance": "See the canonical service_interface entry."
+  }
+}

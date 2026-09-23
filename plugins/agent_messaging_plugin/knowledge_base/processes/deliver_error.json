@@ -1,0 +1,12 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::deliver_error",
+  "display_name": "Deliver Bridge-Contract Failure To Bridge",
+  "description": "Deliver a bridge-delivery contract violation to the originating MCP bridge session as a bridge_delivery_error channel event. Submitted exclusively by the platform's bridge-delivery dispatcher when the contract validator rejects an action's trigger_data (missing keys, originator/action session_id mismatch, unregistered deliver_* processes, etc.) — never authored by the model. Terminal EDGE_SINK action: no result processor, no error processor, no follow-up inference. The error_payload uses the platform's fixed shape (error_message, process_key, action_id, failed_arguments, canonical_schema). Because this builder strips most structured fields down to that fixed shape, a source process with rich structured failure info may prefer routing its own failures through deliver_result instead, with a payload whose own status field discriminates the outcome.",
+  "embedding_description": "Deliver bridge-contract failure to the originating MCP bridge session as bridge_delivery_error channel event. Submitted by the platform's bridge-delivery dispatcher when the contract validator rejects trigger_data; never authored by the model. Carries the fixed error_payload shape (error_message, process_key, action_id, failed_arguments). EDGE_SINK terminal. Sibling to deliver_result.",
+  "processor_policy_category": "edge_sink",
+  "error_processor_customizations": {
+    "action_context": "Delivers a bridge-contract failure payload to the originating MCP caller via the agent_messaging bridge. deliver_error accepts {error_payload: dict, source_process_key: str, bridge_id: str}.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. bridge.no_active_bridge: bridge_id is missing from delivery params, or no active bridge exists for the id, or the bridge is closed. bridge.queue_full: the bridge already has too many pending outbound events. bridge.process_call_failed: error_payload was not a dict.",
+    "recovery_guidance": "Same recovery posture as deliver_result — bridge-side delivery failure means the originating caller has lost the channel. Escalate to the originating user-process error handler rather than retry blindly. If the queue is full, the caller is consuming events too slowly; drop with a structured error rather than back-pressure the dispatcher. If error_payload is malformed, that is a platform bug in the dispatcher itself — escalate."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::postgres_state_management_plugin::read_state",
+  "display_name": "Read State (Postgres)",
+  "description": "Query PostgreSQL state database. Supports flexible filtering with table and conditions.",
+  "embedding_description": "Query the PostgreSQL state store by namespace and a query object with table, filters, and optional limit. Returns records and count. Use to read plugin state, look up entities, or fetch rows for workflows.",
+  "result_processor_customizations": {
+    "action_label": "Read State",
+    "result_type": "query_results",
+    "result_description": "Records retrieved from the PostgreSQL database with count and metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Querying PostgreSQL state database for records matching specified filters",
+    "error_interpretation": "QueryError with 'table': missing or invalid table name in query. QueryError with 'limit': limit must be an integer. ConnectionError: PostgreSQL connection failed or pool exhausted.",
+    "recovery_guidance": "For table errors: ensure the query includes a valid 'table' key. For limit errors: provide an integer value for limit. For connection errors: verify PostgreSQL is running and accessible."
+  }
+}

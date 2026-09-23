@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::archive_file",
+  "display_name": "Archive Knowledge Base Document",
+  "description": "Retire a document by moving it under the knowledge base's archive subdirectory, stamping its metadata block, and re-keying its index chunk so it stays discoverable and readable at the new path. The sanctioned alternative to deletion for archive-managed KBs (e.g. workbench).",
+  "embedding_description": "Archive, retire, or mark superseded a workbench document (a markdown .md file) instead of deleting it: move the file into the knowledge base's archive folder, stamp it with an Archived date (and Superseded_by when a replacement exists), and keep it findable and readable at its new archived path. Use to declare a document done, obsolete, or replaced by a newer version when delete is not allowed and archive is the policy.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge base document archived",
+    "result_type": "knowledge_base_file_archived",
+    "result_description": "Document moved to the archive subdirectory, metadata stamped, and chunk re-keyed to the new path",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Archiving a knowledge base document",
+    "error_interpretation": "ValueError: the knowledge base has no archive subdirectory configured. PermissionError: the path is already archived or is a snapshot sidecar. FileExistsError: a document already exists at the archive destination (never overwritten).",
+    "recovery_guidance": "Confirm the KB supports archiving and the source path is a live document; if a successor exists, pass superseded_by."
+  }
+}

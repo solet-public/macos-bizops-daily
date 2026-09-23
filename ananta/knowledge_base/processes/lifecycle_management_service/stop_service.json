@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::lifecycle_management_service::stop_service",
+  "display_name": "Stop Service",
+  "description": "Stop a running service",
+  "embedding_description": "Shut down a running service plugin gracefully. Halt a background service without restarting the platform. Stop a named service and release its resources. Quiesce a worker or daemon plugin on demand. Turn off a service interface implementation without affecting others.",
+  "result_processor_customizations": {
+    "action_label": "Service stopped",
+    "result_type": "service_lifecycle",
+    "result_description": "Service shutdown result with keys: success (boolean indicating shutdown status), service_name (name of the stopped service), message (status description)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Stops a running service plugin, gracefully shutting down its operations and releasing resources",
+    "error_interpretation": "ServiceNotFoundError: The requested service is not registered. NotRunningError: The service is not currently running. ShutdownTimeoutError: The service did not stop within the allowed time. DependentServicesError: Other services depend on this service and are still running.",
+    "recovery_guidance": "For service not found: Verify the service name is correct. For not running: The service may have already stopped or never started. For shutdown timeout: The service may be stuck; consider force stopping. For dependent services: Stop dependent services first before stopping this one."
+  }
+}

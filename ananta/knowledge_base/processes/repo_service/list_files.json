@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::repo_service::list_files",
+  "display_name": "List Repository Files",
+  "description": "List directory entries under a repo-root-confined path (defaults to the repo root), to a bounded recursion depth, with an optional file-name glob filter. Returns {path, type: file|dir} entries; denylisted locations (.git/, profile/ secrets, bundled venvs, __pycache__, runtime dirs) are excluded from the listing. The base path is confined exactly like read_file — traversal / symlink-escape / absolute-outside / denylisted base is typed-rejected. Entry count is capped with an explicit truncated marker.",
+  "embedding_description": "Enumerate files and subdirectories under a directory in the platform repository worktree, bounded by depth and optional name glob. Repo-root confined; excludes .git, profile secrets, and vendored venvs. Use to explore the tree or discover paths before reading them.",
+  "result_processor_customizations": {
+    "action_label": "Directory listed",
+    "result_type": "repo_list_files_result",
+    "result_description": "Object with 'base' (listed dir or '.'), 'entries' ([{path, type}] — denylisted excluded), 'truncated'.",
+    "presentation_guidance": "Group entries by type (dirs then files) or present as a tree; if 'truncated' is true, note the entry cap and suggest a narrower path/glob or shallower depth.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing a repo-root-confined worktree directory (bounded depth, optional glob) with denylisted entries excluded.",
+    "error_interpretation": "RepoPathError: the base path escaped the repo root or is not a directory. RepoDenylistError: the base path targets a denylisted location — excluded by policy, not absent.",
+    "recovery_guidance": "For RepoPathError: pass a repo-root-relative path to an actual directory (or omit for the root). For RepoDenylistError: that directory is intentionally excluded (.git/profile/venv/runtime)."
+  }
+}

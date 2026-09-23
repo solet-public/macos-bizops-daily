@@ -1,0 +1,16 @@
+{
+  "process_key": "service_interface::address_book_service::register",
+  "arguments": {
+    "name": "test_11_1_2_tagged_endpoint",
+    "address_type": "endpoint",
+    "description": "Test endpoint with tags for integration testing (test 11.1.2)",
+    "entries": [
+      {
+        "field_type": "url",
+        "description": "API Base URL",
+        "value": "https://api.test-11-1-2.example.com/v1"
+      }
+    ],
+    "tags": ["production", "api", "integration-test"]
+  }
+}

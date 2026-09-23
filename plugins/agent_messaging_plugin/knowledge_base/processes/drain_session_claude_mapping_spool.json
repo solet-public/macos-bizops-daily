@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::drain_session_claude_mapping_spool",
+  "display_name": "Drain the session-claude-mapping capture spool",
+  "description": "T1 usage-capture lane (2026-08-05). Drains the SessionStart hook's file-per-firing spool -- the directory declared by the platform's session-mapping spool env var, written by .claude/hooks/capture_session_mapping.py on every worker SessionStart -- into the session_claude_mapping table. Lists the spool dir, upserts a row per well-formed firing, and deletes each file only after its upsert durably completes -- crash-safe by construction: a file that survives a crash before its post-write delete is safely re-ingested next drain (the upsert conflicts on the same (agent_instance_id, claude_session_id, captured_at) triple the spool filename encodes, so re-ingestion updates the same row rather than duplicating it). A malformed file (bad JSON, missing required field) is logged and left in place for investigation, never silently deleted and never fatal to the rest of the drain. A missing or nonexistent spool dir (APP_HOME unset, or no firing has happened yet) is a valid steady state, returning zero-processed rather than an error. Callable on demand (this verb) AND wired as a call site in the platform's D1 session-lifecycle sweep tick, same pattern as the overdue-session marking it runs alongside.",
+  "embedding_description": "Drain the session-start capture spool into the agent_instance_id-to-claude_session_id mapping table -- distinct from report_alive (a liveness heartbeat, not identity capture), spawn_session (creates the managed_session row this mapping cross-references, captures no Claude session_id), and list_sessions (reads managed_session rows only, never the capture spool).",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Session-claude-mapping spool drained",
+    "result_type": "drain_session_claude_mapping_spool_result",
+    "result_description": "files_seen (spool files found this call), upserted (successfully ingested and deleted), skipped_malformed (left in place for investigation, not deleted).",
+    "presentation_guidance": "State the three counts plainly. A high skipped_malformed count relative to files_seen is worth flagging -- it usually means the SessionStart hook or the spool file format has drifted from what this drain expects, not that the drain itself is broken (the drain never fails loud on a malformed file; it logs and moves on)."
+  },
+  "error_processor_customizations": {
+    "action_context": "The only failure mode this verb raises on is state_service_unavailable (the platform's StateManagementInterface binding is down) -- filesystem-level issues (missing spool dir, unreadable/malformed spool file, a file that can't be deleted after a successful upsert) are all handled internally and reported as part of a normal successful result, never as an error.",
+    "error_interpretation": "state_service_unavailable means the platform's state binding is down; this verb performed no filesystem changes and no spool files were touched.",
+    "recovery_guidance": "Retry is always safe -- this verb is idempotent by construction (the upsert conflicts on the same triple the spool filename encodes), so re-running after a state_service_unavailable failure, or on the next scheduled sweep tick, never risks a duplicate or lost row."
+  }
+}

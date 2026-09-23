@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::record_held_authorization",
+  "display_name": "Record a held-authorization refusal (R1 held-authorization queue)",
+  "description": "R1 held-authorization queue (2026-08-17). Records one open entry: a gate-green request Git-Controller refused because it could not verify a first-party authorization in its own inbox — the pre-authorization exception in the git-controller-commit skill's Step 0. This is the mechanically-enumerable half of the R1 fix — the platform-side backstop that closes the failure regardless of any seat's memory, complementing the OBLIGATIONS slot in the seat running-log convention (ananta/knowledge_base/seat_running_log_convention.md), which fixes the same failure through seat discipline. Convention (not mechanically enforced — capability first, lockdown only after usage data, per the seat's 2026-08-17 ruling): Git-Controller calls this at REFUSAL time, never the requesting peer — a peer that forgets to record an obligation would equally forget to enqueue one, so this call must be triggered by the refusal itself, a moment Git-Controller reaches mechanically every time. Every call is a fresh INSERT: the same request can be refused more than once across retries, and each refusal is its own obligation until something retires it, so this is a log of refusal EVENTS, not a one-row-per-request cache.",
+  "embedding_description": "Recording that Git-Controller blocked a commit because the authorization backing it was only a relayed citation, not a first-party message Git-Controller itself holds. Logs who is blocked, who owes the authorization, and why, so the obligation survives a rotation instead of living only in a conversation. Called by Git-Controller at the moment of refusal, not by the peer whose request was refused.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Held authorization recorded",
+    "result_type": "record_held_authorization_result",
+    "result_description": "{\"entry_id\": \"hau_...\", \"status\": \"recorded\"} — entry_id is what a later retire_held_authorization call needs.",
+    "presentation_guidance": "This is a finding worth surfacing, not routine noise — it means a piece of finished work is now sitting blocked. Name what is blocked and who it is waiting on."
+  },
+  "error_processor_customizations": {
+    "action_context": "A plain state insert into held_authorization. No caller-identity check on this verb — the Git-Controller-at-refusal-time convention is documented, not enforced.",
+    "error_interpretation": "missing_argument: one of requesting_peer/owed_by_role/branch_or_request_ref/reason was empty. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "missing_argument means the caller omitted a required field — fix the call, do not retry as-is. state_service_unavailable is worth a retry once the platform is up. This verb is NOT safe to blind-retry after a fault of unknown outcome — a retry after a write that actually landed creates a genuine second open entry for the same refusal; confirm via list_held_authorizations before re-calling."
+  }
+}

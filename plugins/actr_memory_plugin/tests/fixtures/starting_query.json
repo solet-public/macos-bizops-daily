@@ -1,0 +1,9 @@
+{
+    "name": "my_query",
+    "description": "Search for schema code",
+    "process_key": "service_interface::memory_service::recall",
+    "arguments": {
+        "query": "How is the project organized",
+        "top_k": 5
+    }
+}

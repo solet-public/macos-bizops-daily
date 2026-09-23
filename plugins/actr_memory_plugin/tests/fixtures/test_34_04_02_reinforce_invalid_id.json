@@ -1,0 +1,14 @@
+{
+  "name": "test_reinforce_invalid_id",
+  "description": "Verify error handling when reinforcing a non-existent memory",
+  "process_key": "plugin::actr_memory_plugin::reinforce_action",
+  "arguments": {
+    "params": {
+      "memory_id": "non-existent-uuid-67890"
+    },
+    "state": {
+      "session_id": "test-session-031"
+    }
+  },
+  "timeout_seconds": 30
+}

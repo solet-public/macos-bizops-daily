@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::deactivate",
+  "display_name": "Deactivate Knowledge Base",
+  "description": "Deactivate a knowledge base so it is excluded from search results.",
+  "embedding_description": "Hide an installed knowledge base from search without uninstalling or deleting it. Flips the install record's active flag off so its chunks stay indexed but stop appearing in search results, reversible later with activate. Use to temporarily mute or suppress a knowledge base's content from retrieval while keeping it installed.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge base deactivated",
+    "result_type": "knowledge_base_deactivated",
+    "result_description": "KB is now inactive and excluded from search",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Deactivating a knowledge base",
+    "error_interpretation": "NotFoundError: KB not found.",
+    "recovery_guidance": "Use list_installed to verify the KB name."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::process_memorization_queue_cron",
+  "display_name": "Process Memorization Queue (Cron Sibling)",
+  "description": "Scheduler-fired EDGE_SINK sibling that processes due memorization reviews. Terminal action; no result-processor dispatch and no inference scaffold. Cron-only wiring (`is_discoverable=False`); not surfaced via process_search. The model-callable equivalent is service_interface::memory_service::process_memorization_queue.",
+  "embedding_description": "Scheduler cron sibling that fires due-memorization-queue processing as an EDGE_SINK terminal action. Operator wiring used only by the actr_memory recurring schedule; returns processed_count without re-entering the inference scaffold. The model-callable equivalent is service_interface::memory_service::process_memorization_queue."
+}

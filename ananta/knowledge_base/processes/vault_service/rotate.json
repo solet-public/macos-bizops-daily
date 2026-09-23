@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::rotate",
+  "display_name": "Rotate Secret",
+  "description": "Update an existing secret value. Increments version for tracking. Use this instead of delete+store to maintain history.",
+  "embedding_description": "Vault: rotate a secret. Replace the value of an existing credential, password, OAuth client_secret, API key, refresh token, or bearer token under the same vault key. Increments the version counter so audit history is preserved. Requires the vault to be unlocked. Use (not delete + store) when downstream consumers reference the secret by stable key — they keep working across the rotation.",
+  "result_processor_customizations": {
+    "action_label": "Secret rotated",
+    "result_type": "secret_rotated",
+    "result_description": "Confirmation that secret was updated with new value. Contains key (identifier), version (new version number), and message (status). NEVER contains secret values.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Updates an existing secret with a new encrypted value. Increments version counter for audit tracking.",
+    "error_interpretation": "VaultLocked: Vault must be unlocked before rotating secrets. KeyNotFound: No secret exists with the specified key - use store() instead. InvalidValue: New value is empty or invalid.",
+    "recovery_guidance": "For VaultLocked: Prompt user to unlock vault first. For KeyNotFound: Suggest using store() to create a new secret. For InvalidValue: Ask user to provide a valid non-empty value."
+  }
+}

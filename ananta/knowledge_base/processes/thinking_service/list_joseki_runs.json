@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::thinking_service::list_joseki_runs",
+  "display_name": "List Joseki Runs",
+  "description": "Bounded listing of joseki run rows, optionally filtered by status (running/awaiting_user/completed/failed) and/or joseki_key, newest first up to limit (default 50). Each row uses the same projection as get_joseki_run.",
+  "embedding_description": "List recent platform-driven joseki runs across all cards: which joseki executions are currently running, which parked awaiting a user, which completed or failed — filterable by run status or by one card's JOSEKI_KEY. The fleet-level run dashboard read. Distinct from get_joseki_run (one run by id) and list_playbooks or list_plans (planning artifacts, not joseki executions)."
+}

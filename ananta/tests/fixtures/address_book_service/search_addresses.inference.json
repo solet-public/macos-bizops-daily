@@ -1,0 +1,10 @@
+{
+  "natural_language_query": "Find my API addresses",
+  "expected_process_key": "service_interface::address_book_service::search",
+  "expected_arguments_structure": {
+    "query": "string (optional)",
+    "address_type": "string (optional)",
+    "tag": "string (optional)",
+    "limit": "integer (optional)"
+  }
+}

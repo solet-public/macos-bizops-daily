@@ -1,0 +1,15 @@
+{
+  "name": "test_get_vector_basic",
+  "description": "Retrieve a specific vector by ID",
+  "process_key": "plugin::pgvector_service_plugin::get_vector_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vector_id": "test-vector-id-001"
+    },
+    "state": {
+      "current_session_id": "test-get-basic-001"
+    },
+    "timeout_seconds": 30
+  }
+}

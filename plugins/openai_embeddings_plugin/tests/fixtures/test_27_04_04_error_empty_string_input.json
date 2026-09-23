@@ -1,0 +1,10 @@
+{
+  "name": "test_error_empty_string_input",
+  "description": "Test behavior with empty string in inputs array",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": [""],
+    "input_type": "text"
+  },
+  "timeout_seconds": 60
+}

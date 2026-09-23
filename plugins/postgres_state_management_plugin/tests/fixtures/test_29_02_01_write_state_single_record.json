@@ -1,0 +1,22 @@
+{
+  "name": "test_write_state_single_record",
+  "description": "Verify write_state can insert a single record into the database",
+  "process_key": "plugin::postgres_state_management_plugin::write_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "data": {
+        "table": "key_value_store",
+        "record": {
+          "id": "test_kv_29_02_01",
+          "namespace": "test",
+          "key": "test_key_01",
+          "value": "test_value_01",
+          "scope": "GLOBAL"
+        }
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

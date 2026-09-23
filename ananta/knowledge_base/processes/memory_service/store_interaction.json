@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::store_interaction",
+  "display_name": "Store Interaction",
+  "description": "Store an interaction event in short-term session memory. Used by I/O interfaces (console, JSON-RPC, Telegram, etc.) to record user inputs and system outputs for conversation history. Events are stored with timestamps and namespace for filtering.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Store Interaction",
+    "result_type": "interaction_stored",
+    "result_description": "Interaction event stored in session memory",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Storing interaction event in session memory",
+    "error_interpretation": "ValidationError: invalid event_type or missing required fields. DatabaseError: failed to persist event to storage.",
+    "recovery_guidance": "Verify event_type is 'user_input' or 'system_output'. For database errors: verify state storage is accessible."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "test_execute_sql_invalid_syntax",
+  "description": "Verify execute_sql returns error on invalid SQL syntax",
+  "process_key": "plugin::postgres_state_management_plugin::execute_sql",
+  "arguments": {
+    "params": {
+      "sql_query": "INVALID SQL SYNTAX HERE!!!"
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "empty",
+    "Namespace is empty",
+    "error",
+    "not found"
+  ],
+  "action_status": "error"
+}

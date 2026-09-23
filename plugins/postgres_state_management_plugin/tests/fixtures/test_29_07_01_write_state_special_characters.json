@@ -1,0 +1,22 @@
+{
+  "name": "test_write_state_special_characters",
+  "description": "Verify write_state handles special characters in values correctly",
+  "process_key": "plugin::postgres_state_management_plugin::write_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "data": {
+        "table": "key_value_store",
+        "record": {
+          "id": "test_special_chars_01",
+          "namespace": "test_special",
+          "key": "special_key",
+          "value": "Value with 'quotes', \"double quotes\", and special chars: !@#$%^&*()",
+          "scope": "GLOBAL"
+        }
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

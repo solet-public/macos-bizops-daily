@@ -1,0 +1,12 @@
+{
+  "name": "test_memory_stats",
+  "description": "Verify retrieval of comprehensive memory system statistics",
+  "process_key": "plugin::actr_memory_plugin::memory_stats_action",
+  "arguments": {
+    "params": {},
+    "state": {
+      "session_id": "test-session-090"
+    }
+  },
+  "timeout_seconds": 30
+}

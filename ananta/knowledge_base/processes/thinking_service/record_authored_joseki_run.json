@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::record_authored_joseki_run",
+  "display_name": "Record Authored Joseki Run",
+  "description": "record that a registered joseki card produced one successful run: increment its run-evidence counter, stamp the last-run timestamp, and promote a candidate card to proven once it has at least one recorded run.",
+  "embedding_description": "Log a successful execution of an authored joseki pattern as run evidence on its lifecycle row. Increments the run counter and last-run time, and advances a candidate joseki to proven because proven means at least one recorded successful run. This is evidence about the reusable joseki card itself, not a per-step observation inside a work-breakdown execution.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Authored joseki run recorded",
+    "result_type": "authored_joseki_run_result",
+    "result_description": "Run-evidence result with keys: joseki_key, state, run_count, wbs_id, status",
+    "presentation_guidance": "Report the joseki_key, its run_count after this record, and its state — note when a candidate has just been earned into proven.",
+    "output_action_guidance": "The run evidence is durable. A candidate with its first recorded run is now proven; a card that was already proven simply gains a run. Continue the current plan."
+  },
+  "error_processor_customizations": {
+    "action_context": "Recording run evidence for an authored joseki card so it can be earned into the proven state. record_authored_joseki_run accepts {joseki_key, wbs_id?}.",
+    "error_interpretation": "JosekiNotFound: no lifecycle row exists for the key. StateConflict: the card is a draft (never validated), superseded, or archived — only a candidate or proven card accepts run evidence — or the row changed underneath the compare-and-set.",
+    "recovery_guidance": "Draft cards: promote the card to candidate (which validates it) before recording a run. Superseded or archived cards: use the current replacement card instead. Conflicts from a concurrent update: re-read with get_authored_joseki and resubmit."
+  }
+}

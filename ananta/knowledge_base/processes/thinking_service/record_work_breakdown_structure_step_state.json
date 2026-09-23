@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::thinking_service::record_work_breakdown_structure_step_state",
+  "display_name": "Record WBS Step State",
+  "description": "record step-level execution state and produced artifacts in an existing Work Breakdown Structure without rewriting the whole document.",
+  "embedding_description": "Record step state in work breakdown structure. Update a single WBS step with generated filenames, completion status, checkpoint outcomes, or phase handoff state. Narrow mutation that preserves the rest of the document.",
+  "error_processor_customizations": {
+    "action_context": "Recording execution state for a WBS step. record_work_breakdown_structure_step_state accepts {wbs_id, step_number, status, state_summary?, output_artifacts?}.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. NotFoundError: WBS with this ID does not exist."
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "test_list_memories",
+  "description": "List memories with filters",
+  "process_key": "service_interface::memory_service::list_memories",
+  "arguments": {
+    "memory_type": "episodic",
+    "status": "active",
+    "sort_by": "strength",
+    "limit": 10
+  }
+}

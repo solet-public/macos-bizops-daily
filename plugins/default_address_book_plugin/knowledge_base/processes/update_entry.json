@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::default_address_book_plugin::update_entry",
+  "display_name": "Update Entry",
+  "description": "Update a specific entry by ID.",
+  "embedding_description": "Update a specific entry by entry_id. Modify field_type, description, or value without changing the address. Use to correct or refresh address details; returns updated entry data after modification. Useful for corrections or updates.",
+  "result_processor_customizations": {
+    "action_label": "Update Entry",
+    "result_type": "entry_updated",
+    "result_description": "Updated entry record with new values",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

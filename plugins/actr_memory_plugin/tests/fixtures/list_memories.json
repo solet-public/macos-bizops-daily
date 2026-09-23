@@ -1,0 +1,9 @@
+{
+  "name": "test_list_memories_direct_plugin_blocked",
+  "description": "Verify that direct plugin invocation is blocked when plugin is bound to a service interface. Must use service_interface::memory_service::list_memories instead.",
+  "process_key": "plugin::actr_memory_plugin::list_memories",
+  "arguments": {
+    "limit": 10,
+    "sort_by": "strength"
+  }
+}

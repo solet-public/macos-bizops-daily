@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::cloud_self_deployment_service::deploy_self",
+  "display_name": "Deploy this solet to a new image tag",
+  "description": "Runs the blue-green deploy mechanic against the solet's own ECS service + ALB target group + listener rule. Detects the live resource version, verifies the image exists in ECR, births a sibling task definition + target group + ECS service, waits for the sibling's ALB health check, atomically swaps the listener rule, drains the old target group, then enqueues a durable complete_deploy action so the new color tears down the old one. Returns status='cutover_complete' once steps 1–7 finish and the finisher row is enqueued.",
+  "embedding_description": "Deploy this solet to a new image tag via blue-green ECS swap from inside her own container. Steps 1–7 on old color: detect version, verify ECR image, birth sibling, wait for ALB health, smoke probe, ModifyRule cutover, drain. Enqueues complete_deploy as durable action so new color runs steps 8–10. Returns from_version, to_version, image_tag, sibling ARNs, cutover_at, finisher_action_id.",
+  "result_processor_customizations": {
+    "action_label": "deploy_self cutover complete",
+    "result_type": "self_deployment_result",
+    "result_description": "Status, version labels, image tag, sibling ARNs, and the finisher action id.",
+    "presentation_guidance": "Surface the from_version → to_version transition, the cutover_at timestamp, and the finisher_action_id. If status='dry_run', show the planned_calls list. If status='failed', surface the error code + message."
+  },
+  "error_processor_customizations": {
+    "action_context": "Self-deploy of the live solet to a new image tag.",
+    "error_interpretation": "ecr_image_not_found: operator must push the image via CodeBuild first. health_check_timeout: new task did not boot cleanly; check CloudWatch /ecs/<solet>. no_listener_rule_for_solet: provisioning was incomplete or the ALB has been edited externally.",
+    "recovery_guidance": "Re-run deploy_self with the same image_tag; AWS resource tags make the step machine idempotent and it resumes from whichever step last completed."
+  }
+}

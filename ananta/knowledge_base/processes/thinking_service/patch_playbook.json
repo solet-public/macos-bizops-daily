@@ -1,0 +1,16 @@
+{
+  "process_key": "service_interface::thinking_service::patch_playbook",
+  "display_name": "Patch Playbook",
+  "description": "Request a playbook revision (e.g., phase transition, scope change). Stores the patch request and resumes the planning VERTEX to produce an updated playbook and plan.",
+  "embedding_description": "Request a revision to an existing playbook when scope changes, a phase transition occurs, new constraints appear, or the current playbook needs correction. Use to submit a patch request that causes the planning vertex to produce an updated playbook and aligned plan rather than manually rewriting the playbook document yourself.",
+  "result_processor_customizations": {
+    "action_label": "playbook patch requested",
+    "result_type": "playbook_patched",
+    "result_description": "Patch request stored; planning VERTEX will resume",
+    "output_action_guidance": "The playbook patch has been submitted to the planning VERTEX. The planning model will produce an updated playbook and plan."
+  },
+  "error_processor_customizations": {
+    "action_context": "Patching a playbook. patch_playbook accepts {playbook_id, patch_description}.",
+    "error_interpretation": "NotFound: playbook_id does not exist. ConnectionError: thinking model not reachable."
+  }
+}

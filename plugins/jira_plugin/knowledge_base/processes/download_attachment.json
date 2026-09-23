@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::download_attachment",
+  "display_name": "Jira: Download Attachment",
+  "description": "Download a Jira attachment (by attachment id, from get_issue's attachment metadata) into blob storage and return its attachment_blob_key, filename, mime, and size. Read action.",
+  "embedding_description": "Fetch the actual bytes of a file attached to a Jira issue and store them in platform blob storage, returning a blob key reference along with the filename, mime type, and size. Take the attachment id from the issue's attachment metadata first. The returned key can be handed to other plugins to email or analyse the file.",
+  "result_processor_customizations": {
+    "action_label": "Jira attachment downloaded",
+    "result_type": "jira_download_attachment_result",
+    "result_description": "attachment_blob_key referencing the stored bytes, plus filename, mime, and size.",
+    "presentation_guidance": "Confirm the download and give the filename. The attachment_blob_key references potentially sensitive corporate content (sensitivity 0.3) — surface it for downstream use but do not treat it as public."
+  },
+  "error_processor_customizations": {
+    "action_context": "Download a Jira attachment into blob storage.",
+    "error_interpretation": "jira.not_found: no attachment with that id exists. jira.permission_denied: the account cannot access the parent issue. jira.invalid_params: the attachment_id was missing. blob_storage_service_not_available: the platform blob store is not bound.",
+    "recovery_guidance": "jira.not_found: get the attachment id from get_issue. jira.permission_denied: grant the service account browse permission on the issue's project. blob_storage_service_not_available: ensure blob storage is configured."
+  }
+}

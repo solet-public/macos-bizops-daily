@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "anchors": [
+    {
+      "anchor_id": "stable-pre-manager-seed-v1",
+      "anchor_kind": "pre_manager_seed",
+      "channel_id": "stable",
+      "repository": "https://github.com/solet-public/macos-bizops.git",
+      "commit": "fab22b6f2c832a5b86176f6916166f6c6bc7677b",
+      "tree_hash": "13461a6db6829e5d6546852fe49574adfaf40874",
+      "provenance_sha256": "7136ce79e4f06f28889a3daf91f1a4ad62eb48c0aca5f8b8d6f3b49160be6d6f",
+      "seed_id": "bb782efa-a331-5748-bc29-7f012b9a5f9d",
+      "origin_id": "123e4567-e89b-12d3-a456-426614174001",
+      "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "channel_relation": "fast_forward",
+      "transition_paths": []
+    }
+  ]
+}

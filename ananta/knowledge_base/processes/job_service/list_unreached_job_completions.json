@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::job_service::list_unreached_job_completions",
+  "display_name": "List Unreached Job Completions",
+  "description": "List finished background jobs whose completion had nowhere to arrive. Measured 2026-08-14: a job completion never returns over the bridge that dispatched it — the configured continuation posts a message into an IO channel, and a flow created by a bridge dispatch (the local CLI and every direct process_call) has no such channel, so those results sit in the ledger unannounced. This verb returns exactly the jobs stamped that way at completion time, newest first, each with its stored result or error payload attached. Jobs carrying no stamp are never listed: an absent stamp means the condition was not measured, not that the job was unreachable. Use this to sweep up outcomes nobody was told about; use get_job when the job_id is already known.",
+  "embedding_description": "Find completed background jobs whose results were never delivered to anyone. Sweep up orphaned or unannounced async job outcomes dispatched from a command line or a direct process call, where no session was listening when the work finished, and read their result payloads in one pass.",
+  "result_processor_customizations": {
+    "action_label": "Unreached completions listed",
+    "result_type": "unreached_completions_listed",
+    "result_description": "A jobs array (newest first, capped by the limit argument, default 20 and maximum 100) plus a count of the records in this page. Each job carries the ledger fields — id, provider_name, status, timestamps, metadata — with its newest stored result and error payloads attached under result and error.",
+    "presentation_guidance": "Report the count and then each job's provider_name, completion time, and the substance of its result payload — that payload is the outcome nobody received, so it is the point of the answer, not an appendix. An empty list means no finished job is stamped as unreached, which is a normal and good state; do not present it as a failure. The count reflects this page only, not the total ever recorded.",
+    "output_action_guidance": "Deliver the results that matter to whoever needed them, and cite the job_id alongside each so the record can be re-read with get_job. Do not re-dispatch the originating verb to obtain a result already listed here — the work is finished and re-running it would repeat side effects such as creating a second file or a second export."
+  },
+  "error_processor_customizations": {
+    "action_context": "Lists finished asynchronous jobs stamped as having had no completion channel",
+    "error_interpretation": "A limit outside 1-100 raises and returns an error envelope rather than being silently clamped, so a caller asking for a larger page cannot lose the overflow without noticing. Every other error is the underlying job or payload query failing, surfaced as the stringified exception. An empty jobs list is never an error.",
+    "recovery_guidance": "On a limit error: re-invoke with a limit between 1 and 100, paging through by acting on each page before requesting the next. On a query error: check database connectivity and job-service health, then re-invoke — the read is idempotent and changes nothing."
+  }
+}

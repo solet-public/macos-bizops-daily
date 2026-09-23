@@ -1,0 +1,26 @@
+name: claude_ai_export_session_source_plugin
+description: |
+  LLM session ledger source for Claude.ai web data-export ZIPs (M9). The
+  operator hands a ZIP to the solet via the
+  ``plugin::claude_ai_export_session_source_plugin::ingest_export`` EDGE
+  verb (file_path OR base64 content_bytes, 100 MiB cap). The verb body
+  stores the ZIP through blob_storage_service, inserts a
+  session_ledger__source row + __import_batch, and triggers the
+  importer. From there this plugin walks the archive via the standard
+  PushedSourceMixin path against the now-durable blob.
+
+  The retired POST /api/v1/ledger/claude_ai_export/upload HTTP route
+  was removed 2026-06-15 per the unified URL-walker design v3 §3 —
+  ``ingest_export`` replaces it cleanly with no compat shim.
+
+  Per [[one-plugin-per-scenario]] this is the ONE plugin for claude.ai
+  exports. Per [[no-shared-plugin-base-class]] the parser machinery
+  lives in ananta.llm.session_ledger.vendor.claude_ai_export so this
+  plugin stays a thin adapter.
+
+implements:
+  - interface: LLMSessionSourceInterface
+  - interface: PushedSourceMixin
+  - interface: EdgeProcessProvider
+
+optional: true

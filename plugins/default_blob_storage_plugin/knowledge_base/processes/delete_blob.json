@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_blob_storage_plugin::delete_blob",
+  "display_name": "Delete Blob",
+  "description": "Permanently delete a blob by blob_id. This operation cannot be undone.",
+  "embedding_description": "Permanently delete a blob by namespace and blob_id. Use to clean up temporary or obsolete files and reclaim storage; operation cannot be undone. Returns deletion status for confirmation. Best used for ephemeral artifacts or privacy removals.",
+  "result_processor_customizations": {
+    "action_label": "Blob Deleted",
+    "result_type": "blob_deleted",
+    "result_description": "Confirmation that blob was permanently deleted",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Permanently deleting a blob from storage by blob_id",
+    "error_interpretation": "NotFoundError: Blob with given ID does not exist. StorageError: Failed to delete blob from filesystem. PermissionError: Insufficient permissions to delete from storage.",
+    "recovery_guidance": "For not found: verify blob_id is correct. For storage errors: check filesystem health. For permission errors: verify storage directory permissions."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::local_self_deployment_service::complete_swap",
+  "display_name": "Complete local blue-green swap",
+  "description": "Internal finisher for local blue-green self-deployment. After restart_with_manifest activates the new color, complete_swap runs on the new active color and tears down the prior color: signals prior_pid, waits briefly, escalates if needed, and unregisters prior_instance_id from the local router. This process is not operator-discoverable; it is targeted by durable follow-up actions.",
+  "embedding_description": "Complete local blue-green swap after activation. Green-side finisher that receives prior_pid, prior_instance_id, and prior_color, terminates the old solet process, unregisters it from the local router, and returns status, prior_instance_id, prior_color, and steps_completed. Internal durable action, not normal operator command.",
+  "result_processor_customizations": {
+    "action_label": "local swap finisher complete",
+    "result_type": "local_blue_green_complete_swap_result",
+    "result_description": "Envelope with status, prior_instance_id, prior_color, and steps_completed.",
+    "presentation_guidance": "For internal logs, surface status and steps_completed. Operators normally should not see this unless investigating a swap failure."
+  },
+  "error_processor_customizations": {
+    "action_context": "Complete a local blue-green swap by stopping and unregistering the prior color.",
+    "error_interpretation": "Failures usually indicate OS signal permission problems, an unexpected prior_pid state, or local router unavailability.",
+    "recovery_guidance": "Inspect local router status, process table, and the solet logs. If the old process is already gone and the router no longer lists it, treat the operation as effectively complete."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::session_ledger_service::register_source",
+  "display_name": "register_source",
+  "description": "Register an LLM session ledger ingest source. Idempotent on (source_kind, root_uri): when a matching row already exists the verb returns the existing source_id with outcome='existed' and does NOT re-INSERT; otherwise it inserts a fresh row and returns outcome='registered'. Boot-time starting_actions for filesystem-rooted sources (codex_filesystem, claude_code_filesystem) rely on this idempotency to stay no-ops across reboots; the auto-register pass in startup_sequence._init_session_ledger_service uses the same guard for symbolic sources (e.g. agent_messaging) that advertise SessionSourceDescriptor.default_pulling_root_uri. account_label and config_json are applied only on the registered path; an existing row's fields are NOT overwritten (operators who need to update those use a future update_source verb).",
+  "embedding_description": "Register an LLM session ledger ingest source by source_kind + root_uri. Idempotent: existing (source_kind, root_uri) returns id with outcome='existed'; otherwise insert with outcome='registered'. Backs boot-time starting_actions for codex_filesystem + claude_code_filesystem. Symbolic-source auto-register reuses same idempotency. account_label + config_json applied only on registered path."
+}

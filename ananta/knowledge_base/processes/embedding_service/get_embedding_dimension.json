@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::embedding_service::get_embedding_dimension",
+  "display_name": "Get Embedding Dimension",
+  "description": "Get the vector dimension for an embedding model.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Embedding dimension retrieved",
+    "result_type": "dimension_retrieved",
+    "result_description": "Model dimension info with keys: dimension (integer vector size), model (model name queried)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves the vector dimension (number of floats) for an embedding model. Dimension is needed for vector database schema configuration.",
+    "error_interpretation": "ModelNotFoundError: specified model does not exist. ServiceError: embedding service unavailable.",
+    "recovery_guidance": "For model errors: use list_models to discover available models. For service errors: check embedding service status and retry."
+  }
+}

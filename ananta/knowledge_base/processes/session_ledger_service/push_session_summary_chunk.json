@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::session_ledger_service::push_session_summary_chunk",
+  "display_name": "push_session_summary_chunk",
+  "description": "Push one caller-side summary chunk for a session into the M6 search index. Generates an embedding via embedding_service, stores it via vector_service, then inserts the session_ledger__summary row.",
+  "embedding_description": "Push one caller-side summary chunk for a session into the M6 search index. Generates an embedding via embedding_service, stores it via vector_service, then inserts the session_ledger__summary row. Used by auto_summarize cron + operator-side lift verbs (lift_codex_stage1_summaries) to make session summaries searchable via search_sessions."
+}

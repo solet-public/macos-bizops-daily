@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::create_file",
+  "display_name": "Create Knowledge Base File",
+  "description": "Create, write, save, or place a new document or file in a knowledge base. For git knowledge bases: commits to managed branch. Chunks and indexes the new file. The sanctioned way for a filesystem-less agent to place a new document (e.g. a workbench doc). Use for persistent artifacts that should survive the session.",
+  "embedding_description": "Create, write, save, add, or place a brand-new document or file that does not yet exist in a knowledge base, writing its initial contents. This is how an agent without filesystem access persists a new document, note, plan, report, or artifact so it survives the session and becomes searchable. For git-backed KBs the new file is committed to the managed branch, then chunked and indexed. Some knowledge bases require a metadata block in the content on create. This is the way to place a new workbench planning document: create it as a markdown (.md) file in the workbench knowledge base with the required metadata block (Date, Author, Status, Embedding Description, Summary). Use to write a new document, not to overwrite one that already exists (use edit_file for that).",
+  "result_processor_customizations": {
+    "action_label": "Knowledge base file created",
+    "result_type": "knowledge_base_file_created",
+    "result_description": "New file created and indexed",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Creating a knowledge base file",
+    "error_interpretation": "FileExistsError: file already exists. Use edit_file instead.",
+    "recovery_guidance": "Use edit_file to modify existing files."
+  }
+}

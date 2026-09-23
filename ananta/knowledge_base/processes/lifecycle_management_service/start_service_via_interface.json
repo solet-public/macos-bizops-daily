@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::lifecycle_management_service::start_service_via_interface",
+  "display_name": "Start Service Via Interface",
+  "description": "Start a service plugin with specified configuration",
+  "embedding_description": "Bring up a service plugin at runtime. Boot a background service that was not started at platform startup. Initialize and start a named service with its config. Spin up a worker or daemon plugin on demand. Launch a service interface implementation. Bring an inactive service online without restarting the solet.",
+  "result_processor_customizations": {
+    "action_label": "Service started",
+    "result_type": "service_lifecycle",
+    "result_description": "Service startup result with keys: success (boolean indicating startup status), service_name (name of the started service), message (status description)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Starts a service plugin with specified configuration, loading the plugin, initializing its dependencies, and beginning its operational loop",
+    "error_interpretation": "ServiceNotFoundError: The requested service plugin is not installed or registered. ConfigurationError: Invalid or missing configuration parameters. DependencyError: Required service dependencies are not available. AlreadyRunningError: The service is already running.",
+    "recovery_guidance": "For service not found: Check the service name spelling and verify the plugin is installed. For configuration errors: Review the service's required configuration parameters. For dependency errors: Start required dependency services first. For already running: Use stop_service first if a restart is needed."
+  }
+}

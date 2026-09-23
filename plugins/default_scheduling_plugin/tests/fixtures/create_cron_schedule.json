@@ -1,0 +1,11 @@
+{
+  "name": "test_create_cron_schedule",
+  "description": "Create a scheduled job using cron expression for repeated execution",
+  "process_key": "plugin::default_scheduling_plugin::create_cron_schedule",
+  "arguments": {
+    "cron_expression": "test_value",
+    "actions": [],
+    "label": "test_value",
+    "tags": "test_value"
+  }
+}

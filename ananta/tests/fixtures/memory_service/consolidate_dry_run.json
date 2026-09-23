@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::consolidate",
+  "arguments": {
+    "strength_threshold": -1.5,
+    "min_age_days": 7,
+    "dry_run": true
+  }
+}

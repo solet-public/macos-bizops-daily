@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::discovery_service::get_service_health",
+  "display_name": "Get Discovery Service Health",
+  "description": "Get platform statistics including total process count, registered capabilities, and discovery service health. Use this for questions like 'how many processes?', 'what capabilities are available?', or 'platform statistics'.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Discovery service health retrieved",
+    "result_type": "health_status",
+    "result_description": "Health status with keys: is_healthy (boolean service status), total_processes (count of registered processes), total_usage_records (usage tracking count), index_last_built (timestamp of last index rebuild)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves health metrics and statistics from the discovery service including process counts and index status",
+    "error_interpretation": "ConnectionError: Discovery service or its dependencies unavailable. TimeoutError: Health check took too long, service may be overloaded.",
+    "recovery_guidance": "For connection errors: Service may be starting up, suggest waiting and retrying. For timeout: Service may be under heavy load, suggest trying again later."
+  }
+}

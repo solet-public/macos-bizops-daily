@@ -1,0 +1,14 @@
+{
+  "name": "test_consolidate_dry_run",
+  "description": "Verify dry run consolidation - preview what would be consolidated without making changes",
+  "process_key": "plugin::actr_memory_plugin::consolidate_action",
+  "arguments": {
+    "params": {
+      "dry_run": true
+    },
+    "state": {
+      "session_id": "test-session-081"
+    }
+  },
+  "timeout_seconds": 120
+}

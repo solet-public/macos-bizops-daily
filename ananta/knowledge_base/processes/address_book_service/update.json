@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::update",
+  "display_name": "Update Address",
+  "description": "Update address metadata (not entries). Name cannot be changed. Updates memory ingestion if description changes.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Address updated",
+    "result_type": "address_modified",
+    "result_description": "Updated address result with keys: address (the updated address record), message (confirmation)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Updates address metadata (type, description, tags) but not entries. Name is immutable. Description changes trigger memory re-ingestion.",
+    "error_interpretation": "NotFoundError: no address exists with the given name. ValidationError: invalid metadata values. NoChangesError: no fields were provided to update.",
+    "recovery_guidance": "For not found: use 'search' to find addresses or 'register' to create. For validation errors: check that provided values are valid. For no changes: provide at least one of address_type, description, or tags."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::unlock",
+  "display_name": "Unlock Vault",
+  "description": "Unlock the vault with passphrase. Required before accessing secrets. Can also be done via the per-solet <SOLET_NAME>_VAULT_PASSPHRASE env var (e.g. EXAMPLE_VAULT_PASSPHRASE for a solet named 'example').",
+  "embedding_description": "Vault: unlock. Provide the passphrase so the platform derives the master key (PBKDF2, 1.2M iterations) and decrypts stored secrets. Required before retrieve, store, rotate, or delete will succeed. Can also be done implicitly at startup via the per-solet <NAME>_VAULT_PASSPHRASE env var (e.g. EXAMPLE_VAULT_PASSPHRASE for a solet named 'example').",
+  "result_processor_customizations": {
+    "action_label": "Vault unlocked",
+    "result_type": "vault_unlocked",
+    "result_description": "Vault unlock result. Contains message (status) and unlocked (true if successful). Master key is now in memory.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Unlocks the vault using passphrase to derive the master key. Uses PBKDF2 with 1.2M iterations for key derivation.",
+    "error_interpretation": "InvalidPassphrase: Passphrase is incorrect. VaultNotInitialized: Vault needs to be initialized first. AlreadyUnlocked: Vault is already unlocked (not an error).",
+    "recovery_guidance": "For InvalidPassphrase: Ask user to re-enter passphrase. For VaultNotInitialized: Guide user through vault initialization. For AlreadyUnlocked: Inform user vault is ready for use."
+  }
+}

@@ -1,0 +1,205 @@
+{
+  "answers": {
+    "consents": {},
+    "decisions": {
+      "autostart": "enabled",
+      "coding_agents": [
+        "codex",
+        "claude_code"
+      ],
+      "connector_configuration_timing": "first_use",
+      "embeddings_implementation": "lm_studio",
+      "execution_topology": "solo",
+      "inference_implementation": "lm_studio",
+      "setup_profile": "macos-bizops"
+    },
+    "flow_id": "macos.repository_setup",
+    "flow_source_revision": "861bbd52e4c2aec28134c7c87bf88dfb0e62aab2",
+    "name": "fixture",
+    "public_inputs": {
+      "clone_directory": "/tmp/Solets/fixture",
+      "lm_studio_base_url": "http://localhost:1234/v1",
+      "repository_ref": "release-2026-08-30",
+      "setup_journal_path": "/tmp/.local/state/solet/transactions/fixture.json",
+      "solet_name": "fixture"
+    },
+    "resolution_evidence": [
+      {
+        "id": "setup_profile",
+        "source": "seed_lock",
+        "summary": "macos-bizops"
+      },
+      {
+        "id": "autostart",
+        "source": "config",
+        "summary": "true"
+      },
+      {
+        "id": "embeddings_implementation",
+        "source": "flow_default",
+        "summary": "lm_studio"
+      },
+      {
+        "id": "coding_agents",
+        "source": "flow_default",
+        "summary": "codex,claude_code"
+      },
+      {
+        "id": "execution_topology",
+        "source": "flow_default",
+        "summary": "solo"
+      },
+      {
+        "id": "connector_configuration_timing",
+        "source": "flow_default",
+        "summary": "first_use"
+      },
+      {
+        "id": "lm_studio_base_url",
+        "source": "flow_default",
+        "summary": "http://localhost:1234/v1"
+      },
+      {
+        "id": "inference_implementation",
+        "source": "flag",
+        "summary": "lm_studio"
+      }
+    ],
+    "schema_version": 1,
+    "target": "/tmp/Solets/fixture"
+  },
+  "answers_fingerprint": "sha256:182f559e5a9eef734052b1a04bc76626bee83dddf295e54f1096e015c7f57407",
+  "approval_fingerprint": "sha256:7d593445e5037c13ce277586ce4f2642a8a5ff7dafa5016ed8db46641e3799ca",
+  "approval_recorded_at": "2026-08-31T07:43:22.821255Z",
+  "completion": {
+    "coding_agent_plugins_visible": "pending",
+    "embedding_request_succeeds": "pending",
+    "fresh_session_hooks_active": "pending",
+    "fresh_shell_python_valid": "pending",
+    "genesis_artifacts_valid": "pending",
+    "install_state_projection_matches": "pending",
+    "instance_environment_dependency_closure_valid": "pending",
+    "knowledge_retrieval_succeeds": "pending",
+    "launchagent_running": "pending",
+    "peer_identity_valid": "pending",
+    "pgvector_ready": "pending",
+    "plugin_roster_matches_plan": "pending",
+    "postgres_ready": "pending",
+    "postgres_role_policy_valid": "pending",
+    "python_version_valid": "pending",
+    "router_ready": "pending"
+  },
+  "created_at": "2026-08-31T07:43:22.821008Z",
+  "evidence": [],
+  "flow_contract_digest": "sha256:ab2a9d6df8098fee294c9886d9e3a39a9bb555b4d28efe6feaea731f7741105f",
+  "flow_id": "macos.repository_setup",
+  "flow_source_revision": "861bbd52e4c2aec28134c7c87bf88dfb0e62aab2",
+  "input_fingerprint": "sha256:fb5fc1ddb6a0507302557165ebd7e96f24e4d6c5f11fa535c6efdc8dfb151191",
+  "name": "fixture",
+  "operation_attempts": [],
+  "operation_id": "04b96168-bf87-4ef1-bd83-8ff6bf99ecd4",
+  "operation_stages": {},
+  "operation_statuses": {},
+  "profile": "macos-bizops",
+  "result_kind": null,
+  "schema_version": 1,
+  "seed_archive_sha256": "142facdfe3eebc298a4648c9d84a6524618933562b2c4ab5f405578b02841da8",
+  "seed_commit": "861bbd52e4c2aec28134c7c87bf88dfb0e62aab2",
+  "seed_repository": "https://github.com/dwestgate/2026-08-30_local_bizops_861bbd52e.git",
+  "seed_tag": "release-2026-08-30",
+  "seed_tree_hash": "668a3aaa22f4010251864cf31bd435e6f8212d73",
+  "stage_probe_attempts": [],
+  "stage_probe_statuses": {
+    "coding_agents": {
+      "entry": {},
+      "exit": {
+        "coding_agent_plugins_visible": "pending",
+        "fresh_session_hooks_active": "pending",
+        "peer_identity_valid": "pending"
+      }
+    },
+    "completion": {
+      "entry": {},
+      "exit": {
+        "coding_agent_plugins_visible": "pending",
+        "fresh_session_hooks_active": "pending",
+        "install_state_projection_matches": "pending",
+        "knowledge_retrieval_succeeds": "pending",
+        "plugin_roster_matches_plan": "pending"
+      }
+    },
+    "decision_review": {
+      "entry": {},
+      "exit": {
+        "decisions_resolved": "pending"
+      }
+    },
+    "genesis": {
+      "entry": {},
+      "exit": {
+        "fresh_shell_path_valid": "pending",
+        "fresh_shell_python_valid": "pending",
+        "genesis_artifacts_valid": "pending",
+        "launchagent_running": "pending",
+        "router_ready": "pending"
+      }
+    },
+    "models": {
+      "entry": {
+        "decisions_resolved": "pending"
+      },
+      "exit": {
+        "embedding_request_succeeds": "pending"
+      }
+    },
+    "optional_accounts": {
+      "entry": {},
+      "exit": {
+        "external_postgres_connection_valid": "pending",
+        "google_workspace_connection_valid": "pending",
+        "marketo_connection_valid": "pending",
+        "plugin_roster_matches_plan": "pending",
+        "salesforce_connection_valid": "pending",
+        "schwab_connection_valid": "pending",
+        "snowflake_connection_valid": "pending",
+        "zuora_connection_valid": "pending"
+      }
+    },
+    "preflight": {
+      "entry": {},
+      "exit": {
+        "git_checkout_valid": "pending",
+        "python_version_valid": "pending"
+      }
+    },
+    "session_sources": {
+      "entry": {},
+      "exit": {
+        "session_sources_retrievable": "pending"
+      }
+    },
+    "system_dependencies": {
+      "entry": {},
+      "exit": {
+        "pgvector_ready": "pending",
+        "postgres_ready": "pending",
+        "postgres_role_policy_valid": "pending",
+        "python_version_valid": "pending"
+      }
+    }
+  },
+  "stages": {
+    "coding_agents": "pending",
+    "completion": "pending",
+    "decision_review": "pending",
+    "genesis": "pending",
+    "models": "pending",
+    "optional_accounts": "pending",
+    "preflight": "pending",
+    "session_sources": "pending",
+    "system_dependencies": "pending"
+  },
+  "status": "pending",
+  "target": "/tmp/Solets/fixture",
+  "updated_at": "2026-08-31T07:43:22.821255Z"
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::update_entry",
+  "display_name": "Update Entry",
+  "description": "Update a specific entry by its ID. Only provided fields are updated.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Entry updated",
+    "result_type": "entry_modified",
+    "result_description": "Updated entry result with keys: entry (the updated entry record), message (confirmation)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Updates specific fields of an existing entry by its ID, only modifying fields that are explicitly provided",
+    "error_interpretation": "NotFoundError: no entry exists with the given ID. ValidationError: invalid field values provided. NoChangesError: no fields were provided to update.",
+    "recovery_guidance": "For not found: use 'resolve' on the parent address to get valid entry IDs. For validation errors: check the field values are valid strings. For no changes: provide at least one of field_type, description, or value."
+  }
+}

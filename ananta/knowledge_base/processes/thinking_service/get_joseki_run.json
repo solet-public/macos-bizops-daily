@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::thinking_service::get_joseki_run",
+  "display_name": "Get Joseki Run",
+  "description": "Read one joseki run's row by run id: status (running/awaiting_user/completed/failed), the card and WBS it executes, its session and flow, the last submitted step, typed failure detail, and reconciler attempt count. found=False when the id is unknown.",
+  "embedding_description": "Check the status of a single platform-driven joseki run by its run id: is the run still executing, parked awaiting a user, completed, or failed — and with what typed failure detail. The per-run observability read for callers polling a run they started with run_joseki. Distinct from list_joseki_runs (the bounded multi-run listing) and get_authored_joseki (the CARD's lifecycle row, not a run)."
+}

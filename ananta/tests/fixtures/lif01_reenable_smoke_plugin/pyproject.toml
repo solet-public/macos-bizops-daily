@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lif01_reenable_smoke_plugin"
+version = "1.0.0"
+description = "Test fixture for the LIF-01 set_plugin_enabled disable->enable smoke. LifecycleManaged plugin whose prepare_for_readiness raises unless orchestrator_ref is injected -- the exact re-enable failure mode."
+requires-python = "==3.13.*"
+dependencies = []
+
+[project.entry-points."ananta.plugins"]
+lif01_reenable_smoke_plugin = "lif01_reenable_smoke_plugin.plugin:Lif01ReenableSmokePlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lif01_reenable_smoke_plugin*"]

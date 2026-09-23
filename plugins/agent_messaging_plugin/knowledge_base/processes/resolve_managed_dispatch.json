@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::resolve_managed_dispatch",
+  "display_name": "Resolve a managed-dispatch coordinator decision",
+  "description": "Coordinator-side causal decision surface. Actor identity is not a parameter: the server derives the registered instance/session from authenticated call context and verifies it is the immutable spawning coordinator still holding spawned_by_role. Supported actions are request_retry, resolve_blocker, accept_completion, reject_completion, and cancel. request_retry is explicit and idempotent under the same dispatch_id from uptake_uncertain, failed_start, worker_lost, or expired: it derives fresh bounded deadlines from immutable windows, clears attempt-local evidence, increments attempt_number once, reconstructs every spawn/lineage field from the prepared dispatch, and creates the replacement attempt. A replacement start failure returns to supervised failed_start. resolve_blocker returns an authorized blocker to active after its ruling. reject_completion returns completion_reported to active for evidence repair. cancel records a terminal reason. accept_completion is the only edge to completed: it re-reads/re-hashes the expected artifact, validates every declared evidence obligation and verdict independently, and binds acceptance to the exact worker-evidence digest. Every action carries event_id, prior_version, and payload; duplicates are idempotent and stale decisions remain rejected audit events.",
+  "embedding_description": "Make the coordinator decision for a durable worker lane: resolve a blocker, request one bounded replacement attempt, accept or reject exact completion evidence, or cancel within authority. The acceptance action is the only way a managed dispatch becomes completed.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Managed dispatch decision recorded",
+    "result_type": "managed_dispatch_resolution_result",
+    "result_description": "The resulting managed_dispatch projection after the accepted or idempotently replayed coordinator action, including state/version, attempt number/current attempt, blocker/completion evidence, terminal reason, and next action/owner.",
+    "presentation_guidance": "Lead with action, resulting state, causal version, next_required_action, and responsible_role. For completed, state that exact artifact/hash/evidence were independently revalidated; do not imply Git landing, deployment, or publication."
+  },
+  "error_processor_customizations": {
+    "action_context": "Checks event idempotency and causal version, validates that the requested action is legal from the current dispatch state, applies one CAS transition, and appends the coordinator decision. Completion acceptance performs a fresh filesystem read and hash before the state update.",
+    "error_interpretation": "coordinator_authority_denied means the authenticated caller is not the immutable spawning coordinator holding its durable role. *_not_allowed means the current state cannot take that action. stale_dispatch_version means another event won the race and this rejected decision remains auditable. completion artifact/hash/evidence/verdict/worker-evidence errors mean independent acceptance failed and the dispatch did not complete. A replacement host error leaves the same dispatch_id in supervised failed_start.",
+    "recovery_guidance": "Read managed_dispatch_status and decide from the fresh version. Reject or repair completion evidence rather than overriding validation. Route operator-only authority gaps to the operator; this verb does not grant capabilities or authorize Git/live-state mutation."
+  }
+}

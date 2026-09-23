@@ -1,0 +1,27 @@
+# Issue chooser configuration for the seed's upstream feedback channel.
+#
+# blank_issues_enabled: false is deliberate. The forms carry the evidence
+# discipline and the content gate; a blank issue carries neither, and the
+# evidence a blank issue omits is exactly what costs a round-trip. Every
+# item class an adopter can send has a form below — including the round
+# parent, which would otherwise be unfileable with blank issues disabled.
+blank_issues_enabled: false
+
+# The "Design proposal (RFC-shaped) — send a pull request, not an issue"
+# contact link was REMOVED 2026-08-15 (operator ruling, "open source, closed
+# contribution"). It was an active instruction to do the one thing the project
+# cannot absorb: someone following it did real work that then had to be
+# declined. CONTRIBUTING.md now states plainly that pull requests, patches and
+# design proposals are all not accepted, and why — merging unreviewed code into
+# a seed that provisions a database, writes keychain credentials, installs a
+# background service and edits the shell would make this repository a
+# supply-chain path into every downstream install.
+contact_links:
+  - name: Reporting a security vulnerability — do not open an issue
+    url: https://github.com/solet-public/macos-bizops/security/policy
+    about: >-
+      A public issue discloses the problem to everyone before there is a fix,
+      including to the people running this software on their own machines. Use
+      the Report a vulnerability button on the Security tab, or email
+      info@solet.ai. The full policy, including what to include and what is in
+      scope, is in .github/SECURITY.md in your own clone.

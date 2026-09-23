@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "vector_count",
+    "dimensions",
+    "Namespace is empty",
+    "error"
+  ],
+  "output_not_contains": [
+    "exception"
+  ]
+}

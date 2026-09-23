@@ -1,0 +1,58 @@
+name: snowflake_plugin
+description: >
+  Snowflake warehouse connector — read-only queries, warehouse/database/schema
+  introspection, and full-result export to workspace .tsv files (contained
+  under export_allowed_roots). Executor: snowflake-connector-python.
+  Auth: key-pair (RSA JWT) as the operator's own Snowflake user, resolved from
+  the address book entry "snowflake_account" via chain-consumed vault::
+  references — no PAT, no browser flow, no callback server.
+
+  Foreign-target invariant (SQL-lockdown honesty condition, umbrella design §3):
+  this plugin reaches ONLY the Snowflake account resolved from the
+  operator-registered "snowflake_account" address-book entry — no account
+  parameter on any verb. It never imports or touches the platform state DB.
+
+  READ-ONLY, HARD (operator-ratified RATIFY-2): no write verb exists. Snowflake
+  has no session-level read-only flag (unlike Postgres), so the TRUE
+  developer-proof boundary is the read-only ROLE the connection is pinned
+  to — the connector's statement-leader guard is fast-fail UX only.
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider
+
+config:
+  statement_timeout_seconds:
+    type: integer
+    required: false
+    default: 60
+    description: >
+      Session-level STATEMENT_TIMEOUT_IN_SECONDS applied at connection time to
+      every query, bounding hung/expensive warehouse queries.
+  login_timeout_seconds:
+    type: integer
+    required: false
+    default: 30
+    description: >
+      Per-connection login timeout (seconds) for the JWT key-pair handshake.
+  export_allowed_roots:
+    type: list
+    required: false
+    default: []
+    description: >
+      Absolute workspace directories export_query may write TSV files under
+      (realpath + commonpath containment, mirroring ledger_allowed_roots).
+      Empty by default = REFUSE-ALL: every export is refused until the operator
+      opts workspace roots in here (operator ruling 2026-07-15 — bulk query
+      data lands in the operator's own workspace, never context or platform
+      blob storage). Prefer the exact export directories over broad parents.
+
+# Credentials live in the address book entry "snowflake_account": literals
+# (account, user, warehouse, database, schema, role, auth_method) plus a
+# private_key field that stores a
+# "vault::<solet>.default_address_book_plugin.snowflake_private_key"
+# reference (PEM, chain-consumed). The secret lives in the RESOLVER's
+# namespace so the address book reads it under its own identity
+# (resolve_with_secrets). It is chain-consumed — this plugin neither declares
+# nor reads that vault key directly, and it holds no plugin-owned runtime
+# vault keys of its own, so both VaultKeysProvider hooks return [].

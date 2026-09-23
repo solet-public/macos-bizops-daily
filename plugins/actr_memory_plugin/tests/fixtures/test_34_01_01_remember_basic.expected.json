@@ -1,0 +1,12 @@
+{
+  "action_status": "completed",
+  "data_contains": {
+    "memory_id": true,
+    "message": true
+  },
+  "output_not_contains": [
+    "error",
+    "not available"
+  ],
+  "timeout_seconds": 60
+}

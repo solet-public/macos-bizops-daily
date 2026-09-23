@@ -1,0 +1,100 @@
+# Radon cyclomatic-complexity tracked-debt register.
+#
+# Per-function entries whose C/D/E/F cyclomatic complexity the operator
+# has explicitly deferred to the post-AWS-solet cycle. Tracking:
+# Task #74. Per
+# `workbench/2026-05-25_plugin_god_class_remediation.md` §9.D–§9.Z.
+#
+# Removing an entry from this list is the unit of remediation progress.
+# Adding new entries without operator approval defeats the gate's purpose.
+#
+# Format: one `<file_path>::<function_name>` per line. File path is
+# POSIX-suffix-matched (so repo-relative entries work); function name is
+# the bare name (no `ClassName.` prefix). Blank lines and `#` comments
+# are ignored.
+
+# Added 2026-05-26 (operator-approved). First-time-in-scope after dev_tools/ elimination
+# Phase 1+2 structurally-moved http_routes.py for docstring path-updates.
+plugins/agent_messaging_plugin/src/agent_messaging_plugin/http_routes.py::_peer_send_impl  # legacy: 2026-09-03 W2-1
+# Added 2026-05-26 (operator-approved). Pure-move-revealed-debt after Phase 4 relocated
+# peer_registry_migration_live_smoke.py (renamed from ..._smoke.py, P6) from dev_tools/ to plugins/agent_messaging_plugin/tests/.
+# Same shape as other allowlisted linear smoke mains (per-check sequences,
+# operator-facing smoke harness with all cases inlined in main, hits D(23) cc, refactorable
+# by extracting _case_* helpers but deferred per Task #74 pattern.
+plugins/agent_messaging_plugin/tests/peer_registry_migration_live_smoke.py::main  # legacy: 2026-09-03 W2-1
+
+# Added 2026-07-07 (operator-ratified, GTE-05 ananta/tests enforcement).
+# The 10 pre-existing C+ functions inventoried by the read-only debt audit
+# at workbench/2026-07-07_ananta_tests_debt_audit.md (§2, snapshot
+# 2026-07-07T04:20:20Z) — seeded so per-file + aggregate cc enforcement
+# over ananta/tests goes green without masking the tracked debt. Removal
+# is the unit of remediation progress; do NOT add new entries here
+# without operator approval. The F(55) entry below is marked RETIRE-FIRST:
+# it is the single largest item and leads the remediation queue.
+# RETIRE-FIRST — CC F(55), the campaign's first target:
+ananta/tests/llm/agent_messaging/repository_migration_smoke.py::main  # legacy: 2026-09-03 W2-1
+# CC D(21):
+ananta/tests/llm/session_ledger/list_sessions_m17_filters_smoke.py::_matches  # legacy: 2026-09-03 W2-1
+# CC C(20):
+ananta/tests/llm/session_ledger/events_window_fold_smoke.py::_matches  # legacy: 2026-09-03 W2-1
+# CC C(15):
+ananta/tests/llm/session_ledger/census_fold_smoke.py::test_per_source_tallies  # legacy: 2026-09-03 W2-1
+# CC C(14):
+ananta/tests/llm/session_ledger/read_migration_active_sessions_live_smoke.py::test_list_active_sessions  # legacy: 2026-09-03 W2-1
+# CC C(12):
+ananta/tests/llm/session_ledger/read_migration_slice6b_live_smoke.py::test_get_session_timeline_cursor_content_json_cap  # legacy: 2026-09-03 W2-1
+# CC C(12):
+ananta/tests/services/vault_service/vault_service_proxy_smoke.py::_subsmoke_parity  # legacy: 2026-09-03 W2-1
+# CC C(12):
+ananta/tests/session_ledger_service/interfaces_split_no_god_class_smoke.py::check_verb_counts  # legacy: 2026-09-03 W2-1
+# CC C(11):
+ananta/tests/llm/session_ledger/deployment_migration_live_smoke.py::test_full_pairing_lifecycle  # legacy: 2026-09-03 W2-1
+# CC C(11):
+ananta/tests/llm/session_ledger/polling_driver_migration_live_smoke.py::test_polling_driver_lifecycle  # legacy: 2026-09-03 W2-1
+
+# Added 2026-08-28 (Git-Controller-ratified pre-existing debt).
+# Skeptical review: Git-Controller measured HEAD directly and found these
+# byte-identical functions at CC D(21) and CC C(17), respectively. This
+# models-stage change does not grant a new-code complexity exception.
+# Remediation contract: extract coherent scenario helpers; remove these entries
+# as the burn-down unit rather than extending this tracked-debt register.
+solet_cli/tests/discovered_decision_scenarios.py::_verified_scenario  # legacy: 2026-09-03 W2-1
+solet_cli/tests/discovered_decision_scenarios.py::_future_model_carrier_scenario  # legacy: 2026-09-03 W2-1
+
+# Added 2026-09-15 (Main-seat decision under rul_367d8bd6 standing seat authority
+# -- not one of the 4 operator-reserved categories; follows the 2026-08-28
+# precedent immediately above: pre-existing, byte-identical debt surfaced
+# by an unrelated landing, ratified by the fleet authority actually handling
+# that landing rather than requiring a fresh human sign-off each time).
+# Surfaced during R35 final assembly (unt_907393d3): PassiveManagerState.validate
+# is unchanged from Unit B's own independently-verified source hash
+# (35c5771d1827da213df8564f3f27585c4e5e2a75429ba8753d661bc92b7ad923) --
+# not introduced or touched by this candidate. Independently read the
+# function before deciding: a clean sequence of ~6 independent early-return
+# guard clauses (unique-registry-owner check, transaction-identity-match
+# check, per-phase precondition checks) -- mechanically refactorable via
+# extract-method, deferred per the same Task #74 burn-down pattern as every
+# other entry here rather than forced into an assembly-only lane's charter.
+# Recorded as an open decision on iss_d2f03248, disclosed to the Operator,
+# reversible if overruled. Remediation contract: extract per-guard-clause
+# helpers; removal is the burn-down unit.
+solet_cli/src/solet_manager/release_observer.py::validate  # owner: fleet-coordinator-seat reason: iss_d2f03248 pre-existing debt surfaced by R35 assembly expires: 2026-12-15
+
+# Surfaced 2026-09-20 (lane-fix-gates-b-ungated-surfaces-20260920, unt_26776365)
+# widening `_PER_FILE_GATE_TOP_LEVEL` to close iss_f99ef8c2/577, iss_7e4169ea/632,
+# iss_17bb31c5/707, iss_2456a716/777: solet_cli/src and solet_cli/tests were
+# previously outside every per-file and whole-tree gate surface, so this is the
+# tree's first-ever coherence-gate measurement of them, not debt this lane
+# introduced. All three below are CC C(11), read independently before listing:
+# `_migrate_answer_values` is a sequential decision-by-decision rewrite loop
+# with two isinstance-dispatch branches (str vs list answer values);
+# `_check_real_and_synthetic_bootstrap` and `_assert_fingerprint_binding` are
+# straight-line smokes, a sequence of independent `_check`/`raise AssertionError`
+# assertions with no shared branching logic -- complexity from assertion COUNT,
+# not from entangled control flow. Recorded as an open decision on this unit,
+# disclosed to the fleet-coordinator seat and Git-Controller in the landing
+# report, reversible if overruled. Remediation contract: extract-method (migration.py) / split into
+# per-assertion helpers (the two smokes); removal is the burn-down unit.
+solet_cli/src/solet_manager/contract_reconciliation.py::_migrate_answer_values  # owner: fleet-coordinator-seat reason: gates-cluster-b-ungated-surfaces (chg_f24592a5) pre-existing debt surfaced by scope widening expires: 2026-12-20
+solet_cli/tests/journal_migration_smoke.py::_check_real_and_synthetic_bootstrap  # owner: fleet-coordinator-seat reason: gates-cluster-b-ungated-surfaces (chg_f24592a5) pre-existing debt surfaced by scope widening expires: 2026-12-20
+solet_cli/tests/permission_preflight_smoke.py::_assert_fingerprint_binding  # owner: fleet-coordinator-seat reason: gates-cluster-b-ungated-surfaces (chg_f24592a5) pre-existing debt surfaced by scope widening expires: 2026-12-20

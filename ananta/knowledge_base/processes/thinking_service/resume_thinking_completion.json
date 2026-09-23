@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::thinking_service::resume_thinking_completion",
+  "display_name": "Resume Thinking Completion",
+  "description": "Re-enter the planning inference loop with a served autonomic completion. Platform-submitted continuation: the serve verb submit_autonomic_completion submits this after its CAS win; the durable request row supplies the completion text and planning correlation.",
+  "embedding_description": "Re-enter the planning loop after an autonomic-routed completion was served. INF-02 resume continuation keyed by request_id: reads the served completion text and planning correlation from the durable core inference_completion_request row, appends the OUTPUT context event, then submits the parsed planning actions or finalizes the playbook and plan. Platform-submitted by submit_autonomic_completion — not an operator entry point. Distinct from process_planning_results (the vertex that ASSEMBLES the prompt and requests the completion)."
+}

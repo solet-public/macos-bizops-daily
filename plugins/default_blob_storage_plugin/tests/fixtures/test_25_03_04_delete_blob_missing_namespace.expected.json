@@ -1,0 +1,6 @@
+{
+  "action_status": "error",
+  "error_code": "blob_storage.missing_namespace",
+  "error_message_contains": "Namespace parameter is required",
+  "timeout_seconds": 30
+}

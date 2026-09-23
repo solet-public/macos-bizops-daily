@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>local.solet.{{SOLET_NAME}}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{CLONE_DIR}}/.venv/bin/python3</string>
+    <string>-m</string>
+    <string>ananta.cli</string>
+    <string>--app-home</string>
+    <string>{{CLONE_DIR}}/profile</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>{{RUNTIME_DIR}}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>SOLET_NAME</key>
+    <string>{{SOLET_NAME}}</string>
+    <key>PATH</key>
+    <string>{{PATH_ENV}}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+</dict>
+</plist>

@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::inference_service::take_action",
+  "arguments": {
+    "user_input": "What is the current time?",
+    "context": {}
+  }
+}

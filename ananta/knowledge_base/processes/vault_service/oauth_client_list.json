@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::oauth_client_list",
+  "display_name": "List OAuth Clients",
+  "description": "List all OAuth clients currently registered with the Streamable HTTP MCP transport. Returns public metadata only (client_id, client_name, scopes, created_at) — never the secret or its hash.",
+  "embedding_description": "Enumerate the OAuth 2.1 client_credentials pairs registered against this solet's Streamable HTTP MCP transport. Returns a list of entries containing client_id, client_name, scopes, and created_at (sorted by created_at). Secrets and their scrypt hashes are NEVER surfaced — only the public client_id is reusable across calls. Use to inventory live connectors or to identify revocation candidates.",
+  "result_processor_customizations": {
+    "action_label": "OAuth clients listed",
+    "result_type": "oauth_client_list",
+    "result_description": "Public metadata for every registered OAuth client. Contains a 'clients' list with client_id, client_name, scopes, and created_at per entry. Never contains the secret or its hash.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads every row from the oauth_client store, projects to {client_id, client_name, scopes, created_at}, sorts by created_at.",
+    "error_interpretation": "OAuthClientStoreUnavailable: the vault's oauth_client store has not been opened (vault prepare_for_readiness has not completed).",
+    "recovery_guidance": "Wait for vault startup to complete and retry; if it persists, check vault logs for store initialization failures."
+  }
+}

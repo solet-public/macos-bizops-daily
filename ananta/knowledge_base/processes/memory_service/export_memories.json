@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::export_memories",
+  "display_name": "Export Memories",
+  "description": "Export memories to a JSON file for backup, transfer, or hydration. Optional file_path must resolve under an operator-configured export_allowed_roots directory (an unset roots list refuses every export); optional include_archived widens the set; and an optional tags filter keeps only records carrying EVERY listed tag (ALL semantics, matching recall) — e.g. export one agent's memory-passthrough projection with ['agent_memory', 'agent_memory:origin:<X>'] and never leak another origin's records. Bulk data lands in a file, never through the MCP bridge.",
+  "embedding_description": "Write memories to a JSON snapshot file for backup, migration, or per-origin hydration. Filter by tags with ALL semantics to export only one origin's projection records, and gate the destination under an operator-configured workspace root. File-based bulk export, not a bridge stream.",
+  "result_processor_customizations": {
+    "action_label": "Export Memories",
+    "result_type": "export_complete",
+    "result_description": "Results of memory export including file path and count of memories exported",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Exporting memories to a JSON file for backup",
+    "error_interpretation": "FileWriteError: failed to write export file to the specified path. PermissionError: insufficient permissions to write to the path. memory.export_path_refused: the file_path is not contained under a configured export_allowed_roots directory (or none is configured). DatabaseError: failed to query memories for export.",
+    "recovery_guidance": "For memory.export_path_refused: pass a path under an operator-configured export_allowed_roots directory, or ask the operator to add one. For file write errors: verify the path is writable and has sufficient disk space. For permission errors: check file system permissions. For database errors: verify state storage is accessible."
+  }
+}

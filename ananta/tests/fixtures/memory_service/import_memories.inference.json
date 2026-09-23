@@ -1,0 +1,5 @@
+{
+  "query": "Import memories from backup file",
+  "expected_process_key": "service_interface::memory_service::import_memories",
+  "expected_arguments": {}
+}

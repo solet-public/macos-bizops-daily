@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::focus_action",
+  "display_name": "Focus",
+  "description": "Pin a memory to the focus buffer for guaranteed context inclusion (max 3)",
+  "embedding_description": "Pin a memory to the focus buffer so it always appears in prompt context. Provide memory_id; returns focused_count. Use to keep critical context visible. Max 3 focused memories — unfocus one first if buffer is full.",
+  "result_processor_customizations": {
+    "action_label": "Memory focused",
+    "result_type": "memory_focused",
+    "result_description": "Confirmation that the memory has been pinned to focus buffer",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

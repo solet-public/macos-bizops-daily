@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent_messaging_plugin"
+version = "0.1.0"
+description = "Durable agent-thread/message persistence + peer messaging for inter-agent calls"
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    "fastapi>=0.115,<1.0",
+    "mcp==1.28.1",
+    "pyjwt==2.13.0",
+    "httpx>=0.27",
+    "click>=8.1",
+]
+
+[project.scripts]
+# Non-MCP local-invocation CLI: drive a running solet over its
+# localhost bridge surface when the client's MCP-server allowlist blocks
+# the stdio bridge. Design: workbench/2026-07-18_mcp_free_local_invocation_cli_design.md
+solet-bridge = "agent_messaging_plugin.local_cli.cli:main"
+
+[project.entry-points."ananta.plugins"]
+agent_messaging_plugin = "agent_messaging_plugin.plugin:AgentMessagingPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["agent_messaging_plugin*"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "TCH"]

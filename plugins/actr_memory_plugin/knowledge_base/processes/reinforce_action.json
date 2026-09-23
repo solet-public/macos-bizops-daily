@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::reinforce_action",
+  "display_name": "Reinforce Memory",
+  "description": "Explicitly reinforce a memory by adding a retrieval timestamp, strengthening its ACT-R activation",
+  "embedding_description": "Reinforce a memory by adding a retrieval timestamp to increase activation strength. Provide memory_id; returns updated strength and retrieval_count. Use to strengthen important memories after use. Call after successful recall to keep it strong.",
+  "result_processor_customizations": {
+    "action_label": "Memory reinforced",
+    "result_type": "memory_reinforced",
+    "result_description": "Memory reinforcement confirmation with updated strength value",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::get_recent_memory",
+  "arguments": {
+    "session_id": "test-session-001",
+    "max_events": 5
+  }
+}

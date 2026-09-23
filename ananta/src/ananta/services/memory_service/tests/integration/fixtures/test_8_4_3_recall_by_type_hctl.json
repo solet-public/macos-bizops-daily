@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::recall",
+  "arguments": {
+    "query": "test integration",
+    "top_k": 5,
+    "memory_type": "episodic"
+  }
+}

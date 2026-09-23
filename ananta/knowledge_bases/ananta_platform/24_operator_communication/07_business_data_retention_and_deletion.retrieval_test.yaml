@@ -1,0 +1,31 @@
+# Retrieval-test companion for the blob/run-flow-evidence retention statement.
+# Gated by service_interface::knowledge_service::test_retrieval. Until the gate
+# is live, run each query through service_interface::knowledge_service::search
+# and confirm this article ranks at or above min_rank for targets and no
+# better than forbidden_min_rank for forbidden queries.
+
+article_path: knowledge_bases/ananta_platform/24_operator_communication/07_business_data_retention_and_deletion.md
+consumer_profile: both
+
+target_queries:
+  - "how long are blobs retained on this platform"
+  - "does the platform automatically delete old blobs"
+  - "retention policy for joseki run-flow evidence"
+  - "is there a TTL on business connector exports"
+  - "how do I see what is consuming blob storage"
+  - "verbs to inspect and delete a blob"
+  - "no automatic deletion policy for evidence and blobs"
+  - "can I set an expiry date on stored blobs"
+
+forbidden_queries:
+  - "gitignore convention for business connector staging data"  # 08_business_record_classification_convention should win
+  - "how do I delete a session from the ledger"                  # session_ledger deletion is a different mechanism, not covered here
+  - "what does my solet capture and embed from my sessions" # 01_hydration_runbook ingestion disclosure should win
+
+min_rank: 1
+forbidden_min_rank: 3
+
+process_key_assertions:
+  - plugin::default_blob_storage_plugin::search_blobs
+  - plugin::default_blob_storage_plugin::get_blob_metadata
+  - plugin::default_blob_storage_plugin::delete_blob

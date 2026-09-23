@@ -1,0 +1,28 @@
+{
+  "name": "coordination-hooks",
+  "version": "0.1.0+codex.20260904000514",
+  "description": "Project-orientation and coordination reminders, a Git-Controller mistake-prevention gate, an async Codex context-status reporter, and a synchronous peer-inbox consumer.",
+  "author": {
+    "name": "seed-factory"
+  },
+  "keywords": [
+    "coordination",
+    "hooks",
+    "git-policy",
+    "context-status",
+    "inbox-consumer"
+  ],
+  "interface": {
+    "displayName": "Coordination Hooks",
+    "shortDescription": "Reviewable hooks for coordinated Codex sessions.",
+    "longDescription": "Adds project-orientation, unread-message, and role-binding reminders; a Git-Controller mistake-prevention gate; context_status_reporter.py, a stock-Codex async Stop hook that reads the current transcript and reports only fresh post-compaction native context measurements; and inbox_consumer.py (CDX-06), a SYNCHRONOUS Stop hook that checks the session's peer inbox for anything already queued and, if so, forces the turn to continue (Codex decision:block) with a fixed nudge -- plus report_inbox_consumption, an honesty attestation recorded on every check regardless of outcome, so a session that has not actually consumed its inbox can never be mistaken for one that has. Deployment-specific guidance stays in the project's native AGENTS.md instructions, and hook revocation remains an explicit operator action in Codex's supported /hooks surface.",
+    "developerName": "seed-factory",
+    "category": "Productivity",
+    "capabilities": [
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Explain the installed coordination hook contract."
+    ]
+  }
+}

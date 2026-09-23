@@ -1,0 +1,20 @@
+{
+  "name": "test_store_blob_basic",
+  "description": "Store a simple text blob with basic metadata",
+  "process_key": "plugin::default_blob_storage_plugin::store_blob",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "content": "SGVsbG8gV29ybGQh",
+      "metadata": {
+        "original_name": "hello.txt",
+        "mime_type": "text/plain",
+        "description": "A simple test file"
+      }
+    },
+    "state": {
+      "current_session_id": "test-store-basic-001"
+    },
+    "timeout_seconds": 30
+  }
+}

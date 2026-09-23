@@ -1,0 +1,25 @@
+[project]
+name = "session_bridge_plugin"
+version = "1.0.0"
+description = "Drains the Claude Code dispatch hook spool into memory_service (W4 hook bridge, M1)."
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[project.entry-points."ananta.plugins"]
+session_bridge_plugin = "session_bridge_plugin.plugin:SessionBridgePlugin"

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::flow_service::get_flow_input_for_presentation",
+  "display_name": "Get Flow Input For Presentation",
+  "description": "Extract the original user input for result/error presentation prompts. Returns only original_input and flow_id (excludes attachments to prevent confusion between input attachments and output attachment refs).",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Get Flow Input For Presentation",
+    "result_type": "flow_input_presentation",
+    "result_description": "Original user input for presentation (excludes attachments)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Extracting original user input for result/error presentation",
+    "error_interpretation": "NotFoundError with 'flow_id': no flow record exists with the specified ID. DatabaseError: failed to query flow record.",
+    "recovery_guidance": "For not found errors: verify the flow_id is correct. For database errors: verify database connectivity and retry."
+  }
+}

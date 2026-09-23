@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "g_suite_plugin"
+version = "1.0.0"
+description = "Google Workspace (Gmail, Drive, Sheets, Docs, Slides) plugin for Ananta"
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    # Official Google client libraries ONLY — library-first, no CLI wrapping,
+    # no third-party OAuth wrappers, no deprecated oauth2client. google-auth
+    # rides the actively-audited `cryptography` backend already in the venv.
+    "google-api-python-client>=2",
+    "google-auth>=2",
+    "google-auth-oauthlib>=1",
+    # OAuth callback surface (browser redirect handler).
+    "fastapi>=0.111",
+    "uvicorn>=0.29",
+]
+
+[project.entry-points."ananta.plugins"]
+g_suite_plugin = "g_suite_plugin.plugin:GSuitePlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["g_suite_plugin*"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

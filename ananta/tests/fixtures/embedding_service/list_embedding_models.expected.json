@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "models"
+  ],
+  "output_not_contains": [
+    "error"
+  ]
+}

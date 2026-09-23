@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::register_authored_work_breakdown_structure",
+  "display_name": "Register Authored WBS",
+  "description": "persist a Work Breakdown Structure document that the calling agent authored by value: validate it, then store it through the standard WBS storage path so it becomes retrievable and executable.",
+  "embedding_description": "Register an agent-authored work breakdown structure so the platform stores it and makes it retrievable. Persists the document to the knowledge base and the WBS tracking table with authored-by-value provenance after hard-fail validation. Registration never overwrites an existing WBS.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Authored WBS registered",
+    "result_type": "authored_wbs_registration_result",
+    "result_description": "Registration result with keys: wbs_id, status, knowledge_base_path, source_memory_id",
+    "presentation_guidance": "Confirm the registration with the wbs_id and knowledge_base_path so the caller can reference the stored document.",
+    "output_action_guidance": "The document is stored, focused, and retrievable. Continue with the next step of the current plan; no re-validation is needed."
+  },
+  "error_processor_customizations": {
+    "action_context": "Registering an agent-authored Work Breakdown Structure document. register_authored_work_breakdown_structure accepts {content, wbs_id, manifest_id, phase_number, phase_name}. Validation runs first; nothing is stored when it fails.",
+    "error_interpretation": "ValidationError: the document failed hard-fail validation — the message lists every finding — or the action arguments do not conform to the schema. AlreadyRegistered: a WBS with this wbs_id already exists; registration never overwrites. StorageError: the knowledge base or state write failed after validation passed.",
+    "recovery_guidance": "Validation failures: repair the listed findings in the authored document (validate_authored_work_breakdown_structure gives the same report without side effects) and resubmit. Already-registered: revise the existing document with patch_work_breakdown_structure instead of re-registering. Storage failures: retry once the platform reports healthy."
+  }
+}

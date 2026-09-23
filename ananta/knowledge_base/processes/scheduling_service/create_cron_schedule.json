@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::scheduling_service::create_cron_schedule",
+  "display_name": "Create Cron Schedule",
+  "description": "Create a recurring UTC cron schedule. Configure exactly one execution mode: provide a non-empty action_definitions list of syntactically valid {process_key, arguments} objects, or provide memory_tag for the terminal get_memories_by_tag read. Registration validates entry shape and scheduled-action policy; execution resolves process_key against processes registered at fire time. The memory-tag result is written to the schedule result row and does not start a model turn. Use direct action definitions for deterministic peer notifications, mechanizable Joseki runs, monitoring actions, and other mechanizable recurring work. Cancel via clear_scheduled_actions_by_tag.",
+  "embedding_description": "Create recurring executable work on a UTC cron cadence. action_definitions requires non-empty, syntactically valid {process_key, arguments} entries; execution resolves each process_key against processes registered at fire time. memory_tag is the mutually exclusive terminal mode: it performs get_memories_by_tag, records the result, and does not start a model turn. Cancel via clear_scheduled_actions_by_tag.",
+  "result_processor_customizations": {
+    "action_label": "Cron Schedule Created",
+    "result_type": "schedule_created",
+    "result_description": "Confirmation of recurring cron schedule creation with schedule_id and next execution time",
+    "presentation_guidance": "",
+    "output_action_guidance": "A recurring schedule has been created. If this is a user-facing check-in/heartbeat, consider telling the requester what cadence to expect. Retain the schedule_id or tags so you can cancel the schedule once it is no longer needed."
+  },
+  "error_processor_customizations": {
+    "action_context": "Creating a recurring cron schedule with direct action definitions or a terminal memory lookup",
+    "error_interpretation": "default_scheduling_plugin.invalid_cron_expression: invalid cron expression syntax. default_scheduling_plugin.parameter_error: malformed or inference-bearing action definition, empty action list, invalid memory_tag, or an execution-mode conflict. default_scheduling_plugin.schedule_create_error: persistence or scheduler registration failed after valid parameters.",
+    "recovery_guidance": "For cron syntax errors: verify cron expression format (minute hour day month weekday). For execution-mode errors: use non-empty {process_key, arguments} action definitions for executable work, or a non-empty memory_tag only when a terminal tagged-memory read is the complete intent. For scheduler errors: verify the scheduling service is running."
+  }
+}

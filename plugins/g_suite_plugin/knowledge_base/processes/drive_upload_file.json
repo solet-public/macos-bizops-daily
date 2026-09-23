@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::drive_upload_file",
+  "display_name": "Drive: Upload File",
+  "description": "Upload bytes to Google Drive from a blob (blob_key). Content comes from platform blob storage only — to upload a local file, ingest it via blob_storage_service.store_blob_from_file first and pass the resulting blob_key. Optional parent folder id and mime type override. Runs as a background job: dispatch returns a job_id immediately, and the new file's id and web view link arrive via a follow-up message once the upload completes. Requires a connected account.",
+  "embedding_description": "Upload bytes from platform blob storage into Google Drive as a new binary file, as a background job. Requires a display name and optional parent folder or MIME override; dispatch returns a job_id for tracking, and completion delivers the created Drive file id and web link. Use this write path to place a platform-held blob in Drive after local files have been ingested into blob storage.",
+  "result_processor_customizations": {
+    "action_label": "Drive upload started",
+    "result_type": "g_suite_drive_upload_result",
+    "result_description": "Job queued for the Drive upload; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to upload a file into Google Drive from a blob.",
+    "error_interpretation": "gsuite.invalid_params: blob_key not supplied, or missing session_id/flow_id context. gsuite.not_found: the referenced blob_key does not exist. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.invalid_params: supply a blob_key (ingest a local file via store_blob_from_file first if needed). gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

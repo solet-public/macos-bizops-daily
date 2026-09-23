@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::external_postgres_plugin::list_schemas",
+  "display_name": "External Postgres: List Schemas",
+  "description": "List the non-system schemas in a registered foreign Postgres connection. Requires connection_name. System schemas (pg_catalog, information_schema, pg_toast) are excluded. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) — the dispatch returning is NOT the same as the job finishing; the schema list itself is delivered when the job completes.",
+  "embedding_description": "List the user schemas in a registered external Postgres database, leaving internal system namespaces out. The TOP level of foreign-database introspection -- the first call when orienting inside an unfamiliar database. Dispatches asynchronously; the schema-name list arrives via job completion, not this call's own return.",
+  "result_processor_customizations": {
+    "action_label": "Foreign Postgres schema listing queued",
+    "result_type": "external_postgres_list_schemas_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the schema list — that arrives separately when the job completes and is delivered as its own message.",
+    "presentation_guidance": "This call only confirms the job was queued — do not present job_id/status as the answer to 'what schemas exist'. Acknowledge the request is in flight; the schema list itself lands in a follow-up message when the job completes. Once delivered, list the schema names (schema metadata, data_sensitivity 0.1) and suggest list_tables with a schema to go deeper."
+  },
+  "error_processor_customizations": {
+    "action_context": "List the non-system schemas of a registered foreign Postgres connection.",
+    "error_interpretation": "external_pg.invalid_params: missing connection_name. external_pg.connection_unknown: no connection registered under that name. external_pg.auth_failed / external_pg.permission_denied: the registered credential was rejected. external_pg.platform_db_refused: the connection targets the platform's own database.",
+    "recovery_guidance": "external_pg.connection_unknown: run list_connections. external_pg.auth_failed/permission_denied: ask the operator to re-check the registered connection."
+  }
+}

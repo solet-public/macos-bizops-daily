@@ -1,0 +1,22 @@
+{
+  "name": "test_write_state_unicode",
+  "description": "Verify write_state handles unicode characters correctly",
+  "process_key": "plugin::postgres_state_management_plugin::write_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "data": {
+        "table": "key_value_store",
+        "record": {
+          "id": "test_unicode_01",
+          "namespace": "test_unicode",
+          "key": "unicode_key",
+          "value": "Unicode test: Chinese characters or emojis or symbols",
+          "scope": "GLOBAL"
+        }
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,15 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "does not exist",
+    "not exist",
+    "not found",
+    "Not found",
+    "unknown",
+    "Unknown",
+    "Unfortunately",
+    "describe_schema",
+    "schema",
+    "namespace"
+  ]
+}

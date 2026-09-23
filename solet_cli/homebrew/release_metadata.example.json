@@ -1,0 +1,18 @@
+{
+  "formula_revision": 0,
+  "install_mode": "release",
+  "manager_url": "https://github.com/solet-public/macos-bizops/releases/download/release-2026-08-21/solet-0.1.0.tar.gz",
+  "manager_source_repository": "https://github.com/solet-public/solet.git",
+  "manager_source_commit": "e25c3f0ffaa8f98cbefe21901c411c4eaea3475f",
+  "manager_source_tree_hash": "d5c05c572bd6bff7b1ca7139498e7bd955f028a8",
+  "release_archive_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "seed_repository": "https://github.com/solet-public/macos-bizops.git",
+  "seed_release_tag": "release-2026-08-21",
+  "seed_commit": "0123456789abcdef0123456789abcdef01234567",
+  "seed_tree_hash": "89abcdef0123456789abcdef0123456789abcdef",
+  "seed_profile": "macos-bizops",
+  "seed_channel_id": "stable",
+  "seed_provenance": {"schema_version": 1, "provenance_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "seed_id": "123e4567-e89b-12d3-a456-426614174000", "origin_id": "123e4567-e89b-12d3-a456-426614174001", "manifest_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "bundle_name": "macos-bizops", "platform": "local", "source_commit": "0123456789abcdef0123456789abcdef01234567", "source_date": "2026-09-15T00:00:00+00:00"},
+  "existing_install_contract": {"flow_id": "existing-install", "flow_schema_version": 1, "bundle_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+  "allowed_repository_migrations": []
+}

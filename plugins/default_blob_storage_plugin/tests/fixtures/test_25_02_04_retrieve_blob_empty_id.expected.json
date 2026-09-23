@@ -1,0 +1,6 @@
+{
+  "action_status": "error",
+  "error_code": "blob_storage.invalid_blob_id",
+  "error_message_contains": "cannot be empty",
+  "timeout_seconds": 30
+}

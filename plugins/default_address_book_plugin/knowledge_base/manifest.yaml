@@ -1,0 +1,22 @@
+name: default_address_book_plugin
+description: >
+  Default Address Book plugin process definitions and reference documentation.
+
+category: plugin-internal
+tags:
+  - plugin_reference
+  - default_address_book
+
+content:
+  patterns:
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+      - "processes/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

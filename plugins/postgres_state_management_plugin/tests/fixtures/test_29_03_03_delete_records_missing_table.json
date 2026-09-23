@@ -1,0 +1,17 @@
+{
+  "name": "test_delete_records_missing_table",
+  "description": "Verify delete_records returns error when table is missing",
+  "process_key": "plugin::postgres_state_management_plugin::delete_records",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "query": {
+        "filters": {
+          "id": "test123"
+        }
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

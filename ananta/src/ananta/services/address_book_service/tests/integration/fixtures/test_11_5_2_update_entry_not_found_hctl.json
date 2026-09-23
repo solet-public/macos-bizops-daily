@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::address_book_service::update_entry",
+  "arguments": {
+    "entry_id": "nonexistent-entry-id",
+    "description": "Should fail"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "test_recompute_strengths",
+  "description": "Recompute ACT-R activation strength for all memories",
+  "process_key": "service_interface::memory_service::recompute_strengths",
+  "arguments": {}
+}

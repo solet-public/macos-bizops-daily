@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::stop_memorizing",
+  "arguments": {
+    "memory_id": "mem_nonexistent_999"
+  }
+}

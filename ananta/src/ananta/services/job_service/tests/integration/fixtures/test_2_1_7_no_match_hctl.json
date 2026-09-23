@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::job_service::get_latest_job",
+  "arguments": {
+    "plugin_name": "nonexistent_plugin_xyz"
+  }
+}

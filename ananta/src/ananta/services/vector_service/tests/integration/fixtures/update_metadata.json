@@ -1,0 +1,78 @@
+{
+  "name": "test_update_metadata",
+  "description": "Store a vector and update its metadata.",
+  "sequence": [
+    {
+      "step": "precleanup_vector_update_target",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_update_target"
+          },
+          "soft_delete": false
+        }
+      }
+    },
+    {
+      "step": "store_vector",
+      "process_key": "service_interface::vector_service::store_vectors",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vectors": [
+          {
+            "id": "vector_update_target",
+            "vector": [
+              -0.43,
+              0.09,
+              0.67
+            ],
+            "dimension": 3,
+            "metadata": {
+              "label": "update_before",
+              "category": "metadata"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step": "update_metadata",
+      "process_key": "service_interface::vector_service::update_metadata",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vector_id": "vector_update_target",
+        "metadata": {
+          "label": "update_after",
+          "category": "metadata"
+        }
+      }
+    },
+    {
+      "step": "cleanup_delete_vector",
+      "process_key": "service_interface::vector_service::delete_vectors",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vector_ids": [
+          "vector_update_target"
+        ]
+      }
+    },
+    {
+      "step": "cleanup_vector_update_target",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_update_target"
+          },
+          "soft_delete": false
+        }
+      }
+    }
+  ]
+}

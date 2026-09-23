@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::forget_action",
+  "display_name": "Forget",
+  "description": "Archive a memory (soft delete)",
+  "embedding_description": "Archive (soft delete) a memory by memory_id so it no longer appears in recall results. Use when a memory is outdated or incorrect; returns confirmation without permanent deletion. Archived memories remain stored but excluded from recall.",
+  "result_processor_customizations": {
+    "action_label": "Memory archived",
+    "result_type": "memory_archived",
+    "result_description": "Archive confirmation with memory_id",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

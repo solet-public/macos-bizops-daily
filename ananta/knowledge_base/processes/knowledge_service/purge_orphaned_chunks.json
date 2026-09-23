@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::purge_orphaned_chunks",
+  "display_name": "Purge Orphaned KB Chunks",
+  "description": "Operator-fired one-shot sweeper that hard-deletes knowledge:official memory rows whose IDs are not referenced by any active default_knowledge_plugin__knowledge_install record. NEVER auto-fires on the spawn path — replaces the prior spawn-time auto-purge that blew the 600s router-registration budget when it accumulated 271,605 archived rows. Default confirm=False returns a dry-run with the orphan count plus the first 10 sample IDs; confirm=True deletes in per-batch state-service transactions of batch_size rows. Optional max_batches caps the run when the operator wants to chunk the work across maintenance windows. Cross-service vector cleanup is best-effort outside the state-service transaction per W5.P §3.1 Option A; orphan vectors are reconciled separately by service_interface::memory_service::cleanup_orphaned_vectors (the kb-side purge_orphan_vectors sweeper was retired per the forks-ruling FORK C).",
+  "embedding_description": "Drain accumulated KB chunk orphans from actr_memory_plugin__memory after blue-green cutover or install-record drift. Hard-delete knowledge:official memory rows whose id is no longer referenced by an active install record. Default dry-run reports orphan count + sample IDs; confirm=True commits in batched transactions. Operator-fired backstop for 271k-orphan accumulation incident; never auto-fires.",
+  "result_processor_customizations": {
+    "action_label": "KB chunk orphans purged",
+    "result_type": "kb_orphan_purge_result",
+    "result_description": "Orphan count (found on dry_run / deleted on completed), active install-record memory count, total knowledge:official chunk count, batches_run on confirm path, sample_ids on dry_run path",
+    "presentation_guidance": "Treat dry_run output as inventory: orphan_count + sample_ids show what would be deleted. Treat completed output as commitment: orphan_count is the rows hard-deleted, batches_run is the per-batch transaction count.",
+    "output_action_guidance": "On dry_run with non-zero orphan_count, decide whether to re-invoke with confirm=True (and optional max_batches for chunked runs). On completed, optionally re-run dry_run to verify the table is now clean, then run service_interface::memory_service::cleanup_orphaned_vectors to reconcile cross-service vector residue."
+  },
+  "error_processor_customizations": {
+    "action_context": "Operator-fired purge of orphan KB chunks accumulated in actr_memory_plugin__memory. Accepts {confirm?, batch_size?, max_batches?}.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. RuntimeError: state_service unavailable or transactional context could not be opened. psycopg.Error: per-batch DELETE failed mid-transaction (rolled back atomically per state_service.transactional contract).",
+    "recovery_guidance": "Re-run with confirm=False to confirm the orphan inventory before retrying confirm=True. If a batch failed, the rows are still present (rollback semantics); reduce batch_size and retry. For pgvector residue left after a failed cross-service vector delete, invoke service_interface::memory_service::cleanup_orphaned_vectors separately."
+  }
+}

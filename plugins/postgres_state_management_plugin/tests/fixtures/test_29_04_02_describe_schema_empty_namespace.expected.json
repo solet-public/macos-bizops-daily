@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "action_status",
+    "completed",
+    "namespace",
+    "tables"
+  ],
+  "output_not_contains": [
+    "failed"
+  ],
+  "timeout_seconds": 60
+}

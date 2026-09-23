@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::marketo_plugin::check_setup",
+  "display_name": "Marketo: Check Setup",
+  "description": "Probe six configured API-user READ capabilities (lead field schema, lead query, activity type catalog, current-day API usage, campaign listing, static list listing) and report the specific Access API Role permission missing for any that fail. This is broader than test_connection, which only checks credentials. Write/execute verbs cannot be safely probed and remain explicit in writes_unverified. ⚠ Two coverage limits, not one: beyond unprobed writes, all six probes are Lead-API reads, so reads_verified says nothing about Marketo's SEPARATE Read-Only Asset entitlement gating /rest/asset/v1/ — an instance can report reads_verified=true and still hold no asset entitlement. That gap is an operator screen (Admin → Users & Roles), not an API question; treat it as a requirement to verify, never as an assurance from this verb.",
+  "embedding_description": "Audit the configured Marketo API user's Access API Role across lead schema, lead query, activity metadata, API usage, campaign listing, and static list listing, with per-capability permission diagnostics and remediation guidance.",
+  "result_processor_customizations": {
+    "action_label": "Marketo setup checked",
+    "result_type": "marketo_check_setup_result",
+    "result_description": "Dict with reads_verified (bool, READ capabilities only — NOT the whole setup), checks (a list of {capability, verb, status, error_code?, error_message?, guidance?} per probe), writes_unverified (verb names whose permissions can't be probed safely), writes_unverified_note.",
+    "presentation_guidance": "If reads_verified is false, lead with the specific failed capability + its guidance (exact Role permission to add, or the correct admin screen for a partition/credential problem) rather than a generic 'setup incomplete'. Always mention writes_unverified so the operator knows write/trigger permission gaps can still surface later even when reads_verified=true. When reads_verified=true, scope the claim to the six Lead-API READ capabilities actually probed — it is not a whole-setup pass, and in particular it carries no information about the separate Read-Only Asset entitlement, which only an operator can confirm in Admin → Users & Roles."
+  },
+  "error_processor_customizations": {
+    "action_context": "Check which capabilities the configured Marketo API user's Role actually grants.",
+    "error_interpretation": "marketo.not_configured: no marketo_instance address-book entry registered yet — nothing to check.",
+    "recovery_guidance": "marketo.not_configured: register the marketo_instance address-book entry first (see hydration_guidance.md), then run check_setup."
+  }
+}

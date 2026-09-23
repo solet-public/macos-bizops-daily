@@ -1,0 +1,6 @@
+{
+  "process_key": "plugin::actr_memory_plugin::recompute_strengths_action",
+  "display_name": "Recompute Strengths",
+  "description": "Recalculate activation strength for all memories",
+  "embedding_description": "Recalculate activation strength for all memories. Use after parameter changes or data migration; returns updated_count and a status message. Forces decay/strength recomputation across all records. Useful after tuning decay parameters."
+}

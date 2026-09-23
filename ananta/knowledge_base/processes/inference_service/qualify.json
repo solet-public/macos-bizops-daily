@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::inference_service::qualify",
+  "display_name": "Qualify Bound Inference Provider",
+  "description": "Issue one deterministic, tightly bounded structured request against the currently bound inference provider and report only provider identity, model identity, completion status, and structured-result validity.",
+  "embedding_description": "Verify that the currently bound inference provider and configured model can complete one deterministic, low-token structured request. Returns only provider, model, completed, and structured_result_valid; it never exposes generated text, usage, or provider payloads.",
+  "action_definition_template_arguments": {}
+}

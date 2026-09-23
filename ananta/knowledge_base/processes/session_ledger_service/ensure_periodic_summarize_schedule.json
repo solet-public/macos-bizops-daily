@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::session_ledger_service::ensure_periodic_summarize_schedule",
+  "display_name": "Ensure Periodic Ledger Auto-Summarize Schedule",
+  "description": "Idempotently install (or normalize) a single cron schedule that fires `service_interface::session_ledger_service::summarize_quiescent_sessions` every `cadence_minutes` minutes. Mirrors `ensure_periodic_poll_schedule` for the M6 auto-summarize path: clears any existing schedules tagged `ledger:periodic_summarize`, then creates one fresh schedule with the requested cadence.\n\nBoot-only — wired via the profile's `starting_actions` so a fresh solet starts summarizing her own sessions the moment her services come up. The `is_discoverable=False` flag keeps the verb out of the model's `process_search` results; operator-initiated re-runs go through the operator bridge directly.\n\nFails fast if scheduling_service is not bound at session_ledger_service construction. Summaries auto-flow on quiescence; no external observer agent required.",
+  "embedding_description": "Boot-time idempotent helper that installs a single cron firing summarize_quiescent_sessions every N minutes. Mirrors ensure_periodic_poll_schedule. Tag: ledger:periodic_summarize. Default cadence 10 minutes.",
+  "result_processor_customizations": {
+    "action_label": "Ensure Periodic Ledger Auto-Summarize",
+    "result_type": "ledger_periodic_summarize_ensured",
+    "result_description": "Periodic auto-summarize schedule status — created, already_present, or normalized after duplicate cleanup.",
+    "presentation_guidance": "",
+    "output_action_guidance": "The ledger now auto-summarizes quiescent sessions every configured interval. If you are diagnosing whether summaries are landing, check session_ledger__session.summary_text after the next firing rather than re-running this verb."
+  },
+  "error_processor_customizations": {
+    "action_context": "Ensuring a single periodic auto-summarize cron schedule for the LLM session ledger",
+    "error_interpretation": "RuntimeError: scheduling_service not bound (profile omits scheduling). ValueError: cadence_minutes out of the 1..59 range. SchedulerError: scheduling backend rejected the cron expression or refused to clear/create the schedule.",
+    "recovery_guidance": "If scheduling is unavailable, the operator can invoke summarize_quiescent_sessions directly from the operator bridge as a one-shot. If cadence validation failed, retry with a value in [1, 59]."
+  }
+}

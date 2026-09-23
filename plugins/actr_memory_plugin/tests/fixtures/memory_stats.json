@@ -1,0 +1,6 @@
+{
+  "name": "test_memory_stats_direct_plugin_blocked",
+  "description": "Verify that direct plugin invocation is blocked when plugin is bound to a service interface. Must use service_interface::memory_service::memory_stats instead.",
+  "process_key": "plugin::actr_memory_plugin::memory_stats",
+  "arguments": {}
+}

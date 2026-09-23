@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "macos_coding_agent_session_plugin"
+version = "1.0.0"
+description = "macOS-scope MCP bridge subprocess lifecycle owner — spawn / terminate / restart / list bridges and auto-reconnect on router port change."
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    # Pinned exact, not >=10.0: 12.2.2 (PyPI's current release as of 2026-09-22)
+    # measured with a genuine intermittent FSEventStream delivery regression --
+    # the callback silently never fires and the watcher times out at its full
+    # deadline. Reproduced directly: 1/5 standalone runs failed on 12.2.2 with
+    # the exact symptom every born-clone gate run hit (3/3 gate runs failed,
+    # consistent with a fresh gate venv always resolving the newest release);
+    # reverting to 12.2 restored 3/3 (then 6/6 total) clean passes. 12.2 is the
+    # version this checkout's own long-lived dev venv had been running with no
+    # observed failures. Widen the pin only after a newer release is
+    # specifically verified across multiple runs, not on the open range's say-so.
+    "pyobjc-framework-FSEvents==12.2",
+]
+
+[project.entry-points."ananta.plugins"]
+macos_coding_agent_session_plugin = "macos_coding_agent_session_plugin.plugin:MacosCodingAgentSessionPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["macos_coding_agent_session_plugin*"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

@@ -1,0 +1,11 @@
+{
+  "name": "{{MARKETPLACE_NAME}}",
+  "owner": { "name": "seed-factory" },
+  "plugins": [
+    {
+      "name": "coordination-hooks",
+      "source": "./plugins/github_midwife_plugin/claude_plugin/coordination-hooks",
+      "description": "Fleet coordination hooks for coordinator-style multi-session workflows: a knowledge-base-first reminder, a check-your-messages reminder, a role-binding reminder, an opt-in idle-wake waiter, an opt-in git-mutation guard, a heartbeat report-alive hook, a rotation-due watch hook, the memory-passthrough capture/session-context hooks plus their drain/hydrate/sync CLI utilities, and two spawn-injected worker hooks (a headless tool-allowlist gate and a session-mapping capture) fallback-shipped for a spawned worker's own host adapter."
+    }
+  ]
+}

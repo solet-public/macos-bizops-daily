@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::list",
+  "display_name": "List Secrets",
+  "description": "List secret keys and metadata (NEVER values). Optionally filter by tag.",
+  "embedding_description": "Vault: list stored secrets — metadata only, NEVER values. Enumerates keys + tags + metadata + version of every credential / password / OAuth client_secret / API key / refresh+bearer token. Does NOT require unlocking (metadata is unencrypted). Optional tag filter narrows the subset. Use to inventory credentials the solet holds.",
+  "result_processor_customizations": {
+    "action_label": "Secrets listed",
+    "result_type": "secrets_listed",
+    "result_description": "List of secret metadata. Contains secrets (array of records with key, tags, metadata, version) and count (total number). NEVER contains secret values.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Lists secret keys and metadata from the vault. Does not require vault to be unlocked (metadata is not encrypted).",
+    "error_interpretation": "VaultNotInitialized: Vault has not been set up yet. StorageError: Unable to read from vault storage backend.",
+    "recovery_guidance": "For VaultNotInitialized: Guide user through vault initialization. For StorageError: Check storage backend health and permissions."
+  }
+}

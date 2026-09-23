@@ -1,0 +1,23 @@
+# Retrieval-test companion for the solet charter template article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+
+article_path: knowledge_bases/ananta_platform/24_operator_communication/02_solet_charter_template.md
+consumer_profile: both
+
+target_queries:
+  - "solet charter template"
+  - "which charter sections are platform constant and which does the owner fill"
+  - "how do I write the minimum viable charter with a new owner"
+  - "what are the platform design values"
+  - "governance model owner is final authority agents hold positions"
+  - "what is a solet identity substrate sessions ephemeral"
+
+forbidden_queries:
+  - "operator decision brief format"                 # 01_operator_decision_briefs owns this
+  - "first days onboarding conversation steps"       # the first-days runbook owns this
+  - "seed hydration environment setup"               # the hydration runbook owns this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions: []

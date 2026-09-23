@@ -1,0 +1,100 @@
+#!/bin/zsh
+# codex-{{SOLET_NAME}} — start stock Codex with {{SOLET_NAME}}'s
+# durable no-MCP receive path armed.
+#
+# Usage: codex-{{SOLET_NAME}} [role] [codex arguments ...]
+#   role   durable coordination role and human-facing label (default: Operator)
+#
+# CODEX_BIN may name an explicit stock Codex executable. It defaults to the
+# `codex` found on PATH. The launcher never enables MCP or bypasses approvals.
+
+set -u
+
+role="${1:-Operator}"
+if (( $# > 0 )); then
+  shift
+fi
+
+cd {{CLONE_DIR_ZSH}} || exit 1
+
+codex_bin="${CODEX_BIN:-codex}"
+if ! command -v "$codex_bin" >/dev/null 2>&1; then
+  print -u2 -- "codex-{{SOLET_NAME}}: stock Codex executable not found: $codex_bin"
+  exit 1
+fi
+
+# Solet name: NOT part of the neutral AGENT_* fleet-identity family
+# below (that family is deliberately unprefixed per the 2026-07-28 ruling in
+# agent_messaging_plugin/env_contract.py) — this is the separate variable
+# naming which solet this shell talks to. Several plugins resolve it at
+# module-import time for scoped vault keys, and quality_gates/run_smokes.py
+# (the Git-Controller gate path) fails loudly without it. launch.template
+# (the daemon launcher) already exports it; keep both launchers in lockstep.
+export SOLET_NAME="{{SOLET_NAME}}"
+
+# The session id is computed exactly once. The watcher, durable inbox, and
+# Codex process must all inherit this same value or their per-session
+# routing keys diverge silently.
+export AGENT_IDENTITY="codex"
+export AGENT_SESSION_LABEL="$role"
+export AGENT_ROLE="$role"
+export AGENT_SESSION_ID="ases-$(date +%s)-$$-${RANDOM}"
+export AGENT_WAKE_CLI="{{SOLET_NAME}}"
+export FLEET_TRANSPORT="${{{SOLET_NAME}}_FLEET_TRANSPORT:-watch}"
+export GIT_CONTROLLER_NAME="{{GIT_CONTROLLER_NAME}}"
+
+if [[ "$FLEET_TRANSPORT" == "watch" ]]; then
+  if [[ -n "${XDG_RUNTIME_DIR:-}" ]]; then
+    runtime_dir="$XDG_RUNTIME_DIR/ananta"
+  else
+    runtime_dir="$HOME/.ananta/runtime"
+  fi
+  watch_log="$runtime_dir/{{SOLET_NAME}}.${AGENT_SESSION_ID}.watch.log"
+
+  if mkdir -p "$runtime_dir" 2>/dev/null && chmod 700 "$runtime_dir" 2>/dev/null; then
+    # Plain background child only: no nohup, disown, or setsid. `exec` below
+    # preserves this shell's pid, so --exit-with-parent names the Codex process.
+    #
+    # CDX-06 (2026-08-24): the spool is ARMED. codex-0147-async-hook-regression
+    # (2026-08-13) disabled it here because the coordination-hooks Codex
+    # plugin then shipped no `Stop` handler at all, so nothing ever drained
+    # it. The plugin now ships `inbox_consumer.py`, a SYNCHRONOUS Stop hook
+    # that calls `solet wake --max-wait <a few seconds>` on every turn
+    # boundary specifically to drain this spool -- so it is exactly the
+    # consumer the old comment found missing, not a reason to keep the tee
+    # off. Delivery itself was always unaffected either way: the durable
+    # inbox and this watcher's own stdout/log stream are unconditional and
+    # independent of the spool tee.
+    "$AGENT_WAKE_CLI" watch \
+      --agent-id codex \
+      --role "$AGENT_ROLE" \
+      --exit-with-parent "$$" \
+      >>"$watch_log" 2>&1 &
+    watcher_pid=$!
+
+    integer attempt=0
+    while (( attempt < 100 )); do
+      if grep -Fq '"watch": "armed"' "$watch_log" 2>/dev/null; then
+        break
+      fi
+      if ! kill -0 "$watcher_pid" 2>/dev/null; then
+        break
+      fi
+      sleep 0.1
+      (( attempt += 1 ))
+    done
+
+    if ! grep -Fq '"watch": "armed"' "$watch_log" 2>/dev/null; then
+      print -u2 -- "codex-{{SOLET_NAME}}: watcher did not arm; see $watch_log"
+      tail -n 20 "$watch_log" >&2 2>/dev/null || true
+      if kill -0 "$watcher_pid" 2>/dev/null; then
+        kill -TERM "$watcher_pid" 2>/dev/null || true
+      fi
+      wait "$watcher_pid" 2>/dev/null || true
+    fi
+  else
+    print -u2 -- "codex-{{SOLET_NAME}}: cannot prepare watcher runtime directory: $runtime_dir"
+  fi
+fi
+
+exec "$codex_bin" "$@"

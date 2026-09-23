@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::coding_agent_session_service::spawn_bridge",
+  "display_name": "Spawn MCP bridge subprocess for a coding-agent tab",
+  "description": "Start a `python -m agent_messaging_plugin.mcp_bridge` subprocess for one coding-agent tab and track it under the supplied agent_instance_id. The bridge subprocess connects to the solet router using `<solet_name>.bridge.port` runtime discovery, then forwards MCP tool calls between the agent's CLI and the solet. Idempotent: when the tracker already holds a live subprocess under the supplied id, the existing pid is returned unchanged with status=already_running. Called by the iTerm2 coding-agent management plugin's `spawn(role)` verb immediately after the new tab's claude-code (or codex) process is launched. The bridge subprocess parent is the solet plugin process, NOT iTerm2 — killing iTerm2 does not orphan the bridge subprocess.",
+  "embedding_description": "Start an MCP bridge subprocess for one coding-agent tab so tool calls flow between the agent's CLI and the solet router. Spawns `python -m agent_messaging_plugin.mcp_bridge` with SOLET_NAME + AGENT_IDENTITY env; discovers router port via <name>.bridge.port. Idempotent under tracked agent_instance_id. Returns BridgeSpawnResult: status, agent_instance_id, pid, started_at, message.",
+  "result_processor_customizations": {
+    "action_label": "MCP bridge spawned",
+    "result_type": "coding_agent_session_bridge_spawn_result",
+    "result_description": "BridgeSpawnResult frozen dataclass with status (success / already_running / failed), agent_instance_id, solet_name, pid, started_at ISO-8601 UTC, and human-readable message.",
+    "presentation_guidance": "Lead with status. On status='success', surface the pid plus the started_at. On status='already_running', say so plainly — the operator does NOT need to act. On status='failed', surface the message verbatim (typically a subprocess.Popen error or a runtime-dir validation failure)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Spawn an MCP bridge subprocess for a coding-agent tab.",
+    "error_interpretation": "subprocess_spawn_failed: `python -m agent_messaging_plugin.mcp_bridge` could not be started (typically a missing .venv, an invalid PYTHONPATH, or a permission problem). runtime_dir_missing: ~/.ananta/runtime/ does not exist, which means the solet has not yet bound a bridge port file the bridge subprocess can discover. invalid_args: either agent_instance_id or solet_name was empty.",
+    "recovery_guidance": "subprocess_spawn_failed: confirm the solet is running and that `python -m agent_messaging_plugin.mcp_bridge` works manually from the repo root. runtime_dir_missing: start the solet (./launch.py with SOLET_NAME set) so the bridge port file appears. invalid_args: re-issue the call with both fields populated."
+  }
+}

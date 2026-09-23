@@ -1,0 +1,38 @@
+{
+  "name": "test_execute_in_seconds_multiple_actions",
+  "description": "Schedule multiple actions to execute after a delay",
+  "process_key": "plugin::default_scheduling_plugin::execute_in_seconds",
+  "arguments": {
+    "params": {
+      "seconds": 60,
+      "label": "Multi-Action Schedule",
+      "tags": "multi,workflow",
+      "actions": [
+        {
+          "process_key": "plugin::reporting_plugin::generate_report",
+          "arguments": {
+            "report_type": "summary"
+          }
+        },
+        {
+          "process_key": "plugin::discord_plugin::post_message",
+          "arguments": {
+            "message": "Report generated and ready"
+          }
+        },
+        {
+          "process_key": "plugin::notification_plugin::send_email",
+          "arguments": {
+            "to": "admin@example.com",
+            "subject": "Report Ready"
+          }
+        }
+      ]
+    },
+    "state": {
+      "session_id": "test-session-104",
+      "flow_id": "test-flow-104"
+    }
+  },
+  "timeout_seconds": 30
+}

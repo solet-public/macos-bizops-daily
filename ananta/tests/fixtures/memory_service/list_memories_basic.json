@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::memory_service::list_memories",
+  "arguments": {
+    "memory_type": null,
+    "status": "active",
+    "tag": null,
+    "sort_by": "strength",
+    "limit": 20
+  }
+}

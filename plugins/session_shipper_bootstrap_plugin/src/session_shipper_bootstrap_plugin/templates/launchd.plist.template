@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${LAUNCHD_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${PYTHON_BIN}</string>
+        <string>${INSTALL_DIR}/shipper.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${INSTALL_DIR}/shipper.log</string>
+    <key>StandardErrorPath</key>
+    <string>${INSTALL_DIR}/shipper.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DEPLOYMENT_ID</key>
+        <string>${DEPLOYMENT_ID}</string>
+        <key>MACHINE_ID</key>
+        <string>${MACHINE_ID}</string>
+    </dict>
+</dict>
+</plist>

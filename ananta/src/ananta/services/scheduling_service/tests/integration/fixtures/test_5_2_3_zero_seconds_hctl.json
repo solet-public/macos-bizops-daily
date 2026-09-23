@@ -1,0 +1,12 @@
+{
+  "process_key": "service_interface::scheduling_service::execute_in_seconds",
+  "arguments": {
+    "seconds": 0,
+    "actions": [
+      {
+        "process_key": "service_interface::job_service::get_latest_job",
+        "arguments": {}
+      }
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "process_key": "service_interface::inference_service::process_error",
+  "display_name": "Process Error (Error Recovery Inference)",
+  "description": "Analyze error and recover by inserting recovery steps into the active plan.",
+  "embedding_description": "Error recovery inference VERTEX. Analyzes a failed action (error + canonical_schema + failed_action observation) and produces recovery steps via upsert_plan (insert 1-2 recovery steps BEFORE the failed step; keep + renumber remainder) plus user notification via post_message. Does NOT retry the failed action directly. Used by the platform's error-handling pathway.",
+  "action_definition_template_arguments": {
+    "params": {
+      "model": {},
+      "prompt": {
+        "observation": {
+          "error": "<<ERROR>>",
+          "failed_action": "<<FAILED_ACTION>>",
+          "canonical_schema": "<<CANONICAL_SCHEMA>>"
+        },
+        "user": {
+        "instructions": [
+          "An action failed. The observation contains the error, the failed action, and the canonical_schema.",
+          "",
+          "RECOVERY STRATEGY: Insert recovery steps into the active plan, then let normal plan execution handle them.",
+          "",
+          "1. Analyze the error",
+          "   — Read the error, canonical_schema, and action_context in the observation",
+          "   — Identify the category: ValidationError, wrong IO target, service unavailable, or unrecoverable",
+          "",
+          "2. Update the plan via upsert_plan",
+          "   — Insert 1-2 recovery steps BEFORE the failed step",
+          "   — Keep the failed step and all subsequent steps (renumbered)",
+          "   — Mark recovery steps as [ ] (uncompleted)",
+          "   — Do NOT retry the failed action directly from this vertex",
+          "",
+          "   Example: if step 5 failed, the updated plan should look like:",
+          "     [X] 4. (previous completed step)",
+          "     [ ] 5. Recovery: <fix description> (upsert_plan or post_message)",
+          "     [ ] 6. <original failed step, renumbered>",
+          "     [ ] 7. <original step 6, renumbered>",
+          "",
+          "3. Inform the user: resolve the active IO plugin namespace with query_process_registry, then invoke plugin::<namespace>::post_message with message and any namespace-specific arguments from its schema",
+          "   — Brief, non-technical explanation of what went wrong",
+          "   — Do NOT include system internals, stack traces, or raw error messages",
+          "",
+          "The next plan continuation vertex will execute the recovery steps normally."
+        ],
+        "output_schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "reasoning",
+            "actions"
+          ],
+          "properties": {
+            "reasoning": {
+              "type": "string",
+              "description": "Explain what went wrong and what recovery steps you are inserting into the plan"
+            },
+            "actions": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        },
+        "flow_input": "<<<:service_interface::flow_service::get_flow_input_for_presentation()>>>"
+        }
+      }
+    }
+  }
+}

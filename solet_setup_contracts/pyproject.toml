@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "solet-setup-contracts"
+version = "0.1.0"
+description = "Stdlib-only shared setup-contract readers"
+requires-python = "==3.13.*"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["solet_setup_contracts*"]

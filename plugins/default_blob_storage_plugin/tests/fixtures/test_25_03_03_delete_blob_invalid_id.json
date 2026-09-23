@@ -1,0 +1,15 @@
+{
+  "name": "test_delete_blob_invalid_id",
+  "description": "Attempt to delete blob with invalid ID format",
+  "process_key": "plugin::default_blob_storage_plugin::delete_blob",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "blob_id": "bad-id"
+    },
+    "state": {
+      "current_session_id": "test-delete-invalid-id-001"
+    },
+    "timeout_seconds": 30
+  }
+}

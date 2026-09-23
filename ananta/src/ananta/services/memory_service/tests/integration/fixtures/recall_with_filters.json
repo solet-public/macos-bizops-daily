@@ -1,0 +1,46 @@
+{
+  "name": "test_recall_with_filters",
+  "description": "Test recall with memory type filter",
+  "sequence": [
+    {
+      "step": "create_test_memory",
+      "process_key": "service_interface::memory_service::remember",
+      "arguments": {
+        "content": "Python is a high-level programming language known for its readability and versatility.",
+        "tags": ["programming", "python", "test-recall-filter"]
+      },
+      "capture": {
+        "memory_id": {
+          "source": "output",
+          "output_key": "Memory ID"
+        }
+      }
+    },
+    {
+      "step": "recall_episodic_only",
+      "process_key": "service_interface::memory_service::recall",
+      "arguments": {
+        "query": "programming language readability",
+        "top_k": 3,
+        "memory_type": "episodic",
+        "include_archived": false
+      }
+    },
+    {
+      "step": "recall_all_types",
+      "process_key": "service_interface::memory_service::recall",
+      "arguments": {
+        "query": "programming language",
+        "top_k": 10,
+        "memory_type": "all"
+      }
+    },
+    {
+      "step": "cleanup_forget",
+      "process_key": "service_interface::memory_service::forget",
+      "arguments": {
+        "memory_id": "${memory_id}"
+      }
+    }
+  ]
+}

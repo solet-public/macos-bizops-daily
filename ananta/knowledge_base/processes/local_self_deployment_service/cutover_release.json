@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::local_self_deployment_service::cutover_release",
+  "display_name": "Cut over to a reconciliation-approved release",
+  "description": "Local self-deployment cutover authorized by an approved reconciliation: compare-and-swap on current release, router-active instance and start token, manifest ETag, and both surface digests, then the target-owned blue-green swap. All refusals precede any spawn, and the reconciliation identity is recorded in the candidate release VERSION.",
+  "embedding_description": "Activate a new immutable local release for bytes an approved reconciliation already wrote, on a target that exposes this interface. Use for idempotent cutover re-runs or a cutover-only plan; stale approval values refuse before anything is built.",
+  "result_processor_customizations": {
+    "action_label": "reconciliation cutover",
+    "result_type": "local_reconciliation_cutover",
+    "result_description": "Cutover status, prior release and exact prior instance, and the provenance recorded in the candidate.",
+    "presentation_guidance": "Lead with status and reason_code, and keep the prior instance id visible because rollback selects that exact instance. A queued cutover is not a verified one; say so rather than implying the new bytes are serving."
+  },
+  "error_processor_customizations": {
+    "action_context": "Activate a reconciliation-approved local release.",
+    "error_interpretation": "The cutover could not be proven safe. Treat it as an unproven outcome, not as a rollback and not as a success.",
+    "recovery_guidance": "Re-observe release, instance, start token and ETag, obtain a fresh approval, and retry. An unreadable verification is never a reason to roll back."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::update",
+  "display_name": "Update Knowledge Base",
+  "description": "For git KBs: pull upstream changes and reindex. For local KBs: reindex files with newer modification times. On merge conflict: aborts merge and returns conflicted file list.",
+  "embedding_description": "Refresh an already-installed knowledge base by pulling in newer source content. For git-backed KBs it runs a git pull of upstream commits and then reindexes; for local KBs it reindexes only files whose modification time is newer than the last index. Aborts and reports the conflicted files on a git merge conflict. Use to sync a KB with upstream changes or pick up locally edited files without rebuilding the whole index.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge base updated",
+    "result_type": "knowledge_base_updated",
+    "result_description": "Updated KB name and changed file count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Updating a knowledge base",
+    "error_interpretation": "MergeConflictError: upstream changes conflict with local edits. GitError: fetch or pull failed.",
+    "recovery_guidance": "Resolve conflicts via edit_file then retry update."
+  }
+}

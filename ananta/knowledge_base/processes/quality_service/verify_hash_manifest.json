@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::quality_service::verify_hash_manifest",
+  "display_name": "Verify Landing Hash Manifest",
+  "description": "Independently rehash every declared {repo-relative path: SHA-256} entry beneath a named absolute worktree or candidate-tree root and return exact, mismatch, or missing for each file. The manifest is validated before any file is read; paths cannot escape the root through traversal or a symlink. The verb also reports when a scratch worktree's .venv or editable-install pointer resolves source outside that root, the worktree-shadowing class tracked by iss_60621400. It never stages, commits, merges, or otherwise mutates Git.",
+  "embedding_description": "Verify a landing file manifest by SHA-256 in a named worktree or candidate tree. Reports per-file exact/mismatch/missing evidence and warns if editable Python installs resolve back to another checkout, which can make a scratch gate test the wrong source. Read-only; no Git mutation.",
+  "result_processor_customizations": {
+    "action_label": "Landing hash manifest verified",
+    "result_type": "gc_hash_verify_result",
+    "result_description": "Object with unit_id, root_path, files [{path, expected_sha256, actual_sha256|null, status}], all_exact, editable_install_warnings, and editable_install_shadowing_detected.",
+    "presentation_guidance": "Lead with all_exact and any missing/mismatch paths. Surface editable_install_shadowing_detected prominently: a true value means a Python gate may have imported code from outside the declared root.",
+    "output_action_guidance": "This is evidence only. Do not infer landing authorization or mutate Git from a passing result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reading declared files and Python editable-install pointers under an absolute worktree/candidate-tree root.",
+    "error_interpretation": "ValueError means the root, manifest digest, or declared relative path was invalid or escaped the root. A per-file missing or mismatch is returned as a normal report result, not an invocation error.",
+    "recovery_guidance": "Correct the root/path/digest declaration and rerun. For a mismatch or missing path, repair the candidate manifest or file surface; for editable-install warnings, run the gate using a venv whose pointers resolve into the declared root."
+  }
+}

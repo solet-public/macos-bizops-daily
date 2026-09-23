@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::consolidate_action",
+  "display_name": "Consolidate Memories",
+  "description": "Summarize weak episodic memories into semantic memories",
+  "embedding_description": "Summarize weak episodic memories into semantic memories. Optional dry_run preview. Returns candidates, clusters, and consolidation actions. Use to compress memory, reduce noise, and create higher-level semantic summaries.",
+  "result_processor_customizations": {
+    "action_label": "Memory consolidation",
+    "result_type": "consolidation_completed",
+    "result_description": "Consolidation results with candidates, clusters, and actions taken",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

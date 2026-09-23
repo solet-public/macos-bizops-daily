@@ -1,0 +1,16 @@
+{
+  "name": "test_create_cron_missing_actions",
+  "description": "Attempt to create a cron schedule without the required actions parameter",
+  "process_key": "plugin::default_scheduling_plugin::create_cron_schedule",
+  "arguments": {
+    "params": {
+      "cron_expression": "0 9 * * *",
+      "label": "Missing Actions Schedule"
+    },
+    "state": {
+      "session_id": "test-session-006",
+      "flow_id": "test-flow-006"
+    }
+  },
+  "timeout_seconds": 30
+}

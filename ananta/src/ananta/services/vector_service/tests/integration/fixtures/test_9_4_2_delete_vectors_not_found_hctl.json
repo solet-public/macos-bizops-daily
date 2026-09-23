@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::vector_service::delete_vectors",
+  "arguments": {
+    "namespace": "pgvector_service_plugin",
+    "vector_ids": ["nonexistent-delete-test-123"]
+  }
+}

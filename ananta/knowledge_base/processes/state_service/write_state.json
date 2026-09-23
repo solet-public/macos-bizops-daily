@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::state_service::write_state",
+  "display_name": "Write State",
+  "description": "Insert one or more records into a namespaced state-database table.\n\nUse this for plain row-level inserts when no higher-level domain process exists. The platform auto-populates standard fields (id, namespace, name, audit columns) before the row reaches the storage backend.\n\nPrefer domain-specific processes when available (for example: scheduling_service::* for scheduling operations, vault_service::* for credential persistence, memory_service::* for memory writes). Use write_state only when you genuinely need direct table access from a plugin that does not own its own service interface.",
+  "embedding_description": "Insert records into the state database with table+record (or table+records list). Used by plugins for direct table writes when no domain-specific service-interface verb exists. Auto-injects id, namespace, audit columns. Prefer domain-specific processes when available.",
+  "result_processor_customizations": {
+    "action_label": "Write State",
+    "result_type": "write_result",
+    "result_description": "Insert outcome with generated id(s) and inserted count, plus echoed namespace metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "State write completed. If you needed the new row's id for a downstream step, read it from data.result.generated_id (single record) or data.result.generated_ids (batch). Proceed with the next planned action."
+  },
+  "error_processor_customizations": {
+    "action_context": "Inserting records into state database with provided table+record(s)",
+    "error_interpretation": "WriteError with 'table': missing or invalid table name in data. WriteError with 'record'/'records': missing or invalid record payload. NamespaceError: namespace string fails format validation (alphanumeric, hyphens, underscores only). ConnectionError: database connection failed or pool exhausted.",
+    "recovery_guidance": "For table errors: ensure data includes a valid 'table' key. For record errors: provide either a single 'record' dict or a 'records' list of dicts. For namespace errors: use only alphanumeric characters, hyphens, and underscores. For connection errors: verify database is running and accessible."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "test_learn_basic",
+  "description": "Verify ingesting knowledge from a file path into memory",
+  "process_key": "plugin::actr_memory_plugin::learn_action",
+  "arguments": {
+    "params": {
+      "path": "/tmp/test_knowledge.md"
+    },
+    "state": {
+      "session_id": "test-session-070"
+    }
+  },
+  "timeout_seconds": 60
+}

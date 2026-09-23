@@ -1,0 +1,13 @@
+name: default_thinking_plugin
+description: Structured planning and task reasoning routed through the platform inference service
+optional: true
+
+implements:
+  - interface: ThinkingServiceInterface
+
+config:
+  system_prompt_path:
+    type: string
+    required: false
+    default: config/prompts/thinking_system_prompt.md
+    description: Profile-relative path to the reasoning system prompt

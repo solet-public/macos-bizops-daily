@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::lifecycle_management_service::start_service_via_interface",
+  "arguments": {
+    "service": "agent_messaging_plugin"
+  }
+}

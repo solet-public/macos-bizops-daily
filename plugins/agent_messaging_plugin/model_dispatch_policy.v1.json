@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "policy_version": "model-dispatch-policy-v2",
+  "orchestrator": {
+    "role_names": ["Main"],
+    "allowed_models": ["claude-sonnet-5", "claude-fable-5", "claude-fable-5-1"]
+  },
+  "dispatch_kinds": {
+    "diagnose": {},
+    "design": {},
+    "review": {},
+    "fix": {},
+    "infrastructure": {}
+  },
+  "capability_floors": {
+    "state_schema": {
+      "issue_ids": ["iss_63d91ca9", "iss_da9e5e67", "iss_5f91287d"],
+      "reason": "Declaring or modifying a state-service table (get_schema_definitions / ColumnDefinition / TableSchema) is its own capability dimension, independent of dispatch_kind and of a ticket's raw min_capability_score; two Sonnet-5 landings in two days redeclared platform-protected fields that no static gate checks and crashed initialize_schemas on every candidate boot.",
+      "brief_markers": [
+        "get_schema_definitions",
+        "ColumnDefinition",
+        "TableSchema",
+        "SchemaDefinition",
+        "initialize_schemas",
+        "state-service table",
+        "state table"
+      ],
+      "floor_pairs": [
+        {"agent_runtime": "claude_code", "model": "claude-opus-5"},
+        {"agent_runtime": "claude_code", "model": "claude-fable-5-1"},
+        {"agent_runtime": "codex", "model": "gpt-5.6-sol"}
+      ]
+    }
+  }
+}

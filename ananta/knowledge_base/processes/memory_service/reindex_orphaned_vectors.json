@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::reindex_orphaned_vectors",
+  "display_name": "Reindex Orphaned Vectors",
+  "description": "Reindex memories that have DB records but no embeddings. This fixes data inconsistencies where memories exist but their vector embeddings are missing. Safe to run - only adds missing embeddings.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Reindex Orphaned Vectors",
+    "result_type": "reindex_results",
+    "result_description": "Results of reindexing memories missing embeddings",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reindexing memories that are missing vector embeddings",
+    "error_interpretation": "EmbeddingError: failed to generate embeddings. DatabaseError: failed to query or update memory records.",
+    "recovery_guidance": "For embedding errors: verify embedding service is available. For database errors: verify state and vector storage are accessible."
+  }
+}

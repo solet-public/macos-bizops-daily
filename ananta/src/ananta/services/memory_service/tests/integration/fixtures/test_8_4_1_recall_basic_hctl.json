@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::recall",
+  "arguments": {
+    "query": "Zorblaxia capital fictional country",
+    "top_k": 5
+  }
+}

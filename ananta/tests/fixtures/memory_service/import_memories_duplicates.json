@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::import_memories",
+  "arguments": {
+    "file_path": "/tmp/memory_backup_with_duplicates.json",
+    "regenerate_embeddings": true
+  }
+}

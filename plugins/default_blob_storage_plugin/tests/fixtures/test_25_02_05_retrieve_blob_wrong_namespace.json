@@ -1,0 +1,20 @@
+{
+  "name": "test_retrieve_blob_wrong_namespace",
+  "description": "Attempt to retrieve blob from wrong namespace - namespace isolation test",
+  "process_key": "plugin::default_blob_storage_plugin::retrieve_blob",
+  "arguments": {
+    "params": {
+      "namespace": "different_namespace",
+      "blob_id": "gen-abc123xyz4567"
+    },
+    "state": {
+      "current_session_id": "test-retrieve-wrong-ns-001"
+    },
+    "timeout_seconds": 30
+  },
+  "requires_setup": {
+    "store_blob_first": true,
+    "use_returned_blob_id": true,
+    "store_in_namespace": "test_namespace"
+  }
+}

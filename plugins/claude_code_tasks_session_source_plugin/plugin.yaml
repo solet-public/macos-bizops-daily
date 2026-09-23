@@ -1,0 +1,31 @@
+name: claude_code_tasks_session_source_plugin
+description: |
+  LLM session ledger source that walks Claude Code's per-CLI-session
+  task tree at `~/.claude/tasks/<cli-session-uuid>/<task-id>.json`.
+  Each session subdirectory is one ledger session keyed on its
+  filename-stem UUID (same identifier space as claude_code_local);
+  each task file inside emits ONE SYSTEM event with
+  `content_json={"subtype": "task_state", ...}`. M6 hybrid-extractor
+  subtype-lift pattern (`19_session_ledger_01_system_event_subtype_lift.md`).
+
+implements:
+  - interface: LLMSessionSourceInterface
+  - interface: PullingSourceMixin
+
+optional: true
+
+config:
+  root_uri:
+    description: >-
+      Filesystem path containing Claude Code per-CLI-session task
+      directories. Each subdirectory holds zero or more
+      `<task-id>.json` files plus session-management noise
+      (`.highwatermark`, `.lock`) that the plugin filters via *.json
+      glob. Default matches the CLI convention.
+    default: "~/.claude/tasks"
+  glob:
+    description: >-
+      File-name glob used to enumerate task files inside each session
+      subdirectory. Producer writes `<task-id>.json`; the glob excludes
+      `.highwatermark` / `.lock` / editor temp files automatically.
+    default: "*.json"

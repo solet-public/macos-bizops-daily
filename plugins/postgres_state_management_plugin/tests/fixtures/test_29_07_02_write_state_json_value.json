@@ -1,0 +1,22 @@
+{
+  "name": "test_write_state_json_value",
+  "description": "Verify write_state handles complex JSON values (dict/list) correctly",
+  "process_key": "plugin::postgres_state_management_plugin::write_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "data": {
+        "table": "key_value_store",
+        "record": {
+          "id": "test_json_value_01",
+          "namespace": "test_json",
+          "key": "json_key",
+          "value": "{\"nested\": {\"data\": [1, 2, 3], \"flag\": true}}",
+          "scope": "GLOBAL"
+        }
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

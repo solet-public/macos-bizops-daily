@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "updated",
+    "address"
+  ],
+  "output_not_contains": [
+    "error",
+    "not found"
+  ]
+}

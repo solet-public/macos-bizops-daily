@@ -1,0 +1,25 @@
+{
+  "name": "test_execute_in_seconds_short_delay",
+  "description": "Schedule a one-time execution with a short 5 second delay",
+  "process_key": "plugin::default_scheduling_plugin::execute_in_seconds",
+  "arguments": {
+    "params": {
+      "seconds": 5,
+      "label": "Quick Check",
+      "tags": "quick,test",
+      "actions": [
+        {
+          "process_key": "plugin::discord_plugin::post_message",
+          "arguments": {
+            "message": "Quick check completed"
+          }
+        }
+      ]
+    },
+    "state": {
+      "session_id": "test-session-102",
+      "flow_id": "test-flow-102"
+    }
+  },
+  "timeout_seconds": 30
+}

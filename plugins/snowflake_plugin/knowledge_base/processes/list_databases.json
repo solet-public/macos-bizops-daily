@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::snowflake_plugin::list_databases",
+  "display_name": "Snowflake: List Databases",
+  "description": "List databases visible to the configured role in the Snowflake account. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; the database list itself is delivered when the job completes.",
+  "embedding_description": "List the Snowflake databases the operator's read-only warehouse role can see. Dispatches asynchronously, returning a job_id while the listing runs in the background. The starting point for exploring the data warehouse: begin here, then drill into a database's schemas and tables.",
+  "result_processor_customizations": {
+    "action_label": "Snowflake database listing queued",
+    "result_type": "snowflake_list_databases_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the database list -- that arrives separately when the job completes and is delivered as its own message: databases, a list of {name} objects.",
+    "presentation_guidance": "This call only confirms the job was queued -- do not present job_id/status as the answer to 'what databases exist'. Acknowledge the request is in flight; the database list itself lands in a follow-up message when the job completes. Once delivered, list the database names plainly (low sensitivity, data_sensitivity 0.1) and suggest list_schemas with a database to go deeper."
+  },
+  "error_processor_customizations": {
+    "action_context": "List databases visible to the configured Snowflake role.",
+    "error_interpretation": "snowflake.auth_failed: the key-pair JWT was rejected. snowflake.permission_denied: the role has no visible databases. snowflake.api_error: an unexpected warehouse error.",
+    "recovery_guidance": "snowflake.auth_failed/permission_denied: ask the operator to check the connecting user's key and role grants."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "process_key": "service_interface::memory_service::export_memories",
+  "arguments": {
+    "file_path": "/tmp/memory_export_full.json",
+    "include_archived": true,
+    "include_embeddings": false
+  }
+}

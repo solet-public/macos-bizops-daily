@@ -1,0 +1,47 @@
+{
+  "sequence": [
+    {
+      "step": "store_blob",
+      "process_key": "service_interface::blob_storage_service::store_blob",
+      "arguments": {
+        "namespace": "lifecycle_test_ns",
+        "content": "TGlmZWN5Y2xlIHRlc3QgY29udGVudA==",
+        "metadata": {
+          "original_name": "lifecycle_test.txt",
+          "mime_type": "text/plain",
+          "test_type": "lifecycle"
+        }
+      },
+      "capture": {
+        "blob_id": {
+          "source": "output",
+          "key": "blob_id"
+        }
+      }
+    },
+    {
+      "step": "verify_exists",
+      "process_key": "service_interface::blob_storage_service::get_blob_metadata",
+      "arguments": {
+        "namespace": "lifecycle_test_ns",
+        "blob_id": "${blob_id}"
+      }
+    },
+    {
+      "step": "delete_blob",
+      "process_key": "service_interface::blob_storage_service::delete_blob",
+      "arguments": {
+        "namespace": "lifecycle_test_ns",
+        "blob_id": "${blob_id}"
+      }
+    },
+    {
+      "step": "verify_deleted",
+      "process_key": "service_interface::blob_storage_service::get_blob_metadata",
+      "arguments": {
+        "namespace": "lifecycle_test_ns",
+        "blob_id": "${blob_id}"
+      }
+    }
+  ]
+}

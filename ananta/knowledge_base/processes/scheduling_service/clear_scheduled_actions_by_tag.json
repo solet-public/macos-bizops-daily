@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::scheduling_service::clear_scheduled_actions_by_tag",
+  "display_name": "Clear Scheduled Actions By Tag",
+  "description": "Cancel all scheduled jobs matching a specific tag. This is the preferred cleanup mechanism for recurring check-ins/heartbeats and timeout reminders: tag related schedules up front (for example: progress:<session_id> or job:<job_id>) so you can cancel them in one call when work completes or the user no longer needs updates.",
+  "embedding_description": "Bulk cancel schedules by tag. Cleanup progress check-ins, heartbeats, timeouts, reminders, and monitoring schedules. Tag schedules by session_id/flow_id/job_id for reliable cleanup. Prevents stale follow-ups and reduces user-visible spam.",
+  "result_processor_customizations": {
+    "action_label": "Schedules Cleared by Tag",
+    "result_type": "bulk_schedule_cancelled",
+    "result_description": "Count of schedules cancelled matching the specified tag",
+    "presentation_guidance": "",
+    "output_action_guidance": "Tagged schedules have been cleared. If the tag was used for user-facing check-ins (progress/timeout), consider whether you should send a final status update, or proceed silently if the user has already been informed."
+  },
+  "error_processor_customizations": {
+    "action_context": "Bulk cancelling all scheduled jobs matching a specific tag",
+    "error_interpretation": "ValidationError with 'tag': tag parameter is empty or invalid. SchedulerError: scheduling service unavailable.",
+    "recovery_guidance": "For tag errors: provide a non-empty tag string. For scheduler errors: verify the scheduling service is running."
+  }
+}

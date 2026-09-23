@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::cleanup_orphaned_vectors",
+  "display_name": "Rebuild Memory Vectors",
+  "description": "Rebuild the memory-vector namespace: clear every vector, then reindex every live memory from its content. A one-shot operator-gated repair for pre-existing orphan vectors (the cascade-vector-first delete paths now prevent new orphans by construction). The namespace is shared by ACT-R memories and knowledge-base chunks, so one rebuild covers both. dry_run reports the would-be cleared and reindexed counts without mutating; the destructive run requires confirm=true because it wipes every vector before regenerating.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Rebuild Memory Vectors",
+    "result_type": "rebuild_results",
+    "result_description": "Vector-namespace rebuild results: cleared (vectors removed) and reindexed (memories regenerated). Under dry_run these are the would-be counts and nothing was changed.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Rebuilding the shared memory-vector namespace (clear all vectors, then reindex every live memory)",
+    "error_interpretation": "rebuild_not_confirmed: the destructive run needs confirm=true. vector_clear_failed: the vector namespace could not be cleared. VectorStoreError: failed to access vector storage.",
+    "recovery_guidance": "For rebuild_not_confirmed: re-invoke with confirm=true, or dry_run=true to preview the counts. For clear or store errors: verify vector storage is accessible."
+  }
+}

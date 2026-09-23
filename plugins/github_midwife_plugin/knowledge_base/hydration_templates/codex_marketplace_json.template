@@ -1,0 +1,20 @@
+{
+  "name": "{{MARKETPLACE_NAME}}",
+  "interface": {
+    "displayName": "{{SOLET_NAME}} Coordination"
+  },
+  "plugins": [
+    {
+      "name": "coordination-hooks",
+      "source": {
+        "source": "local",
+        "path": "./plugins/github_midwife_plugin/codex_plugin/coordination-hooks"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

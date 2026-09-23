@@ -1,0 +1,14 @@
+{
+  "name": "test_forget_invalid_id",
+  "description": "Verify error handling when attempting to forget a non-existent memory",
+  "process_key": "plugin::actr_memory_plugin::forget_action",
+  "arguments": {
+    "params": {
+      "memory_id": "non-existent-uuid-12345"
+    },
+    "state": {
+      "session_id": "test-session-021"
+    }
+  },
+  "timeout_seconds": 30
+}

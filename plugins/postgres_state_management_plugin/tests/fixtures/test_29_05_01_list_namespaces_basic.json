@@ -1,0 +1,10 @@
+{
+  "name": "test_list_namespaces_basic",
+  "description": "Verify list_namespaces returns all available namespaces",
+  "process_key": "plugin::postgres_state_management_plugin::list_namespaces",
+  "arguments": {
+    "params": {},
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

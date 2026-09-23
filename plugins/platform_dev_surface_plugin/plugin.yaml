@@ -1,0 +1,32 @@
+name: platform_dev_surface_plugin
+description: >
+  Platform dev-surface plugin. Serves two READ-ONLY service interfaces over
+  the local platform repo + toolchain so an external MCP client (ChatGPT) or
+  the run_joseki driver's live e2e run can inspect the tree and run the
+  platform's own quality gates:
+
+    - quality_service (GTE-02): list_gates / run_gate / run_test — three thin,
+      allowlist-only verbs wrapping quality_gates/*.py + run_smokes.py with
+      canonical argv baked server-side. Callers pick a gate/smoke by NAME; no
+      free-form path, argv, or flag ever reaches the shell.
+    - repo_service (Half-1): read-only repo primitives (search / read_file /
+      list_files / git_status / git_diff / propose_patch). Repo-root-confined,
+      secret-scrubbed, bounded output. propose_patch stores an artifact only —
+      apply stays behind Git-Controller/operator and is NEVER a verb.
+
+  Nothing here mutates the repo or .git/. git_status/git_diff use only the
+  read-only git surface the GIT-CONTROLLER policy permits. Every verb logs its
+  server-built CallContext principal (requires_call_context).
+
+  LOCAL-PROFILE ONLY: this plugin anchors on the git worktree (it locates the
+  repo root by walking up from APP_HOME to the ancestor carrying quality_gates/
+  AND .git). A cloud solet has no git repo, so prepare_for_readiness
+  fail-louds there by design — DO NOT include platform_dev_surface_plugin in
+  cloud manifests.
+
+  Design: workbench/2026-07-05_b3_repo_and_gates_primitives_design.md.
+optional: true
+
+implements:
+  - interface: QualityServiceInterface
+  - interface: RepoServiceInterface

@@ -1,0 +1,19 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::read_model_capability_catalog",
+  "display_name": "Read the model capability catalog",
+  "description": "iss_48ea8171 (2026-09-20). Returns the stored model x effort table -- Artificial Analysis Intelligence Index score, real USD cost-per-task, the seed-or-run-derived relative_cost_multiplier, acceptance state, measured_at and the per-cell staleness window -- with each cell annotated is_fresh (measured inside its window at as_of) and servable (accepted AND fresh). By default only accepted cells are returned; include_unaccepted=true also returns pending_crosscheck, crosscheck_conflict and withdrawn cells so a reviewer can see what the catalog is waiting on. Optional runtime and model filters. This read is what the hand-maintained ticket-header JSON on prj_937a6ec1 is replaced by. A read that fills the state layer's 100-row page is refused as catalog_too_large rather than served as a possibly truncated table.",
+  "embedding_description": "Looking up the stored table of which AI models at which reasoning-effort settings score how well and cost how much per task, and seeing which rows are verified and recent enough that automated work assignment is allowed to rely on them.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Capability catalog read",
+    "result_type": "read_model_capability_catalog_result",
+    "result_description": "cells (rows plus is_fresh, servable), total_cells, servable_cells, as_of.",
+    "presentation_guidance": "Lead with servable_cells versus total_cells. When zero cells are servable, say the catalog is not yet usable by dispatch and name the acceptance states present rather than presenting scores as if they were live.",
+    "output_action_guidance": "Pass a cell's capability_score scale (0-100 AA index) into select_dispatch_tier's required_score; do not hand-pick a cell from this read when the selector can be asked."
+  },
+  "error_processor_customizations": {
+    "action_context": "One ordered query over model_capability_cell through the state interface; no writes.",
+    "error_interpretation": "catalog_too_large: the read filled a full page and may be truncated. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "For catalog_too_large, narrow with the runtime or model filter; the catalog should be a few dozen rows, so a full page means something is writing rows it should not."
+  }
+}

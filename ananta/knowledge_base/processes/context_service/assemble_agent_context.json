@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::context_service::assemble_agent_context",
+  "display_name": "Assemble Agent Context Briefing",
+  "description": "Assemble a read-only, retrieval/provenance-first grounding briefing for an agent: named bundles (process catalog, plan state, guidance, frame, conversation), the answer contract, available process contracts, and per-block provenance. Never calls an inference provider — no local model required. Use to get grounding before acting without asking the solet to reason for you.",
+  "embedding_description": "Assemble a structured, provenance-tagged context briefing for a coding agent — process catalog, plan state, guidance, and answer contract as data — without running any language model.",
+  "result_processor_customizations": {
+    "action_label": "Agent-context briefing assembled",
+    "result_type": "agent_context_briefing",
+    "result_description": "Briefing with keys: profile (assembly profile name), bundles (named bundles: process_catalog, plan_state, guidance, frame, conversation, answer_contract, other; each a list of {content, source_kind, subtype, reasoning_slot, provenance}), answer_contract (decode/answer schema as data, or null), available_contracts (list of process_key strings), provenance (flat rows of {block_id, source_kind, kind, ref}), manifest (block_count, bundle_counts, budget, budget_applied, dropped, has_answer_contract)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Use the bundles and answer_contract as grounding to determine and construct the next action; do not treat the briefing itself as a completed task."
+  },
+  "error_processor_customizations": {
+    "action_context": "Assembles a structured grounding briefing (context bundles + provenance + answer contract) from the prompt-assembly pipeline without invoking any inference provider",
+    "error_interpretation": "FrameworkError 'prompts_dir not found' or missing memory/discovery service: a platform service the assembly pipeline depends on is not available. ValueError: a malformed playbook or guidance section was encountered during assembly.",
+    "recovery_guidance": "For missing-service errors: the platform may still be starting up — suggest waiting for readiness and retrying. For malformed-artifact errors: report the specific playbook/section so it can be corrected; the briefing does not fall back to inference."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "test_execute_in_seconds_missing_actions",
+  "description": "Attempt to schedule without actions parameter (should fail)",
+  "process_key": "plugin::default_scheduling_plugin::execute_in_seconds",
+  "arguments": {
+    "params": {
+      "seconds": 30,
+      "label": "Missing Actions"
+    },
+    "state": {
+      "session_id": "test-session-107",
+      "flow_id": "test-flow-107"
+    }
+  },
+  "timeout_seconds": 30
+}

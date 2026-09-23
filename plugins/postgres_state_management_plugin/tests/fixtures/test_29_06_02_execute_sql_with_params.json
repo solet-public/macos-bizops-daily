@@ -1,0 +1,13 @@
+{
+  "name": "test_execute_sql_with_params",
+  "description": "Verify execute_sql supports parameterized queries",
+  "process_key": "plugin::postgres_state_management_plugin::execute_sql",
+  "arguments": {
+    "params": {
+      "sql_query": "SELECT %s as param1, %s as param2",
+      "sql_params": ["test_value_1", 42]
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,31 @@
+# Retrieval-test companion for the operator-facing seed-update guide. Gated by
+# service_interface::knowledge_service::test_retrieval (W7). Until the gate is
+# live, run each query through service_interface::knowledge_service::search and
+# confirm this article ranks at or above min_rank for targets.
+
+article_path: knowledge_bases/github_midwife_plugin/06_seed_update_operator_guide.md
+consumer_profile: both
+
+target_queries:
+  - "how do I update my solet myself, step by step"
+  - "someone told me a new version of my solet is available, what do I do"
+  - "plain language guide to updating my solet without a coding agent"
+  - "update guide for the solet owner, not the coding agent"
+  - "brew upgrade then solet-manager update dry-run to update my solet"
+  - "solet-manager update refused, what do the exit codes mean"
+  - "what does verified from solet-manager doctor mean before updating"
+  - "the update stopped part way, solet-manager reconcile dry-run"
+  - "my solet plugin still seems old after an update, is the cache refreshed"
+  - "how do I know if a newly activated plugin's knowledge is actually searchable"
+  - "no active color error right after restarting my solet"
+  - "how do I check my CLAUDE.md instructions actually got updated"
+  - "configure a workspace root for business connector results after an update"
+  - "how do I verify marketo or zuora reads are working correctly after an update"
+  - "how should a joseki card handle records now that reads don't return values inline"
+min_rank: 3
+
+forbidden_queries:
+  - "birth a brand new solet from a seed for the first time"
+  - "why does assemble_seed read policy from the deployed release instead of the ref"
+  - "manifest_hash equal to predecessor manifest_sha256 tell for stale policy"
+forbidden_min_rank: 1

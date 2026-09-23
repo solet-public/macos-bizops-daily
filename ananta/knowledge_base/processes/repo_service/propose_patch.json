@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::repo_service::propose_patch",
+  "display_name": "Propose Patch",
+  "description": "Store a unified diff as a durable ARTIFACT for the operator / Git-Controller to review and apply — this verb NEVER applies anything. It extracts each target path from the diff, confines every one to the repo root (traversal / denylist rejected), runs a READ-ONLY 'git apply --check' to record whether the diff still applies cleanly, and persists the diff + paths + the clean-applies flag + the caller principal via the state interface in the plugin's own namespace (no raw SQL). Returns {patch_id, applies_cleanly, path_count}. APPLY IS NOT A VERB and is structurally absent: the operator or Git-Controller reads the patch_id and applies it through the normal 5-step handoff. Diff size and path count are capped.",
+  "embedding_description": "Store a proposed code change (unified diff) as a durable patch artifact for the operator or Git-Controller to apply later — the service never applies or commits it. Records a read-only git-apply-check clean-applies flag and confines every target path. Returns a patch_id. Apply is not a verb.",
+  "result_processor_customizations": {
+    "action_label": "Patch proposed",
+    "result_type": "repo_propose_patch_result",
+    "result_description": "Object with 'patch_id' (artifact reference), 'applies_cleanly' (git apply --check result), 'path_count' (confined target paths).",
+    "presentation_guidance": "Report the patch_id and whether it applies_cleanly; make clear the patch is STORED for operator/Git-Controller apply — this service does not apply it. If applies_cleanly is false, note the proposal is stale against the current tree.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Extracting + confining a unified diff's target paths, running a read-only 'git apply --check', and storing the proposal as a state-interface artifact (own namespace).",
+    "error_interpretation": "RepoPathError: a diff target path escaped the repo root / is denylisted, the diff exceeded the size or path-count cap, or no valid confined target paths were found in the diff. There is no apply path — a stored artifact with applies_cleanly=false is a valid result, not an error.",
+    "recovery_guidance": "For RepoPathError: ensure every '+++ b/<path>' in the diff is a repo-root-relative, non-denylisted path and the diff is within the size/path caps. To actually apply a stored patch, hand the patch_id to the operator / Git-Controller (this service cannot apply it)."
+  }
+}

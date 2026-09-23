@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::delete",
+  "display_name": "Delete Address",
+  "description": "Delete address and all its entries. Archives associated memory.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Address deleted",
+    "result_type": "address_removed",
+    "result_description": "Delete confirmation with keys: message (confirmation of deletion)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Permanently deletes an address and all its entries, archiving the associated memory record",
+    "error_interpretation": "NotFoundError: no address exists with the given name. DatabaseError: deletion failed due to storage issues. MemoryServiceError: memory archival failed but address may be deleted.",
+    "recovery_guidance": "For not found: the address may have already been deleted, or use 'search' to find the correct name. For database errors: suggest retrying the operation. For memory errors: address is deleted, memory may need manual cleanup."
+  }
+}

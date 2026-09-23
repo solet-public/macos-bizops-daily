@@ -1,0 +1,41 @@
+{
+  "name": "test_export_import_cycle",
+  "description": "Export memories to file, then verify import would work",
+  "sequence": [
+    {
+      "step": "remember_for_export",
+      "process_key": "service_interface::memory_service::remember",
+      "arguments": {
+        "content": "Test memory for export/import cycle verification.",
+        "tags": ["export-test", "temporary"]
+      },
+      "capture": {
+        "memory_id": {
+          "source": "output",
+          "output_key": "Memory ID"
+        }
+      }
+    },
+    {
+      "step": "export_memories",
+      "process_key": "service_interface::memory_service::export_memories",
+      "arguments": {
+        "file_path": "/tmp/ananta_memory_export_test.json",
+        "include_archived": false
+      },
+      "capture": {
+        "export_path": {
+          "source": "output",
+          "field": "data.file_path"
+        }
+      }
+    },
+    {
+      "step": "cleanup_forget",
+      "process_key": "service_interface::memory_service::forget",
+      "arguments": {
+        "memory_id": "${memory_id}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://solet.ai/schemas/setup-answers-v1.json",
+  "title": "Normalized Solet setup answers",
+  "description": "Closed, non-secret projection shared by terminal, headless, and future local-web setup frontends.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "flow_id",
+    "flow_source_revision",
+    "name",
+    "target",
+    "public_inputs",
+    "decisions",
+    "consents",
+    "resolution_evidence"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "flow_id": {"const": "macos.repository_setup"},
+    "flow_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{1,31}$"},
+    "target": {"type": "string", "pattern": "^/", "minLength": 2},
+    "public_inputs": {
+      "type": "object",
+      "propertyNames": {
+        "allOf": [
+          {"pattern": "^[a-z][a-z0-9_]{1,127}$"},
+          {"not": {"pattern": "(?i)(password|secret|token|credential|private_key|oauth_code)"}}
+        ]
+      },
+      "additionalProperties": {"$ref": "#/definitions/public_value"}
+    },
+    "decisions": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_]{1,127}$"},
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "string", "minLength": 1},
+          {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+            "uniqueItems": true
+          }
+        ]
+      }
+    },
+    "consents": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_]{1,127}$"},
+      "additionalProperties": {"type": "boolean"}
+    },
+    "resolution_evidence": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/resolution_evidence"}
+    }
+  },
+  "definitions": {
+    "public_value": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "integer"},
+        {"type": "number"},
+        {"type": "string"},
+        {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      ]
+    },
+    "resolution_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "summary"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,127}$"},
+        "source": {
+          "enum": ["flag", "config", "seed_lock", "flow_default", "interactive", "preapproved"]
+        },
+        "summary": {"type": "string", "maxLength": 512}
+      }
+    }
+  }
+}

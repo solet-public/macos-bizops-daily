@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "contract_id": "solet_manager.apply_manifest_binding.v1",
+  "arguments": {
+    "type": "object",
+    "required": [
+      "new_manifest",
+      "reason"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "new_manifest": {
+        "type": "object",
+        "required": [
+          "plugins"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "plugins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "profile_name": {
+            "type": "string"
+          },
+          "service_bindings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "reason": {
+        "type": "string"
+      },
+      "expected_etag": {
+        "type": "string"
+      },
+      "dry_run": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "binding_rule": {
+    "version": 1,
+    "service_bindings": {
+      "input_path": "new_manifest.service_bindings",
+      "provided_input": "merge_over_current_bindings",
+      "omitted_input": "copy_current_bindings",
+      "materialized_path": "profile/config/service_bindings.json"
+    },
+    "receipt": {
+      "path": ".solet/genesis.json",
+      "required_completed_steps": [
+        "validate_name",
+        "resolve_target",
+        "materialize_configs",
+        "seed_root_manifest",
+        "materialize_kb_symlinks",
+        "write_manifest_marker"
+      ]
+    }
+  }
+}

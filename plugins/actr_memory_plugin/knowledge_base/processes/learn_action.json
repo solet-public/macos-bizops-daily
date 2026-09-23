@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::learn_action",
+  "display_name": "Learn",
+  "description": "Ingest knowledge from files",
+  "embedding_description": "Ingest knowledge from files or directories into long-term memory. Provide path, optional glob pattern, recursive flag, tags, and memorize option. Returns counts of memories created and files skipped. Works well with markdown sources by default.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge ingested",
+    "result_type": "knowledge_ingested",
+    "result_description": "Ingestion results with memories_created count and file statistics",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

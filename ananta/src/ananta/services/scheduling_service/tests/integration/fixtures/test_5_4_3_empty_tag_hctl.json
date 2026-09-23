@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::scheduling_service::clear_scheduled_actions_by_tag",
+  "arguments": {
+    "tag": ""
+  }
+}

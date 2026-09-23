@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::list_installed",
+  "display_name": "List Installed Knowledge Bases",
+  "description": "List all indexed knowledge bases with metadata. Optionally filter to active only.",
+  "embedding_description": "List every installed knowledge base together with its metadata: name, source type, chunk count, and active or inactive status. A read-only enumeration that changes nothing; the active_only flag narrows results to the knowledge bases currently included in search. Use to inventory which knowledge bases exist, check whether a given one is installed, or see which are active.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge bases listed",
+    "result_type": "knowledge_bases_listed",
+    "result_description": "List of installed knowledge bases with metadata",
+    "presentation_guidance": "Present as a formatted list with name, status, and chunk count.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Listing installed knowledge bases",
+    "error_interpretation": "DatabaseError: state service query failed.",
+    "recovery_guidance": "Check state service availability."
+  }
+}

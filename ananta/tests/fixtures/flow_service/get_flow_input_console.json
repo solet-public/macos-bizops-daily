@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::flow_service::get_flow_input",
+  "arguments": {
+    "flow_id": "PLACEHOLDER_FLOW_ID_CONSOLE"
+  },
+  "notes": "flow_id should be set to a flow created with console-style trigger_data containing user_input"
+}

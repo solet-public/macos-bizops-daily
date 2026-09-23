@@ -1,0 +1,39 @@
+name: g_suite_plugin
+description: >
+  Google Workspace — Gmail, Drive, Sheets, Docs, Slides — for the solet,
+  peers, and plans. Enterprise single-account user-OAuth 2.0 with PKCE via the
+  official Google client libraries. The OAuth app is configured as "Internal"
+  (locked to one Workspace org). Refresh/access tokens live in vault; app
+  identity (client_id/redirect_uri/secret-ref) lives in the address book.
+  Bootstrap needs an HTTPS callback → cloud-recommended (ALB routes
+  /oauth/google/* to the callback port).
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider
+
+config:
+  callback_host:
+    type: string
+    required: false
+    default: "127.0.0.1"
+    description: >
+      Host the OAuth callback uvicorn server binds to. The default is explicit
+      IPv4 loopback for a local solet. Cloud ALB-fronted deployments must
+      set 0.0.0.0 explicitly.
+  callback_port:
+    type: integer
+    required: false
+    description: >
+      Preferred TCP port for the OAuth callback server. If unset or unavailable,
+      PortManager auto-allocates. The port is not registered in the ALB — the
+      ALB routes /oauth/google/* by path rule to this task's port.
+
+# App-wide OAuth identity (client_id, client_secret, redirect_uri) lives in the
+# address book entry "google_oauth_app". The entry's client_secret field stores
+# a "vault::<solet>.default_address_book_plugin.google_client_secret"
+# reference: the secret lives in the RESOLVER's namespace so the address book
+# reads it under its own identity. It is chain-consumed — this plugin neither
+# declares nor reads that key (see constants.VAULT_KEY_CLIENT_SECRET), which is
+# why there is no client_secret entry under secrets here. Runtime-scoped refresh
+# and access tokens are stored as scoped vault keys (single-account model).

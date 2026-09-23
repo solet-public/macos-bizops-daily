@@ -1,0 +1,14 @@
+{
+  "name": "test_remember_basic",
+  "description": "Verify storing a simple episodic memory with content only",
+  "process_key": "plugin::actr_memory_plugin::remember_action",
+  "arguments": {
+    "params": {
+      "content": "The mitochondria is the powerhouse of the cell"
+    },
+    "state": {
+      "session_id": "test-session-001"
+    }
+  },
+  "timeout_seconds": 30
+}

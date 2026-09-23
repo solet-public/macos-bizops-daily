@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_coding_agent_session_plugin::restart_bridge",
+  "display_name": "Restart a tracked MCP bridge subprocess (macOS plugin)",
+  "description": "macOS implementation of restart_bridge: composes terminate + spawn under the same agent_instance_id. Used by the FSEvents watcher on `<solet>.bridge.port` change and by the iTerm2 plugin's restart_session. Bound-provider skip semantics mean callers should route through service_interface::coding_agent_session_service::restart_bridge instead of this plugin::* key.",
+  "embedding_description": "macOS-side restart of a tracked MCP bridge subprocess — terminate then re-spawn preserving the agent_instance_id binding. Mirrors the canonical service_interface::coding_agent_session_service::restart_bridge contract. Returns BridgeRestartResult.",
+  "result_processor_customizations": {
+    "action_label": "MCP bridge restarted",
+    "result_type": "coding_agent_session_bridge_restart_result",
+    "result_description": "BridgeRestartResult frozen dataclass mirroring the canonical service interface return.",
+    "presentation_guidance": "See the canonical service_interface entry."
+  },
+  "error_processor_customizations": {
+    "action_context": "macOS-side restart of an MCP bridge subprocess.",
+    "error_interpretation": "See the canonical service_interface entry.",
+    "recovery_guidance": "See the canonical service_interface entry."
+  }
+}

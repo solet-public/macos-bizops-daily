@@ -1,0 +1,10 @@
+{
+  "exit_code": 1,
+  "output_contains": [
+    "NOT FOUND in registry"
+  ],
+  "output_not_contains": [
+    "strength"
+  ],
+  "timeout_seconds": 60
+}

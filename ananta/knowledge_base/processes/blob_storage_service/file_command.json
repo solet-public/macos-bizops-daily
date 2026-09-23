@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::blob_storage_service::file_command",
+  "display_name": "List Files in Blob Storage",
+  "description": "Execute Unix-style file commands on blob storage. Supports 'ls' (list files), 'ls -l' (detailed list), and 'file ID' (inspect specific file). Operates across all namespaces.",
+  "embedding_description": "List files in blob storage. Show all stored files. What files are available. Get file listing. Display stored blobs. See all uploads. View saved files. Browse blob storage contents. List audio image documents. Show file inventory.",
+  "result_processor_customizations": {
+    "action_label": "File listing",
+    "result_type": "file_listing",
+    "result_description": "Pre-formatted file listing output ready for display",
+    "presentation_guidance": "Present the file listing in a clean, readable format similar to ls -l output.",
+    "output_action_guidance": "This message contains the requested file listing. When sharing directly to a human audience, present each file on its own line showing filename, type, size, and date."
+  },
+  "error_processor_customizations": {
+    "action_context": "Executes Unix-style file commands on blob storage to list and inspect files",
+    "error_interpretation": "ParseError: invalid command syntax. NotFoundError: specified file ID does not exist. StorageError: blob storage service unavailable.",
+    "recovery_guidance": "For parse errors: use 'ls', 'ls -l', or 'file ID' format. For not found: verify file ID with 'ls' first. For storage errors: retry."
+  }
+}

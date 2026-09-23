@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::report_alive",
+  "display_name": "Report a managed session alive (report-or-die)",
+  "description": "Fleet session-management Phase B, D1 (§4). A managed session's own heartbeat: re-arms its managed_session.report_by deadline on EVERY call, whether or not a lifecycle_state transition occurs. status='working' drives the target state to 'live', status='idle' to 'idle' — both legal edges from live/idle/overdue in the §3.2 matrix, so a late report from 'overdue' recovers (recovered=true in the result). A report arriving on a 'parked' or terminal (terminated/retired) row is lifecycle_state_conflict — state skew that fails loud rather than silently accepting a report from a session the ledger says should not be reporting. On a lost race with a concurrent writer (typically the platform sweep marking the row overdue), this verb re-reads and retries ONCE before failing loud with stale_lifecycle_state.",
+  "embedding_description": "A managed session's heartbeat call: re-arms its report-or-die deadline and reports whether it is working or idle, recovering automatically from an 'overdue' mark. The report-or-die contract's session-side half; the platform sweep is the other half (marking silent sessions overdue), not covered by this verb.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Session reported alive",
+    "result_type": "report_alive_result",
+    "result_description": "lifecycle_state (the row's state after this call: 'live' or 'idle') and recovered (true iff the row was 'overdue' immediately before this call — a late-but-received heartbeat).",
+    "presentation_guidance": "Flag recovered=true distinctly — it means the session had been marked overdue (silence was already detected) before this heartbeat arrived."
+  },
+  "error_processor_customizations": {
+    "action_context": "Re-reads the managed_session row, checks it is not parked/terminal, then runs a predicated lifecycle_state transition (bounded to one retry on a lost race) followed by an unconditioned report_by re-arm write.",
+    "error_interpretation": "session_not_found: no managed_session row exists for the given agent_instance_id. unknown_status: status was neither 'working' nor 'idle'. lifecycle_state_conflict: the row is 'parked' or terminal — a report from a session the ledger did not expect to be reporting. stale_lifecycle_state: the transition lost its race with a concurrent writer twice in a row (rare — the verb already retries once internally before surfacing this).",
+    "recovery_guidance": "lifecycle_state_conflict usually means the session's own view of its state is stale — check session_status before reporting again. stale_lifecycle_state after the internal retry indicates unusually heavy contention; a fresh report_alive call a moment later should succeed."
+  }
+}

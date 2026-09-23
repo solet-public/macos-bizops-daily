@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::get_session_event_stats",
+  "arguments": {
+    "session_id": "nonexistent-session-00000"
+  }
+}

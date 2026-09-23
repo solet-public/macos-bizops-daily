@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "success",
+    "service"
+  ],
+  "output_not_contains": [
+    "error",
+    "failed"
+  ]
+}

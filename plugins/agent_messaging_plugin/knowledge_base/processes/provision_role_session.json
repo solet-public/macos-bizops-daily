@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::provision_role_session",
+  "display_name": "Provision a managed role session on request",
+  "description": "One-call composition for a requested named role session. It reads an existing role row first and honors its role_class; an unrecognized name defaults to project so callers do not need to know that Git-Controller is project-class. Only an explicitly requested, as-yet-unlegislated principal is legislated, and that governance act stays visible in the result. It then reuses spawn_session's local-name resolution and managed-dispatch path. The spawned worker receives the normal first-turn instruction to claim its own durable role binding; this verb never claims or evicts a holder on the worker's behalf. The Git-controller launcher check is report-only: it names the generated launcher files and whether GIT_CONTROLLER_NAME is armed, but never writes a launcher.",
+  "embedding_description": "Provision a named project or principal role session without making the caller guess role class. Use for Git-Controller on request; defaults new names to project, legislates only a requested principal, and lets the worker claim itself.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Role session provisioned",
+    "result_type": "provision_role_session_result",
+    "result_description": "resolved_role_class, legislation outcome, managed dispatch and attempt, plus read-only Git-controller launcher-gate status.",
+    "presentation_guidance": "State the resolved class, whether legislation was performed, and the managed dispatch identity. For Git-Controller, surface the launcher gate result verbatim: armed is observation only and never changes launcher files."
+  },
+  "error_processor_customizations": {
+    "action_context": "Class resolution and authorization happen before legislation or managed dispatch. A principal legislation occurs only for an explicit requested principal with no existing role row; project roles are not legislated.",
+    "error_interpretation": "missing_argument means role_name was empty. unknown_role_class means requested_role_class was not empty, project, or principal. role_class_not_spawn_assignable means the existing role row carries a class that spawn_session cannot assign. Authorization and dispatch failures retain their existing precise errors.",
+    "recovery_guidance": "For a standard project role such as Git-Controller, omit requested_role_class. Specify principal only when the caller intentionally requests a new principal office; resolve dispatch or launcher configuration failures using the exact returned detail."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::transition_issue",
+  "display_name": "Jira: Transition Issue",
+  "description": "Move a Jira issue through a workflow transition (by transition id from list_transitions), optionally adding a comment. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the transition being applied; the new status is delivered when the job completes. Write action.",
+  "embedding_description": "Apply a chosen workflow transition id to an existing Jira issue, moving the ticket from its current status to the transition's target status and optionally posting a comment during the move. Executes in the background after an immediate job_id acknowledgment; the resulting status is confirmed once applied. The workflow-state write for a selected transition.",
+  "result_processor_customizations": {
+    "action_label": "Jira issue transition queued",
+    "result_type": "jira_transition_issue_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the transition confirmation -- the new status arrives separately when the job completes and is delivered as its own message.",
+    "presentation_guidance": "This call only confirms the transition was queued -- do not present job_id/status as proof the issue moved. Acknowledge the request is in flight; the new status lands in a follow-up message when the job completes. Once delivered, confirm the issue moved and state its new status. This changes a real ticket's workflow state."
+  },
+  "error_processor_customizations": {
+    "action_context": "Move a Jira issue through a workflow transition.",
+    "error_interpretation": "jira.bad_request: the transition id is not valid from the issue's current status, or a transition screen requires a field you did not supply. jira.not_found: the issue key does not exist. jira.invalid_params: key or transition_id was missing. jira.permission_denied: the account cannot transition this issue.",
+    "recovery_guidance": "jira.bad_request: call list_transitions to get a currently-valid transition id (they depend on the current status). jira.invalid_params: supply both key and transition_id. jira.not_found: verify the issue key."
+  }
+}

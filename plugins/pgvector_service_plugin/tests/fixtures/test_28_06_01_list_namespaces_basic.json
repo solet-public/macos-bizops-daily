@@ -1,0 +1,12 @@
+{
+  "name": "test_list_namespaces_basic",
+  "description": "List all vector namespaces in the database",
+  "process_key": "plugin::pgvector_service_plugin::list_namespaces_action",
+  "arguments": {
+    "params": {},
+    "state": {
+      "current_session_id": "test-list-ns-001"
+    },
+    "timeout_seconds": 30
+  }
+}

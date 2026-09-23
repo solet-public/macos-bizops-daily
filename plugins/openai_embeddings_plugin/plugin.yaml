@@ -1,0 +1,26 @@
+name: openai_embeddings_plugin
+description: OpenAI-compatible embeddings provider
+optional: false
+
+implements:
+  - interface: EmbeddingsInterface
+
+config:
+  base_url:
+    type: string
+    required: true
+    default: http://localhost:1234/v1
+    description: Embeddings API base URL
+  model:
+    type: string
+    required: true
+    default: text-embedding-nomic-embed-text-v1.5-embedding
+    description: Embedding model name
+  api_key:
+    type: string
+    required: false
+    secret: true
+    description: API key (if required)
+
+connection_test:
+  type: openai_embeddings

@@ -1,0 +1,22 @@
+name: pgvector_service_plugin
+description: >
+  Pgvector Service plugin process definitions and reference documentation.
+
+category: plugin-internal
+tags:
+  - plugin_reference
+  - pgvector_service
+
+content:
+  patterns:
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+      - "processes/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

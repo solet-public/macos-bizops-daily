@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::store_from_kv_file",
+  "display_name": "Store Secret From Key-Value File",
+  "description": "Read a single named field from a key-value file (.env, JSON, or YAML) and store its value (encrypted at rest). Format auto-detected by file extension; explicit format argument overrides. Useful for ingesting one credential out of a shared config file without exposing the rest.",
+  "embedding_description": "Store secret from named field in a .env / JSON / YAML file. Extract API key from dotenv. Pluck one credential out of shared config. Agent supplies absolute path + field name + vault key; the solet parses, extracts only that field, encrypts, persists. Format auto-detects by extension; explicit override allowed. Top-level scalars only. Variants: store_from_env/file/keychain.",
+  "result_processor_customizations": {
+    "action_label": "Secret stored from KV file",
+    "result_type": "secret_stored",
+    "result_description": "Confirmation that the named field was extracted, encrypted, and stored. Contains key (vault identifier), version, and message. NEVER contains the secret value.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Parses a key-value config file (.env, JSON, or YAML) and extracts one named field as a secret. Used to pluck a single credential out of a shared config without ingesting the rest.",
+    "error_interpretation": "file_path_not_absolute: file_path must be absolute. file_not_found / file_unreadable: file missing or not readable. kv_file_format_unknown: extension not in {.env, .json, .yaml, .yml} and no explicit format. kv_file_parse_error: file content not valid for the chosen format. kv_file_field_not_found: requested field not present in the file. kv_file_field_not_scalar: field value is a nested object/array — only top-level scalars are supported. kv_file_field_empty: extracted value is empty after optional strip.",
+    "recovery_guidance": "For file_path_not_absolute: ask the user to provide an absolute path. For file_not_found / file_unreadable: confirm the path. For kv_file_format_unknown: ask the user for the actual format and re-call with format=\"env\"/\"json\"/\"yaml\". For kv_file_parse_error: ask the user to verify the file syntax. For kv_file_field_not_found: list the available top-level fields (without their values) and ask which one. For kv_file_field_not_scalar: the field nests further — ask the user for the full leaf path or use a flatter file. For kv_file_field_empty: confirm the file actually contains a value for that field."
+  }
+}

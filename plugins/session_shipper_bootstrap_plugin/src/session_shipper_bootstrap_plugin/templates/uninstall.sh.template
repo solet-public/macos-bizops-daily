@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Session shipper uninstaller — rendered from uninstall.sh.template at install time.
+#
+# Per KB client-deployment-plugin-pattern: uninstall is operator-runs-
+# local-shipper-CLI (NOT a model-callable MCP process). The local CLI
+# is what calls service_interface::session_ledger_service::shipper_self_revoke
+# over the shipper's stored OAuth credentials, removing the OAuth client
+# server-side AND marking the deployment row revoked. Then this script
+# removes installed files + unloads the launchd/systemd unit.
+
+set -euo pipefail
+
+DEPLOYMENT_ID="${DEPLOYMENT_ID}"
+SOLET_PUBLIC_URL="${SOLET_PUBLIC_URL}"
+INSTALL_DIR="${INSTALL_DIR}"
+LAUNCHD_PLIST_PATH="${LAUNCHD_PLIST_PATH}"
+SYSTEMD_UNIT_PATH="${SYSTEMD_UNIT_PATH}"
+CLAUDE_CODE_HOOK_PATH="${CLAUDE_CODE_HOOK_PATH}"
+CREDENTIALS_PATH="${CREDENTIALS_PATH}"
+
+echo "uninstalling session shipper for deployment ${DEPLOYMENT_ID}"
+
+# 1. Self-revoke server-side via the shipper's own credentials.
+if [ -x "${INSTALL_DIR}/shipper.py" ] && [ -f "${CREDENTIALS_PATH}" ]; then
+    "${INSTALL_DIR}/shipper.py" --self-revoke || \
+        echo "warning: server-side revoke failed; orphan client may remain"
+fi
+
+# 2. Unload the platform service unit (whichever exists).
+if [ -f "${LAUNCHD_PLIST_PATH}" ]; then
+    launchctl unload "${LAUNCHD_PLIST_PATH}" 2>/dev/null || true
+    rm -f "${LAUNCHD_PLIST_PATH}"
+fi
+
+if [ -f "${SYSTEMD_UNIT_PATH}" ]; then
+    # The rendered output below uses shell command substitution; escape preserved at render time.
+    systemctl --user disable --now "$$(basename "${SYSTEMD_UNIT_PATH}")" 2>/dev/null || true
+    rm -f "${SYSTEMD_UNIT_PATH}"
+fi
+
+# 3. Remove the Claude Code post-message hook config, if present.
+if [ -f "${CLAUDE_CODE_HOOK_PATH}" ]; then
+    rm -f "${CLAUDE_CODE_HOOK_PATH}"
+fi
+
+# 4. Remove the installed shipper directory + credentials sidecar.
+rm -rf "${INSTALL_DIR}"
+rm -f "${CREDENTIALS_PATH}"
+
+echo "session shipper uninstalled cleanly for deployment ${DEPLOYMENT_ID}"

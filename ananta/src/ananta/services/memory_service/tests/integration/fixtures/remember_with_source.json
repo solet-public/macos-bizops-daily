@@ -1,0 +1,28 @@
+{
+  "name": "test_remember_with_source_file",
+  "description": "Remember content with source file attribution",
+  "sequence": [
+    {
+      "step": "remember_with_source",
+      "process_key": "service_interface::memory_service::remember",
+      "arguments": {
+        "content": "This is documentation about the ACT-R memory model and how it implements cognitive decay.",
+        "tags": ["documentation", "actr"],
+        "source_file": "/docs/memory_system.md"
+      },
+      "capture": {
+        "memory_id": {
+          "source": "output",
+          "output_key": "Memory ID"
+        }
+      }
+    },
+    {
+      "step": "cleanup_forget",
+      "process_key": "service_interface::memory_service::forget",
+      "arguments": {
+        "memory_id": "${memory_id}"
+      }
+    }
+  ]
+}

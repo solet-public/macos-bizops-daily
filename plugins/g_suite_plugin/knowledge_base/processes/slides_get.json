@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::slides_get",
+  "display_name": "Slides: Get Presentation",
+  "description": "Fetch a Google Slides presentation's slide list — object id and page-element count per slide. Runs as a background job: dispatch returns a job_id immediately, and the slide list arrives via a follow-up message once the fetch completes. Requires a connected account.",
+  "embedding_description": "Fetch a Google Slides presentation by id as a background job and return a summary of its slides: one row per slide carrying the object id needed to target it in a later structural edit, plus how many page elements (text boxes, images, shapes) that slide holds. The read that precedes editing a deck.",
+  "result_processor_customizations": {
+    "action_label": "Presentation read started",
+    "result_type": "g_suite_slides_get_result",
+    "result_description": "Job queued for the presentation read; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to fetch a Google Slides presentation's slide summary.",
+    "error_interpretation": "gsuite.invalid_params: missing id, or missing session_id/flow_id context. gsuite.not_found: the presentation id does not exist. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.not_found: verify the presentation id. gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

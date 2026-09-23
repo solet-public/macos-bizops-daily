@@ -1,0 +1,13 @@
+{
+  "process_key": "service_interface::vault_service::get_public_key",
+  "display_name": "Get Encryption Public Key",
+  "description": "Return this solet's X25519 public key for sealed-box secret transfer. Lazy-inits if absent.",
+  "embedding_description": "Return the X25519 identity public key of the local solet. Senders use this key to seal secrets destined for this vault. Public keys are public and safe to share in any channel. Lazy-initializes the keypair if it has not been generated yet.",
+  "result_processor_customizations": {
+    "action_label": "Public key retrieved",
+    "result_type": "encryption_public_key",
+    "result_description": "Base64-encoded X25519 public key (32 bytes)",
+    "presentation_guidance": "Quote the public_key string verbatim so the operator can paste it into the sender's export_encrypted call.",
+    "output_action_guidance": "Hand the public_key to the sender solet so it can call export_encrypted with this key as recipient_pubkey."
+  }
+}

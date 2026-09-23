@@ -1,0 +1,33 @@
+name: plan_templates
+description: >
+  Reusable plan-template cards — a joseki-program skeleton with
+  discovery-by-intent metadata (goal, domain, outcome, program) and open
+  binding slots, forked into a concrete plan instance by intent (POR
+  §4.5). Each card's curation-lifecycle state (draft, active, superseded,
+  archived) lives in its front-matter and is advanced by the verb-backed
+  transition machine (transition_plan_template, SUB-01) — there is NO run
+  evidence and NO state table, the deliberate asymmetry with the joseki
+  lifecycle row (a template does not run). This knowledge base MUST stay
+  semantically searchable — templates are discovered by plain-English
+  cosine retrieval on their intent axes. Do NOT add it to
+  SEARCH_EXCLUDED_KB_NAMES: thinking_plans is excluded there by design,
+  which is exactly why plan-template cards live here instead.
+
+category: live
+tags:
+  - plan-template
+
+default_knowledge_layer: 2
+
+content:
+  patterns:
+    include:
+      - "*.md"
+      - "**/*.md"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 0

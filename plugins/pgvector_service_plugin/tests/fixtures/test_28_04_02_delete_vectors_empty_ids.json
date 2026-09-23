@@ -1,0 +1,15 @@
+{
+  "name": "test_delete_vectors_empty_ids",
+  "description": "Attempt to delete with empty vector_ids list - should return zero deleted",
+  "process_key": "plugin::pgvector_service_plugin::delete_vectors_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vector_ids": []
+    },
+    "state": {
+      "current_session_id": "test-delete-empty-001"
+    },
+    "timeout_seconds": 30
+  }
+}

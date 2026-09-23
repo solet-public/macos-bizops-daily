@@ -1,0 +1,10 @@
+{
+  "exit_code": 1,
+  "output_contains": [
+    "\"action_status\": \"error\""
+  ],
+  "output_not_contains": [
+    "\"action_status\": \"completed\""
+  ],
+  "description": "Error when trying to stop memorizing non-existent memory"
+}

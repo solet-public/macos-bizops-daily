@@ -1,0 +1,20 @@
+{
+  "name": "test_read_state_multiple_filters",
+  "description": "Verify read_state handles multiple filter conditions correctly (AND logic)",
+  "process_key": "plugin::postgres_state_management_plugin::read_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "query": {
+        "table": "key_value_store",
+        "filters": {
+          "scope": "GLOBAL",
+          "is_deleted": 0
+        },
+        "limit": 10
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

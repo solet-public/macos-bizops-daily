@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::embedding_service::generate_embeddings",
+  "display_name": "Generate Embeddings",
+  "description": "Generate vector embeddings from text for semantic search and similarity matching.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Embeddings generated",
+    "result_type": "embeddings_generated",
+    "result_description": "Vector embeddings with keys: embeddings (list of float arrays), dimension (vector size), model (model used), count (number of embeddings)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Generates vector embeddings from text input using an embedding model. Embeddings are numerical representations of text for semantic operations.",
+    "error_interpretation": "ValidationError with 'inputs': empty or invalid text list provided. ModelError: specified embedding model not available or failed. RateLimitError: embedding API rate limit exceeded. ServiceError: embedding service unavailable.",
+    "recovery_guidance": "For input errors: ensure inputs is a non-empty list of strings. For model errors: check available models with list_models or use default. For rate limits: wait and retry, or reduce batch size. For service errors: check embedding service status and retry."
+  }
+}

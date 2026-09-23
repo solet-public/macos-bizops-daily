@@ -1,0 +1,2377 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:solet:setup-flow:1",
+  "title": "Solet setup flow contract",
+  "description": "Declarative contract for a repository-delivered, resumable setup wizard. The contract separates requirements from decisions, lets each option activate a different implementation, keeps the user in the authorization path, and requires positive verification before completion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "flow_id",
+    "title",
+    "description",
+    "executor_contracts",
+    "target",
+    "distribution",
+    "policies",
+    "requirements",
+    "decisions",
+    "components",
+    "dependencies",
+    "inputs",
+    "auth_flows",
+    "consents",
+    "permissions",
+    "plugins",
+    "operations",
+    "probes",
+    "stages",
+    "wizard",
+    "state_policy",
+    "completion"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "flow_id": {
+      "$ref": "#/definitions/id"
+    },
+    "title": {
+      "$ref": "#/definitions/non_empty_string"
+    },
+    "description": {
+      "$ref": "#/definitions/non_empty_string"
+    },
+    "executor_contracts": {
+      "$ref": "#/definitions/executor_contracts"
+    },
+    "source_revision": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional immutable repository revision used to produce this contract."
+    },
+    "target": {
+      "$ref": "#/definitions/target"
+    },
+    "distribution": {
+      "$ref": "#/definitions/distribution"
+    },
+    "policies": {
+      "$ref": "#/definitions/policies"
+    },
+    "requirements": {
+      "$ref": "#/definitions/requirement_registry"
+    },
+    "decisions": {
+      "$ref": "#/definitions/decision_registry"
+    },
+    "components": {
+      "$ref": "#/definitions/component_registry"
+    },
+    "dependencies": {
+      "$ref": "#/definitions/dependency_registry"
+    },
+    "inputs": {
+      "$ref": "#/definitions/input_registry"
+    },
+    "auth_flows": {
+      "$ref": "#/definitions/auth_registry"
+    },
+    "consents": {
+      "$ref": "#/definitions/consent_registry"
+    },
+    "permissions": {
+      "$ref": "#/definitions/permission_registry"
+    },
+    "plugins": {
+      "$ref": "#/definitions/plugin_registry"
+    },
+    "operations": {
+      "$ref": "#/definitions/operation_registry"
+    },
+    "probes": {
+      "$ref": "#/definitions/probe_registry"
+    },
+    "stages": {
+      "$ref": "#/definitions/stage_registry"
+    },
+    "wizard": {
+      "$ref": "#/definitions/wizard"
+    },
+    "state_policy": {
+      "$ref": "#/definitions/state_policy"
+    },
+    "completion": {
+      "$ref": "#/definitions/completion"
+    },
+    "known_gaps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/known_gap"
+      },
+      "uniqueItems": true
+    }
+  },
+  "definitions": {
+    "executor_contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "answers_schema",
+        "journal_schema",
+        "adapter_envelope_schema",
+        "transaction_rollup",
+        "stop_command"
+      ],
+      "properties": {
+        "answers_schema": {"const": "setup_answers.schema.json"},
+        "journal_schema": {"const": "setup_journal.schema.json"},
+        "adapter_envelope_schema": {"const": "setup_adapter_envelope.schema.json"},
+        "transaction_rollup": {
+          "const": "verified_then_failed_then_blocked_then_awaiting_user_then_applying_then_pending"
+        },
+        "stop_command": {"const": "deferred"},
+        "start_command": {"$ref": "#/definitions/lifecycle_command_contract"}
+      }
+    },
+    "lifecycle_command_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_ref", "runner", "timeout_seconds", "startup_readiness", "postcondition_probe_refs"],
+      "properties": {
+        "operation_ref": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*::[a-z][a-z0-9_.]*$"
+        },
+        "runner": {"$ref": "#/definitions/id"},
+        "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 900},
+        "startup_readiness": {"$ref": "#/definitions/startup_readiness_contract"},
+        "postcondition_probe_refs": {"$ref": "#/definitions/non_empty_id_array"}
+      }
+    },
+    "startup_readiness_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "budget_source",
+        "budget_unit",
+        "semantic_scope",
+        "release_signal",
+        "consumer_probe_purposes",
+        "consumer_probe_refs",
+        "downstream_reservations"
+      ],
+      "properties": {
+        "contract_version": {"const": 1},
+        "budget_source": {"const": "executor_contracts.start_command.timeout_seconds"},
+        "budget_unit": {"const": "seconds"},
+        "semantic_scope": {"const": "target_start_through_target_cli_health_status_healthy"},
+        "release_signal": {"const": "target_cli_health_top_level_status_healthy"},
+        "consumer_probe_purposes": {
+          "type": "array",
+          "const": ["stage_exit", "completion"]
+        },
+        "consumer_probe_refs": {
+          "type": "array",
+          "const": ["embedding_request_succeeds"]
+        },
+        "downstream_reservations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["governed_process_call_seconds"],
+          "properties": {
+            "governed_process_call_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 899
+            }
+          }
+        }
+      }
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{1,127}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "id_array": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/id"
+      },
+      "uniqueItems": true
+    },
+    "non_empty_id_array": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/id_array"
+        },
+        {
+          "minItems": 1
+        }
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operating_systems",
+        "architectures",
+        "installation_scope"
+      ],
+      "properties": {
+        "operating_systems": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "minimum_version"
+            ],
+            "properties": {
+              "name": {
+                "enum": [
+                  "macos",
+                  "linux",
+                  "windows"
+                ]
+              },
+              "minimum_version": {
+                "$ref": "#/definitions/non_empty_string"
+              }
+            }
+          }
+        },
+        "architectures": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "arm64",
+              "x86_64"
+            ]
+          }
+        },
+        "installation_scope": {
+          "enum": [
+            "per_user",
+            "per_machine",
+            "workspace"
+          ]
+        }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_kind",
+        "release_channel",
+        "update_strategy",
+        "native_application_required"
+      ],
+      "properties": {
+        "source_kind": {
+          "const": "git_repository"
+        },
+        "release_channel": {
+          "enum": [
+            "branch",
+            "tag",
+            "release_archive"
+          ]
+        },
+        "repository_ref_input": {
+          "$ref": "#/definitions/id"
+        },
+        "update_strategy": {
+          "enum": [
+            "pull_and_resume",
+            "remint_and_migrate",
+            "replace_from_release"
+          ]
+        },
+        "native_application_required": {
+          "const": false
+        },
+        "supported_frontends": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "local_web_wizard",
+              "terminal_wizard",
+              "headless_answer_file"
+            ]
+          }
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorization_actor",
+        "model_role",
+        "secret_policy",
+        "failure_policy",
+        "history_policy"
+      ],
+      "properties": {
+        "authorization_actor": {
+          "const": "user"
+        },
+        "model_role": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "may_explain",
+            "may_recommend",
+            "may_authorize",
+            "may_handle_plaintext_secrets"
+          ],
+          "properties": {
+            "may_explain": {
+              "const": true
+            },
+            "may_recommend": {
+              "const": true
+            },
+            "may_authorize": {
+              "const": false
+            },
+            "may_handle_plaintext_secrets": {
+              "const": false
+            }
+          }
+        },
+        "secret_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "plaintext_in_contract",
+            "plaintext_in_journal",
+            "plaintext_in_logs",
+            "brokered_capture_required"
+          ],
+          "properties": {
+            "plaintext_in_contract": {
+              "const": false
+            },
+            "plaintext_in_journal": {
+              "const": false
+            },
+            "plaintext_in_logs": {
+              "const": false
+            },
+            "brokered_capture_required": {
+              "const": true
+            }
+          }
+        },
+        "failure_policy": {
+          "enum": [
+            "fail_loud_checkpoint",
+            "fail_loud_rollback_current_stage"
+          ]
+        },
+        "history_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local_session_artifacts",
+            "ingestion_requires_consent",
+            "context_rotation_requires_handoff"
+          ],
+          "properties": {
+            "local_session_artifacts": {
+              "const": "preserve"
+            },
+            "ingestion_requires_consent": {
+              "const": true
+            },
+            "context_rotation_requires_handoff": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decision_ref",
+            "operator",
+            "value"
+          ],
+          "properties": {
+            "decision_ref": {
+              "$ref": "#/definitions/id"
+            },
+            "operator": {
+              "enum": [
+                "equals",
+                "not_equals",
+                "contains",
+                "not_contains"
+              ]
+            },
+            "value": {
+              "type": [
+                "string",
+                "boolean",
+                "number"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fact_ref",
+            "operator",
+            "value"
+          ],
+          "properties": {
+            "fact_ref": {
+              "$ref": "#/definitions/id"
+            },
+            "operator": {
+              "enum": [
+                "equals",
+                "not_equals",
+                "greater_than",
+                "greater_than_or_equal",
+                "less_than",
+                "less_than_or_equal",
+                "matches"
+              ]
+            },
+            "value": {
+              "type": [
+                "string",
+                "boolean",
+                "number",
+                "integer"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "all"
+          ],
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/definitions/condition"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "any"
+          ],
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/definitions/condition"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "not"
+          ],
+          "properties": {
+            "not": {
+              "$ref": "#/definitions/condition"
+            }
+          }
+        }
+      ]
+    },
+    "requirement_registry": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/requirement"
+        }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "description",
+        "necessity",
+        "satisfaction"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "necessity": {
+          "enum": [
+            "required",
+            "recommended",
+            "optional"
+          ]
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "satisfaction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "fixed_component",
+                "decision",
+                "dependency",
+                "plugin",
+                "manual_assertion"
+              ]
+            },
+            "component_ref": {
+              "$ref": "#/definitions/id"
+            },
+            "decision_ref": {
+              "$ref": "#/definitions/id"
+            },
+            "dependency_ref": {
+              "$ref": "#/definitions/id"
+            },
+            "plugin_ref": {
+              "$ref": "#/definitions/id"
+            },
+            "probe_refs": {
+              "$ref": "#/definitions/id_array"
+            }
+          }
+        }
+      }
+    },
+    "decision_registry": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/decision"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "prompt",
+        "description",
+        "selection_mode",
+        "required",
+        "resolution_stage_ref",
+        "option_source",
+        "review_required"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "prompt": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "selection_mode": {
+          "enum": [
+            "single",
+            "multiple",
+            "ordered_multiple"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "resolution_stage_ref": {
+          "$ref": "#/definitions/id"
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "option_source": {
+          "$ref": "#/definitions/option_source"
+        },
+        "recommended_option_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "minimum_selections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_selections": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "review_required": {
+          "const": true
+        },
+        "rationale_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "option_source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "options"
+          ],
+          "properties": {
+            "mode": {
+              "const": "static"
+            },
+            "options": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": false,
+              "patternProperties": {
+                "^[a-z][a-z0-9_.-]{1,127}$": {
+                  "$ref": "#/definitions/decision_option"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "discovery_probe_ref",
+            "candidate_contract"
+          ],
+          "properties": {
+            "mode": {
+              "const": "discovered"
+            },
+            "discovery_probe_ref": {
+              "$ref": "#/definitions/id"
+            },
+            "candidate_contract": {
+              "$ref": "#/definitions/candidate_contract"
+            },
+            "empty_result_behavior": {
+              "enum": [
+                "block",
+                "offer_manual_entry",
+                "skip_if_optional"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "options",
+            "discovery_probe_ref",
+            "candidate_contract"
+          ],
+          "properties": {
+            "mode": {
+              "const": "hybrid"
+            },
+            "options": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": false,
+              "patternProperties": {
+                "^[a-z][a-z0-9_.-]{1,127}$": {
+                  "$ref": "#/definitions/decision_option"
+                }
+              }
+            },
+            "discovery_probe_ref": {
+              "$ref": "#/definitions/id"
+            },
+            "candidate_contract": {
+              "$ref": "#/definitions/candidate_contract"
+            },
+            "empty_result_behavior": {
+              "enum": [
+                "block",
+                "offer_manual_entry",
+                "use_static_only",
+                "skip_if_optional"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "candidate_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_metadata",
+        "qualification_probe_refs"
+      ],
+      "properties": {
+        "required_metadata": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/non_empty_string"
+          },
+          "uniqueItems": true
+        },
+        "qualification_probe_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "sort_by": {
+          "enum": [
+            "provider_order",
+            "label",
+            "recommended_first",
+            "resource_requirement"
+          ]
+        }
+      }
+    },
+    "decision_option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "description",
+        "availability",
+        "implications",
+        "activates"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "availability": {
+          "enum": [
+            "supported",
+            "experimental",
+            "planned",
+            "unavailable"
+          ]
+        },
+        "unavailable_reason": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "implications": {
+          "$ref": "#/definitions/implications"
+        },
+        "activates": {
+          "$ref": "#/definitions/activation"
+        },
+        "requires": {
+          "$ref": "#/definitions/activation"
+        },
+        "verification_probe_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "followup_decision_refs": {
+          "$ref": "#/definitions/id_array"
+        }
+      }
+    },
+    "implications": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cost",
+        "privacy",
+        "security",
+        "operator_effort"
+      ],
+      "properties": {
+        "cost": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "privacy": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "security": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "operator_effort": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "performance": {
+          "$ref": "#/definitions/non_empty_string"
+        }
+      }
+    },
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "component_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "dependency_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "plugin_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "input_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "auth_flow_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "consent_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "permission_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "operation_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "probe_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "stage_refs": {
+          "$ref": "#/definitions/id_array"
+        }
+      }
+    },
+    "component_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/component"
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "description",
+        "source",
+        "lifecycle"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "kind": {
+          "enum": [
+            "application",
+            "service",
+            "runtime",
+            "package_manager",
+            "coding_agent",
+            "model_host",
+            "database",
+            "external_account",
+            "other"
+          ]
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "source": {
+          "enum": [
+            "repository",
+            "operating_system",
+            "package_manager",
+            "vendor_download",
+            "external_service",
+            "user_supplied"
+          ]
+        },
+        "lifecycle": {
+          "enum": [
+            "managed_by_setup",
+            "verified_only",
+            "user_managed",
+            "external"
+          ]
+        },
+        "dependency_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "input_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "auth_flow_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "install_operation_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "configure_operation_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "probe_refs": {
+          "$ref": "#/definitions/id_array"
+        }
+      }
+    },
+    "dependency_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/dependency"
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "description",
+        "necessity",
+        "probe_refs"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "kind": {
+          "enum": [
+            "os_feature",
+            "runtime",
+            "command",
+            "package",
+            "service",
+            "application",
+            "network",
+            "external_account",
+            "hardware",
+            "filesystem",
+            "other"
+          ]
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "necessity": {
+          "enum": [
+            "required",
+            "recommended",
+            "optional"
+          ]
+        },
+        "version_constraint": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "probe_refs": {
+          "$ref": "#/definitions/non_empty_id_array"
+        },
+        "install_operation_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "alternatives_decision_ref": {
+          "$ref": "#/definitions/id"
+        }
+      }
+    },
+    "input_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/input"
+        }
+      }
+    },
+    "input": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/public_input"
+        },
+        {
+          "$ref": "#/definitions/secret_input"
+        }
+      ]
+    },
+    "public_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "description",
+        "value_type",
+        "sensitive",
+        "prompt_timing",
+        "storage"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "value_type": {
+          "enum": [
+            "string",
+            "integer",
+            "number",
+            "boolean",
+            "path",
+            "url",
+            "email",
+            "duration",
+            "string_array"
+          ]
+        },
+        "sensitive": {
+          "const": false
+        },
+        "prompt_timing": {
+          "enum": [
+            "initial_review",
+            "before_stage",
+            "first_use",
+            "on_demand"
+          ]
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "default": {},
+        "validation": {
+          "$ref": "#/definitions/input_validation"
+        },
+        "storage": {
+          "enum": [
+            "answer_file",
+            "generated_config",
+            "runtime_state",
+            "not_persisted"
+          ]
+        }
+      }
+    },
+    "secret_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "description",
+        "value_type",
+        "sensitive",
+        "prompt_timing",
+        "secret_handling"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "value_type": {
+          "enum": [
+            "password",
+            "api_token",
+            "client_secret",
+            "private_key",
+            "passphrase"
+          ]
+        },
+        "sensitive": {
+          "const": true
+        },
+        "prompt_timing": {
+          "enum": [
+            "initial_review",
+            "before_stage",
+            "first_use",
+            "on_demand",
+            "browser_callback"
+          ]
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "validation": {
+          "$ref": "#/definitions/input_validation"
+        },
+        "secret_handling": {
+          "$ref": "#/definitions/secret_handling"
+        }
+      }
+    },
+    "input_validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minimum_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "allowed_values": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "validation_probe_ref": {
+          "$ref": "#/definitions/id"
+        }
+      }
+    },
+    "secret_handling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_mode",
+        "agent_visibility",
+        "transport",
+        "store",
+        "protections"
+      ],
+      "properties": {
+        "capture_mode": {
+          "enum": [
+            "masked_local_ui",
+            "operator_terminal",
+            "browser_redirect",
+            "clipboard_ephemeral",
+            "existing_keychain_session",
+            "external_cli"
+          ]
+        },
+        "agent_visibility": {
+          "const": "blind"
+        },
+        "transport": {
+          "const": "out_of_band"
+        },
+        "store": {
+          "enum": [
+            "macos_keychain",
+            "platform_vault",
+            "provider_keychain",
+            "external_secret_manager",
+            "never"
+          ]
+        },
+        "protections": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "no_argv",
+              "no_logs",
+              "no_journal",
+              "no_environment",
+              "clear_clipboard",
+              "delete_temporary_file",
+              "restrict_file_mode",
+              "redact_error_messages"
+            ]
+          }
+        }
+      }
+    },
+    "auth_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/auth_flow"
+        }
+      }
+    },
+    "auth_flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "mode",
+        "operator_presence",
+        "credential_owner",
+        "verification_probe_refs",
+        "renewal"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "mode": {
+          "enum": [
+            "none",
+            "oauth_browser",
+            "oauth_device",
+            "oauth_client_credentials",
+            "api_token",
+            "username_password",
+            "database_credentials",
+            "rsa_key_pair",
+            "cli_session",
+            "existing_keychain_session",
+            "manual_external"
+          ]
+        },
+        "operator_presence": {
+          "enum": [
+            "not_required",
+            "required_once",
+            "required_each_renewal",
+            "required_each_use"
+          ]
+        },
+        "credential_owner": {
+          "enum": [
+            "platform_vault",
+            "macos_keychain",
+            "provider_cli",
+            "provider_account",
+            "external_secret_manager",
+            "none"
+          ]
+        },
+        "public_input_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "secret_input_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "external_prerequisites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/non_empty_string"
+          },
+          "uniqueItems": true
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/non_empty_string"
+          },
+          "uniqueItems": true
+        },
+        "callback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "none",
+                "loopback_http",
+                "registered_https_replay",
+                "web_service"
+              ]
+            },
+            "input_ref": {
+              "$ref": "#/definitions/id"
+            }
+          }
+        },
+        "start_operation_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "verification_probe_refs": {
+          "$ref": "#/definitions/non_empty_id_array"
+        },
+        "renewal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "none",
+                "provider_managed",
+                "refresh_token",
+                "scheduled_reauth",
+                "manual_rotation",
+                "before_expiry"
+              ]
+            },
+            "interval_days": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reminder_operation_ref": {
+              "$ref": "#/definitions/id"
+            }
+          }
+        },
+        "security_notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/non_empty_string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "consent_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/consent"
+        }
+      }
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "prompt",
+        "category",
+        "scope",
+        "required",
+        "explicit_assent",
+        "decline"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "prompt": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "category": {
+          "enum": [
+            "data_access",
+            "account_access",
+            "destructive_write",
+            "system_change",
+            "background_service",
+            "shell_modification",
+            "session_history_ingestion",
+            "telemetry"
+          ]
+        },
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/non_empty_string"
+          },
+          "uniqueItems": true
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "explicit_assent": {
+          "const": true
+        },
+        "decline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allowed",
+            "state",
+            "consequence",
+            "reoffer"
+          ],
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "state": {
+              "enum": [
+                "blocked",
+                "declined",
+                "dormant",
+                "not_applicable"
+              ]
+            },
+            "consequence": {
+              "$ref": "#/definitions/non_empty_string"
+            },
+            "reoffer": {
+              "enum": [
+                "never",
+                "first_use",
+                "settings_only",
+                "after_version_change"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "permission_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/permission"
+        }
+      }
+    },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "platform",
+        "kind",
+        "purpose",
+        "grant_actor",
+        "probe_ref",
+        "denial_behavior"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "platform": {
+          "enum": [
+            "macos",
+            "linux",
+            "windows"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "accessibility",
+            "automation",
+            "full_disk_access",
+            "files_and_folders",
+            "screen_recording",
+            "input_monitoring",
+            "notifications",
+            "keychain",
+            "background_items",
+            "network",
+            "other"
+          ]
+        },
+        "purpose": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "grant_actor": {
+          "const": "user"
+        },
+        "system_settings_path": {
+          "type": "string"
+        },
+        "grant_operation_ref": {
+          "$ref": "#/definitions/id"
+        },
+        "probe_ref": {
+          "$ref": "#/definitions/id"
+        },
+        "denial_behavior": {
+          "enum": [
+            "block",
+            "disable_capability",
+            "continue_degraded"
+          ]
+        }
+      }
+    },
+    "plugin_registry": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/plugin_setup"
+        }
+      }
+    },
+    "plugin_setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "installation_policy",
+        "configuration_timing",
+        "documentation_status",
+        "cardinality",
+        "access_posture",
+        "decline"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "installation_policy": {
+          "enum": [
+            "bundled_install_now",
+            "install_when_selected",
+            "install_on_first_use",
+            "not_shipped"
+          ]
+        },
+        "configuration_timing": {
+          "enum": [
+            "initial_setup",
+            "user_choice",
+            "first_use",
+            "on_demand",
+            "none"
+          ]
+        },
+        "documentation_status": {
+          "enum": [
+            "complete",
+            "partial",
+            "implicit",
+            "missing"
+          ]
+        },
+        "cardinality": {
+          "enum": [
+            "exactly_one",
+            "zero_or_one",
+            "zero_or_more",
+            "one_or_more"
+          ]
+        },
+        "enabled_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "dependency_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "component_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "input_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "auth_flow_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "consent_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "permission_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "setup_operation_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "verification_probe_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "access_posture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reads_external_data",
+            "writes_external_data",
+            "destructive_actions",
+            "rbac_boundary"
+          ],
+          "properties": {
+            "reads_external_data": {
+              "type": "boolean"
+            },
+            "writes_external_data": {
+              "type": "boolean"
+            },
+            "destructive_actions": {
+              "type": "boolean"
+            },
+            "rbac_boundary": {
+              "$ref": "#/definitions/non_empty_string"
+            }
+          }
+        },
+        "decline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allowed",
+            "state",
+            "consequence"
+          ],
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "state": {
+              "enum": [
+                "blocked",
+                "dormant",
+                "unconfigured",
+                "not_applicable"
+              ]
+            },
+            "consequence": {
+              "$ref": "#/definitions/non_empty_string"
+            }
+          }
+        },
+        "recurring_maintenance": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event",
+              "action",
+              "operator_required"
+            ],
+            "properties": {
+              "event": {
+                "$ref": "#/definitions/non_empty_string"
+              },
+              "action": {
+                "$ref": "#/definitions/non_empty_string"
+              },
+              "operator_required": {
+                "type": "boolean"
+              },
+              "operation_ref": {
+                "$ref": "#/definitions/id"
+              }
+            }
+          }
+        }
+      }
+    },
+    "operation_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/operation"
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "operation_ref",
+        "runner",
+        "implementation_status",
+        "risk",
+        "requires_confirmation",
+        "idempotency"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "operation_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]*(::[A-Za-z0-9_.:/-]+)+$",
+          "description": "Trusted resolver key. Arbitrary shell command text is intentionally not part of this contract."
+        },
+        "runner": {
+          "enum": [
+            "bootstrap",
+            "genesis",
+            "hydration",
+            "platform_process",
+            "external_cli",
+            "system_settings",
+            "operator"
+          ]
+        },
+        "implementation_status": {
+          "enum": [
+            "implemented",
+            "manual",
+            "adapter_required",
+            "proposed"
+          ]
+        },
+        "risk": {
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "destructive"
+          ]
+        },
+        "requires_confirmation": {
+          "type": "boolean"
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "consent_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "permission_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "input_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "secret_input_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "acquisition": {
+          "type": "object",
+          "description": "Reviewed Homebrew acquisition. Provisioners probe first, preview this exact package closure, reject every undeclared package mutation, and re-probe after apply.",
+          "additionalProperties": false,
+          "required": ["kind", "name", "approved_closure"],
+          "properties": {
+            "kind": {"enum": ["formula", "cask"]},
+            "name": {"$ref": "#/definitions/id"},
+            "approved_closure": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/id"},
+              "uniqueItems": true
+            }
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/parameter_source"
+          }
+        },
+        "idempotency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "precondition_probe_refs",
+            "postcondition_probe_refs"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "probe_then_apply",
+                "upsert",
+                "append_once",
+                "manual_confirm",
+                "not_idempotent"
+              ]
+            },
+            "precondition_probe_refs": {
+              "$ref": "#/definitions/id_array"
+            },
+            "postcondition_probe_refs": {
+              "$ref": "#/definitions/id_array"
+            },
+            "rollback_operation_ref": {
+              "$ref": "#/definitions/id"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "risk": {
+                "enum": [
+                  "high",
+                  "destructive"
+                ]
+              }
+            },
+            "required": [
+              "risk"
+            ]
+          },
+          "then": {
+            "properties": {
+              "requires_confirmation": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "parameter_source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "input_ref"
+          ],
+          "properties": {
+            "input_ref": {
+              "$ref": "#/definitions/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decision_ref"
+          ],
+          "properties": {
+            "decision_ref": {
+              "$ref": "#/definitions/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fact_ref"
+          ],
+          "properties": {
+            "fact_ref": {
+              "$ref": "#/definitions/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "public_constant"
+          ],
+          "properties": {
+            "public_constant": {
+              "type": [
+                "string",
+                "number",
+                "integer",
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "probe_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/probe"
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "probe_ref",
+        "runner",
+        "implementation_status",
+        "level",
+        "expectation"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "probe_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]*(::[A-Za-z0-9_.:/-]+)+$"
+        },
+        "runner": {
+          "enum": [
+            "bootstrap",
+            "genesis",
+            "hydration",
+            "platform_process",
+          "external_cli",
+          "system",
+          "manager",
+          "operator"
+          ]
+        },
+        "implementation_status": {
+          "enum": [
+            "implemented",
+            "manual",
+            "adapter_required",
+            "proposed"
+          ]
+        },
+        "level": {
+          "enum": [
+            "discovery",
+            "precondition",
+            "readiness",
+            "behavior",
+            "completion"
+          ]
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "expectation": {
+          "description": "Declarative advisory documentation for the probe's intended result; it is not evaluated at runtime.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operator"
+          ],
+          "properties": {
+            "operator": {
+              "enum": [
+                "truthy",
+                "falsy",
+                "equals",
+                "not_equals",
+                "contains",
+                "matches",
+                "non_empty",
+                "exit_zero",
+                "schema_valid"
+              ]
+            },
+            "value": {},
+            "field": {
+              "type": "string"
+            }
+          }
+        },
+        "remediation_operation_refs": {
+          "$ref": "#/definitions/id_array"
+        }
+      }
+    },
+    "stage_registry": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_.-]{1,127}$": {
+          "$ref": "#/definitions/stage"
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "description",
+        "sequence",
+        "checkpoint",
+        "operation_refs",
+        "exit_probe_refs"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_when": {
+          "$ref": "#/definitions/condition"
+        },
+        "depends_on_stage_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "checkpoint": {
+          "const": true
+        },
+        "entry_probe_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "operation_refs": {
+          "$ref": "#/definitions/id_array"
+        },
+        "exit_probe_refs": {
+          "$ref": "#/definitions/non_empty_id_array"
+        }
+      }
+    },
+    "wizard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frontends",
+        "pages",
+        "answer_review",
+        "plan_preview",
+        "headless_parity"
+      ],
+      "properties": {
+        "frontends": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "local_web_wizard",
+              "terminal_wizard",
+              "headless_answer_file"
+            ]
+          }
+        },
+        "pages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "item_refs"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/definitions/id"
+              },
+              "title": {
+                "$ref": "#/definitions/non_empty_string"
+              },
+              "description": {
+                "$ref": "#/definitions/non_empty_string"
+              },
+              "required_when": {
+                "$ref": "#/definitions/condition"
+              },
+              "item_refs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "ref"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "decision",
+                        "input",
+                        "consent",
+                        "permission",
+                        "plugin",
+                        "summary"
+                      ]
+                    },
+                    "ref": {
+                      "$ref": "#/definitions/id"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "answer_review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "show_effective_plugins",
+            "show_system_changes",
+            "show_permissions",
+            "show_secret_destinations"
+          ],
+          "properties": {
+            "required": {
+              "const": true
+            },
+            "show_effective_plugins": {
+              "const": true
+            },
+            "show_system_changes": {
+              "const": true
+            },
+            "show_permissions": {
+              "const": true
+            },
+            "show_secret_destinations": {
+              "const": true
+            }
+          }
+        },
+        "plan_preview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "show_operations",
+            "show_restarts",
+            "show_verification"
+          ],
+          "properties": {
+            "required": {
+              "const": true
+            },
+            "show_operations": {
+              "const": true
+            },
+            "show_restarts": {
+              "const": true
+            },
+            "show_verification": {
+              "const": true
+            }
+          }
+        },
+        "headless_parity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "same_schema",
+            "same_validation",
+            "interactive_authorization_must_be_preapproved"
+          ],
+          "properties": {
+            "same_schema": {
+              "const": true
+            },
+            "same_validation": {
+              "const": true
+            },
+            "interactive_authorization_must_be_preapproved": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "state_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "durable_journal",
+        "resume_mode",
+        "statuses",
+        "record_source_revision",
+        "record_answers_hash",
+        "record_probe_evidence",
+        "record_secret_values",
+        "repair_before_reapply"
+      ],
+      "properties": {
+        "durable_journal": {
+          "const": true
+        },
+        "journal_location_ref": {
+          "$ref": "#/definitions/id"
+        },
+        "resume_mode": {
+          "const": "from_first_unverified_checkpoint"
+        },
+        "statuses": {
+          "type": "array",
+          "minItems": 9,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "pending",
+              "awaiting_user",
+              "consented",
+              "applying",
+              "applied",
+              "verified",
+              "declined",
+              "blocked",
+              "failed",
+              "not_applicable"
+            ]
+          }
+        },
+        "record_source_revision": {
+          "const": true
+        },
+        "record_answers_hash": {
+          "const": true
+        },
+        "record_probe_evidence": {
+          "const": true
+        },
+        "record_secret_values": {
+          "const": false
+        },
+        "repair_before_reapply": {
+          "const": true
+        }
+      }
+    },
+    "completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_probe_refs",
+        "allow_health_only",
+        "report"
+      ],
+      "properties": {
+        "required_probe_refs": {
+          "$ref": "#/definitions/non_empty_id_array"
+        },
+        "allow_health_only": {
+          "const": false
+        },
+        "report": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "show_selected_options",
+            "show_declined_options",
+            "show_unverified_items",
+            "show_recurring_maintenance",
+            "show_resume_command"
+          ],
+          "properties": {
+            "show_selected_options": {
+              "const": true
+            },
+            "show_declined_options": {
+              "const": true
+            },
+            "show_unverified_items": {
+              "const": true
+            },
+            "show_recurring_maintenance": {
+              "const": true
+            },
+            "show_resume_command": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "known_gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "summary",
+        "impact",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "summary": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "impact": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "partial",
+            "planned",
+            "blocked"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/non_empty_string"
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

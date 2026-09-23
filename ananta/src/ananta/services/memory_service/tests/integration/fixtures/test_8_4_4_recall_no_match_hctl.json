@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::recall",
+  "arguments": {
+    "query": "xyzzy quantum flux capacitor nonexistent topic 12345",
+    "top_k": 5
+  }
+}

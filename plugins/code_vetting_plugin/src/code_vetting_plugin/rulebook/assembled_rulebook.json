@@ -1,0 +1,252 @@
+{
+  "content": {
+    "directives": {
+      "correctness": [
+        [
+          "universal",
+          "Refute on CORRECTNESS grounds. Assume the code is correct until the finding proves otherwise. Ask: is the described defect a genuine correctness or security fault (off-by-one, wrong error handling, race, resource leak, contract/nullability violation, injection, unsafe deserialization), or is it a taste/style opinion, a misreading of correct code, or a finding that names no real rule it breaks? If it does not pin to a concrete universal-tier or project-tier rule, it is refuted."
+        ]
+      ],
+      "policy": [
+        [
+          "universal",
+          "Refute on POLICY grounds. Load the whole DO-NOT-FLAG list (F2 \u00a74) and the project rulebook (F2 \u00a72) under the active context profile (F2 \u00a73)."
+        ],
+        [
+          "project_local",
+          "the platform's policy INVERTS the usual reviewer instinct: a missing try/except, an absent fallback, no defensive input-validation, no backwards-compat shim, and the *absence* of raw SQL are all CORRECT here, not bugs."
+        ],
+        [
+          "project_local",
+          "Multi-tenant auth / session-isolation / rate-limiting / CSRF findings are category errors (single-user localhost)."
+        ],
+        [
+          "project_local",
+          "Gate-style nits outside the quality surface (RB-SCOPE) do not apply."
+        ],
+        [
+          "universal",
+          "If the finding is any DO-NOT-FLAG class, it is refuted by construction \u2014 say so and mark the refutation dispositive."
+        ]
+      ],
+      "reproduce": [
+        [
+          "universal",
+          "Refute on REPRODUCIBILITY grounds. Ask: does this finding actually reproduce from the evidence given? Is there a concrete, verifiable artifact \u2014 a real repo-relative ``file:line`` and a quoted snippet or tool output \u2014 or is the claim speculative, vague, or hallucinated? A finding whose evidence does not substantiate the claim, or that points at no locatable site when its dimension needs one, does not reproduce and is refuted."
+        ]
+      ]
+    },
+    "dnf_rules": [
+      {
+        "kind": "keyword",
+        "rule_id": "F2\u00a74.1-FASTFAIL-RECOVERY",
+        "summary": "Missing try/except / absent fallback / 'add error recovery' \u2014 RB-FASTFAIL policy, not a bug",
+        "tier": "project_local",
+        "triggers": [
+          "try/except",
+          "try / except",
+          "add error handling",
+          "missing error handling",
+          "no error handling",
+          "add a fallback",
+          "add fallback",
+          "error recovery",
+          "wrap in try",
+          "catch the exception",
+          "should catch",
+          "graceful degradation",
+          "degrade gracefully",
+          "handle the failure gracefully"
+        ]
+      },
+      {
+        "kind": "keyword",
+        "rule_id": "F2\u00a74.2-DEFENSIVE",
+        "summary": "'Add defensive checks / validate inputs more' where code fails fast deliberately \u2014 policy",
+        "tier": "project_local",
+        "triggers": [
+          "add defensive",
+          "defensive programming",
+          "defensive check",
+          "validate inputs more",
+          "add more validation",
+          "add a guard clause"
+        ]
+      },
+      {
+        "kind": "keyword",
+        "rule_id": "F2\u00a74.3-RAWSQL-ABSENCE",
+        "summary": "'Why not just query the table' / use raw SQL \u2014 RB-STATE forbids the shortcut",
+        "tier": "project_local",
+        "triggers": [
+          "query the table directly",
+          "why not just query",
+          "use raw sql",
+          "raw sql would be",
+          "just use a join",
+          "simpler to query directly"
+        ]
+      },
+      {
+        "kind": "keyword",
+        "rule_id": "F2\u00a74.4-MULTITENANT",
+        "summary": "Multi-tenant auth / session isolation / per-user rate limiting / CSRF \u2014 RB-SINGLEUSER category error",
+        "tier": "project_local",
+        "triggers": [
+          "multi-tenant",
+          "multitenant",
+          "session isolation",
+          "tenant isolation",
+          "per-user rate",
+          "rate limiting",
+          "rate-limit",
+          "csrf token",
+          "add rate limiting"
+        ]
+      },
+      {
+        "kind": "keyword",
+        "rule_id": "F2\u00a74.5-CICD",
+        "summary": "'No CI/CD / add GitHub Actions / branch protection' \u2014 git is deliberately not load-bearing",
+        "tier": "project_local",
+        "triggers": [
+          "ci/cd",
+          "github actions",
+          "branch protection",
+          "no ci pipeline",
+          "add ci ",
+          "continuous integration pipeline",
+          "no automated pipeline"
+        ]
+      },
+      {
+        "kind": "keyword",
+        "rule_id": "F2\u00a74.6-BACKCOMPAT",
+        "summary": "'Add backwards-compatibility / version / deprecation shims' \u2014 RB-FASTFAIL forbids them",
+        "tier": "project_local",
+        "triggers": [
+          "backwards compat",
+          "backward compat",
+          "backwards-compat",
+          "backward-compat",
+          "version shim",
+          "compatibility shim",
+          "deprecation shim"
+        ]
+      },
+      {
+        "kind": "keyword",
+        "rule_id": "F2\u00a74.7-GODCLASS-SIZE",
+        "summary": "Large plugin class / many methods \u2014 RB-COHERENCE: size alone is not a god class",
+        "tier": "project_local",
+        "triggers": [
+          "too many methods",
+          "class is too large",
+          "class is too big",
+          "large class with",
+          "split this class",
+          "too many public methods"
+        ]
+      },
+      {
+        "kind": "scope",
+        "rule_id": "F2\u00a74.8-SCOPE",
+        "summary": "Gate-style nit in operator-tooling (workbench/deployment/research/tools/migrations/parity_tests) \u2014 RB-SCOPE",
+        "tier": "project_local",
+        "triggers": []
+      },
+      {
+        "kind": "test_any",
+        "rule_id": "F2\u00a74.10-TEST-ANY",
+        "summary": "Any/broad types in a test file \u2014 the pyright gate excludes tests",
+        "tier": "project_local",
+        "triggers": []
+      }
+    ],
+    "guidance": [
+      {
+        "name": "guidance_magic_strings.md",
+        "text": "# Magic-Strings Judgment \u2014 Which Repeated Literals Are Real (L2 targeting guidance)\n\nArticle Layer: 1\nArticle Role: platform_constraint\nArticle Tags: planning-stage:always, evidence-category:constraint, domain:code-vetting, consumer_profile:both\n\nEmbedding Description: The judgment standard for repeated string literals in a codebase, consumed two ways \u2014 assembled into the vetting rulebook's universal tier and used by the existing AI critic lenses such as ai_slop and correctness as targeting guidance over the literal-frequency evidence table. Covers which repeated literals are genuine config, enum, or constant candidates worth flagging (a status string, a process key, a magic number threading through branches, a table or column name) versus which are legitimately repeated and must NOT be flagged (internationalization prose, test-fixture values, file paths and URLs that are inherently string-shaped, format specifiers, log-message wording), how to weigh a literal's repetition count against its stability and its blast radius if it drifts, and the framing rule that this rides the universal rulebook tier because the judgment is language-agnostic and not platform-specific.\n\n**When you need this**: an AI lens is handed the literal-frequency table and must decide which repeated literals are real magic-string findings; deciding whether a repeated literal is a constant or enum candidate versus legitimate repetition; calibrating a magic-string observation on a foreign repo without turning inherent string repetition into a finding.\n\nThis guidance is NOT a new lens. It is universal-tier rulebook source: the standard for judging repeated literals is not platform-specific, so the rulebook assembler folds it into the universal tier and the existing ai_slop and correctness lenses apply it. The evidence is the repeated-literals table, which the live report renders inside the Structural Quality Metrics section: each repeated literal, its occurrence count, and its locations. That table structurally emits no findings; deciding which entries matter is this article's job.\n\n## Flag these \u2014 real config, enum, or constant candidates\n\nA repeated literal is a candidate finding when extracting it to a named constant, enum, or config key would remove a real drift or correctness hazard. The clearest cases are a status or state string compared in more than one place, where a typo in one copy is a silent bug; a process key, route, or dispatch string threaded through branches; a magic number that is a threshold or limit repeated across call sites; a database table or column name repeated in queries; and a shape or key name that a producer and a consumer must agree on. The tell is that a single change to the value must reach every copy, so a missed copy is a defect.\n\n## Do NOT flag these \u2014 legitimate repetition\n\nRepetition alone is not a finding. Internationalization prose and user-facing message text are legitimately repeated and belong as strings, not constants. Test-fixture values are deliberately literal and local. File paths, URLs, and glob patterns are inherently string-shaped, and their repetition is not a magic-string smell. Format specifiers and log-message wording read best inline. A literal that appears many times but never needs to change together, because each occurrence is independent, is not a magic string.\n\n## Weigh count against stability and blast radius\n\nThe finding strength is repetition count times drift-hazard times blast radius, not raw count. A value that appears three times but MUST stay in lockstep, such as a shared envelope key, outranks a value that appears twenty times independently, such as a common word in log lines. On a foreign repo, calibrate: name the specific literal and the concrete drift it risks, never emit \"many repeated strings\" as a finding, and never turn a codebase's inherent string density into a verdict.\n",
+        "tier": "universal"
+      },
+      {
+        "name": "guidance_dead_symbols.md",
+        "text": "# Dead-Symbols Judgment \u2014 Adjudicating the Candidate Class (L2 targeting guidance)\n\nArticle Layer: 1\nArticle Role: platform_constraint\nArticle Tags: planning-stage:always, evidence-category:constraint, domain:code-vetting, consumer_profile:both\n\nEmbedding Description: The judgment standard for the candidate-dead-symbols evidence class \u2014 the unused-function, class, method, variable, attribute, and property family that vulture assigns 60% confidence and that the suite records as L2-targeting evidence rather than findings. Covers why the whole 60% family is evidence and never a deterministic finding (a library's exported public API is legitimately unused in-repo, and a 60%-confidence finding row on a foreign tree is the hit-job the calibrate-not-verdict posture forbids), the false-positive classes an AI lens must clear before flagging a candidate (dynamic dispatch and getattr-style invocation, registry and decorator-dispatched handlers, framework entry points and callbacks, re-exported public API and package init surface, test-only helpers, and serialization or dataclass fields read reflectively), and how to turn a genuine candidate into a specific finding naming the symbol, the reason nothing reaches it, and the concrete removal or wiring fix.\n\n**When you need this**: an AI lens is handed the candidate-dead-symbols table and must decide which entries are truly dead versus reachable through indirection; judging whether an unused public function is dead code or an exported API; calibrating a dead-code observation on a foreign repo whose entry points and dynamic dispatch cannot be fully seen.\n\nThis guidance is NOT a new lens. It is universal-tier rulebook source, applied by the existing correctness and test_adequacy lenses. The deterministic dead-code scanner emits only the provable classes as findings \u2014 the live report renders `Verdict: confirmed (L1_deterministic)` on unreachable code and unused imports outside re-export surfaces \u2014 while the entire 60% family of function, class, method, variable, attribute, and property carries the explicit framing \"evidence for the AI-critic layer, NOT findings\" in its Candidate Dead Symbols section. That family is evidence because it sits below any clean confidence threshold and false-positives on exactly the code a foreign repo owes the suite no configuration to exonerate.\n\n## Why the 60% family is evidence, not a finding\n\nStatic analysis calls a symbol unused when it sees no in-tree reference. But a library's public API is unused BY the library and used by its consumers; a registry handler is dispatched by string, not by a visible call; a framework callback is invoked by the framework. Emitting a 60%-confidence dead-code finding on a foreign tree, where the entry points and dispatch tables are least visible, is precisely the presumptuous verdict the calibrate-not-verdict posture forbids. So the family is handed to an AI lens to judge with the whole codebase in view, rather than asserted as a fact.\n\n## Clear these false-positive classes before flagging\n\nA candidate is only a finding after the lens rules out every path that reaches it invisibly. Dynamic dispatch and getattr or reflection call it by a computed name. Registry and decorator-dispatched patterns wire it without a visible call \u2014 the platform's own registry-dispatched methods are the canonical case, structurally unused to static analysis and alive at runtime, which is why the self-vet ignores those decorators. Framework entry points, route handlers, CLI commands, and callbacks are invoked externally. Re-exported public API and a package's init surface are used by importers, not in-repo. Test-only helpers, fixtures, and dataclass or serialization fields are read reflectively or by a framework. Any of these makes the symbol reachable, so it is not dead.\n\n## Turn a genuine candidate into a specific finding\n\nWhen a candidate survives that screen, the finding names three things: the symbol and its location; WHY nothing reaches it, meaning no caller, no registry entry, no export, and no dynamic path; and the concrete fix, which is delete it, wire the missing call, or export it if it is meant to be API. A dead-symbol finding without the reason-nothing-reaches-it is not verified \u2014 it is a tool row an AI lens failed to adjudicate. On a foreign repo, calibrate: name the specific symbol and the specific missing reference, at a severity ceiling that reflects the residual uncertainty about entry points that cannot be seen.\n",
+        "tier": "universal"
+      }
+    ],
+    "preamble_sections": [
+      {
+        "body": "You are a **single-lens** reviewer. Load your lens's rules + the whole \"DO NOT FLAG\" list (\u00a74) + the active context profile (\u00a73). Emit findings in the F1 schema, each naming the exact `RB-*` id or gate it violates. **A finding you cannot pin to a rule here (or a universal-tier principle) is a false positive \u2014 drop it.** When unsure between \"real\" and \"policy-sanctioned,\" the DO-NOT-FLAG list wins.",
+        "heading": "How a critic uses this",
+        "tier": "universal"
+      },
+      {
+        "body": "General software correctness + security, provider-neutral:\n- **Correctness:** off-by-one, wrong error handling, race conditions, resource leaks, contract violations, nullability mistakes.\n- **Security (CWE/OWASP-shaped):** injection (SQL/shell/template), secret handling, auth/authz logic errors, unsafe deserialization, path traversal, SSRF, weak crypto.\n- **Dependencies:** known-CVE versions (SCA), license incompatibility, unmaintained/abandoned.\n- **Maintainability:** dead code, excessive complexity, duplication, missing types where the language supports them.\n- **Test adequacy:** vacuous/over-mocked assertions, missing negative paths, new behavior without coverage.\n- **AI-slop tells:** stale comments, ghost/unused params, over-defensive cruft, copy-paste artifacts, over-explaining comments.",
+        "heading": "1. Universal tier (applies to ANY codebase \u2014 ships in the product)",
+        "tier": "universal"
+      },
+      {
+        "body": "Each rule has an id critics cite in `constraint_violated`. Sources are canonical; verify against them, don't paraphrase from memory.\n\n- **RB-FASTFAIL** \u2014 Fast-fail, **no fallback, no defensive programming, no lazy init, no backwards-compat**. *(`05_critical_development_guidelines/CRITICAL_DEVELOPMENT_GUIDELINES_v2.md`.)* **This inverts the usual reviewer instinct** \u2014 see \u00a74; a missing `try/except`, a raised error where another codebase would degrade, an absent compatibility shim are all **correct here**, not bugs.\n- **RB-STATE** \u2014 DB access through the **state interface only**; no raw SQL, no hand-DDL, no `execute_sql`, no direct `psycopg`/`asyncpg`/`PostgresProvider`. Cross-table need \u21d2 restructure to single-namespace or add a sanctioned primitive (operator decision). *(`16_store_abstraction/STATE_INTERFACE_FILTER_GRAMMAR.md`; `quality_gates/sql_access_gate.py`.)* Pre-existing raw-SQL surfaces are tracked debt \u2014 flag **new** additions, not the known debt set.\n- **RB-NAMESPACE** \u2014 A plugin reaches another plugin's data through the **owning service interface**, never a foreign namespace or raw join. *(`03_writing_plugins/CROSS_PLUGIN_DATA_ACCESS.md`.)*\n- **RB-SERVICE** \u2014 Service interfaces = ABC + companion `@service_interface_process` public surface + matching KB JSON. Prohibited: bare `Protocol` as interface; ABC with no registered verb surface; a decorated method with no KB JSON; two plugins sharing a base class to dedup the verb surface. *(`08_service_architecture/SERVICE_ARCHITECTURE.md`.)*\n- **RB-COHERENCE** \u2014 God-class / maintainability judged on the **non-process structural surface** (strip `@platform_process` bodies + `get_edge_process_definitions`), coherence over raw method count. A coherent 200-process plugin is fine; a class spanning audio+credentials+messaging is not. Allowlisted findings are tracked debt, not fresh violations. *(`quality_gates/god_class_check.py`; `22_testing/03_peer_precompletion_gate_procedure.md`.)*\n- **RB-SCOPE** \u2014 Per-file quality gates target the **platform quality surface** only: `ananta/src/`, `plugins/<X>/src/`, `plugins/<X>/tests/`, `quality_gates/`. Operator-tooling (`workbench/`, `deployment/`, `plugins/<X>/{research,tools,migrations,parity_tests}/`) is out of gate scope \u2014 do **not** raise gate-style findings there. *(`22_testing/03_peer_precompletion_gate_procedure.md`.)*\n- **RB-SINGLEUSER** \u2014 the platform is a **single-user localhost** system. Threat-model accordingly. *(Memory `feedback_single_user_system_threat_model`; confirm against the active platform profile.)* No multi-tenant auth, no per-request rate-limiting, no SaaS session isolation findings \u2014 those are category errors here.\n- **RB-LICENSE** \u2014 Two-bucket licensing: distributed plugins **Apache-2.0**, undistributed **LicenseRef-Proprietary**; `pyproject` uses a **bare SPDX string** (NOT `license-files`); Apache deps only in the distributed set (no GPL/AGPL). *(`03_writing_plugins/PLUGIN_LICENSING_CONVENTION.md`; `github_midwife_plugin/03_seed_licensing_convention.md`; memory `reference_plugin_pyproject_license_bare_spdx_no_license_files`.)*\n- **RB-CONNECTOR** \u2014 Connector/foreign-target plugins: reach only address-book-resolved targets (no DSN/URL param on verbs); never touch the platform DB (`assert_foreign_target`); no topology leaks in error strings; blob-only file ingest; read-only role is the true boundary (fast-fail guard is belt only). *(`external_postgres`, `jira`, `snowflake` overviews.)*\n- **RB-DBROLE** \u2014 Localhost `scram-sha-256` for the platform DB role; new plugin/tool opening its own connection reads the Keychain password. *(`20_security_and_sandboxing/03_db_role_lockdown_localhost_scram.md`.)*\n- **RB-PY313** \u2014 Python 3.13 assumed; no version checks / no compat code for older Pythons; modern type hints freely.\n- **RB-GUIDELINES** \u2014 The `scan_quality_guidelines` checklist (weak/`Any` types, magic strings, mixed-concern functions, ad-hoc parsing where stdlib exists, new behavior without tests, reinventing an existing helper) is the craftsmanship baseline. *(`20_security_and_sandboxing/01_security_scanning_phase_1_static.md`.)*\n\n*(Process rules \u2014 Git-Controller-only git, no Agent-tool subagents, KB-first \u2014 govern how agents WORK, not shipped code quality; out of scope for code critics.)*",
+        "heading": "2. Project tier \u2014 the platform rulebook (this is why context is the moat)",
+        "tier": "project_local"
+      },
+      {
+        "body": "The same finding blocks or merely advises depending on the target's stakes (design-brief \u00a75c). The orchestrator infers or asks the profile; critics honor it.\n- **`prototype`** (vibe-coded demo) \u2192 pragmatic + encouraging: does it work, obvious footguns, secrets-in-repo, glaring holes. Skip complexity gating, compliance, supply-chain paranoia. Almost everything is `advisory`; nearly nothing `blocker`.\n- **`production`** \u2192 paranoid: full SAST + SCA + secrets + complexity gates + real blocking severities.\n- **`enterprise`** \u2192 production + compliance/license/supply-chain + (stack-specific) authz-policy correctness.\n\nFor **self-vet of the platform**, the profile is `production` (this is shipping platform code), with RB-SCOPE exempting operator-tooling.",
+        "heading": "3. Context / stakes tier \u2014 calibrate rigor to what the code IS",
+        "tier": "universal"
+      },
+      {
+        "body": "An external reviewer gets these wrong and floods us with noise. If a candidate finding is one of these, **it is refuted by construction** \u2014 L2 shouldn't raise it; L3 kills it on sight:\n1. **Missing `try/except` / absent fallback / \"add error recovery\"** \u2014 that's RB-FASTFAIL *policy*, not a bug.\n2. **\"Add defensive checks / validate inputs more\"** where the code fails fast deliberately \u2014 policy.\n3. **Raw-SQL *absence* / \"why not just query the table\"** \u2014 RB-STATE forbids the shortcut the reviewer is suggesting.\n4. **Multi-tenant auth, session isolation, per-user rate limiting, CSRF** \u2014 RB-SINGLEUSER: category error.\n5. **\"No CI/CD pipeline / no GitHub Actions / add branch protection\"** \u2014 the seed is a biological artifact a stranger forks; git is deliberately not load-bearing for code lifecycle.\n6. **\"Add backwards-compatibility / version shims / deprecation shims\"** \u2014 RB-FASTFAIL forbids them.\n7. **Large plugin class / many methods** \u2014 RB-COHERENCE: size alone isn't a god class; judge the non-process surface.\n8. **Gate-style nits in `workbench/`, `deployment/`, `tools/`, `research/`** \u2014 RB-SCOPE: out of the quality surface.\n9. **Pre-existing tracked-debt** \u2014 a candidate is suppressed ONLY when its specific `file`+dimension is *genuinely* in a tracked-debt allowlist (`radon_cc`/`radon_mi`, god-class, known raw-SQL surfaces), **verified against the actual allowlist** (L1's cross-check) or reasoned by the policy lens. This is **NOT a keyword/dispositive kill** \u2014 a candidate is *not* refuted just because its text mentions \"tracked debt\" (that over-kills real findings; L3's dogfood caught exactly this, 2026-07-19). Flag NEW additions; suppress only verified-allowlisted pre-existing ones.\n10. **`Any`/broad types in test files** \u2014 the pyright gate excludes tests; don't raise them as strict-typing findings. *(memory `reference_pyright_gate_excludes_test_files`.)*\n\nA finding that survives \u00a74 and pins to a \u00a71/\u00a72 rule under the \u00a73 profile is a real finding. Everything else is the noise we exist to filter.",
+        "heading": "4. DO NOT FLAG \u2014 the false-positive killers (the concrete moat)",
+        "tier": "project_local"
+      }
+    ],
+    "version": "f2-v1"
+  },
+  "manifest": {
+    "artifact_hash": "fbdaa91da29fb64f17edaa79a2b8e9afc14a768935c0e70ea0627472329adc99",
+    "sources": [
+      {
+        "anchor": "verify/lenses.py::REFUTE_CLAUSES",
+        "hash": "5d38bd43c87b0021afb3ac9b165f8c35302fda96450c18203e031f36ce52fa0a"
+      },
+      {
+        "anchor": "verify/rulebook.py::DNF",
+        "hash": "a96017c63ad906802f59730cf258c99de5cb062da5864b7cd7a703282233c27f"
+      },
+      {
+        "anchor": "rulebook_doc::How a critic uses this",
+        "hash": "e3a36156c6207da96ad96afb3008521eb89f7209aae79fadee1a53debf26ce98"
+      },
+      {
+        "anchor": "rulebook_doc::1. Universal tier (applies to ANY codebase \u2014 ships in the product)",
+        "hash": "ea049bebb7daa33e9b2d06ce941f5884afc466a71d274d7b380bf881b76c7f38"
+      },
+      {
+        "anchor": "rulebook_doc::2. Project tier \u2014 the platform rulebook (this is why context is the moat)",
+        "hash": "372dceb40ef6c83f148b62317dd8411236c124cb6f33fc912e4b461f9c368f85"
+      },
+      {
+        "anchor": "rulebook_doc::3. Context / stakes tier \u2014 calibrate rigor to what the code IS",
+        "hash": "2f39bbd3d424fdc173733002113b9d3061d686ebfde91ea484b1189b7337978d"
+      },
+      {
+        "anchor": "rulebook_doc::4. DO NOT FLAG \u2014 the false-positive killers (the concrete moat)",
+        "hash": "a3c334dd8782d120d392ffed32fe9940fa4688737618b251a44534fa684a0996"
+      },
+      {
+        "anchor": "guidance::guidance_magic_strings.md",
+        "hash": "3d32650ad44034c4f6d8ec71e6010bdee80e77722aea9d245c8106505a400c40"
+      },
+      {
+        "anchor": "guidance::guidance_dead_symbols.md",
+        "hash": "81fd61f018e2a04a38bfe84bfc78ee22620eb595b3003a6ab244cb5f6591cf2a"
+      }
+    ],
+    "tiers": {
+      "project_local": "f405d0070cd3a9f87fb43c0f800ca58a8975b2530123f070e5b313bd1dc6f653",
+      "universal": "e60006200a3d72868ee2a2d028d0af6d8efd8c5791c637f4b68f182a236eb923"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "test_search_similar_invalid_top_k",
+  "description": "Attempt similarity search with invalid top_k value (zero or negative) - should fail",
+  "process_key": "plugin::pgvector_service_plugin::search_similar_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "query_vector": [0.1, 0.2, 0.3],
+      "top_k": 0
+    },
+    "state": {
+      "current_session_id": "test-search-invalid-topk-001"
+    },
+    "timeout_seconds": 30
+  }
+}

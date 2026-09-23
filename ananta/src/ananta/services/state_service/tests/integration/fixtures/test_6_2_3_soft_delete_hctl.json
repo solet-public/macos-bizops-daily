@@ -1,0 +1,13 @@
+{
+  "process_key": "service_interface::state_service::delete_records",
+  "arguments": {
+    "namespace": "core",
+    "query": {
+      "table": "key_value_store",
+      "filter": {
+        "key": "test_soft_delete_key"
+      },
+      "soft_delete": true
+    }
+  }
+}

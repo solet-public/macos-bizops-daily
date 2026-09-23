@@ -1,0 +1,17 @@
+{
+  "process_key": "service_interface::local_self_deployment_service::swap_status",
+  "display_name": "Read local blue-green swap status",
+  "description": "Read-only diagnostic for local blue-green self-deployment. Returns the local router status snapshot plus plugin-local swap state, including active color, registered colors and ports, drain entries, this process color, this process instance id, and whether a swap is in progress. No state is mutated.",
+  "embedding_description": "Read local blue-green router status and swap state. Use to inspect active_color, registered colors, bridge ports, drain entries, swap_in_progress, self_color, and self_instance_id before or during local restart_with_manifest operations. Read-only and safe.",
+  "result_processor_customizations": {
+    "action_label": "local swap status snapshot",
+    "result_type": "local_blue_green_swap_status",
+    "result_description": "Router status snapshot plus swap_in_progress, self_color, and self_instance_id.",
+    "presentation_guidance": "Lead with active color and registered colors. Include drain entries if present and call out swap_in_progress=true during active cutover."
+  },
+  "error_processor_customizations": {
+    "action_context": "Read local blue-green router and plugin-local swap state.",
+    "error_interpretation": "router_unavailable means the local router socket is missing or unreachable. malformed_status means the router replied with an unexpected payload.",
+    "recovery_guidance": "Verify the router process and socket under the runtime directory. If the router is down, restart through the local launch workflow rather than forcing a swap."
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://solet.ai/schemas/setup-journal-v1.json",
+  "title": "Solet setup transaction journal",
+  "description": "Closed, non-secret durable journal for resumable manager-owned installation transactions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation_id",
+    "name",
+    "target",
+    "input_fingerprint",
+    "answers",
+    "answers_fingerprint",
+    "approval_fingerprint",
+    "approval_recorded_at",
+    "seed_repository",
+    "seed_tag",
+    "seed_commit",
+    "seed_tree_hash",
+    "seed_archive_sha256",
+    "profile",
+    "flow_id",
+    "flow_source_revision",
+    "flow_contract_digest",
+    "status",
+    "stages",
+    "stage_probe_statuses",
+    "stage_probe_attempts",
+    "operation_stages",
+    "operation_statuses",
+    "operation_attempts",
+    "evidence",
+    "completion",
+    "result_kind",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "operation_id": {"type": "string", "format": "uuid"},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{1,31}$"},
+    "target": {"type": "string", "pattern": "^/", "minLength": 2},
+    "input_fingerprint": {"$ref": "#/definitions/sha256"},
+    "answers": {"$ref": "https://solet.ai/schemas/setup-answers-v1.json"},
+    "answers_fingerprint": {"$ref": "#/definitions/sha256"},
+    "approval_fingerprint": {"oneOf": [{"type": "null"}, {"$ref": "#/definitions/sha256"}]},
+    "approval_recorded_at": {"oneOf": [{"type": "null"}, {"$ref": "#/definitions/timestamp"}]},
+    "seed_repository": {"type": "string", "pattern": "^https://github\\.com/.+\\.git$"},
+    "seed_tag": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "seed_commit": {"$ref": "#/definitions/git_hash"},
+    "seed_tree_hash": {"$ref": "#/definitions/git_hash"},
+    "seed_archive_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "profile": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$"},
+    "flow_id": {"const": "macos.repository_setup"},
+    "flow_source_revision": {"$ref": "#/definitions/git_hash"},
+    "flow_contract_digest": {"$ref": "#/definitions/sha256"},
+    "status": {"enum": ["pending", "awaiting_user", "applying", "blocked", "failed", "verified"]},
+    "stages": {"$ref": "#/definitions/status_map"},
+    "stage_probe_statuses": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/definitions/id"},
+      "additionalProperties": {"$ref": "#/definitions/stage_probe_boundaries"}
+    },
+    "stage_probe_attempts": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/stage_probe_attempt"}
+    },
+    "operation_stages": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/definitions/id"},
+      "additionalProperties": {"$ref": "#/definitions/id"}
+    },
+    "operation_statuses": {"$ref": "#/definitions/status_map"},
+    "operation_attempts": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/operation_attempt"}
+    },
+    "evidence": {
+      "type": "array",
+      "items": {"$ref": "https://solet.ai/schemas/setup-adapter-envelope-v1.json#/definitions/evidence"}
+    },
+    "completion": {"$ref": "#/definitions/status_map"},
+    "result_kind": {"oneOf": [{"type": "null"}, {"$ref": "#/definitions/id"}]},
+    "created_at": {"$ref": "#/definitions/timestamp"},
+    "updated_at": {"$ref": "#/definitions/timestamp"}
+  },
+  "definitions": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,127}$"},
+    "git_hash": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "checkpoint_status": {
+      "enum": [
+        "pending",
+        "awaiting_user",
+        "consented",
+        "applying",
+        "applied",
+        "verified",
+        "declined",
+        "blocked",
+        "failed",
+        "not_applicable"
+      ]
+    },
+    "status_map": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_.-]{1,127}$"},
+      "additionalProperties": {"$ref": "#/definitions/checkpoint_status"}
+    },
+    "stage_probe_boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "exit"],
+      "properties": {
+        "entry": {"$ref": "#/definitions/status_map"},
+        "exit": {"$ref": "#/definitions/status_map"}
+      }
+    },
+    "stage_probe_attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probe_id",
+        "stage_id",
+        "boundary",
+        "attempt",
+        "request_id",
+        "checkpoint_status",
+        "error_kind",
+        "retry_safe",
+        "evidence",
+        "repair",
+        "recorded_at"
+      ],
+      "properties": {
+        "probe_id": {"$ref": "#/definitions/id"},
+        "stage_id": {"$ref": "#/definitions/id"},
+        "boundary": {"enum": ["entry", "exit"]},
+        "attempt": {"type": "integer", "minimum": 1},
+        "request_id": {"type": "string", "format": "uuid"},
+        "checkpoint_status": {"$ref": "#/definitions/checkpoint_status"},
+        "error_kind": {"oneOf": [{"type": "null"}, {"$ref": "#/definitions/id"}]},
+        "retry_safe": {"type": "boolean"},
+        "evidence": {
+          "type": "array",
+          "items": {"$ref": "https://solet.ai/schemas/setup-adapter-envelope-v1.json#/definitions/evidence"}
+        },
+        "repair": {"oneOf": [{"type": "null"}, {"type": "string", "maxLength": 2048}]},
+        "recorded_at": {"$ref": "#/definitions/timestamp"}
+      }
+    },
+    "operation_attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "stage_id",
+        "phase",
+        "attempt",
+        "request_id",
+        "checkpoint_status",
+        "error_kind",
+        "retry_safe",
+        "planned_actions",
+        "evidence",
+        "repair",
+        "recorded_at"
+      ],
+      "properties": {
+        "operation_id": {"$ref": "#/definitions/id"},
+        "stage_id": {"$ref": "#/definitions/id"},
+        "phase": {"enum": ["pre_probe", "apply", "post_probe", "completion_probe"]},
+        "attempt": {"type": "integer", "minimum": 1},
+        "request_id": {"type": "string", "format": "uuid"},
+        "checkpoint_status": {"$ref": "#/definitions/checkpoint_status"},
+        "error_kind": {"oneOf": [{"type": "null"}, {"$ref": "#/definitions/id"}]},
+        "retry_safe": {"type": "boolean"},
+        "planned_actions": {
+          "type": "array",
+          "items": {"$ref": "https://solet.ai/schemas/setup-adapter-envelope-v1.json#/definitions/planned_action"}
+        },
+        "evidence": {
+          "type": "array",
+          "items": {"$ref": "https://solet.ai/schemas/setup-adapter-envelope-v1.json#/definitions/evidence"}
+        },
+        "repair": {"oneOf": [{"type": "null"}, {"type": "string", "maxLength": 2048}]},
+        "recorded_at": {"$ref": "#/definitions/timestamp"}
+      }
+    }
+  }
+}

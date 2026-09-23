@@ -1,0 +1,7 @@
+schema_version = 1
+name = "{{INSTANCE_NAME}}"
+target = "{{INSTANCE_TARGET}}"
+autostart = false
+
+[decisions]
+inference_implementation = "none"

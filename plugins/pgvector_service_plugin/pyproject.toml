@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pgvector-service-plugin"
+version = "0.1.0"
+description = "PGVector service plugin for Ananta framework"
+authors = [{name = "Ananta Development Team"}]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    "psycopg-binary>=3.1.0",
+    "psycopg-pool>=3.1.0",
+    "pgvector>=0.2.0",
+    "numpy>=1.24.0",
+    "pydantic>=2.0.0",
+]
+
+[project.entry-points."ananta.plugins"]
+pgvector_service_plugin = "pgvector_service_plugin.plugin:PGVectorServicePlugin"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pgvector_service_plugin"]

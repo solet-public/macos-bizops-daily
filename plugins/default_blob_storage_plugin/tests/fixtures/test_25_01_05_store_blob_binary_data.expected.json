@@ -1,0 +1,11 @@
+{
+  "action_status": "completed",
+  "data_contains": {
+    "blob_id": "gen-"
+  },
+  "data_keys": ["blob_id", "file_path", "metadata"],
+  "metadata_contains": {
+    "mime_type": "application/pdf"
+  },
+  "timeout_seconds": 30
+}

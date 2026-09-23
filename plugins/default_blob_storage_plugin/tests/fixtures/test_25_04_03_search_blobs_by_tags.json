@@ -1,0 +1,17 @@
+{
+  "name": "test_search_blobs_by_tags",
+  "description": "Search blobs filtered by tags",
+  "process_key": "plugin::default_blob_storage_plugin::search_blobs",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "metadata_filters": {
+        "tags": ["profile", "avatar"]
+      }
+    },
+    "state": {
+      "current_session_id": "test-search-tags-001"
+    },
+    "timeout_seconds": 30
+  }
+}

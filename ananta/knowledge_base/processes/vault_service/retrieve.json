@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::retrieve",
+  "display_name": "Retrieve Secret",
+  "description": "Get decrypted secret value by key. Requires vault to be unlocked. Use sparingly - prefer resolve_with_secrets on address book for structured access.",
+  "embedding_description": "Vault: retrieve a secret. Decrypts + returns the plaintext value (password / credential / API key / OAuth client_secret / refresh+bearer token) for a named vault key. Requires unlocking. Use sparingly — prefer address_book::resolve_with_secrets which keeps plaintext out of the agent's conversation. Direct retrieve is correct only when the agent genuinely needs cleartext.",
+  "result_processor_customizations": {
+    "action_label": "Secret retrieved",
+    "result_type": "secret_retrieved",
+    "result_description": "Decrypted secret value. Contains key (identifier) and value (decrypted). SECURITY: Handle with care - contains sensitive data.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Decrypts and retrieves a secret value from the vault. Requires vault to be unlocked with correct passphrase.",
+    "error_interpretation": "VaultLocked: Vault must be unlocked before retrieving secrets. KeyNotFound: No secret exists with the specified key. DecryptionError: Internal error - vault may be corrupted.",
+    "recovery_guidance": "For VaultLocked: Prompt user to unlock vault first. For KeyNotFound: List available secrets or check key spelling. For DecryptionError: Serious issue - suggest checking vault integrity."
+  }
+}

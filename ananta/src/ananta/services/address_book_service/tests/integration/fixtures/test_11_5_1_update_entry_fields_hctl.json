@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::address_book_service::update_entry",
+  "arguments": {
+    "entry_id": "gen-2ec2ufl4rckpt",
+    "description": "Updated description for test 11.5.1"
+  }
+}

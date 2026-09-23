@@ -1,0 +1,22 @@
+name: default_blob_storage_plugin
+description: >
+  Default Blob Storage plugin process definitions and reference documentation.
+
+category: plugin-internal
+tags:
+  - plugin_reference
+  - default_blob_storage
+
+content:
+  patterns:
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+      - "processes/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

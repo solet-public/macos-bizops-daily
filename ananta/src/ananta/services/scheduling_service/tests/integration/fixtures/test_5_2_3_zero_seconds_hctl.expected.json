@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "error",
+    "zero",
+    "positive",
+    "greater than",
+    "invalid",
+    "Sorry"
+  ]
+}

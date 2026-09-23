@@ -1,0 +1,4 @@
+{
+  "process_key": "service_interface::discovery_service::get_discovery_service_health",
+  "arguments": {}
+}

@@ -1,0 +1,25 @@
+{
+  "name": "test_create_cron_every_6_hours",
+  "description": "Create a cron schedule that runs every 6 hours",
+  "process_key": "plugin::default_scheduling_plugin::create_cron_schedule",
+  "arguments": {
+    "params": {
+      "cron_expression": "0 */6 * * *",
+      "label": "Periodic Cleanup Job",
+      "tags": "cleanup,maintenance",
+      "actions": [
+        {
+          "process_key": "plugin::cleanup_plugin::remove_temp_files",
+          "arguments": {
+            "older_than_hours": 24
+          }
+        }
+      ]
+    },
+    "state": {
+      "session_id": "test-session-004",
+      "flow_id": "test-flow-004"
+    }
+  },
+  "timeout_seconds": 30
+}

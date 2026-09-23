@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::store_random",
+  "display_name": "Mint and Store Random Secret",
+  "description": "Mint cryptographically-random bytes inside the vault process and store them under a key. The plaintext never crosses the process boundary; the caller only receives the key, byte length, and a one-way sha256 fingerprint. Used by first-boot orchestrators that need to seed tokens (admin user token, transport bootstrap tokens) without those bytes touching any caller-reachable surface.",
+  "embedding_description": "Mint a fresh random secret inside the vault + store. Args: key, optional byte_length (default 32 / 256 bits), tags/metadata. Returns key, byte_length, sha256 plaintext_fingerprint — never the value. Use for first-boot bootstrap of admin tokens / transport bootstrap tokens — orchestrator needs a vault-resident secret without bytes touching its memory.",
+  "result_processor_customizations": {
+    "action_label": "Random secret minted",
+    "result_type": "secret_minted",
+    "result_description": "Confirmation that a random secret was generated and stored. Contains key, byte_length, plaintext_fingerprint (one-way sha256), and a message. NEVER contains the value.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Generates byte_length cryptographically-random bytes via os.urandom, base64-encodes the result, and stores it under the supplied key via the same AES-256-GCM-at-rest path used for every other vault secret.",
+    "error_interpretation": "InvalidByteLength: byte_length must be at least 16 (128 bits of entropy). KeyExists: the secret already exists — use rotate() if you intend to replace it.",
+    "recovery_guidance": "For InvalidByteLength: raise byte_length to 16 or higher. For KeyExists: if the existing value is acceptable, skip; otherwise rotate."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "natural_language_query": "Persist the audio_processing_plugin's load priority to 40 so it loads earlier next time the solet starts",
+  "expected_process_key": "service_interface::lifecycle_management_service::set_plugin_priority",
+  "expected_arguments_structure": {
+    "plugin_name": "string",
+    "priority": "integer"
+  }
+}

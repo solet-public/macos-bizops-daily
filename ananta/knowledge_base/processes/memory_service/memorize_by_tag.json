@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::memorize_by_tag",
+  "display_name": "Memorize By Tag",
+  "description": "Add all memories with a specific tag to the memorization queue. Useful for batch-memorizing all content from a learning session.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Memorize By Tag",
+    "result_type": "batch_memorization",
+    "result_description": "Results of batch memorization for all memories with the specified tag",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Adding all memories with a specific tag to the memorization queue",
+    "error_interpretation": "NoMatchingMemoriesError: no memories found with the specified tag. DatabaseError: failed to query or update memorization records.",
+    "recovery_guidance": "For no matching memories: verify the tag exists using list_memories. For database errors: verify state storage is accessible."
+  }
+}

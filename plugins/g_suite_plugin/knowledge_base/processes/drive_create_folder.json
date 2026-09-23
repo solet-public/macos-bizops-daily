@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::g_suite_plugin::drive_create_folder",
+  "display_name": "Drive: Create Folder",
+  "description": "Create a Google Drive folder, optionally nested under a parent folder id. Runs as a background job: dispatch returns a job_id immediately, and the new folder's id arrives via a follow-up message once creation completes. Requires a connected account.",
+  "embedding_description": "Create a new folder in Google Drive as a background job, optionally nested inside an existing parent folder id. Dispatch returns a job_id for tracking; completion delivers the new folder's id, which can be passed as the parent when uploading files or creating further folders, so directory structure gets built up a level at a time.",
+  "result_processor_customizations": {
+    "action_label": "Drive folder creation started",
+    "result_type": "g_suite_drive_create_folder_result",
+    "result_description": "Job queued for the Drive folder creation; completion will be delivered automatically.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Return exactly one action using the active IO plugin's post_message (process_key: plugin::<io_plugin>::post_message). Use the provided session_id. Keep the message short and friendly. Do NOT invent process identifiers (no present_result, no status actions)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dispatch a background job to create a folder in Google Drive.",
+    "error_interpretation": "gsuite.invalid_params: missing name, or missing session_id/flow_id context. gsuite.not_found: the given parent folder id does not exist. gsuite.not_connected: no account linked. gsuite.api_error: AsyncJobManager unavailable or job creation failed.",
+    "recovery_guidance": "gsuite.invalid_params: supply a folder name. gsuite.not_found: verify the parent id with drive_list_files. gsuite.not_connected: run connect_account. gsuite.api_error: retry once platform startup has completed."
+  }
+}

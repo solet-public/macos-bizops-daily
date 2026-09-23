@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::scheduling_service::clear_scheduled_action",
+  "display_name": "Clear Scheduled Action",
+  "description": "Cancel a scheduled job by its schedule_id. Useful for cleaning up delayed reminders/timeouts or stopping periodic check-ins once the underlying work has completed. If you scheduled multiple related check-ins, consider using clear_scheduled_actions_by_tag instead of cancelling individual schedule_ids.",
+  "embedding_description": "Cancel a scheduled action by schedule_id. Stop a reminder, timeout, or progress check-in. Cleanup scheduled follow-ups once work completes. Used with execute_in_seconds/create_cron_schedule. Prefer tag-based cleanup when multiple schedules were created.",
+  "result_processor_customizations": {
+    "action_label": "Schedule Cancelled",
+    "result_type": "schedule_cancelled",
+    "result_description": "Confirmation of schedule cancellation with the cancelled schedule_id",
+    "presentation_guidance": "",
+    "output_action_guidance": "The schedule has been cancelled. Consider whether any pending user-facing check-in/reminder should be updated (or whether silent cleanup is sufficient)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Cancelling a scheduled job by its schedule_id",
+    "error_interpretation": "NotFoundError with 'schedule_id': no schedule exists with the given ID. AlreadyExecutedError: the scheduled action has already run and cannot be cancelled. SchedulerError: scheduling service unavailable.",
+    "recovery_guidance": "For not found errors: verify the schedule_id is correct using list operations. For already executed: the action has completed; no cancellation needed. For scheduler errors: verify the scheduling service is running."
+  }
+}

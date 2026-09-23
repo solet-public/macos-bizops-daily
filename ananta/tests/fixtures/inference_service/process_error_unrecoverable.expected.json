@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "actions",
+    "post_message"
+  ],
+  "output_not_contains": [
+    "error"
+  ]
+}

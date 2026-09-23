@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::validate_authored_work_breakdown_structure",
+  "display_name": "Validate Authored WBS",
+  "description": "dry-run validate a Work Breakdown Structure document that the calling agent authored by value, returning every hard-fail error and soft warning without storing anything or invoking any model.",
+  "embedding_description": "Validate an agent-authored work breakdown structure document before registration. Non-mutating dry run: check process keys against the live registry, RESULT_PROCESSOR_KIND annotations, argument schemas, Composed references, placeholders, and phase containment. Returns errors and warnings; stores nothing.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Authored WBS validated",
+    "result_type": "authored_wbs_validation_report",
+    "result_description": "Validation report with keys: valid, errors, warnings, wbs_id",
+    "presentation_guidance": "Present valid first, then every entry of errors and warnings verbatim — the caller needs the full list to repair the document in one pass.",
+    "output_action_guidance": "If valid is true, the document can be registered. If valid is false, repair the listed errors in the authored document and validate again; warnings are advisory and do not block registration."
+  },
+  "error_processor_customizations": {
+    "action_context": "Dry-run validating an agent-authored Work Breakdown Structure document. validate_authored_work_breakdown_structure accepts {content, wbs_id, phase_number, manifest_id?}. The document is passed by value; nothing is stored.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema (note: document findings are returned in the result's errors list, not raised). ServiceUnavailable: the process discovery service is not available, so live process-key existence could not be checked.",
+    "recovery_guidance": "Argument-shape failures: fix the action arguments and resubmit. Discovery unavailability: retry after the platform finishes starting; do not treat it as a document error."
+  }
+}

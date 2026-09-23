@@ -1,0 +1,70 @@
+{
+  "fixture_schema_version": 1,
+  "snapshot_name": "betty-vm-b15-postcutover-convergefail-20260902T2125Z",
+  "extraction_timestamp_utc": "2026-09-04T00:40:10Z",
+  "extraction_method": "read-only host mount of disposable clone lane-i0-fixture3-extract-20260904T003320Z",
+  "checkout_identity": {
+    "head": "4ff38b3de29d5d643757802bf7727b8594cded04",
+    "main": "4ff38b3de29d5d643757802bf7727b8594cded04",
+    "tree": "4dedca3ac7ccbcc6f9ecdf4a801ddf7dd1975cc2"
+  },
+  "seed_identity": {
+    "repository": "https://github.com/dwestgate/2026-08-31_local_bizops_4ff38b3de.git",
+    "tag": "release-2026-08-31",
+    "commit": "4ff38b3de29d5d643757802bf7727b8594cded04",
+    "tree_hash": "4dedca3ac7ccbcc6f9ecdf4a801ddf7dd1975cc2",
+    "profile": "macos-bizops",
+    "flow_id": "macos.repository_setup",
+    "flow_source_revision": "5ae81ea4c453849f971512e5ea7b2eb762f90379",
+    "flow_contract_digest": "sha256:572552bdd63cf06c48b76c79dbcbd0d7eae6e8f15ed85646acf84d36e9e5c054",
+    "answers_fingerprint": "sha256:d24f8aefc0f919c23a5df0ca961a9021116bbbe0146b78051df7a789931a78eb"
+  },
+  "realism_caveat": "tests must not assume pre-1.40 convergence behavior in fixture-3 material.",
+  "files": [
+    {
+      "fixture_path": "registry_instances.json",
+      "in_vm_path": "/Users/admin/.config/solet/instances.json",
+      "sha256": "a503be0e7256514268a0c285f46699a8e0d1ffbe8e6833331c15042d16cc1c6f"
+    },
+    {
+      "fixture_path": "transaction_bizopsb15.json",
+      "in_vm_path": "/Users/admin/.local/state/solet/transactions/bizopsb15.json",
+      "sha256": "b30e453411fd24557b83bcb2bb4923e28ca7d32460bebe36e05bc52c8c972b2f"
+    },
+    {
+      "fixture_path": "install_state.json",
+      "in_vm_path": "/Users/admin/Solets/bizopsb15/.solet/install-state.json",
+      "sha256": "04f558ec994c15a5b63a23d018f25e9f0385ad69c6009196ff457376cedf0948"
+    },
+    {
+      "fixture_path": "terminal_contract_reconciliation_receipt.json",
+      "in_vm_path": "/Users/admin/.local/state/solet/contract-reconciliations/bizopsb15.json",
+      "sha256": "53cee47e206321ad145e29197621931410a73ca511de8e300b6c13ecbec23ffd"
+    },
+    {
+      "fixture_path": "contract_bundle/macos_setup_flow.json",
+      "in_vm_path": "/Users/admin/Solets/bizopsb15/plugins/github_midwife_plugin/knowledge_base/macos_setup_flow.json",
+      "sha256": "6f025ae36d06e220d564d095684b5e8b94f45aa52c39325eb284602c129cbb7d"
+    },
+    {
+      "fixture_path": "contract_bundle/setup_adapter_envelope.schema.json",
+      "in_vm_path": "/Users/admin/Solets/bizopsb15/plugins/github_midwife_plugin/knowledge_base/setup_adapter_envelope.schema.json",
+      "sha256": "4e417853db6f15dd1c81b5c808743326cdc852a64e99487d0671fece74dcef7f"
+    },
+    {
+      "fixture_path": "contract_bundle/setup_answers.schema.json",
+      "in_vm_path": "/Users/admin/Solets/bizopsb15/plugins/github_midwife_plugin/knowledge_base/setup_answers.schema.json",
+      "sha256": "48ff889a1ab22c3f027bd2eef5987ddb4dde2bdf497340cabc242fdb9bbc2565"
+    },
+    {
+      "fixture_path": "contract_bundle/setup_flow.schema.json",
+      "in_vm_path": "/Users/admin/Solets/bizopsb15/plugins/github_midwife_plugin/knowledge_base/setup_flow.schema.json",
+      "sha256": "183625b2677561df6b8352c2df71034c6585d558c5faf09a2abffb48cf129b70"
+    },
+    {
+      "fixture_path": "contract_bundle/setup_journal.schema.json",
+      "in_vm_path": "/Users/admin/Solets/bizopsb15/plugins/github_midwife_plugin/knowledge_base/setup_journal.schema.json",
+      "sha256": "0828b597e84fe77c0f2b3b6e352fafe88ac17352da99bf7a30d6a5e304327a1b"
+    }
+  ]
+}

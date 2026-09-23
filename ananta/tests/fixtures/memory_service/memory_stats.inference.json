@@ -1,0 +1,5 @@
+{
+  "query": "How many memories do I have?",
+  "expected_process_key": "service_interface::memory_service::memory_stats",
+  "expected_arguments": {}
+}

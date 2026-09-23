@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::actr_memory_plugin::remember_action",
+  "display_name": "Remember",
+  "description": "Store a new episodic memory",
+  "embedding_description": "Store a new episodic memory in the ACT-R store. Provide content, optional tags, and source_file; returns memory_id. Use to persist knowledge, notes, or observations for later recall and retrieval. Good for capturing user preferences or key facts.",
+  "result_processor_customizations": {
+    "action_label": "Memory stored",
+    "result_type": "memory_created",
+    "result_description": "New memory record with memory_id and metadata",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

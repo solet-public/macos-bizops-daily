@@ -1,0 +1,19 @@
+{
+  "name": "test_take_action",
+  "description": "Generate AI action plan from user request. Primary inference method for planning and decision-making.",
+  "process_key": "service_interface::inference_service::take_action",
+  "arguments": {
+    "params": {
+      "prompt": "User: \"Create a short hello-world plan\". Respond with a tiny JSON plan.",
+      "model": {
+        "name": "llama-3.1-8b-instruct-meta",
+        "temperature": 0.1,
+        "max_tokens": 512
+      }
+    },
+    "state": {
+      "current_session_id": "sess-test-inference",
+      "flow_id": "flow-test-inference"
+    }
+  }
+}

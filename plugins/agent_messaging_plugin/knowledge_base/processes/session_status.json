@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::session_status",
+  "display_name": "Read one managed session's ledger and host status",
+  "description": "Returns the full managed_session ledger row for one agent_instance_id and adds an honest native-host observation. ledger_state repeats the durable lifecycle_state; host_liveness is alive, dead, or unknown; host_liveness_detail and host_liveness_observed_at identify the observation; state_consistent is false only when the host is definitively dead while the ledger remains nonterminal. coordination_state is managed when dispatch_id is present, legacy_unsupervised for a nonterminal historical row without dispatch_id, and legacy_unmanaged for a terminal historical row without dispatch_id. A missing host_ref, unavailable driver, or probe exception yields unknown rather than a false alive/dead claim.",
+  "embedding_description": "Read one managed session's durable ledger row plus current tri-state native host liveness and managed or legacy coordination projection by agent_instance_id. Returns ledger_state, host_liveness as alive, dead, or unknown, observation detail/time, state_consistent, and coordination_state. Distinct from list_sessions and report_alive.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Session status read",
+    "result_type": "session_status_result",
+    "result_description": "The full managed_session row plus ledger_state, host_liveness (alive, dead, or unknown), host_liveness_detail, host_liveness_observed_at, state_consistent, and coordination_state (managed, legacy_unsupervised, or legacy_unmanaged).",
+    "presentation_guidance": "Lead with ledger_state and host_liveness, preserving unknown as unknown. Call out state_consistent=false as a measured ledger/host conflict. Use lane_id and brief_ref for orientation, and note report_by only when close or overdue."
+  },
+  "error_processor_customizations": {
+    "action_context": "A single filtered managed_session read followed by a best-effort native host-driver liveness probe.",
+    "error_interpretation": "session_not_found: no managed_session row exists for the given agent_instance_id (never claimed, or hard-deleted). state_service_unavailable: the state service is not bound. Host-driver resolution and probe failures do not fail the read; they return host_liveness=unknown with diagnostic detail.",
+    "recovery_guidance": "For session_not_found, confirm the agent_instance_id via list_sessions or the caller's own spawn_session result rather than retrying the same id."
+  }
+}

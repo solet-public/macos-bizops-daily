@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::salesforce_plugin::probe_cli",
+  "display_name": "Salesforce: Probe CLI",
+  "description": "Check whether the locally configured sf executable can return its version. This is offline and does not contact a Salesforce org.",
+  "embedding_description": "Diagnose whether this host can execute the locally configured Salesforce sf CLI before any network-dependent Salesforce connection check or data operation. The probe resolves the executable and requests only its local version string; it does not inspect credentials, resolve an org alias, or contact Salesforce.",
+  "result_processor_customizations": {
+    "action_label": "Salesforce CLI probed",
+    "result_type": "salesforce_probe_cli_result",
+    "result_description": "Bounded local verdict containing executable_path, version, and executable.",
+    "presentation_guidance": "Report this as local CLI availability only; it does not establish that a Salesforce org is configured or reachable."
+  },
+  "error_processor_customizations": {
+    "action_context": "Check local sf CLI availability without contacting Salesforce.",
+    "error_interpretation": "A false executable result means the configured binary could not successfully report its version.",
+    "recovery_guidance": "Install the sf CLI or configure sf_cli_path to an executable local binary, then repeat the probe."
+  }
+}

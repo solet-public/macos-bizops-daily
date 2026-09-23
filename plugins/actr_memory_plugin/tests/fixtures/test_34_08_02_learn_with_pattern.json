@@ -1,0 +1,16 @@
+{
+  "name": "test_learn_with_pattern",
+  "description": "Verify ingesting files matching a specific glob pattern",
+  "process_key": "plugin::actr_memory_plugin::learn_action",
+  "arguments": {
+    "params": {
+      "path": "/tmp/docs",
+      "pattern": "*.txt",
+      "recursive": true
+    },
+    "state": {
+      "session_id": "test-session-071"
+    }
+  },
+  "timeout_seconds": 60
+}

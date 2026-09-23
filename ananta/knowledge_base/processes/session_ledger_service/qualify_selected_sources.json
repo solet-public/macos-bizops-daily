@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::session_ledger_service::qualify_selected_sources",
+  "display_name": "Qualify selected session sources",
+  "description": "Verify the two optional local session-source choices against the manager-owned, schema-validated setup transaction and bounded ledger observations. The result reports Codex and Claude selections only when the transaction name and target match the requesting doctor and the canonical answers fingerprint matches the request. For each source it returns only {selected, consented, registered, backfill_count, retrieval_ok}; it never returns answer content, roots, sessions, or event payloads. A declined source is reported as selected=false and consented=false rather than treated as a failed choice. A selected and consented source is verified only after registration, a positive backfill count, and a bounded source-kind retrieval all succeed. The record provenance is explicitly manager_transaction; this is not a target-local answer record.",
+  "embedding_description": "Check whether the optional Codex and Claude local session inputs selected during setup are truly usable. Compare the manager-recorded target and answers fingerprint with the doctor request, then report bounded per-source consent, registration, backfill count, and retrieval proof without exposing sessions, transcripts, roots, or answer contents.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Qualify selected session sources",
+    "result_type": "selected_session_sources_qualification",
+    "result_description": "Bounded setup qualification containing record_source, target_identity_matched, answers_fingerprint_matched, qualification_reason, and up to two source rows. Each row contains only source, selected, consented, registered, backfill_count, and retrieval_ok; no setup answers, roots, sessions, events, or transcript content are returned.",
+    "presentation_guidance": "State first whether transaction identity and the answers fingerprint matched. For every selected and consented source, report registration, backfill count, and retrieval proof. A declined source is an informative negative selection, not a failed probe. Never present an empty source list following an identity or fingerprint mismatch as evidence that no source was selected.",
+    "output_action_guidance": "Use this as the completion probe for setup-selected local session sources. If the result is blocked, repair the manager transaction identity or answers pairing first; then register and backfill each selected and consented source before retrying."
+  },
+  "error_processor_customizations": {
+    "action_context": "Read-only setup qualification of manager-recorded session-source choices against current ledger registration and bounded retrieval observations.",
+    "error_interpretation": "manager_transaction_missing means the manager journal has no transaction for the requested solet. manager_transaction_invalid means the stored transaction or its recorded answers no longer pass the current setup contract. manager_transaction_identity_mismatch means the requested target or name differs from the stored transaction. answers_fingerprint_mismatch means the doctor request names a different answer record from the transaction that was loaded. A blocked selected and consented row means registration, backfill, or bounded retrieval is incomplete; consent is never inferred from registration.",
+    "recovery_guidance": "Use the exact target and managed name from the authoritative setup transaction. If identity or fingerprint pairing fails, repair or resume the recorded setup transaction rather than trusting the probe request. For each selected and consented source, repair source registration, run its backfill, and confirm bounded source-kind retrieval before retrying."
+  }
+}

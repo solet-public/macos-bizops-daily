@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::fleet_status",
+  "display_name": "Read the bounded fleet status",
+  "description": "Returns a read-only, bounded classification of active managed sessions from the deployment ledger. The default scope=lanes reports contracted lanes; scope=all also renders contract-less registration inventory. It classifies rows as working, STALLED, no-contract, retiring, idle, or holding when an armed session_dependency cites its id, kind, and reference. Each rendered gauge is either a measured snapshot plus the shared gauge-series state or the explicit status 'no gauge'; unresolved gauges never become zero tokens, zero ceiling, or rotation_due=false. The response separately counts report_by IS NULL registrations with oldest/newest timestamps. Owed messages are authoritative role-message records only because direct-wake persistence is code-retired; legacy_direct_delivery_unknown is therefore true. This process does not mutate session state, wake a worker, inspect a terminal, or infer holds from prose.",
+  "embedding_description": "Get a bounded machine-readable fleet check-in: classify active contracted lanes, expose armed dependency holds, show honest context-gauge coverage, count contract-less registrations, and list authoritative role-message backlog. Use instead of list_sessions when the active ledger exceeds that verb's hard roster cap. Read-only; direct-message delivery history remains explicitly unknown.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Fleet status read",
+    "result_type": "fleet_status_result",
+    "result_description": "as_of, scope, class_counts, bounded sessions with classification/holds/gauge, sessions_truncated, unregistered count with oldest/newest timestamps, FIFO bounded owed_messages, owed_messages_truncated as a 0-or-1 overflow indicator (not an exact backlog count), and legacy_direct_delivery_unknown.",
+    "presentation_guidance": "Lead with class_counts and the contract-less inventory count. Preserve STALLED exactly as returned: it is the residual for a past report_by with no armed dependency. For gauge.status='no gauge', state that coverage is absent and never restate placeholder zero values. Treat legacy_direct_delivery_unknown=true as a limitation of direct-message evidence, not proof that a direct message was ignored."
+  },
+  "error_processor_customizations": {
+    "action_context": "A StateManagementInterface-only read of active managed sessions, armed dependencies, gauge rows/history, and role-message delivery records; it performs no writes.",
+    "error_interpretation": "invalid_scope: scope was not lanes or all. state_service_unavailable: the deployment has no bound state service. A bounded-read ceiling failure means the active fleet or armed dependency population exceeded the declared read safety limit and the result is refused rather than guessed or silently truncated.",
+    "recovery_guidance": "Retry with scope=lanes for the contracted-lane view when scope=all is unnecessary. For a read ceiling failure, measure and deliberately redesign the bound; do not treat a partial fleet view as complete. For no gauge, repair reporting coverage separately rather than fabricating a usage reading."
+  }
+}

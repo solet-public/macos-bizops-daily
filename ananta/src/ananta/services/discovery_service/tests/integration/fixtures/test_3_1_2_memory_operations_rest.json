@@ -1,0 +1,9 @@
+{
+  "type": "rest",
+  "method": "POST",
+  "endpoint": "/api/v1/process/call",
+  "body": {
+    "process_key": "service_interface::discovery_service::query_process_registry",
+    "arguments": {"query": "what processes handle memory or recall?"}
+  }
+}

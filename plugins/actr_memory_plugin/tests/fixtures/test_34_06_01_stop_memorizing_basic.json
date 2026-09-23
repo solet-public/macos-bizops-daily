@@ -1,0 +1,14 @@
+{
+  "name": "test_stop_memorizing_basic",
+  "description": "Verify removing a memory from the spaced repetition memorization queue",
+  "process_key": "plugin::actr_memory_plugin::stop_memorizing_action",
+  "arguments": {
+    "params": {
+      "memory_id": "test-memory-uuid-004"
+    },
+    "state": {
+      "session_id": "test-session-050"
+    }
+  },
+  "timeout_seconds": 30
+}

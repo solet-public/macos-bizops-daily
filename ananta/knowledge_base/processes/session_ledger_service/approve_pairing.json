@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::session_ledger_service::approve_pairing",
+  "display_name": "approve_pairing",
+  "description": "Approve a pending shipper deployment pairing by user_code. Ownership-bound: caller's client_id must match deployment.initiating_client_id OR the caller must be operator_equivalent per vault. Constant-time user_code comparison. Transitions deployment pending → approved (clears user_code in same write). Part of M5 shipper bootstrap pairing flow.",
+  "embedding_description": "Approve a pending shipper deployment pairing by user_code. Ownership-bound: caller's client_id must match deployment.initiating_client_id OR caller must be operator_equivalent per vault. Constant-time user_code comparison. Transitions deployment pending → approved (clears user_code in same write). Part of M5 shipper bootstrap pairing flow."
+}

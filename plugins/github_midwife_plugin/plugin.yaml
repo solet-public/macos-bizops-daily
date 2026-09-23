@@ -1,0 +1,21 @@
+name: github_midwife_plugin
+description: >
+  GitHub-sourced genesis midwife. Implements MidwifeServiceInterface for
+  the "born from a public clone, no parent solet present" source
+  axis — the counterpart to macos_midwife_plugin (copy-from-parent) and
+  aws_midwife_plugin (cloud). Dual-use: the genesis.py entrypoint that
+  bootstrap.py's Layer 0 hands off to (python -m
+  github_midwife_plugin.genesis), AND a birth_solet EDGE verb
+  callable from an already-running solet. See
+  workbench/2026-07-08_github_midwife_genesis_design.md (rev-E) and the
+  companion build spec.
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider
+  - interface: MidwifeServiceInterface
+
+# No plugin config: acquisition-mode clone-of-pinned-upstream was retired
+# 2026-07-18 (the Seed Factory replaces it — assemble_seed reads a committed
+# ref, never a caller-supplied clone URL), so the former `source_repo` config
+# is gone.

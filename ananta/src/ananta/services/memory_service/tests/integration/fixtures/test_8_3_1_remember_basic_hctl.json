@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::remember",
+  "arguments": {
+    "content": "The capital of Zorblaxia is Flimflamburg. This is a fictional country used for integration testing.",
+    "tags": ["test", "zorblaxia", "artificial-fact"]
+  }
+}

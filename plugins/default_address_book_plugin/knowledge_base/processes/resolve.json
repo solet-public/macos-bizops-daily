@@ -1,0 +1,13 @@
+{
+  "process_key": "plugin::default_address_book_plugin::resolve",
+  "display_name": "Resolve Address",
+  "description": "Get address by name with all entries. Strengthens memory.",
+  "embedding_description": "Resolve an address by name and return full details with entries and tags. Strengthens the associated memory on access. Use to retrieve stored service info or endpoints; returns the full address record.",
+  "result_processor_customizations": {
+    "action_label": "Resolve Address",
+    "result_type": "address_resolved",
+    "result_description": "Full address record with all entries",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  }
+}

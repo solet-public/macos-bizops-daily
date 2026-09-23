@@ -1,0 +1,12 @@
+# ~/.zshrc — written by {{SOLET_NAME}} hydration on {{HYDRATION_DATE}}.
+#
+# Your previous .zshrc was preserved UNREAD at:
+#   {{BACKUP_PATH}}
+# To restore it exactly as it was, run:
+#   mv {{BACKUP_PATH}} ~/.zshrc
+# Merge anything you need from it yourself — the agent never reads that file.
+#
+# Everything {{SOLET_NAME}}-related lives in the deployment directory (git-updatable);
+# this file stays minimal and should not need to change again.
+
+[ -f "{{CLONE_DIR}}/client/{{SOLET_NAME}}.zsh" ] && source "{{CLONE_DIR}}/client/{{SOLET_NAME}}.zsh"

@@ -1,0 +1,5 @@
+{
+  "query": "Process my memorization reviews",
+  "expected_process_key": "service_interface::memory_service::process_memorization_queue",
+  "expected_arguments": {}
+}

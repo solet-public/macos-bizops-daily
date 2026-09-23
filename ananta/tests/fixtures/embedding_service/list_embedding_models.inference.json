@@ -1,0 +1,5 @@
+{
+  "natural_language_query": "What embedding models are available?",
+  "expected_process_key": "service_interface::embedding_service::list_models",
+  "expected_arguments_structure": {}
+}

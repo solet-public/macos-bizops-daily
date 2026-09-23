@@ -1,0 +1,7 @@
+{
+  "query": "Start a new workflow for this task",
+  "expected_process_key": "service_interface::flow_service::create_flow",
+  "expected_arguments": {
+    "trigger_type": "user_input"
+  }
+}

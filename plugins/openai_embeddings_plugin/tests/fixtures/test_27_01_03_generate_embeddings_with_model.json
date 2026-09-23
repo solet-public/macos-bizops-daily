@@ -1,0 +1,11 @@
+{
+  "name": "test_generate_embeddings_with_model",
+  "description": "Generate embeddings with explicit model specification",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": ["Testing explicit model specification for embeddings."],
+    "model": "text-embedding-nomic-embed-text-v1.5-embedding",
+    "input_type": "text"
+  },
+  "timeout_seconds": 60
+}

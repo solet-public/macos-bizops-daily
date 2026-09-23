@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::platform_health_plugin::execute_registry_sweep",
+  "display_name": "Platform health registry sweep",
+  "description": "WARNING: a diagnostic name does not make this process diagnose-safe: live read-shape calls can reach external systems. dry_run defaults to true and returns every classification row without dispatching. Live dispatch requires dry_run=false and defaults to read-shape service_interface providers only. The plugin's declared outward-facing namespace table is fail-closed: an unlisted provider is never inferred safe. An outward-facing plugin provider must be explicitly enumerated in external_namespaces and paired with an operator_confirmation turn/message id; that citation is echoed in result rows. write_enabled still gates only write-shape verbs. Not a startup-blocking gate — manual operator/CI invocation.",
+  "embedding_description": "Diagnostic gate over the live process registry. Find registration mismatches, ParameterType ARRAY vs LIST drift, malformed invocation schemas, SQL operator type errors (integer = boolean), 'Process not found or malformed' wiring breakages. Run after platform changes touching service interfaces, plugin lifecycles, schema column types, or registry builder paths.",
+  "result_processor_customizations": {
+    "action_label": "Registry sweep completed",
+    "result_type": "platform_health_sweep_result",
+    "result_description": "Per-process pass/fail report. Each row carries process_key, shape (read|write), status (ok|failed|skipped_*), error_class, error_message.",
+    "presentation_guidance": "Lead with the totals (total/ok/failed/skipped). When failed > 0, surface the first ~5 failing rows verbatim — process_key + error_class + error_message — so the operator can triage. Do NOT collapse or summarize failure text; the raw exception message is the diagnostic signal."
+  },
+  "error_processor_customizations": {
+    "action_context": "The sweep itself failed before completing the iteration. Distinct from individual processes failing within a successful sweep (those land in the result rows, not as a top-level error).",
+    "error_interpretation": "An exception inside the sweep machinery (not inside an invoked process) most likely means the orchestrator reference is missing or the process_registry payload is malformed.",
+    "recovery_guidance": "Check that the plugin is loaded (list_plugins) and that the platform completed startup before invoking the verb."
+  }
+}

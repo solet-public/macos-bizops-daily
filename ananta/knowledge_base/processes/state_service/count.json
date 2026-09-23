@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::state_service::count",
+  "display_name": "Count Records",
+  "description": "Count rows matching table + filter criteria. The SQL COUNT runs inside the owner plugin and returns only the scalar at data.result.value (integer >= 0; an empty set returns 0). No rows are materialized or shipped.",
+  "embedding_description": "Count how many rows match a filtered set in a namespace table without retrieving the rows themselves; returns a single integer tally at data.result.value.",
+  "result_processor_customizations": {
+    "action_label": "Count Records",
+    "result_type": "count_result",
+    "result_description": "Integer row count at data.result.value (>= 0; 0 over an empty set)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Counting rows in a state table using table and filter criteria",
+    "error_interpretation": "Error with 'table': missing or invalid table name. Error with 'filters': invalid filter format. Error mentioning 'column': count does not accept a column.",
+    "recovery_guidance": "For table errors: provide a valid table name. For filter errors: verify the filter matches the query_state grammar (equality / list = ANY / is_null / is_not_null / range). Remove any 'column' key -- count takes none."
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "natural_language_query": "Install the plugin checked out at /Users/alice/Workspace/example/plugins/new_plugin and bring its entry-point online",
+  "expected_process_key": "service_interface::lifecycle_management_service::install_plugin_from_path",
+  "expected_arguments_structure": {
+    "path": "string"
+  }
+}

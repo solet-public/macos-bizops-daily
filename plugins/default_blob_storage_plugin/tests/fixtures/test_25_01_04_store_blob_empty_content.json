@@ -1,0 +1,19 @@
+{
+  "name": "test_store_blob_empty_content",
+  "description": "Attempt to store blob with empty content - should fail validation",
+  "process_key": "plugin::default_blob_storage_plugin::store_blob",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "content": "",
+      "metadata": {
+        "original_name": "empty.txt",
+        "mime_type": "text/plain"
+      }
+    },
+    "state": {
+      "current_session_id": "test-store-empty-001"
+    },
+    "timeout_seconds": 30
+  }
+}

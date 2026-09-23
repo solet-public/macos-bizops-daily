@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::repo_service::git_diff",
+  "display_name": "Git Diff",
+  "description": "Return a READ-ONLY unified diff of the platform worktree, plus its --stat summary. Runs 'git diff' (the read-only git surface the GIT-CONTROLLER policy permits) with argv baked server-side: optional ref/commit to diff against, optional repo-root-confined path (rejected if it escapes root), and a staged flag (--cached). NEVER mutates the repo. The diff is size-capped with an explicit truncated marker plus diff_chars_total (the true length). Use to inspect the exact changes before proposing a patch or asking the operator to commit.",
+  "embedding_description": "Show a read-only unified git diff of the platform repository worktree, with a --stat summary. Optional ref, confined path filter, and staged/--cached mode. Size-bounded with a truncation marker. Use to review the exact line changes before a commit or patch proposal.",
+  "result_processor_customizations": {
+    "action_label": "Git diff read",
+    "result_type": "repo_git_diff_result",
+    "result_description": "Object with 'diff' (bounded unified diff), 'truncated', 'diff_chars_total' (true length before cap), 'stat' (--stat summary).",
+    "presentation_guidance": "Lead with the 'stat' summary, then the diff; if 'truncated' is true, note the cap against diff_chars_total and offer to diff a single path.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Running a read-only 'git diff' (optional ref/path, staged flag) over the platform worktree with server-fixed argv.",
+    "error_interpretation": "RepoPathError: the path filter escaped the repo root or is denylisted. A git error surfaces in the diff output; a clean tree returns an empty diff (not an error).",
+    "recovery_guidance": "For RepoPathError: pass a repo-root-relative path. For an unexpected empty diff: check 'staged' (unstaged vs --cached changes) or the 'ref' you diffed against."
+  }
+}

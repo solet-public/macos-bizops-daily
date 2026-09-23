@@ -1,0 +1,11 @@
+{
+  "timeout": 180,
+  "process_key": "service_interface::embedding_service::generate_embeddings",
+  "arguments": {
+    "inputs": [
+      "The quick brown fox jumps over the lazy dog",
+      "Machine learning enables computers to learn from data",
+      "Integration testing validates system components work together"
+    ]
+  }
+}

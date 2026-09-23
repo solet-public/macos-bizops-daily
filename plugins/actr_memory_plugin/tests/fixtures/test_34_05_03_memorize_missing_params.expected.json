@@ -1,0 +1,11 @@
+{
+  "action_status_any": ["error", "completed"],
+  "output_contains_any": [
+    "required",
+    "missing",
+    "memory_id or content",
+    "must provide",
+    "next_review_at"
+  ],
+  "timeout_seconds": 60
+}

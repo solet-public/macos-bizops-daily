@@ -1,0 +1,17 @@
+{
+  "name": "test_search_similar_dot_product",
+  "description": "Similarity search using dot product distance metric",
+  "process_key": "plugin::pgvector_service_plugin::search_similar_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "query_vector": [1.0, 0.0, 0.0, 1.0],
+      "top_k": 3,
+      "distance_metric": "DOT_PRODUCT"
+    },
+    "state": {
+      "current_session_id": "test-search-dot-product-001"
+    },
+    "timeout_seconds": 30
+  }
+}

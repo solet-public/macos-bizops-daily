@@ -1,0 +1,14 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "Memories created",
+    "created",
+    "ingest",
+    "session",
+    "memory",
+    "status",
+    "result",
+    "COMPLETED",
+    "0"
+  ]
+}

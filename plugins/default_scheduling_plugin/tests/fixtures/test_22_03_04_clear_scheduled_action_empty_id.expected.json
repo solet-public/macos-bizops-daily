@@ -1,0 +1,9 @@
+{
+  "action_status": "ERROR",
+  "error_contains": {
+    "type": "plugin_error",
+    "code": "default_scheduling_plugin"
+  },
+  "error_message_contains": ["schedule_id", "required"],
+  "timeout_seconds": 30
+}

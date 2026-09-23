@@ -1,0 +1,11 @@
+{
+  "process_key": "service_interface::blob_storage_service::store_blob",
+  "arguments": {
+    "namespace": "test_namespace",
+    "content": "VGhpcyBpcyBhIHRlc3QgYmxvYiBjb250ZW50",
+    "metadata": {
+      "original_name": "test_file.txt",
+      "mime_type": "text/plain"
+    }
+  }
+}

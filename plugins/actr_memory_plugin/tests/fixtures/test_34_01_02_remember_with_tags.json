@@ -1,0 +1,15 @@
+{
+  "name": "test_remember_with_tags",
+  "description": "Verify storing a memory with organizational tags for later filtering",
+  "process_key": "plugin::actr_memory_plugin::remember_action",
+  "arguments": {
+    "params": {
+      "content": "Python list comprehensions provide a concise way to create lists based on existing iterables",
+      "tags": ["python", "syntax", "best-practices"]
+    },
+    "state": {
+      "session_id": "test-session-002"
+    }
+  },
+  "timeout_seconds": 30
+}

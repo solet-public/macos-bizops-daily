@@ -1,0 +1,14 @@
+{
+  "process_key": "service_interface::inference_service::process_results",
+  "arguments": {
+    "result_type": "discovery",
+    "result_data": {
+      "processes": [
+        {
+          "process_key": "service_interface::memory_service::store",
+          "confidence": 0.95
+        }
+      ]
+    }
+  }
+}

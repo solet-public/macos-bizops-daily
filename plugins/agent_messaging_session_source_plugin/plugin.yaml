@@ -1,0 +1,9 @@
+name: agent_messaging_session_source_plugin
+description: |
+  LLM session ledger source for the platform's own agent_messaging tables
+  (core__agent_thread, core__agent_message). Reads peer-thread + agent-thread
+  conversations as ingest sessions so they land in the unified ledger.
+implements:
+  - interface: LLMSessionSourceInterface
+  - interface: PullingSourceMixin
+optional: true

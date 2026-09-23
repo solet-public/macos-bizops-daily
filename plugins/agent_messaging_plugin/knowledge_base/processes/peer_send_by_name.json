@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::peer_send_by_name",
+  "display_name": "Send peer message by role name",
+  "description": "Resolve a durable fleet role at send time, persist the role envelope, and attempt delivery to the current holder without caching an ephemeral instance id. An offline resolved holder returns queued_for_replay; a vacant role fails before persistence. The result also reports the holder's managed-drive disposition: not_managed means completed state reads found no managed row, ineligible_state means the holder's row is outside the driveable lifecycle states, driver_unavailable means the state or driver channel could not be resolved, driver_sent means only that the driver channel accepted an inbox notice, and driver_error means that channel raised. driver_sent never proves a model turn or message consumption.",
+  "embedding_description": "Route a durable message to the current holder of a named fleet role, including reconnect-safe queued_for_replay behavior and managed-drive diagnosis. Search for role dispatch outcomes not_managed, ineligible_state, driver_unavailable, driver_sent, and driver_error; driver_sent is driver-channel acceptance rather than recipient uptake.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Peer message delivered by role name",
+    "result_type": "peer_send_by_name_result",
+    "result_description": "Returns thread_id, message_id, delivery, the role name's resolved holder tuple, and drive_on_delivery. delivery may be queued_notification, queued_wake, queued_watcher, or queued_for_replay and describes persistence/routing rather than model uptake. drive_on_delivery is not_managed (completed lookup found no row), ineligible_state (managed lifecycle refuses a drive), driver_unavailable (lookup or channel unavailable), driver_sent (driver channel accepted the notice), or driver_error (channel raised). driver_sent does not prove a model turn or inbox consumption.",
+    "presentation_guidance": "Name the role and the exact resolved_session_label, then surface both delivery and drive_on_delivery without converting either into a consumption claim. Treat queued_for_replay as durable but not live delivery. Treat not_managed and ineligible_state as distinct routing facts, driver_unavailable and driver_error as unsuccessful drive attempts, and driver_sent solely as driver-channel acceptance pending independent turn evidence."
+  },
+  "error_processor_customizations": {
+    "action_context": "Resolves a durable role binding at act time, persists to the role thread, delivery-attempts the current holder, and separately reports the managed driver outcome.",
+    "error_interpretation": "peer_role_vacant means no holder exists and nothing was persisted; peer_role_malformed means the binding lacks an instance id; bridge.not_running and state_service_unavailable identify missing infrastructure. An offline holder is a queued_for_replay result. not_managed, ineligible_state, driver_unavailable, driver_sent, and driver_error are drive_on_delivery result values; none alone proves consumption.",
+    "recovery_guidance": "Repair vacant or malformed role ownership from the intended holder with peer_claim_role, then route by name again so resolution occurs fresh. When a persisted result reports not_managed, ineligible_state, driver_unavailable, or driver_error, verify holder lineage and choose a supported recovery channel. Even after driver_sent, require a causal reply or equivalent model-turn evidence before declaring uptake."
+  }
+}

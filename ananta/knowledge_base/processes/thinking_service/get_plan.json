@@ -1,0 +1,15 @@
+{
+  "process_key": "service_interface::thinking_service::get_plan",
+  "display_name": "Get Plan",
+  "description": "Retrieve the full content of a plan from the knowledge base by plan ID. Works for plans created via create_extended_plan or via playbook finalization.",
+  "embedding_description": "Retrieve the full markdown plan document for a known plan_id. Use after a plan has been created, revised, or referenced from another artifact when you need the exact current plan text, numbered steps, sub-steps, and metadata for review, comparison, prompt assembly, debugging, or user-visible explanation.",
+  "result_processor_customizations": {
+    "action_label": "plan retrieved",
+    "result_type": "plan_content",
+    "result_description": "Full plan markdown content from knowledge base"
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving a plan by ID. get_plan accepts {plan_id}.",
+    "error_interpretation": "NotFound: plan_id does not exist in thinking_task or thinking_playbook tables."
+  }
+}

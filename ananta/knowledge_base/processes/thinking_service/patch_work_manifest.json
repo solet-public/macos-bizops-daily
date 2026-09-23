@@ -1,0 +1,11 @@
+{
+  "process_key": "service_interface::thinking_service::patch_work_manifest",
+  "display_name": "Patch Work Manifest",
+  "description": "revise an existing Work Manifest document via a full-document rewrite. Use only when a narrow state-recording process is not sufficient.",
+  "embedding_description": "Revise an existing Work Manifest document by replacing its current manifest content with updated phase-level information. Use to update ordered phases, phase outcomes, status, authorization state, or other manifest-only planning context after progress, review, or replanning. Keep the manifest at the phase level only; do not add work items, steps, or sub-steps.",
+  "processor_policy_category": "edge_sink",
+  "error_processor_customizations": {
+    "action_context": "Writing Work Manifest content to the knowledge base. patch_work_manifest accepts {manifest_id, content}. The manifest should contain phases only — no work items, steps, or sub-steps.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. StorageError: knowledge base write failed."
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "test_update_metadata_add_custom_fields",
+  "description": "Update metadata with custom plugin-specific fields",
+  "process_key": "plugin::default_blob_storage_plugin::update_blob_metadata",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "blob_id": "gen-abc123xyz4567",
+      "metadata": {
+        "custom_field_1": "value1",
+        "custom_field_2": 42,
+        "processing_status": "completed"
+      }
+    },
+    "state": {
+      "current_session_id": "test-update-custom-001"
+    },
+    "timeout_seconds": 30
+  },
+  "requires_setup": {
+    "store_blob_first": true,
+    "use_returned_blob_id": true
+  }
+}

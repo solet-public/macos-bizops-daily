@@ -1,0 +1,7 @@
+{
+  "natural_language_query": "Stop the REST interface",
+  "expected_process_key": "service_interface::lifecycle_management_service::stop_service",
+  "expected_arguments_structure": {
+    "service_name": "string"
+  }
+}

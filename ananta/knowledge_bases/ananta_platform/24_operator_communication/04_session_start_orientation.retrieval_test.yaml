@@ -1,0 +1,39 @@
+# Retrieval-test companion for the session-start orientation article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+article_path: knowledge_bases/ananta_platform/24_operator_communication/04_session_start_orientation.md
+consumer_profile: both
+
+target_queries:
+  - "session start orientation"                                         # the literal pinned C9 bootstrap query — must never drop out of top rank
+  - "session start orientation standing governance documents"
+  - "what documents should a fresh session anchor on"
+  - "where do I find the charter and standing positions at session start"
+  - "is this governance question already settled somewhere"
+  - "what do I do first when a new session starts"
+  - "the knowledge base search came back empty what do I check next"
+  - "how do I check my inbox and role after a restart or clear"
+
+# forbidden_min_rank is 2, not the platform-conventional 4, because of the query below.
+# CONVERTED, not deleted (Dawn ruled 2026-08-01): this query's premise — that the
+# comparison "which surface do I use" belongs exclusively to 04_recall_before_work.md —
+# was invalidated by the C9 hub ruling, which requires this article to cover all three
+# retrieval surfaces (knowledge base, session ledger, memory) with runnable commands.
+# A hub legitimately ranking 2nd behind the specialist at 1st is the correct shape, not
+# overreach; degrading the content to force rank>=4 would have inverted the product to
+# satisfy the instrument. The invariant this line still enforces: page zero must never
+# OUTRANK 04_recall_before_work.md for this query (must not reach rank 1).
+forbidden_queries:
+  - "operator decision brief format"                  # 01_operator_decision_briefs owns this
+  - "operator collaboration craft working conventions" # 03_collaboration_craft owns this
+  - "recall before work knowledge base first"          # 14_knowledge_retrieval/04_recall_before_work owns this
+  - "which search surface do I use, knowledge base, memory, or the session ledger" # CONVERTED invariant: must not outrank 04_recall_before_work.md (rank must be >=2, i.e. not rank 1)
+
+min_rank: 3
+forbidden_min_rank: 2
+
+process_key_assertions:
+  - service_interface::knowledge_service::search
+  - service_interface::session_ledger_service::search_event_content
+  - service_interface::memory_service::recall
+  - plugin::agent_messaging_plugin::peer_inbox
+  - plugin::agent_messaging_plugin::peer_holds_role

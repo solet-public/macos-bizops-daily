@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_coding_agent_session_plugin::list_bridges",
+  "display_name": "List every tracked MCP bridge subprocess (macOS plugin)",
+  "description": "macOS implementation of list_bridges: read-only enumeration of the tracker's registry. Bound-provider skip semantics mean callers should route through service_interface::coding_agent_session_service::list_bridges instead of this plugin::* key.",
+  "embedding_description": "macOS-side enumeration of tracked MCP bridge subprocesses — one row per agent_instance_id with pid + alive + started_at. Mirrors the canonical service_interface::coding_agent_session_service::list_bridges contract. Returns BridgeListResult.",
+  "result_processor_customizations": {
+    "action_label": "Tracked MCP bridges enumerated",
+    "result_type": "coding_agent_session_bridge_list_result",
+    "result_description": "BridgeListResult frozen dataclass mirroring the canonical service interface return.",
+    "presentation_guidance": "See the canonical service_interface entry."
+  },
+  "error_processor_customizations": {
+    "action_context": "macOS-side enumeration of tracked MCP bridge subprocesses.",
+    "error_interpretation": "See the canonical service_interface entry.",
+    "recovery_guidance": "See the canonical service_interface entry."
+  }
+}

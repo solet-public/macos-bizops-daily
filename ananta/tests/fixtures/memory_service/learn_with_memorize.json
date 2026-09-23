@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::memory_service::learn",
+  "arguments": {
+    "path": "/tmp/important_facts.md",
+    "pattern": "*.md",
+    "recursive": false,
+    "memorize": true,
+    "tags": ["critical", "memorize"]
+  }
+}

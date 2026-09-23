@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "macos-vault-plugin"
+version = "0.1.0"
+description = "Secure credential storage plugin for Ananta (macOS Keychain + dual-write SQL)"
+authors = [{name = "Ananta Development Team"}]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    "cryptography>=41.0.0",
+    "keyring>=24.0.0",  # OS keychain integration (Linux secret-service, Windows Credential Manager)
+    "pynacl>=1.5.0",  # libsodium sealed boxes for cross-solet secret transfer
+    "pyyaml>=6.0.1",  # KV-file ingestion (store_from_kv_file with yaml format)
+    # macOS only: direct Security framework access for iCloud Keychain (Apple Passwords)
+    # which the keyring library cannot reach because it wraps the legacy `security` CLI.
+    "pyobjc-framework-Security>=10.0; platform_system == 'Darwin'",
+]
+
+# The previous ``[aws]`` extras alias is gone — boto3 was only used by
+# ``SecretsManagerKeychain``, which moved to ``secrets_manager_vault_plugin``
+# in Task #26 (2026-05-22). This plugin is now filesystem/state-only with
+# no AWS dependency.
+
+[project.entry-points."ananta.plugins"]
+macos_vault_plugin = "macos_vault_plugin.plugin:MacosVaultPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["macos_vault_plugin"]

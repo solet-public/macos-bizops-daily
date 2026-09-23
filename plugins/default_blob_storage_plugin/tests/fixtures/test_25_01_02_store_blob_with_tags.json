@@ -1,0 +1,21 @@
+{
+  "name": "test_store_blob_with_tags",
+  "description": "Store a blob with tags metadata for searchability",
+  "process_key": "plugin::default_blob_storage_plugin::store_blob",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "content": "aW1hZ2UgY29udGVudCBoZXJl",
+      "metadata": {
+        "original_name": "photo.png",
+        "mime_type": "image/png",
+        "description": "User profile photo",
+        "tags": "profile,avatar,user"
+      }
+    },
+    "state": {
+      "current_session_id": "test-store-tags-001"
+    },
+    "timeout_seconds": 30
+  }
+}

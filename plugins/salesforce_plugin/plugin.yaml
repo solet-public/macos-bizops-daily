@@ -1,0 +1,77 @@
+name: salesforce_plugin
+description: >
+  Salesforce org connector — SOQL reads, typed record CRUD (including delete),
+  and metadata describe. Executor: full CLI delegation — every verb shells
+  out to the operator's `sf` CLI (operator-ratified 2026-07-14, replacing the
+  sf-CLI session-borrow client factory, dead on current CLI releases because
+  `sf org display --json` now redacts `accessToken` unconditionally). The
+  CLI's own keychain-backed refresh token (established once via
+  `sf org login web`) is the durable credential; the platform stores NO
+  Salesforce secret, and no access token of any kind ever enters this
+  process. There is no session-expiry retry mechanism — the CLI refreshes
+  its own credential transparently inside every invocation.
+
+  Foreign-target invariant (SQL-lockdown honesty condition, umbrella design §3):
+  this plugin reaches ONLY the org whose instance_host is pinned in the
+  operator-registered "salesforce_org" address-book entry — the CLI alias's
+  resolved host is verified against the pin exactly once per process
+  lifetime, and no verb takes an org/domain parameter. It never imports or
+  touches the platform state DB.
+
+  FULL R/W INCLUDING DELETE (operator-ratified RATIFY-2): record deletion is
+  an acceptable-loss class, unlike database destruction. Bulk API v2 ingest
+  (insert/update/upsert/delete, submitted --async and polled — never
+  hardDelete) is also in scope. run_apex, bulk query, and ContentVersion
+  file verbs remain out of v1 for build-effort reasons only (pullable into
+  v1 on request).
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider
+
+config:
+  api_version:
+    type: string
+    required: false
+    default: "62.0"
+    description: >
+      The Salesforce REST API version to pin. Never floats — an operator
+      override still resolves through this same config key.
+  sf_cli_path:
+    type: string
+    required: false
+    default: "sf"
+    description: >
+      Path to the sf CLI binary. The default resolves via PATH; deployments
+      where the platform process's PATH does not carry the CLI (LaunchAgent)
+      pin an absolute path — e.g. the standalone bundle's bin/sf.
+  export_allowed_roots:
+    type: list
+    required: false
+    default: []
+    description: >
+      Absolute workspace directories export_soql may write TSV files under
+      (realpath + commonpath containment, mirroring ledger_allowed_roots).
+      Empty by default = REFUSE-ALL: every export is refused until the operator
+      opts workspace roots in here (operator ruling 2026-07-15 — bulk query
+      data lands in the operator's own workspace, never context or platform
+      blob storage). Prefer the exact export directories over broad parents.
+      Also governs bulk_job_results' three CSV outputs (successful/failed/
+      unprocessed records).
+  import_allowed_roots:
+    type: list
+    required: false
+    default: []
+    description: >
+      Absolute workspace directories bulk_ingest_submit may read ingest CSVs
+      from (realpath + commonpath containment, the read-side mirror of
+      export_allowed_roots). Empty by default = REFUSE-ALL: every Bulk API
+      v2 ingest job is refused until the operator opts workspace roots in
+      here. Prefer the exact ingest directories over broad parents.
+
+# Org binding lives in the address book entry "salesforce_org": two literal
+# fields, target_org (the sf CLI alias or username every verb is invoked
+# against) and instance_host (the pinned my-domain host that alias must
+# resolve to). No vault key exists for this plugin — the durable credential
+# is the sf CLI's own keychain-backed refresh token, and no access token of
+# any kind ever enters this process, so both VaultKeysProvider hooks return [].

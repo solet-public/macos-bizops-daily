@@ -1,0 +1,9 @@
+{
+  "process_key": "service_interface::state_service::read_state",
+  "arguments": {
+    "namespace": "invalid$namespace@#$",
+    "query": {
+      "table": "flows"
+    }
+  }
+}

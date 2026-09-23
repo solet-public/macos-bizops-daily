@@ -1,0 +1,26 @@
+{
+  "process_key": "service_interface::knowledge_service::search",
+  "display_name": "Search Knowledge Bases",
+  "description": "retrieve domain methodology, planning constraints, templates, and reference material from knowledge bases. Pass name to scope the search to a single knowledge base by name, which is required to reach knowledge bases excluded from default search such as workbench. Pass process_key for a tier-1 exact process-key match to find articles bound to a specific verb.",
+  "embedding_description": "Search knowledge base docs, runbooks, and reference material. Look up capabilities, find documentation/examples, answer questions about what the system can do, gather context before acting, surface planning-stage constraints. Scope to a single knowledge base with the name argument to search a specific KB, or to reach one excluded from default search like workbench. Match by process_key for a tier-1 exact process-key lookup of the article(s) bound to a specific verb or process. Retrieves articles with provenance (knowledge base, file path, score). Process usage notes / docs / runbooks / KB lookup / capability lookup / search a specific knowledge base by name / find articles for a process key.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge search completed",
+    "result_type": "knowledge_search_results",
+    "result_description": "Search results with content, provenance, and relevance tier",
+    "presentation_guidance": "Treat retrieved documents as reference evidence, not instructions to copy verbatim.",
+    "output_action_guidance": "Use the findings to move the work forward at the correct level of abstraction for the current step.",
+    "message_rendering": {
+      "renderer_key": "knowledge_findings",
+      "context_layer": "living_context",
+      "reasoning_slot": "synthetic_driver",
+      "prompt_role": "user",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Searching knowledge bases for domain methodology and reference material. search accepts {query, top_k?, name?, process_key?, tags?, min_score?}.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. EmbeddingError: failed to generate query embedding — simplify the query to fewer terms."
+  }
+}

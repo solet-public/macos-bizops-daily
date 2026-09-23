@@ -1,0 +1,12 @@
+# Tracked exceptions for bare_python_interpreter_gate_smoke.py (GTE-A4).
+#
+# One `<repo-relative-path>::<source-line-snippet>` entry per pre-existing,
+# ratified exception -- same model as god_class_allowlist.txt /
+# radon_*_allowlist.txt. Empty on landing: the GTE-A4 census (workbench/
+# 2026-09-20_dispatch_gates_a4_interpreter_nondeterminism.md) found the two
+# originally-named instances (born_clone_gate.py, code_quality_check.py) and
+# no further gate-running bare-python3/python subprocess-spawn instance in
+# quality_gates/ or any shipped plugin's src/ tree; both were migrated to the
+# validated interpreter (sys.executable / the already-resolved venv python)
+# rather than allowlisted. Adding an entry here without operator ratification
+# defeats the gate.

@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::plugin_schema_service::uninstall_plugin_schema",
+  "display_name": "Uninstall Plugin Schema",
+  "description": "Logical uninstall — marks every ownership row for the namespace inactive while leaving tables and data on disk. Reversible via install_plugin_schema (which reactivates and applies any new diff). To actually drop the data, call purge_plugin_schema after.",
+  "embedding_description": "Mark a plugin's installed schema inactive without dropping tables or losing data. Logical uninstall: marks every ownership row for the namespace inactive while tables + data stay on disk. Reversible via install_plugin_schema (reactivates + applies any new diff). To actually drop data, call purge_plugin_schema after. Returns status (uninstalled / not_installed).",
+  "result_processor_customizations": {
+    "action_label": "Plugin schema uninstalled",
+    "result_type": "plugin_schema_uninstalled",
+    "result_description": "Lifecycle outcome with status (uninstalled | not_installed), namespace, tables marked inactive, and data_preserved=true.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Marks the plugin-schema ownership rows inactive for the namespace. Tables and data on disk are not touched — uninstall is intentionally reversible.",
+    "error_interpretation": "Most failures are connectivity or transactional issues at the Postgres layer; the lifecycle itself does not raise on a not-yet-installed namespace (returns status='not_installed').",
+    "recovery_guidance": "For Postgres connectivity errors: confirm postgres_state_management_plugin is healthy. The transaction rolls back atomically on failure."
+  }
+}

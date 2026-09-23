@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::learn",
+  "arguments": {
+    "path": "/Users/alice/Workspace/example/CLAUDE.md",
+    "tags": ["test", "ingested"]
+  }
+}

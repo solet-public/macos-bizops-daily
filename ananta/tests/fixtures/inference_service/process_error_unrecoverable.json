@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::inference_service::process_error",
+  "arguments": {
+    "error_message": "Database connection failed: unable to connect to host",
+    "error_context": {
+      "process_key": "service_interface::state_service::read",
+      "error_type": "connection_error"
+    }
+  }
+}

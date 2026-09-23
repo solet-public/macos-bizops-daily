@@ -1,0 +1,73 @@
+{
+  "name": "test_get_namespace_stats",
+  "description": "Store a vector and fetch namespace statistics.",
+  "sequence": [
+    {
+      "step": "precleanup_vector_stats_target",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_stats_target"
+          },
+          "soft_delete": false
+        }
+      }
+    },
+    {
+      "step": "store_vector",
+      "process_key": "service_interface::vector_service::store_vectors",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vectors": [
+          {
+            "id": "vector_stats_target",
+            "vector": [
+              0.6,
+              0.2,
+              -0.15
+            ],
+            "dimension": 3,
+            "metadata": {
+              "label": "stats_target",
+              "category": "stats"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step": "get_namespace_stats",
+      "process_key": "service_interface::vector_service::get_namespace_stats",
+      "arguments": {
+        "namespace": "pgvector_service_plugin"
+      }
+    },
+    {
+      "step": "cleanup_delete_vector",
+      "process_key": "service_interface::vector_service::delete_vectors",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "vector_ids": [
+          "vector_stats_target"
+        ]
+      }
+    },
+    {
+      "step": "cleanup_vector_stats_target",
+      "process_key": "service_interface::state_service::delete_records",
+      "arguments": {
+        "namespace": "pgvector_service_plugin",
+        "query": {
+          "table": "embeddings",
+          "filters": {
+            "id": "vector_stats_target"
+          },
+          "soft_delete": false
+        }
+      }
+    }
+  ]
+}

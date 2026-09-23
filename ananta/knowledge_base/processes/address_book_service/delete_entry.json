@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::delete_entry",
+  "display_name": "Delete Entry",
+  "description": "Delete a specific entry by its ID.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Entry deleted",
+    "result_type": "entry_removed",
+    "result_description": "Delete confirmation with keys: message (confirmation of deletion)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Permanently deletes a specific entry from an address by its ID",
+    "error_interpretation": "NotFoundError: no entry exists with the given ID. DatabaseError: deletion failed due to storage issues.",
+    "recovery_guidance": "For not found: the entry may have already been deleted, or use 'resolve' to get valid entry IDs. For database errors: suggest retrying the operation."
+  }
+}

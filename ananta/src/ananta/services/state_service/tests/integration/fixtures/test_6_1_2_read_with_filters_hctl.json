@@ -1,0 +1,14 @@
+{
+  "process_key": "service_interface::state_service::read_state",
+  "arguments": {
+    "namespace": "core",
+    "query": {
+      "table": "process_registry",
+      "columns": ["process_key", "provider_type", "provider"],
+      "filter": {
+        "provider_type": "service"
+      },
+      "limit": 5
+    }
+  }
+}

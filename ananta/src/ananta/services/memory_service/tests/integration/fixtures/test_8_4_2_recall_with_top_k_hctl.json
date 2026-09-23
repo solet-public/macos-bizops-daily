@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::memory_service::recall",
+  "arguments": {
+    "query": "categorization tags multiple test integration",
+    "top_k": 3
+  }
+}

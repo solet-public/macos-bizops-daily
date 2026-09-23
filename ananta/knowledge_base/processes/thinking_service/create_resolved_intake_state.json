@@ -1,0 +1,26 @@
+{
+  "process_key": "service_interface::thinking_service::create_resolved_intake_state",
+  "display_name": "Create Resolved Intake State",
+  "description": "persist an authored-by-value Resolved Intake State document. The calling agent authors the full markdown document and passes it in `content`; the platform validates, stores, and focuses it.",
+  "embedding_description": "Persist an authored resolved intake state document. The calling agent writes the full durable intake state markdown capturing the selected intake strategy, resolved blocker fields, deliberate defaults, and manifest handoff, then passes it by value. The platform validates section sizes, stores the document, and returns it as working context for the next turn.",
+  "result_processor_customizations": {
+    "action_label": "Resolved Intake State created",
+    "result_type": "intake_state_create_result",
+    "result_description": "The full stored Resolved Intake State document",
+    "presentation_guidance": "",
+    "output_action_guidance": "The Resolved Intake State has been stored and is now available as working context. Continue executing the current step as shown in the updated ACTIVE_PLAN.",
+    "message_rendering": {
+      "renderer_key": "raw_observation",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": true,
+      "history_kind": "none",
+      "transition_behavior": "filtered"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Persisting an authored-by-value Resolved Intake State document. create_resolved_intake_state accepts {intake_id, content}. The calling agent must author the full intake state markdown and pass it in `content` — the platform never generates it.",
+    "error_interpretation": "authored_content_required: `content` was missing or empty — the thinking-model authoring path was retired (DEP-01); author the full document and pass it by value. ValidationError: arguments do not conform to the schema, or a `##` section exceeds the size limit. StorageError: knowledge base write failed."
+  }
+}

@@ -1,0 +1,40 @@
+name: postgres_state_management_plugin
+description: PostgreSQL-based state management provider
+optional: false
+
+implements:
+  - interface: StateManagementInterface
+
+config:
+  host:
+    type: string
+    required: true
+    default: localhost
+    description: PostgreSQL host
+  port:
+    type: integer
+    required: true
+    default: 5432
+    description: PostgreSQL port
+  user:
+    type: string
+    required: true
+    description: Database user
+  password:
+    type: string
+    required: true
+    secret: true
+    description: Database password
+  database:
+    type: string
+    required: true
+    default: ananta
+    description: Database name
+  system_database:
+    type: string
+    required: true
+    default: postgres
+    description: System database for initial connection
+
+connection_test:
+  type: postgresql

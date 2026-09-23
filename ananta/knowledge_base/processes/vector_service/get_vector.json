@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vector_service::get_vector",
+  "display_name": "Get Vector",
+  "description": "Retrieve a specific vector by ID.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Vector retrieved",
+    "result_type": "vector_data",
+    "result_description": "Complete vector data including embedding array, metadata dictionary, creation timestamp, and namespace information",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves a specific vector by its unique ID from a namespace",
+    "error_interpretation": "NotFoundError: vector ID doesn't exist in namespace. NamespaceError: namespace not found. ValidationError: invalid vector ID format.",
+    "recovery_guidance": "For not found errors: verify the vector ID is correct or use search_similar to find related vectors. For namespace errors: verify namespace exists with list_namespaces."
+  }
+}

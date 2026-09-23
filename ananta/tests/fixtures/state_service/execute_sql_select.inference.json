@@ -1,0 +1,7 @@
+{
+  "query": "Run this SQL query: SELECT * FROM core.flows",
+  "expected_process_key": "service_interface::state_service::execute_sql",
+  "expected_arguments": {
+    "sql_query": "SELECT * FROM core.flows"
+  }
+}

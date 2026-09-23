@@ -1,0 +1,28 @@
+{
+  "process_key": "service_interface::memory_service::recall",
+  "display_name": "Recall",
+  "description": "search memory for relevant prior work/patterns.",
+  "embedding_description": "Search the memory store for episodic memories matching a natural-language query. ACT-R activation + vector similarity ranking. Returns memories with id, content, memory_type, strength, similarity, final_score, created_at, retrieval_count, tags. Use to recall prior interactions, preferences, decisions, or session context. Distinct from knowledge_service::search (KB articles).",
+  "result_processor_customizations": {
+    "action_label": "Recall",
+    "result_type": "memory_search_results",
+    "result_description": "Memories matching the search query ranked by strength and similarity scores",
+    "presentation_guidance": "",
+    "output_action_guidance": "Use the recalled memories and the user's request to search the knowledge base for stage-appropriate planning evidence. The opening-investigation query should read like a short methodology lookup, not a transcript of the user's request. Compose it from the request's own domain axes — the axes come from the request itself, never from a hardcoded domain list — and preserve the user's domain vocabulary on those axes verbatim. For example, a quarterly pipeline-review request with a defined reporting cadence, an approval chain, and a named review methodology becomes a query like: 'quarterly pipeline review methodology: intake stage architecture (scoping, data collection, validation, analysis, review, sign-off); approval-chain constraints; reporting cadence; review methodology tradition'. Notice what is intentionally omitted from that example: connector field names, report template IDs, export file formats, named integration endpoints, and exclusion clauses ('no manual overrides', 'no legacy exports'). Those implementation-recipe terms pull execution surfaces (parameter tables, tool recipes, delivery formats) instead of methodology and belong to a later execution-level search after an execution path is selected. At this opening-investigation stage, prefer methodology, constraints, intake strategy, approval-stage guidance, and capability-contract overviews. Defer parameter tables, tool recipes, execution configs, delivery formats, and other implementation-level references. When the next action is knowledge_service.search and layer filters are available, use exactly knowledge_layers=[2,3,4] for opening investigation searches; do not also set min_knowledge_layer or max_knowledge_layer.",
+    "output_action_guidance_empty": "No episodic memories were found for this session yet. Use the user's request alone to search the knowledge base for stage-appropriate planning evidence. The opening-investigation query should read like a short methodology lookup, not a transcript of the user's request. Compose it from the request's own domain axes — the axes come from the request itself, never from a hardcoded domain list — and preserve the user's domain vocabulary on those axes verbatim. For example, a quarterly pipeline-review request with a defined reporting cadence, an approval chain, and a named review methodology becomes a query like: 'quarterly pipeline review methodology: intake stage architecture (scoping, data collection, validation, analysis, review, sign-off); approval-chain constraints; reporting cadence; review methodology tradition'. Notice what is intentionally omitted from that example: connector field names, report template IDs, export file formats, named integration endpoints, and exclusion clauses ('no manual overrides', 'no legacy exports'). Those implementation-recipe terms pull execution surfaces (parameter tables, tool recipes, delivery formats) instead of methodology and belong to a later execution-level search after an execution path is selected. At this opening-investigation stage, prefer methodology, constraints, intake strategy, approval-stage guidance, and capability-contract overviews. Defer parameter tables, tool recipes, execution configs, delivery formats, and other implementation-level references. When the next action is knowledge_service.search and layer filters are available, use exactly knowledge_layers=[2,3,4] for opening investigation searches; do not also set min_knowledge_layer or max_knowledge_layer.",
+    "message_rendering": {
+      "renderer_key": "recalled_memories",
+      "context_layer": "living_context",
+      "reasoning_slot": "working_evidence",
+      "prompt_role": "assistant",
+      "ephemeral": false,
+      "history_kind": "output_event",
+      "transition_behavior": "living_to_ossified"
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Searching memories using vector similarity and ACT-R activation",
+    "error_interpretation": "EmbeddingError: failed to generate embedding for search query. DatabaseError: failed to query vector storage. NoMemoriesError: no memories found matching the query.",
+    "recovery_guidance": "For embedding errors: verify embedding service is available. For database errors: verify vector storage is accessible. For no results: try broader search terms or check if memories exist."
+  }
+}

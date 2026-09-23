@@ -1,0 +1,11 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::stop_interface",
+  "display_name": "Stop Agent Messaging Bridge",
+  "description": "Stop the agent_messaging FastAPI bridge and clear runtime state. Shuts down the FastAPI background thread, releases the allocated localhost port, removes the runtime port file ~/.ananta/runtime/<solet>.bridge.port, drops the in-memory bridge session map and peer registry, and unregisters the claude_code native wake adapter. Durable thread and message rows in core__agent_thread / core__agent_message are unaffected. Use before shutdown or controlled restart so MCP bridge subprocesses observe a clean disconnect rather than a hung connection. IO interface lifecycle exit point — paired with start_interface.",
+  "embedding_description": "Stop the agent messaging bridge. Shut down FastAPI background thread, release the dynamically allocated localhost port, remove the runtime port file, clear in-memory bridge sessions and peer registry, unregister the native wake adapter. Use before shutdown or restart. Durable thread and message rows are not affected.",
+  "error_processor_customizations": {
+    "action_context": "Stops the agent_messaging FastAPI bridge.",
+    "error_interpretation": "ValidationError: arguments do not conform to the schema. session_not_bound: stop requested before start_interface completed. APIError: FastAPI background thread failed to join within the timeout, or port release failed.",
+    "recovery_guidance": "If clean shutdown fails, do not assume the channel is still safe for normal delivery. Retry stop once if the interface appears partially active. If the join times out, a FastAPI background thread is likely wedged on an in-flight long-poll — inspect thread state and consider a process-level restart. While stop is degraded, avoid relying on post_message for important coordination and restart the plugin or platform before resuming interactive work."
+  }
+}

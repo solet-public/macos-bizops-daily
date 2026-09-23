@@ -1,0 +1,42 @@
+# Retrieval-test companion for the seed-update runbook. Gated by
+# service_interface::knowledge_service::test_retrieval (W7). Until the gate is
+# live, run each query through service_interface::knowledge_service::search and
+# confirm this article ranks at or above min_rank for targets.
+
+article_path: knowledge_bases/github_midwife_plugin/05_seed_update_runbook.md
+consumer_profile: both
+
+target_queries:
+  - "update a live solet from a newer seed release"
+  - "solet-manager inspect import update doctor sequence for an existing clone"
+  - "update preview refused tracked_overlap_present how do I keep my local change"
+  - "which seed update steps still have to be done by hand with the manager"
+  - "local_changes_present allowed_after_import what does the classification mean"
+  - "solet-manager update dry-run preserved local modifications committed local state"
+  - "manual git pull recovery for a diverged seed history clone"
+  - "seed update runbook git pull fast forward re-mint"
+  - "do I need to rebuild the venv after pulling a seed update"
+  - "apply a new seed version without losing solet state"
+  - "seed update added a new plugin but it is not active"
+  - "shipped hook fix but the installed claude code plugin still runs the old version"
+  - "verify installed claude plugin cache matches the pulled deployment source"
+  - "plugin update says already at latest version but hook content did not change"
+  - "how to force claude code to re-copy a plugin without bumping its version"
+  - "does this release fix business connectors putting records in agent context"
+  - "business connector reads fail loud after updating, no workspace root configured"
+  - "configure export root on an already-hydrated solet"
+  - "should I use apply_manifest or launchctl to restart after a seed update"
+  - "seed update removed knowledge base articles but old content still shows up in search"
+  - "purge indexed knowledge base chunks for files a seed release deleted"
+  - "the seed repository moved how do I point my clone at the new one"
+  - "git remote set-url origin after the seed changes home"
+  - "my clone says already up to date but new releases exist"
+  - "mandatory homunculus to solet migration before restarting"
+  - "how do I know when a new seed release has been published"
+  - "subscribe to seed repository releases on GitHub to get notified of updates"
+  - "seed moved to a new repository and I stopped getting release notifications"
+min_rank: 3
+
+forbidden_queries:
+  - "birth a brand new solet from a seed for the first time"
+forbidden_min_rank: 1

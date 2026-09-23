@@ -1,0 +1,165 @@
+# macos-samantha-solet profile - local personal finance / market-data seed.
+#
+# This profile is sheet-derived from the
+# "2026-07-20_macos_samantha_<source commit identifier>" column in the
+# Ananta Plugin x Profile Matrix. It extends the local business-ops style
+# foundation with personal/export ingest and the Charles Schwab market-data
+# connector, while excluding Branch-specific Jira/Snowflake/Salesforce/Zuora
+# connectors and every AWS-hosting / creative-media capability.
+
+profile_name: macos-samantha-solet
+description: |
+  Local Samantha solet profile: foundational local services, memory,
+  knowledge, thinking, pgvector, local embeddings, local LM-Studio inference,
+  agent messaging, scheduling, health diagnostics, local blue-green
+  self-deployment, Claude-family session ledger sources, ChatGPT and Claude.ai
+  export ingestion, dev tooling, Google Workspace, read-only external Postgres,
+  and Charles Schwab market data. Excludes: AWS-hosting and solet-cloning
+  capabilities beyond the required github_midwife_plugin birth spine,
+  Branch-specific business connectors (Jira, Snowflake, Salesforce, Zuora),
+  Codex-family session sources, retired messaging plugins, test fixtures, and
+  creative/media plugins.
+
+plugins:
+  # Foundational services
+  - postgres_state_management_plugin
+  - default_blob_storage_plugin
+  - default_address_book_plugin
+  - macos_vault_plugin
+
+  # Memory + knowledge + thinking
+  - actr_memory_plugin
+  - default_knowledge_plugin
+  - default_thinking_plugin
+
+  # Vector search
+  - pgvector_service_plugin
+
+  # Embeddings
+  - openai_embeddings_plugin
+
+  # Local inference (LM Studio, bound as inference_service)
+  - default_inference_plugin
+
+  # IO surfaces
+  - agent_messaging_plugin
+
+  # Scheduling
+  - default_scheduling_plugin
+
+  # Operator/CI diagnostic gate
+  - platform_health_plugin
+
+  # Local blue-green self-deployment
+  - macos_self_deployment_plugin
+
+  # Session-ledger sources
+  - agent_messaging_session_source_plugin
+  - chatgpt_export_session_source_plugin
+  - claude_code_filesystem_session_source_plugin
+  - claude_code_history_session_source_plugin
+  - claude_code_tasks_session_source_plugin
+  - claude_code_cloud_session_source_plugin
+  - claude_code_pushed_session_source_plugin
+  - claude_ai_export_session_source_plugin
+  - session_bridge_plugin
+  - session_shipper_bootstrap_plugin
+
+  # Dev tooling
+  - code_vetting_plugin
+  - platform_dev_surface_plugin
+  - macos_coding_agent_session_plugin
+
+  # Connectors
+  - external_postgres_plugin
+  - g_suite_plugin
+  - schwab_market_data_plugin
+
+  # Birth spine - genesis + birth_solet only; contains no seed factory.
+  - github_midwife_plugin
+
+plugin_config_overrides:
+  postgres_state_management_plugin:
+    user: ${SOLET_NAME}
+  session_ledger_service:
+    ledger_allowed_roots:
+      - "~/.claude/projects"
+      - "~/.claude/history.jsonl"
+      - "~/.claude/tasks"
+
+address_book_entries:
+  - name: openai_embeddings
+    address_type: api
+    description: OpenAI-compatible embeddings via LM Studio
+    tags: []
+    entries:
+      - field_type: base_url
+        description: LM Studio OpenAI-compatible base URL
+        value: http://localhost:1234/v1
+      - field_type: model
+        description: Embeddings model name
+        value: text-embedding-nomic-embed-text-v1.5-embedding
+  - name: pgvector_service_db
+    address_type: database
+    description: PostgreSQL/pgvector connection for this solet
+    tags: []
+    entries:
+      - field_type: host
+        description: host
+        value: localhost
+      - field_type: port
+        description: port
+        value: "5432"
+      - field_type: note
+        description: database
+        value: ${SOLET_NAME}
+      - field_type: note
+        description: db_schema
+        value: ${SOLET_NAME}
+      - field_type: note
+        description: user
+        value: ${SOLET_NAME}
+      - field_type: password
+        description: password
+        value: vault::${SOLET_NAME}.pgvector_service_plugin.password
+
+starting_actions:
+  - name: start_agent_messaging_interface
+    process_key: plugin::agent_messaging_plugin::start_interface
+    description: |
+      Start the consolidated agent_messaging bridge - single FastAPI
+      surface on a dynamic port backing every mcp__<name>__* tool
+      (platform-call, peer messaging, backend-agent threads).
+
+service_bindings:
+  state_service: postgres_state_management_plugin
+  plugin_schema_service: postgres_state_management_plugin
+  vault_service: macos_vault_plugin
+  address_book_service: default_address_book_plugin
+  memory_service: actr_memory_plugin
+  vector_service: pgvector_service_plugin
+  embedding_service: openai_embeddings_plugin
+  inference_service: default_inference_plugin
+  blob_storage_service: default_blob_storage_plugin
+  knowledge_service: default_knowledge_plugin
+  thinking_service: default_thinking_plugin
+  self_deployment_service: macos_self_deployment_plugin
+  local_self_deployment_service: macos_self_deployment_plugin
+
+notes:
+  excluded:
+    mock_inference_plugin: Retired platform-wide.
+    macos_midwife_plugin, aws_midwife_plugin, aws_undertaker_plugin, aws_self_deployment_plugin, aws_account_admin_plugin: Solet-cloning or AWS-hosting capability outside the bornable github_midwife_plugin spine.
+    rds_postgres_state_management_plugin, rds_pgvector_service_plugin, s3_blob_storage_plugin, secrets_manager_vault_plugin, titanv2_embeddings_plugin: AWS-hosted split-service siblings excluded from this local seed.
+    demo_canary_plugin, probe_smoke_broken_plugin: Dev/test fixtures; never production seed material.
+    audio_processing_plugin, audio_separation_plugin, cosyvoice2_tts_plugin, comfyui_image_generation_plugin, musical_synthesis_plugin, sound_effects_plugin, voice_embeddings_plugin, whisper_asr_plugin, generative_composition_plugin, pedalboard_effects_plugin, soundcloud_artist_studio_plugin, ssml_plugin: Creative/media stack excluded from this profile.
+    codex_ambient_session_source_plugin, codex_cloud_session_source_plugin, codex_filesystem_session_source_plugin, codex_goals_session_source_plugin, codex_history_session_source_plugin, codex_memories_session_source_plugin, codex_pushed_session_source_plugin, codex_state_session_source_plugin: Codex-family session sources excluded by the sheet.
+    jira_plugin, snowflake_plugin, salesforce_plugin, zuora_plugin: Branch/business-tenant connectors excluded by the Samantha sheet column.
+    discord_plugin, signal_plugin: Retired messaging plugins.
+    iterm2_coding_agent_management_plugin: Unchecked in the sheet; revisit only if the iTerm2 driver is wanted with macos_coding_agent_session_plugin.
+  transient:
+    github_midwife_plugin: Required birth spine. Remove from steady-state after genesis only when the hydration procedure explicitly calls for it.
+  operator_setup_required:
+    g_suite_plugin: Needs an operator Google Cloud OAuth client and browser approval.
+    external_postgres_plugin: Needs at least one external_pg::<name> address-book entry before its verbs are useful; the plugin remains read-only.
+    schwab_market_data_plugin: Needs schwab_oauth_app address-book metadata, the Schwab OAuth client secret in vault, and a browser OAuth approval. Schwab refresh tokens have a hard 7-day cap, so recurring re-approval is expected.

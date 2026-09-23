@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::state_service::describe_schema",
+  "display_name": "Describe Schema",
+  "description": "Get the schema definition for a namespace including tables, columns, and relationships.\n\nUse this when you need to safely query platform tables via state_service but you are not sure which table/column names exist (for example: inspecting the default_scheduling_plugin schedules table before writing a read_state query).",
+  "embedding_description": "Inspect the database schema for a namespace (tables/columns/relationships). Use to learn how to query a namespace safely via read_state/execute_sql (e.g., scheduling plugin schedules table for heartbeat checks).",
+  "result_processor_customizations": {
+    "action_label": "Describe Schema",
+    "result_type": "schema_definition",
+    "result_description": "Schema definition including tables, columns, types, and relationships",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving schema definition for a database namespace",
+    "error_interpretation": "NamespaceNotFoundError: the specified namespace does not exist. ConnectionError: database connection failed.",
+    "recovery_guidance": "For namespace errors: verify the namespace name is correct using list_namespaces. For connection errors: verify database is running and accessible."
+  }
+}

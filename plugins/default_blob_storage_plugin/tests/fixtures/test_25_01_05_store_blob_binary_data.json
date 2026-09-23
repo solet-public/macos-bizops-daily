@@ -1,0 +1,21 @@
+{
+  "name": "test_store_blob_binary_data",
+  "description": "Store binary content (simulated PDF) with appropriate metadata",
+  "process_key": "plugin::default_blob_storage_plugin::store_blob",
+  "arguments": {
+    "params": {
+      "namespace": "documents_namespace",
+      "content": "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwo+PgplbmRvYmoK",
+      "metadata": {
+        "original_name": "document.pdf",
+        "mime_type": "application/pdf",
+        "description": "Sample PDF document",
+        "tags": "document,pdf,sample"
+      }
+    },
+    "state": {
+      "current_session_id": "test-store-binary-001"
+    },
+    "timeout_seconds": 30
+  }
+}

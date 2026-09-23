@@ -1,0 +1,15 @@
+{
+  "name": "test_clear_scheduled_action_empty_id",
+  "description": "Attempt to clear a schedule with an empty schedule_id",
+  "process_key": "plugin::default_scheduling_plugin::clear_scheduled_action",
+  "arguments": {
+    "params": {
+      "schedule_id": ""
+    },
+    "state": {
+      "session_id": "test-session-204",
+      "flow_id": "test-flow-204"
+    }
+  },
+  "timeout_seconds": 30
+}

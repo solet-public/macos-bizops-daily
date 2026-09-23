@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::store_from_env",
+  "display_name": "Store Secret From Environment Variable",
+  "description": "Read a secret value from a named environment variable and store it (encrypted at rest). The agent supplies only the env var name; the platform reads the value and never returns it. Use this to ingest credentials without the agent ever seeing the secret.",
+  "embedding_description": "Store secret from environment variable. Ingest credential, OAuth client_secret loader, API key from env. Agent provides env var name (e.g. OPENAI_API_KEY) plus a vault key; the solet reads os.environ, encrypts, persists. Use when the credential is already exported in the user's shell. Variants: store_from_file, store_from_kv_file, store_from_keychain.",
+  "result_processor_customizations": {
+    "action_label": "Secret stored from env var",
+    "result_type": "secret_stored",
+    "result_description": "Confirmation that secret was read from environment, encrypted, and stored. Contains key (vault identifier), version, and message. NEVER contains the secret value.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads a value from os.environ in solet process and stores it in the vault. Used by agent-driven credential ingestion so the value never enters the agent's conversation context.",
+    "error_interpretation": "env_var_not_set: The named environment variable is not exported in the solet's process environment. env_var_empty: The variable is set but empty. VaultLocked: Vault must be unlocked first.",
+    "recovery_guidance": "For env_var_not_set: ask the user to export the variable in the shell that launched the solet and restart the solet, or supply the value via store_from_file / store_from_keychain instead. For env_var_empty: confirm the user actually populated the variable. For VaultLocked: prompt the user to unlock the vault first."
+  }
+}

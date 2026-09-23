@@ -1,0 +1,15 @@
+{
+  "name": "test_store_vectors_empty",
+  "description": "Attempt to store empty vectors list - should return error",
+  "process_key": "plugin::pgvector_service_plugin::store_vectors_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vectors": []
+    },
+    "state": {
+      "current_session_id": "test-store-empty-001"
+    },
+    "timeout_seconds": 30
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "test_process_memorization_queue",
+  "description": "Process due memorization reviews (spaced repetition)",
+  "process_key": "service_interface::memory_service::process_memorization_queue",
+  "arguments": {}
+}

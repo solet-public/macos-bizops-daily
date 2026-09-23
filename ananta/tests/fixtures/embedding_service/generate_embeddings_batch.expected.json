@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "embeddings",
+    "dimension"
+  ],
+  "output_not_contains": [
+    "error"
+  ]
+}

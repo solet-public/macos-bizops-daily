@@ -1,0 +1,10 @@
+{
+  "process_key": "service_interface::memory_service::learn",
+  "arguments": {
+    "path": "/tmp/test_document.md",
+    "pattern": "*.md",
+    "recursive": false,
+    "memorize": false,
+    "tags": ["documentation", "test"]
+  }
+}

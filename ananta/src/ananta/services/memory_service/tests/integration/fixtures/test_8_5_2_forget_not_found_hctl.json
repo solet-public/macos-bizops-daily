@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::forget",
+  "arguments": {
+    "memory_id": "nonexistent-memory-99999"
+  }
+}

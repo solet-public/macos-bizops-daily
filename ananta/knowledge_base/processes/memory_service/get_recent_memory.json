@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::get_recent_memory",
+  "display_name": "Get Recent Memory",
+  "description": "Retrieve recent interaction history formatted for LLM context. Returns chronological conversation history across all I/O interfaces (console, JSON-RPC, Telegram, etc.). Memories are global - session_id is an optional filter, not required.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Get Recent Memory",
+    "result_type": "recent_memory",
+    "result_description": "Formatted conversation history with event count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving recent conversation history",
+    "error_interpretation": "DatabaseError: failed to query conversation events from storage.",
+    "recovery_guidance": "For database errors: verify state storage is accessible and running."
+  }
+}

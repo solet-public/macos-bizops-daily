@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::thinking_service::run_joseki",
+  "display_name": "Run Joseki",
+  "description": "Execute a registered joseki card platform-side. Instantiates the card into a joseki-scoped WBS under the supplied bindings (closed-world only), mints a dedicated run session, and returns a run handle immediately; the run's steps execute asynchronously through the coordinator's continuation machinery. One run at a time (global plan focus): a busy rejection means retry after the current run completes.",
+  "embedding_description": "Run a registered joseki card automatically: start a platform-driven joseki execution from a JOSEKI_KEY and concrete bindings, get back a run id and watch it execute its steps without an agent driving each one. Use for scheduled or programmatic joseki execution — quality-gate runs, summary-and-embedding pipelines, deploy procedures. Distinct from create/validate/register_authored_joseki (card authoring), transition_authored_joseki (lifecycle curation), and the pull verbs start_wbs_execution/get_next_wbs_step (an agent driving a WBS itself)."
+}

@@ -1,0 +1,13 @@
+{
+  "action_status": "completed",
+  "data_contains": {
+    "deleted_memories": true,
+    "deleted_memorizations": true,
+    "deleted_vectors": true,
+    "purged": true
+  },
+  "output_not_contains": [
+    "error"
+  ],
+  "timeout_seconds": 120
+}

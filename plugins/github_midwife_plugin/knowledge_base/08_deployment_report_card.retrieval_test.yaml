@@ -1,0 +1,32 @@
+# Retrieval-test companion for the deployment report card article.
+# Gated by service_interface::knowledge_service::test_retrieval.
+
+article_path: knowledge_bases/github_midwife_plugin/08_deployment_report_card.md
+consumer_profile: both
+
+target_queries:
+  - "is everything set up what is missing from this deployment"
+  - "deployment report card how much is configured"
+  - "functional scorecard checklist for a solet"
+  - "is the session ledger optional for a new solet"
+  - "should spawned workers run under tmux"
+  - "operator says no to session ledger ingestion does the row disappear from the deployment card"
+  - "derive setup checks from the active plugin roster instead of a fixed list"
+  - "does a local model actually perform session summarization"
+  - "how do I know a role binding is stale instead of live"
+  - "one row per plugin setup completeness and validated usage"
+  - "not all users will have access to a connector is that a deficiency"
+  - "demonstrate spawning a session at different models and effort levels"
+  - "quick readiness check at the start of a session"
+  - "should I run the full report card every time a session starts"
+  - "my session is labeled but does it actually hold the role"
+
+forbidden_queries:
+  - "seed hydration environment setup postgres launchers"     # 01_hydration_runbook owns this
+  - "first days onboarding a new owner"                       # 04_first_days_runbook owns this
+  - "how do I report a platform bug to the seed maintainers"  # 07_upstream_feedback_runbook owns this
+
+min_rank: 3
+forbidden_min_rank: 4
+
+process_key_assertions: []

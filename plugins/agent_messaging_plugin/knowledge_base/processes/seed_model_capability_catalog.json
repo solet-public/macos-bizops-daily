@@ -1,0 +1,19 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::seed_model_capability_catalog",
+  "display_name": "Seed the model capability catalog from the declarative table",
+  "description": "iss_48ea8171 (2026-09-20). Writes plugins/agent_messaging_plugin/model_capability_seed.v1.json -- the hand-reconciled 2026-09-19 model x effort table of Artificial Analysis Intelligence Index scores and real USD cost-per-task -- into the durable catalog. Every seeded cell is written as pending_crosscheck, never accepted: a seed is a starting point, not evidence, and only a real refresh run that cross-checks two independent sources may accept a cell. The seed never touches a cell a real run already accepted, so it is idempotent and safe to call at every start-up; re-seeding rewrites pending cells with the same values and reports which accepted cells it preserved. One model_capability_refresh_run row (trigger=seed) and one model_capability_observation row per seeded metric (source_id=seed_table) are written alongside, so the seed's provenance is on the record like any fetch. Optional staleness_window_hours (default 72) is stamped on each cell. Refuses with seed_unavailable or seed_invalid when the JSON is missing or malformed rather than half-loading it.",
+  "embedding_description": "Loading the starting table of AI model capability scores and per-task dollar costs into the platform database as unverified pending rows, a bootstrap that dispatch may not rely on until a real refresh run cross-checks and accepts each row.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Capability catalog seeded",
+    "result_type": "seed_model_capability_catalog_result",
+    "result_description": "run_id, seed_version, cells_seeded, accepted_cells_preserved (model@effort list).",
+    "presentation_guidance": "State how many cells were written as pending_crosscheck and how many accepted cells were left untouched. Say plainly that seeded cells are not yet servable to dispatch.",
+    "output_action_guidance": "A seed alone makes nothing selectable. select_dispatch_tier refuses catalog_stale until a refresh run accepts cells; read_model_capability_catalog with include_unaccepted=true shows what was seeded."
+  },
+  "error_processor_customizations": {
+    "action_context": "One JSON read, one refresh-run insert, then per cell an existence lookup, observation inserts and an upsert, all through the state interface.",
+    "error_interpretation": "seed_unavailable: the seed JSON could not be read. seed_invalid: the seed JSON is malformed (missing provenance, unknown effort, duplicate cell). parameter_invalid: staleness_window_hours is not a positive integer. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "For seed_invalid, fix the named field in model_capability_seed.v1.json; the seed is all-or-nothing. A state fault surfaces as a StateOperationError and leaves the run row status=running; re-running the seed opens a fresh run."
+  }
+}

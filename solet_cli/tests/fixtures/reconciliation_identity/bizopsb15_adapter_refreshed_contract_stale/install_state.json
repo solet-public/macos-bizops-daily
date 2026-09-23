@@ -1,0 +1,7 @@
+{
+  "answers_fingerprint": "sha256:d24f8aefc0f919c23a5df0ca961a9021116bbbe0146b78051df7a789931a78eb",
+  "flow_id": "macos.repository_setup",
+  "flow_source_revision": "5ae81ea4c453849f971512e5ea7b2eb762f90379",
+  "name": "bizopsb15",
+  "target": "/Users/admin/Solets/bizopsb15"
+}

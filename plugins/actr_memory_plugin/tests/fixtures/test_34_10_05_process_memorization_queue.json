@@ -1,0 +1,12 @@
+{
+  "name": "test_process_memorization_queue",
+  "description": "Verify processing of due memorization reviews in the spaced repetition queue",
+  "process_key": "plugin::actr_memory_plugin::process_memorization_queue_action",
+  "arguments": {
+    "params": {},
+    "state": {
+      "session_id": "test-session-094"
+    }
+  },
+  "timeout_seconds": 60
+}

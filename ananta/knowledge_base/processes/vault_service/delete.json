@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::delete",
+  "display_name": "Delete Secret",
+  "description": "Permanently delete a secret from the vault. This action is irreversible.",
+  "embedding_description": "Vault: delete a secret. Permanently erase a stored credential, password, OAuth client_secret, API key, refresh token, or bearer token from the vault by its key. Irreversible — no version history is retained after deletion. Requires the vault to be unlocked. Use when retiring an expired or leaked credential or cleaning up after a connector teardown.",
+  "result_processor_customizations": {
+    "action_label": "Secret deleted",
+    "result_type": "secret_deleted",
+    "result_description": "Confirmation of permanent secret deletion. Contains key (identifier) and message (status). The secret value has been permanently erased.",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Permanently deletes a secret from the vault. This operation is irreversible - the encrypted data is erased.",
+    "error_interpretation": "VaultLocked: Vault must be unlocked before deleting secrets. KeyNotFound: No secret exists with the specified key. PermissionDenied: User lacks permission to delete secrets.",
+    "recovery_guidance": "For VaultLocked: Prompt user to unlock vault first. For KeyNotFound: List available secrets to verify the key. For PermissionDenied: Check vault access permissions."
+  }
+}

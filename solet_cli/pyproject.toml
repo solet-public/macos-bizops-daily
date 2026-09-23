@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "solet-cli"
+version = "0.1.0"
+description = "Standalone manager for creating and operating local Solet instances"
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = ["packaging==26.2", "solet-setup-contracts"]
+
+[project.scripts]
+solet = "solet_manager.cli:main"
+solet-manager = "solet_manager.manager_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["solet_manager*"]
+
+[tool.setuptools.package-data]
+solet_manager = ["released_metadata/*.json"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["B", "C4", "E", "F", "I", "N", "UP", "W"]
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"

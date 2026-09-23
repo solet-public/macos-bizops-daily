@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::g_suite_plugin::connect_account",
+  "display_name": "Connect Google Workspace Account",
+  "description": "Generate the Google consent URL (OAuth 2.0 with PKCE S256) the operator opens in their browser to grant this solet access to the Workspace account. Returns authorize_url + a fresh state nonce + the redirect_uri. After the operator approves, the plugin's callback handler (start_interface) stores the refresh + access tokens in vault automatically. Requires the callback server running and the 'google_oauth_app' address-book entry to exist.",
+  "embedding_description": "Start Google Workspace OAuth linking by generating a PKCE consent URL with offline access. The operator approves Gmail, Drive, Docs, Sheets, and Slides scopes, then the callback stores a durable refresh token. Use this account-connection step before invoking Workspace data operations.",
+  "result_processor_customizations": {
+    "action_label": "Google consent URL generated",
+    "result_type": "g_suite_connect_account_result",
+    "result_description": "Dict with authorize_url, state nonce, redirect_uri, and human-readable instructions for the operator.",
+    "presentation_guidance": "Lead with authorize_url and tell the operator to open it in a browser and approve access. Surface instructions verbatim; surface state + redirect_uri only when debugging the callback."
+  },
+  "error_processor_customizations": {
+    "action_context": "Generate the Google Workspace OAuth authorization URL.",
+    "error_interpretation": "app_config_error: the 'google_oauth_app' address-book entry is missing or malformed — client_id / client_secret / redirect_uri not loadable.",
+    "recovery_guidance": "app_config_error: register the 'google_oauth_app' address-book entry with client_id, a vault:: client_secret reference, and redirect_uri. The setup runbook lives in the plugin overview KB (01_g_suite_overview.md)."
+  }
+}

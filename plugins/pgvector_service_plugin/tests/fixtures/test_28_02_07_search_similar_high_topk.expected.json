@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "results",
+    "count"
+  ],
+  "output_not_contains": [
+    "exception"
+  ],
+  "action_status": "completed"
+}

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "default-blob-storage-plugin"
+version = "0.1.0"
+description = "Default blob storage plugin for Ananta framework"
+authors = [{name = "Ananta Development Team"}]
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+]
+
+[project.entry-points."ananta.plugins"]
+default_blob_storage_plugin = "default_blob_storage_plugin.plugin:DefaultBlobStoragePlugin"
+
+[project.scripts]
+default_blob_storage_plugin = "default_blob_storage_plugin.cli:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["default_blob_storage_plugin"]

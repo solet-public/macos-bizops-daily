@@ -1,0 +1,8 @@
+{
+  "natural_language_query": "Send a status update",
+  "expected_process_key": "service_interface::io_interface_service::post_message",
+  "expected_arguments_structure": {
+    "message": "string",
+    "session_id": "string (optional)"
+  }
+}

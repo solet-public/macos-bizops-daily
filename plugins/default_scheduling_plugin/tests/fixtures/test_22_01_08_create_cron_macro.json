@@ -1,0 +1,23 @@
+{
+  "name": "test_create_cron_macro",
+  "description": "Create a cron schedule using a cron macro like @daily",
+  "process_key": "plugin::default_scheduling_plugin::create_cron_schedule",
+  "arguments": {
+    "params": {
+      "cron_expression": "@daily",
+      "label": "Daily Macro Schedule",
+      "tags": "daily,macro",
+      "actions": [
+        {
+          "process_key": "plugin::cleanup_plugin::daily_cleanup",
+          "arguments": {}
+        }
+      ]
+    },
+    "state": {
+      "session_id": "test-session-008",
+      "flow_id": "test-flow-008"
+    }
+  },
+  "timeout_seconds": 30
+}

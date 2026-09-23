@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::stop_memorizing",
+  "display_name": "Stop Memorizing",
+  "description": "Remove a memory from the memorization queue.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Stop Memorizing",
+    "result_type": "memorization_stopped",
+    "result_description": "Confirmation that the memory has been removed from the memorization queue",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Removing a memory from the spaced repetition memorization queue",
+    "error_interpretation": "MemoryNotFoundError: the specified memory_id does not exist. NotMemorizingError: memory is not currently in the memorization queue. DatabaseError: failed to update memorization records.",
+    "recovery_guidance": "For memory not found: verify the memory_id is correct. For not memorizing: the memory is not in the queue. For database errors: verify state storage is accessible."
+  }
+}

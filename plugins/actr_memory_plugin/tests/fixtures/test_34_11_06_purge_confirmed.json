@@ -1,0 +1,14 @@
+{
+  "name": "test_purge_confirmed",
+  "description": "Verify that purge with confirmation flag permanently deletes all memories",
+  "process_key": "plugin::actr_memory_plugin::purge_memories_action",
+  "arguments": {
+    "params": {
+      "confirm": true
+    },
+    "state": {
+      "session_id": "test-session-105"
+    }
+  },
+  "timeout_seconds": 60
+}

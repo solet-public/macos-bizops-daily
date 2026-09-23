@@ -1,0 +1,5 @@
+{
+  "query": "Save this conversation to memory",
+  "expected_process_key": "service_interface::memory_service::ingest_session",
+  "expected_arguments": {}
+}

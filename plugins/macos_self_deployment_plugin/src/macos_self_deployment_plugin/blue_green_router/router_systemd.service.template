@@ -1,0 +1,15 @@
+[Unit]
+Description=the solet local blue-green router (solet ${SOLET_NAME})
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=${WORKING_DIR}
+ExecStart=${PYTHON_BIN} -m macos_self_deployment_plugin.blue_green_router.router --solet ${SOLET_NAME} --public-port ${PUBLIC_PORT} --socket-path ${SOCKET_PATH} --runtime-dir ${RUNTIME_DIR}
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:${LOG_DIR}/router.log
+StandardError=append:${LOG_DIR}/router.err
+
+[Install]
+WantedBy=default.target

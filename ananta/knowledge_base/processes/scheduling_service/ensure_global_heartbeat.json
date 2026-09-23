@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::scheduling_service::ensure_global_heartbeat",
+  "display_name": "Ensure Global Heartbeat",
+  "description": "Ensure the platform has a single, always-on global \"heartbeat\" wake-up scheduled. This is a liveness / responsiveness primitive: if the heartbeat exists, the solet will wake periodically even when no user is actively chatting, enabling status check-ins, stuck-work detection, and delivery of async job results.\n\nThis process is designed to be safe to call repeatedly (idempotent). It should create the heartbeat schedule if missing, and optionally normalize duplicates (for example: if multiple heartbeat schedules exist, clear by tag and recreate a single schedule).\n\nThe heartbeat is intentionally NOT bound to any user session. It is global infrastructure. The work the heartbeat performs (what to check, which sessions to notify) should be stored as memory-driven follow-up instructions and/or follow-up queue items.\n\nRecommended convention:\n- schedule tag: heartbeat:global\n- memory_tag (wake-up memory): heartbeat:global\n- follow-up queue tag (work backlog): followup_queue:global\n\nTypical usage:\n- On the first user message after startup (or whenever unsure), call ensure_global_heartbeat.\n- Thereafter, rely on the heartbeat to drive periodic check-ins and follow-up processing. Individual tasks can still schedule targeted wake-ups via execute_in_seconds when higher-frequency polling is needed.\n\nThis process should NOT send user-visible messages itself. It only ensures a wake-up mechanism exists; messaging decisions remain in the normal ReAct loop when the wake-up fires.",
+  "embedding_description": "Ensure a single global heartbeat wake-up exists (keep-alive / liveness). Use to prevent \"silent comas\" by guaranteeing periodic wake-ups that can drive status check-ins, async job delivery, and stuck-work detection. Idempotent: safe to call on first user message after startup. Not session-bound; uses memory_tag conventions like heartbeat:global and followup_queue:global.",
+  "result_processor_customizations": {
+    "action_label": "Global Heartbeat Ensured",
+    "result_type": "heartbeat_ensured",
+    "result_description": "Heartbeat status including whether it was created, already present, or normalized (duplicate cleanup), plus schedule identifiers and cadence details",
+    "presentation_guidance": "",
+    "output_action_guidance": "A global heartbeat wake-up has been ensured. If you are implementing responsiveness patterns, you can now rely on periodic wake-ups to drive check-ins and follow-up processing. If the user is waiting on ongoing work, consider whether you should send an immediate status message now, or let the heartbeat handle periodic updates."
+  },
+  "error_processor_customizations": {
+    "action_context": "Ensuring a single global heartbeat wake-up schedule exists",
+    "error_interpretation": "SchedulerError: scheduling service unavailable or failed to create/update the schedule. PermissionError: heartbeat management not allowed in this environment. ValidationError: invalid cadence / tag inputs.",
+    "recovery_guidance": "If scheduling is unavailable, fall back to user-driven check-ins (post a message acknowledging the wait and ask the user to retry later). If validation fails, use a safe default cadence and the recommended heartbeat:global tag convention."
+  }
+}
+

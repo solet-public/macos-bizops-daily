@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::get_focused",
+  "display_name": "Get Focused Memories",
+  "description": "Return all memories currently in the focus buffer (0-3) with full content. These are the memories pinned for guaranteed prompt context inclusion. Returns an envelope object with 'memories' (the focused memory records) and 'count'.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Get Focused Memories",
+    "result_type": "focused_memories",
+    "result_description": "Envelope with the memories currently pinned in the focus buffer ('memories' list) and their 'count'",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieving memories from the focus buffer",
+    "error_interpretation": "DatabaseError: failed to query focus buffer.",
+    "recovery_guidance": "Verify state storage is accessible."
+  }
+}

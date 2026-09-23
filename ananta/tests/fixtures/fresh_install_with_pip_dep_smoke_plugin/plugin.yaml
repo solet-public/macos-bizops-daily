@@ -1,0 +1,11 @@
+name: fresh_install_with_pip_dep_smoke_plugin
+description: >
+  Test fixture for C4 new-pip-deps smoke. One EDGE @platform_process
+  verb (tabulate_proof) that imports `tabulate` (declared as a pip
+  dependency in pyproject.toml) and returns its rendered output in the
+  envelope. Proves pip-dep resolution + in-process importability +
+  blue-green pickup of new-pip-dep plugins.
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider

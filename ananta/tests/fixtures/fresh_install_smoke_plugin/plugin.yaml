@@ -1,0 +1,11 @@
+name: fresh_install_smoke_plugin
+description: >
+  Test fixture for ER-12 install_plugin_from_path smoke. One EDGE
+  @platform_process verb (test_verb) returning {"alive": true}. Used to
+  prove all four positive-outcome assertions: metadata freshness,
+  allowlist augmentation, in-session reachability, blue-green
+  persistence.
+optional: true
+
+implements:
+  - interface: EdgeProcessProvider

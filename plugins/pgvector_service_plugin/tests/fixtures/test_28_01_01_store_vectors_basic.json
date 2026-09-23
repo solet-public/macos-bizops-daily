@@ -1,0 +1,24 @@
+{
+  "name": "test_store_vectors_basic",
+  "description": "Store a single vector embedding with metadata for semantic search",
+  "process_key": "plugin::pgvector_service_plugin::store_vectors_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "vectors": [
+        {
+          "vector": [0.1, 0.2, 0.3, 0.4, 0.5],
+          "dimension": 5,
+          "metadata": {
+            "source": "test_document",
+            "category": "integration_test"
+          }
+        }
+      ]
+    },
+    "state": {
+      "current_session_id": "test-store-basic-001"
+    },
+    "timeout_seconds": 30
+  }
+}

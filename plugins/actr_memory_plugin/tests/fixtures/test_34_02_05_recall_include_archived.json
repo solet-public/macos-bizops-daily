@@ -1,0 +1,16 @@
+{
+  "name": "test_recall_include_archived",
+  "description": "Verify that include_archived flag enables retrieval of archived (forgotten) memories",
+  "process_key": "plugin::actr_memory_plugin::recall_action",
+  "arguments": {
+    "params": {
+      "query": "archived knowledge",
+      "include_archived": true,
+      "top_k": 5
+    },
+    "state": {
+      "session_id": "test-session-014"
+    }
+  },
+  "timeout_seconds": 30
+}

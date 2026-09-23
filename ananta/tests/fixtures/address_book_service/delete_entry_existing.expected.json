@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "deleted",
+    "entry"
+  ],
+  "output_not_contains": [
+    "error",
+    "not found"
+  ]
+}

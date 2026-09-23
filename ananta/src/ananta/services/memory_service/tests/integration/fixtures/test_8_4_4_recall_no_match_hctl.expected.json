@@ -1,0 +1,16 @@
+{
+  "exit_code": 0,
+  "output_contains_any": [
+    "no match",
+    "not found",
+    "no results",
+    "no memories",
+    "empty",
+    "recall",
+    "memory",
+    "status",
+    "result",
+    "COMPLETED",
+    "0"
+  ]
+}

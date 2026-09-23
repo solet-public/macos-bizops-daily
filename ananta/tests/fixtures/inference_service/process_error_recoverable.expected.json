@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "actions",
+    "retry"
+  ],
+  "output_not_contains": [
+    "error"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "action_status": "error",
+  "output_contains_any": [
+    "not found",
+    "does not exist",
+    "error",
+    "Error"
+  ],
+  "timeout_seconds": 60
+}

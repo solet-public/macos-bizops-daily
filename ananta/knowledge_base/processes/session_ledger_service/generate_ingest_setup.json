@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::session_ledger_service::generate_ingest_setup",
+  "display_name": "generate_ingest_setup",
+  "description": "Create a pending shipper deployment for ingest setup. Captures initiating_client_id from authenticated_principal as the ownership-binding seed (spec §13.3). Validates the requested sources against IngestSourceKind, generates machine_id binding, and returns {deployment_id, machine_id, authorized_source_kinds} for the operator-side shipper installer to consume. Part of M5 shipper bootstrap pairing flow.",
+  "embedding_description": "Create a pending shipper deployment for ingest setup. Captures initiating_client_id from authenticated_principal as the ownership-binding seed (spec §13.3). Validates requested sources against IngestSourceKind, generates machine_id binding, returns {deployment_id, machine_id, authorized_source_kinds} for operator-side shipper installer. M5 shipper bootstrap pairing flow."
+}

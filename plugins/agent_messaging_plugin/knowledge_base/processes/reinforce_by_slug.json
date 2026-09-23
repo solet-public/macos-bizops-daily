@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::reinforce_by_slug",
+  "display_name": "Reinforce a memory fact by its local slug",
+  "description": "maintenance-verbs M2.2 cite->reinforce wiring. Resolves slug (a memory fact's local file name minus '.md') to its canonical memory_id via the fact's own agent_memory:slot:<origin>:<slug> tag, using the injected memory_service directly (get_memories_by_tag then reinforce) — no local export file involved. Synchronous, ms-scale, no AsyncJobManager job. Call this when a fact is actually applied — cited in an incident, invoked in a review — never on a schedule or automatically; this verb IS the reinforcement wiring, not a citation-detection mechanism.",
+  "embedding_description": "Strengthen a specific memory fact's ACT-R activation by its human-readable slug instead of its opaque memory_id, so a session that only knows a hook's file name (from MEMORY.md or a local fact file) can reinforce it directly after actually using it — the measured-usage half of ambient-index placement decay.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Memory reinforced by slug",
+    "result_type": "reinforce_by_slug_result",
+    "result_description": "{memory_id, slug} — the resolved canonical id and the slug it was resolved from, confirming which record was actually reinforced.",
+    "presentation_guidance": "Confirm the resolved memory_id alongside the slug so the caller can verify the right fact was reinforced, especially the first few times this is used by a new caller."
+  },
+  "error_processor_customizations": {
+    "action_context": "One get_memories_by_tag lookup on the fact's own slot tag, then one reinforce call — both direct memory_service method calls, no job, no local file access.",
+    "error_interpretation": "missing_argument: slug was empty. memory_service_unavailable: memory_service is not bound on this solet. solet_name_unset: SOLET_NAME is required to build the slot tag. slug_not_found: no memory record carries a slot tag for that slug — it may not exist, or has never been drained to canonical. slug_ambiguous: more than one record matched the slug's slot tag — a data-integrity signal, never resolved by picking one.",
+    "recovery_guidance": "For slug_not_found, confirm the slug is the exact local file name minus '.md' (no path, no extension) and that the fact has been drained to canonical at least once via the memory-passthrough sync. slug_ambiguous needs operator/seat investigation, not a retry — duplicate slot tags should not exist."
+  }
+}

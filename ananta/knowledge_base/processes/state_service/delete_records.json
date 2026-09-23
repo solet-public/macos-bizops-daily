@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::state_service::delete_records",
+  "display_name": "Delete Records",
+  "description": "Delete records in a namespace using table + filter criteria. Supports soft delete by default with optional hard delete override.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Delete Records",
+    "result_type": "deletion_result",
+    "result_description": "Count of records deleted from database with soft_delete status",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Deleting records from state database using table and filter criteria",
+    "error_interpretation": "QueryError with 'table': missing or invalid table name. QueryError with 'filters': invalid filter format. PermissionError: deletion not allowed for this namespace.",
+    "recovery_guidance": "For table errors: ensure valid table name is provided. For filter errors: verify filter format matches expected structure. For permission errors: check namespace permissions."
+  }
+}

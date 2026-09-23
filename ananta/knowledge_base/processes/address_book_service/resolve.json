@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::address_book_service::resolve",
+  "display_name": "Resolve Address",
+  "description": "Get address by name with all entries. Strengthens associated memory on access. Does NOT resolve vault references - use resolve_with_secrets for that.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Address resolved",
+    "result_type": "address_retrieved",
+    "result_description": "Full address record with keys: address (object with id, name, type, description, tags), entries (list of entry records with id, field_type, description, value)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Retrieves an address by its registered name with all associated entries, strengthening memory association on access",
+    "error_interpretation": "NotFoundError: no address registered with this name. DatabaseError: address book storage unavailable.",
+    "recovery_guidance": "For not found: suggest using 'search' to find similar addresses or 'register' to create a new one. For database errors: suggest retrying or checking service status."
+  }
+}

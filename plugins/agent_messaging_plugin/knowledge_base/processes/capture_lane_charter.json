@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::capture_lane_charter",
+  "display_name": "Capture a lane's operator charter",
+  "description": "Fleet watch-transport-migration phase 2 slice 6 (design check-in ruling item 3). The seat-invoked governance act that writes a lane_charter row — the operator's verbatim founding words for a lane, captured byte-exact so spawn_session can drive them unmodified as a spawned worker's literal first turn. Insert-only: this verb ALWAYS writes a NEW row, never updates a prior one. Calling it again for the same lane_id does not edit the earlier charter's text in place; it supersedes by recency instead — spawn_session's lookup always resolves the latest row for a lane_id (captured_at desc, id desc tie-break). There is deliberately no update or delete path for charter_text anywhere in this codebase, which is what makes 'the operator's stored words are write-once' true rather than merely documented. directed_by is server-built from call_context (the same provenance convention spawn_session and legislate_role already use) — never caller-supplied.",
+  "embedding_description": "Capture the operator's verbatim charter text for a lane, stored append-only so a later spawn_session call can drive it byte-exact as the spawned worker's first turn — distinct from spawn_session (which reads the latest captured charter, never writes one) and from legislate_role (a different governance act, assigning role_class rather than founding a lane).",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Lane charter captured",
+    "result_type": "capture_lane_charter_result",
+    "result_description": "lane_id (the lane this charter founds), charter_text (the verbatim words just stored), brief_ref (the accompanying workbench path or dispatch id, if any), captured_at (when the operator spoke these words, as passed by the caller — not the row-write time), and directed_by (the server-built principal that captured it).",
+    "presentation_guidance": "Confirm the lane_id the charter was captured for and echo back the captured_at timestamp. Do not quote charter_text back at length in a routine confirmation — the caller already has it verbatim; a one-line excerpt is enough to confirm nothing was mangled in transit."
+  },
+  "error_processor_customizations": {
+    "action_context": "All three required-field checks (missing_lane_id, missing_charter_text, missing_captured_at) run BEFORE the state write, so a refused call never touches state.",
+    "error_interpretation": "missing_lane_id: lane_id was empty or whitespace-only. missing_charter_text: charter_text was empty or whitespace-only — an empty charter is refused rather than stored as a valid 'no charter' row (spawn_session's own resolve already treats a genuinely absent row as 'no charter', so an empty-string row would be a confusing second way to express the same thing). missing_captured_at: captured_at was empty or whitespace-only. state_service_unavailable: state_service is not bound on this solet.",
+    "recovery_guidance": "Supply all three required fields (lane_id, charter_text, captured_at) and retry — none of these errors touch state, so a retry with corrected arguments is always safe. If the goal is to correct a PRIOR charter's wording, call this verb again with the corrected text rather than looking for an edit path: the new row supersedes by recency and the old row's text is left untouched (immutability by design, not a gap)."
+  }
+}

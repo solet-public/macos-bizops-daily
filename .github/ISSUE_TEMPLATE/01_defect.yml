@@ -1,0 +1,106 @@
+name: Defect report
+description: Something behaves wrongly, and you have the evidence that shows it.
+title: "§N.M — "
+labels: ["defect"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        One defect per issue. If you have three, file three — each needs its own
+        disposition, and a merged issue can only be closed once. Filing several
+        items in one round? File the **Feedback round** issue first and attach
+        these to it as sub-issues.
+
+  - type: input
+    id: item_number
+    attributes:
+      label: Item number
+      description: >-
+        Your round and item number, as `§N.M` — part number, item number. Put the
+        same value at the front of the issue title. This is what lets a later
+        round, a release note, or a maintainer's reply cite this item precisely.
+      placeholder: "§42.3"
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: The exact command or action
+      description: >-
+        What you ran or did, verbatim. A report without this costs a round-trip;
+        a report with it is often fixable the day it arrives.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed output
+      description: >-
+        What actually happened, pasted rather than paraphrased. Re-read this
+        field before submitting — pasted output is where identifiers hide.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected instead, and what led you to expect it.
+    validations:
+      required: true
+
+  - type: input
+    id: release
+    attributes:
+      label: Release measured against
+      description: >-
+        Your seed repository's HEAD commit, and the version named in
+        RELEASE_NOTES.md when one is present.
+      placeholder: "a2bc5d629 / RELEASE_NOTES.md 2026-08-12 re-mint"
+    validations:
+      required: true
+
+  - type: textarea
+    id: inference
+    attributes:
+      label: Diagnosis or inference (optional)
+      description: >-
+        Any read you have on the cause. Mark inference as inference — a confident
+        wrong diagnosis is more expensive than none, and the maintainers can see
+        parts of the tree you cannot.
+    validations:
+      required: false
+
+  - type: textarea
+    id: local_change
+    attributes:
+      label: Local fix or divergence you are carrying (optional)
+      description: >-
+        If you patched this locally, describe the defect above and your change
+        here — the maintainers' tree has usually moved, and a patch against an
+        older base can be behind their current fix without either side noticing.
+        Say plainly whether you want this upstreamed; "we will stop raising it if
+        this is a deliberate no" is a complete and welcome sentence.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: content_gate
+    attributes:
+      label: Content gate
+      description: >-
+        This issue is published the moment you submit it, and editing it
+        afterwards does not unpublish what was there. Tick this because you
+        re-read the body, never to get past the form.
+      options:
+        - label: >-
+            I re-read this issue and it contains no personal identifiers, no
+            employer or business specifics (no company names, tenant URLs,
+            internal project names, or business-record data from any connector),
+            and no credentials or secret-looking values — including inside the
+            pasted output above.
+          required: true

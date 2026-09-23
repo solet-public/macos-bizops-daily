@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::knowledge_service::activate",
+  "display_name": "Activate Knowledge Base",
+  "description": "Activate a deactivated knowledge base so it appears in search results.",
+  "embedding_description": "Re-enable a previously deactivated knowledge base so its chunks are included in search results again. Flips the install record's active flag back on, and does not re-index or re-embed any content. Use to restore a knowledge base you had temporarily turned off back into the searchable set.",
+  "result_processor_customizations": {
+    "action_label": "Knowledge base activated",
+    "result_type": "knowledge_base_activated",
+    "result_description": "KB is now active and included in search",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Activating a knowledge base",
+    "error_interpretation": "NotFoundError: KB not found.",
+    "recovery_guidance": "Use list_installed to verify the KB name."
+  }
+}

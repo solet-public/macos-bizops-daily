@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::vault_service::oauth_client_register",
+  "display_name": "Register OAuth Client (pre-registered for claude.ai)",
+  "description": "Mint a fresh (client_id, client_secret) pair for the Streamable HTTP MCP transport's OAuth 2.1 flows. The client_secret is returned exactly ONCE in the response; only an scrypt hash is stored. The minted client is flagged operator_approved=True and defaults to grant_types=['authorization_code', 'refresh_token'] — the standard claude.ai connector shape. Use to provision claude.ai's custom-connector Advanced Settings OAuth fields, or pass grant_types=['client_credentials'] for machine-to-machine clients. Dynamic Client Registration is disabled at /register (Task #31); this is the only path to introduce a usable OAuth client.",
+  "embedding_description": "Register an operator-approved OAuth 2.1 client for a custom MCP connector. Args: client_name, scopes (default mcp:read,write), redirect_uris (for authorization_code), grant_types (default auth_code+refresh; allowlist {authorization_code, client_credentials, refresh_token}). Returns client_id + cleartext client_secret (ONE-TIME, scrypt-hashed). DCR disabled — only path to a usable client.",
+  "result_processor_customizations": {
+    "action_label": "OAuth client registered",
+    "result_type": "oauth_client_registered",
+    "result_description": "Confirmation that a new operator-approved OAuth client was minted. Contains client_id, cleartext client_secret (returned once), client_name, scopes, redirect_uris, grant_types, and operator_approved=True. The secret is unrecoverable after this response.",
+    "presentation_guidance": "Surface the client_id and client_secret to the user immediately; the secret is unrecoverable after this response and is required to configure the claude.ai connector's Advanced Settings OAuth fields. Also surface the assigned grant_types so the operator can confirm the client is intended for the claude.ai flow (authorization_code + refresh_token) vs a machine-to-machine flow (client_credentials).",
+    "output_action_guidance": "Hand the client_id and client_secret to the operator so they can paste them into claude.ai's custom-connector Advanced Settings. If grant_types=['client_credentials'], hand the credentials to the machine-to-machine integration instead."
+  },
+  "error_processor_customizations": {
+    "action_context": "Mints a fresh client_id (client-<32 hex>) and client_secret (32-byte urlsafe), hashes the secret with scrypt + per-row salt, and inserts a row into the oauth_client store with name, scopes, redirect_uris, grant_types, and operator_approved=True. The cleartext secret leaves the vault exactly once, in the success response.",
+    "error_interpretation": "OAuthClientInvalidName: client_name is empty or whitespace, OR grant_types contains values outside the allowlist {authorization_code, client_credentials, refresh_token}, OR grant_types is empty after validation. OAuthClientStoreUnavailable: the vault's oauth_client store has not been opened (vault prepare_for_readiness has not completed).",
+    "recovery_guidance": "For OAuthClientInvalidName: supply a non-empty client_name and ensure grant_types only contains allowed values (defaults to ['authorization_code', 'refresh_token'] if omitted). For OAuthClientStoreUnavailable: wait for vault startup to complete and retry; if it persists, check vault logs."
+  }
+}

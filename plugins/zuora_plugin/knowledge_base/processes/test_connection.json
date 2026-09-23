@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::zuora_plugin::test_connection",
+  "display_name": "Zuora: Test Connection",
+  "description": "Verify the configured Zuora credentials by minting a bearer token. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; ok/base_url/client_id are delivered when the job completes.",
+  "embedding_description": "Verify the Zuora connector is configured and reachable by minting an OAuth bearer token. Dispatches asynchronously: a job_id comes back at once, ok/base_url/client_id land moments later — useful for diagnosing a connection or credential problem. No parameters.",
+  "result_processor_customizations": {
+    "action_label": "Zuora connection check queued",
+    "result_type": "zuora_test_connection_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the connection result -- ok/base_url/client_id arrive separately, as their own message, when the job completes.",
+    "presentation_guidance": "This call only confirms the check was queued -- do not present job_id/status as proof of connectivity. Acknowledge the check is in flight; the result lands in a follow-up message when the job completes. Once delivered, report ok plus the base_url/client_id for the operator's confirmation; low sensitivity (connection metadata, data_sensitivity 0.1)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Test the configured Zuora connection.",
+    "error_interpretation": "zuora.not_configured: no zuora_tenant address-book entry is registered, or it is incomplete. zuora.auth_failed: the OAuth client_id/client_secret were rejected.",
+    "recovery_guidance": "zuora.not_configured: register the zuora_tenant address-book entry per the plugin's KB runbook. zuora.auth_failed: ask the operator to verify the OAuth client is still active."
+  }
+}

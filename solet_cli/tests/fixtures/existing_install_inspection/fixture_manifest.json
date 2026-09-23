@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "classification_repositories": [
+    "row_01_development_checkout",
+    "row_02_provenance_unavailable",
+    "row_03_source_identity_unproven",
+    "row_04_inspection_incomplete",
+    "row_05_legacy_provenance",
+    "row_06_diverged_seed_history",
+    "row_07_blocking_local_state",
+    "row_08_reviewed_historical_repository",
+    "row_09_unknown_repository_canonical_commit",
+    "row_10_local_changes_present",
+    "row_11_pre_manager_seed_clone",
+    "row_12_clean_fast_forward_seed_clone"
+  ],
+  "adversarial_repositories": [
+    "toctou_original",
+    "toctou_adversary",
+    "exit_precedence",
+    "tracker_fail_on_call",
+    "inventory_present_valid",
+    "inventory_present_malformed",
+    "inventory_absent"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "test_search_similar_euclidean",
+  "description": "Similarity search using euclidean distance metric",
+  "process_key": "plugin::pgvector_service_plugin::search_similar_action",
+  "arguments": {
+    "params": {
+      "namespace": "pgvector_service_plugin",
+      "query_vector": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+      "top_k": 10,
+      "distance_metric": "EUCLIDEAN"
+    },
+    "state": {
+      "current_session_id": "test-search-euclidean-001"
+    },
+    "timeout_seconds": 30
+  }
+}

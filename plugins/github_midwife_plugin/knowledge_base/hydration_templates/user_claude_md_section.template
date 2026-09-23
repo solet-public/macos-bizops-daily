@@ -1,0 +1,7 @@
+<!-- BEGIN SOLET {{SOLET_NAME}} v1 -->
+When `{{SOLET_NAME}}` is available on PATH, a knowledge-base search is the normal first step for non-trivial work:
+
+```sh
+{{SOLET_NAME}} call service_interface::knowledge_service::search '{"query": "session start orientation", "top_k": 8}'
+```
+<!-- END SOLET {{SOLET_NAME}} -->

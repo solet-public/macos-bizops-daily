@@ -1,0 +1,23 @@
+{
+  "process_key": "plugin::pgvector_service_plugin::delete_vectors_action",
+  "display_name": "Delete Vectors",
+  "description": "Delete vectors by IDs or filter criteria",
+  "embedding_description": "Delete vectors by id list or metadata filters within a namespace. Returns deleted_count for confirmation. Use to clean up stale embeddings or remove data after updates; deleted vectors are not recoverable.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Vectors deleted",
+    "result_type": "vectors_deleted",
+    "result_description": "Deletion result with deleted_count",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result.",
+    "field_sensitivities": {
+      "deleted_count": 0.1
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Deletes vectors from a namespace by id list or metadata filters via the pgvector backend.",
+    "error_interpretation": "ValidationError: neither vector_ids nor filters were provided, or filters reference unknown metadata fields. NotFoundError: the namespace does not exist. DatabaseError: the underlying DELETE failed (connection lost, transaction conflict).",
+    "recovery_guidance": "Provide at least one of vector_ids or filters; deletion is intentionally guarded against accidental whole-namespace wipes. If the namespace is missing, verify with list_namespaces_action before retrying. For transient database errors, retry once; persistent failures indicate the pgvector service is unhealthy and should be surfaced rather than re-attempted in a loop.",
+    "retryable": true
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::flow_service::get_flow_input",
+  "arguments": {
+    "flow_id": "nonexistent_flow_xyz_12345"
+  }
+}

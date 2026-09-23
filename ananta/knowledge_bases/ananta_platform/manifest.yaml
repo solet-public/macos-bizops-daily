@@ -1,0 +1,27 @@
+name: ananta_platform
+description: >
+  Core platform documentation: architecture overview, action system, plugin authoring,
+  memory system, development guidelines, startup sequence, service architecture,
+  architectural consistency, container deployment, vault/address book operations,
+  security architecture, and sandboxing decisions.
+
+category: platform-internal
+tags:
+  - platform_documentation
+  - architecture_reference
+  - development_guidelines
+  - security_architecture
+
+content:
+  patterns:
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+      - "**/scripts/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

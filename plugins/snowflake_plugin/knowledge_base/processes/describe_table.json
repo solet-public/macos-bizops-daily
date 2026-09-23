@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::snowflake_plugin::describe_table",
+  "display_name": "Snowflake: Describe Table",
+  "description": "Describe a table's columns (name, type, nullability, default) in the configured Snowflake account. Requires database, schema, and table. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the job finishing; the column list itself is delivered when the job completes.",
+  "embedding_description": "Show one Snowflake table's own column shape -- name, data type, nullability, default -- the LAST, most granular introspection step, once a specific table is already identified. Dispatches asynchronously; the column list is delivered when the background job completes, not by this call.",
+  "result_processor_customizations": {
+    "action_label": "Snowflake table description queued",
+    "result_type": "snowflake_describe_table_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the column list -- that arrives separately when the job completes and is delivered as its own message: columns, a list of {name, type, nullable, default} objects.",
+    "presentation_guidance": "This call only confirms the job was queued -- do not present job_id/status as the answer to 'what are this table's columns'. Acknowledge the request is in flight; the column list itself lands in a follow-up message when the job completes. Once delivered, list the column names and types plainly (low sensitivity, data_sensitivity 0.1)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Describe a table's columns in Snowflake.",
+    "error_interpretation": "snowflake.invalid_params: missing database, schema, or table. snowflake.api_error: the table does not exist or another warehouse error occurred.",
+    "recovery_guidance": "snowflake.invalid_params: supply database, schema, and table, from list_tables. snowflake.api_error: verify the table name is spelled correctly and exists in that schema."
+  }
+}

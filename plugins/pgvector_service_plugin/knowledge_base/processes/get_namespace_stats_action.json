@@ -1,0 +1,25 @@
+{
+  "process_key": "plugin::pgvector_service_plugin::get_namespace_stats_action",
+  "display_name": "Get Namespace Statistics",
+  "description": "Get statistics for a vector namespace (count, dimension, etc)",
+  "embedding_description": "Get statistics for a vector namespace, including vector count and embedding dimension. Use to validate index size, verify dimensions, or monitor storage health. Helpful for compatibility checks and index planning.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Namespace statistics",
+    "result_type": "namespace_stats",
+    "result_description": "Namespace statistics with count and dimension",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result.",
+    "field_sensitivities": {
+      "namespace": 0.2,
+      "count": 0.1,
+      "dimension": 0.1
+    }
+  },
+  "error_processor_customizations": {
+    "action_context": "Returns aggregate statistics (vector count, embedding dimension) for one pgvector namespace.",
+    "error_interpretation": "ValidationError: namespace is missing or empty. NotFoundError: the namespace does not exist in the embeddings table. DatabaseError: the underlying query failed.",
+    "recovery_guidance": "Pass a non-empty namespace string; use list_namespaces_action first if unsure which namespaces exist. A NotFoundError means the namespace has not been written to yet — treat as zero-count rather than an error from a planning perspective. Retry transient database errors once.",
+    "retryable": true
+  }
+}

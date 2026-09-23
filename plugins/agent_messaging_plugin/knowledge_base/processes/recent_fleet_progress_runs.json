@@ -1,0 +1,7 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::recent_fleet_progress_runs",
+  "display_name": "Read recent workstream progress assessments",
+  "description": "Returns a bounded newest-first page of structured Phase-B fleet_progress_run records. Supplying workstream_id narrows the page to one stream so a steward can compute its next delta without parsing a markdown log or retrieving an unrelated memory tag. The response has returned, truncated, and a tie-safe next_cursor.",
+  "embedding_description": "Read a bounded newest-first trend of structured Phase-B progress assessments for one stable workstream, including its objective citation, metrics, measured deltas, evidence-based assessment, recommendation, critique state, escalations, and cited Phase-A pass without parsing a markdown review log.",
+  "processor_policy_category": "edge"
+}

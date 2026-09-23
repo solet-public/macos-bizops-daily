@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::quality_service::run_gate",
+  "display_name": "Run Quality Gate",
+  "description": "Execute ONE platform quality gate by its allowlisted name and return the pass/fail verdict with bounded output. The name maps to a FIXED quality_gates/<script>.py command form baked server-side (with --allowlist and --warn-only where applicable); the caller never supplies a path, argv, or flag. Directly-runnable gates: 'code_quality' (the whole-tree aggregate — ruff, pyright, the coherence trio at canonical scope, integration, service-interface AST), 'whole_tree_integration', 'service_interface_ast', 'sql_access', 'wint2_driver_import', 'wint2_vault_key_declaration'. An unknown name, or a coherence-only name that must run via the aggregate, is rejected with a typed error. SOLET_NAME is set server-side. This is an agent/driver convenience surface, NOT a substitute for Git-Controller's canonical pre-commit gate run.",
+  "embedding_description": "Run a single named platform quality gate and get its pass/fail result. Executes one quality_gates script (code_quality aggregate, whole_tree_integration, service_interface_ast, sql_access, ruff/pyright/radon via the aggregate) with server-baked argv. Allowlist-only gate name; bounded output; long-running.",
+  "result_processor_customizations": {
+    "action_label": "Quality gate run",
+    "result_type": "quality_gate_run_result",
+    "result_description": "Object with 'gate', 'passed', 'exit_code', 'timed_out', 'summary', 'output' (bounded tail), 'truncated', 'output_chars_total'.",
+    "presentation_guidance": "Lead with gate and passed. On failure, surface 'summary' and the tail of 'output'; if 'truncated' is true, note that output was capped at output_chars_total total characters.",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Running one platform quality gate via a fixed server-side quality_gates/<script>.py subprocess with a hard timeout and bounded output capture.",
+    "error_interpretation": "ValueError/QualityGateError: the gate name is unknown or is a coherence-only gate that must run via the 'code_quality' aggregate — NOT a gate failure, a bad argument. A gate that runs but fails returns passed=false with exit_code!=0 (not an error). timed_out=true with exit_code 124 means the hard timeout fired before the gate finished.",
+    "recovery_guidance": "For an unknown-name error: call list_gates and pick a directly-runnable name (or run the coherence trio via 'code_quality'). For a real gate failure (passed=false): read 'summary'/'output' and fix the flagged code. For a timeout: the gate is genuinely slow — retrying rarely helps within the same tree state."
+  }
+}

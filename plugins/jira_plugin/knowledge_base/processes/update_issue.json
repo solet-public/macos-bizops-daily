@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::jira_plugin::update_issue",
+  "display_name": "Jira: Update Issue",
+  "description": "Apply a non-empty fields object (summary, description, assignee, labels, custom fields, ...) to an existing Jira issue by key. Returns immediately with a job_id and status 'queued' (D0.3 deferred-completion shape) -- the dispatch returning is NOT the same as the update being applied; the confirmation is delivered when the job completes. Write action.",
+  "embedding_description": "Edit fields on an existing Jira issue by key: change its summary or description, reassign it, adjust labels, or set custom fields through a non-empty fields object. Dispatches asynchronously, returning a job_id immediately; the saved-change confirmation arrives via job completion. In-place field maintenance on a ticket whose key is already known.",
+  "result_processor_customizations": {
+    "action_label": "Jira issue update queued",
+    "result_type": "jira_update_issue_result",
+    "result_description": "Dispatch envelope: job_id (string) and status ('queued'). This is NOT the update confirmation -- that arrives separately when the job completes and is delivered as its own message.",
+    "presentation_guidance": "This call only confirms the update was queued -- do not present job_id/status as proof the fields were saved. Acknowledge the request is in flight; the save confirmation lands in a follow-up message when the job completes. Once delivered, confirm which issue was updated. This mutates a real ticket's fields, so be explicit that the change was saved."
+  },
+  "error_processor_customizations": {
+    "action_context": "Update fields on an existing Jira issue.",
+    "error_interpretation": "jira.bad_request: a field name/value is invalid for this issue (unknown field, wrong shape, or a value the screen does not allow). jira.not_found: the issue key does not exist. jira.invalid_params: 'fields' was missing or empty. jira.permission_denied: the account cannot edit this issue.",
+    "recovery_guidance": "jira.bad_request: verify field names and value shapes (Jira fields are often nested objects). jira.invalid_params: pass a non-empty 'fields' object. jira.not_found: confirm the issue key."
+  }
+}

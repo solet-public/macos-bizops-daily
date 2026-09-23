@@ -1,0 +1,12 @@
+{
+  "process_key": "service_interface::scheduling_service::create_cron_schedule",
+  "arguments": {
+    "cron_expression": "0 * * * *",
+    "actions": [
+      {
+        "process_key": "service_interface::memory_service::consolidate",
+        "arguments": {}
+      }
+    ]
+  }
+}

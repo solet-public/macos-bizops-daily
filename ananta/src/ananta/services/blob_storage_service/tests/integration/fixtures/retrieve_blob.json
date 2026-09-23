@@ -1,0 +1,42 @@
+{
+  "name": "test_retrieve_blob",
+  "description": "Store a blob, retrieve it by blob_id, then delete it to keep the namespace clean.",
+  "sequence": [
+    {
+      "step": "store_blob",
+      "process_key": "service_interface::blob_storage_service::store_blob",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "content": "QmxvYiBzdG9yYWdlIHJldHJpZXZlIHZhbGlkYXRpb24gcGF5bG9hZC4=",
+        "metadata": {
+          "original_name": "integration_retrieve_blob.txt",
+          "mime_type": "text/plain",
+          "description": "Blob storage integration payload for retrieve test",
+          "tags": "blob-tests,retrieve"
+        }
+      },
+      "capture": {
+        "blob_id": {
+          "source": "output",
+          "key": "blob_id"
+        }
+      }
+    },
+    {
+      "step": "retrieve_blob",
+      "process_key": "service_interface::blob_storage_service::retrieve_blob",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "blob_id": "${blob_id}"
+      }
+    },
+    {
+      "step": "cleanup_delete_blob",
+      "process_key": "service_interface::blob_storage_service::delete_blob",
+      "arguments": {
+        "namespace": "blob_storage_service_tests",
+        "blob_id": "${blob_id}"
+      }
+    }
+  ]
+}

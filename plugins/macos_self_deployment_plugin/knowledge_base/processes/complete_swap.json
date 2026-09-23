@@ -1,0 +1,17 @@
+{
+  "process_key": "plugin::macos_self_deployment_plugin::complete_swap",
+  "display_name": "Complete blue-green swap (green-side finisher)",
+  "description": "Durable action enqueued by blue after a successful activate so green can finish the swap. Plugin-namespace registration backing the service-interface verb service_interface::local_self_deployment_service::complete_swap. Implements the post-activate cleanup: SIGTERM prior_pid (blue's solet process), unregister prior_instance_id from the local-blue-green router, and remove prior_color from the router's known-colors map. Green's action_queue_poller picks this up via the EDGE category. Idempotent on prior_pid: missing-process is success.",
+  "embedding_description": "Complete blue-green swap — green-side finisher. Receives prior_pid + prior_color from blue's restart_with_manifest. SIGTERMs prior_pid (graceful flush), waits, SIGKILLs if needed. Calls router.unregister_color() to clean the router map. Idempotent: missing prior_pid returns already_complete. Platform-machinery; not operator-invoked. Returns prior_pid, terminated_at, router_unregistered.",
+  "result_processor_customizations": {
+    "action_label": "blue-green swap finisher complete",
+    "result_type": "local_blue_green_complete_swap_result",
+    "result_description": "Status, prior_pid, terminated_at, router_unregistered flag.",
+    "presentation_guidance": "Lead with status. If status='completed', surface prior_pid + terminated_at. If status='already_complete', surface the no-op reason (prior already dead). If status='failed', surface the error verbatim — this is platform-machinery; failure here indicates a swap-protocol bug worth investigation."
+  },
+  "error_processor_customizations": {
+    "action_context": "Green-side finisher of a local blue-green swap.",
+    "error_interpretation": "missing_args: complete_swap requires prior_pid + prior_instance_id from blue's restart_with_manifest call; missing args means the durable action was enqueued malformed. router_unregister_failed: the router could not unregister the prior color; check whether the router is up. signal_failed: SIGTERM/SIGKILL on prior_pid failed; likely permission issue or pid reuse.",
+    "recovery_guidance": "If router_unregister_failed but prior process is dead, the swap is effectively complete; manual operator inspection of the router's status() can confirm. If signal_failed, investigate process state via `ps -p prior_pid` and operator-side cleanup."
+  }
+}

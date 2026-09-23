@@ -1,0 +1,5 @@
+{
+  "query": "Export my memories to a file",
+  "expected_process_key": "service_interface::memory_service::export_memories",
+  "expected_arguments": {}
+}

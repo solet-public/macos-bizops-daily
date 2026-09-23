@@ -1,0 +1,18 @@
+{
+  "process_key": "service_interface::memory_service::process_memorization_queue",
+  "display_name": "Process Memorization Queue",
+  "description": "Process all due memorization reviews. Called by scheduler to reinforce memories via spaced repetition.",
+  "embedding_description": "",
+  "result_processor_customizations": {
+    "action_label": "Process Memorization Queue",
+    "result_type": "queue_processed",
+    "result_description": "Results of processing due memorization reviews with counts of processed and completed items",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Processing due spaced repetition reviews in the memorization queue",
+    "error_interpretation": "DatabaseError: failed to query or update memorization records. StrengthUpdateError: failed to update memory strength values.",
+    "recovery_guidance": "For database errors: verify state storage is accessible. For strength update errors: verify the memory records exist."
+  }
+}

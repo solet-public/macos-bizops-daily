@@ -1,0 +1,16 @@
+{
+  "name": "test_read_state_basic",
+  "description": "Verify basic read_state functionality with namespace and table query",
+  "process_key": "plugin::postgres_state_management_plugin::read_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "query": {
+        "table": "key_value_store",
+        "limit": 10
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

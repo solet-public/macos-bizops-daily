@@ -1,0 +1,1 @@
+{"text_key":"seat.model","display_name":"Seat model command","description":"Select an explicit Claude model after the seat clear has settled.","embedding_description":"Operator command sent during opt-in seat rotation model selection.","template":"/model {model_name}","placeholders":["model_name"],"used_by":["plugin::agent_messaging_plugin::seat_rotation"]}

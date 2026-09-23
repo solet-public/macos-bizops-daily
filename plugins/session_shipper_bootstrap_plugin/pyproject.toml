@@ -1,0 +1,28 @@
+[project]
+name = "session_shipper_bootstrap_plugin"
+version = "1.0.0"
+description = "Shipper bootstrap + pairing routes for the LLM session ledger."
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"session_shipper_bootstrap_plugin.templates" = ["*.template"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[project.entry-points."ananta.plugins"]
+session_shipper_bootstrap_plugin = "session_shipper_bootstrap_plugin.plugin:SessionShipperBootstrapPlugin"

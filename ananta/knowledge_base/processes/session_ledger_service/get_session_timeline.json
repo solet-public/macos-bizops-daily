@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::session_ledger_service::get_session_timeline",
+  "display_name": "get_session_timeline",
+  "description": "Return the ordered event timeline for one ingested session, chronological by sequence ASC. Required argument: session_id (les-...). Optional after_sequence acts as a cursor — only events whose sequence is strictly greater than this value are returned (default 0 surfaces from the beginning). Optional limit clamps to [1..500] (default 100). Each event row carries id, sequence, event_type (MESSAGE, TOOL_CALL, TOOL_RESULT, SYSTEM, ATTACHMENT), role, content_text, content_json, content_blob_id, vendor_event_id, vendor_parent_event_id, event_at, batch_id, and imported_at. Use this verb to drill into one specific session's events without writing raw SQL against session_ledger__event; pair with list_sessions to first locate the session_id of interest.",
+  "embedding_description": "Get the chronological event timeline for one LLM session ledger session by session_id (les-...). Returns events ordered sequence ASC: id, sequence, event_type, role, content_text, content_json, content_blob_id, vendor_event_id, vendor_parent_event_id, event_at, batch_id, imported_at. Cursor: after_sequence (strict >). limit clamps to 1..500 default 100."
+}

@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::address_book_service::resolve",
+  "arguments": {
+    "name": "nonexistent_address_11_2_2_xyz"
+  }
+}

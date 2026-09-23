@@ -1,0 +1,19 @@
+{
+  "process_key": "service_interface::thinking_service::get_authored_joseki",
+  "display_name": "Get Authored Joseki Lifecycle Row",
+  "description": "read the lifecycle record for a registered joseki card: its current state, authoring provenance, knowledge-base path, replacement pointer when superseded, and run evidence (run count and last-run time).",
+  "embedding_description": "Look up the current lifecycle status of an authored joseki card by key. Returns its state, provenance, stored card path, superseded-by replacement, run count and last-run timestamp. This reads the durable lifecycle row for observability; it does not parse or validate the card markdown and it changes nothing.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Authored joseki row read",
+    "result_type": "authored_joseki_row",
+    "result_description": "Lifecycle row with keys: found, joseki_key, state, provenance, knowledge_base_path, superseded_by, run_count, last_run_at",
+    "presentation_guidance": "When found is false, say the joseki is not registered. Otherwise report the state and run evidence; mention superseded_by when the card is superseded.",
+    "output_action_guidance": "This is a read for lifecycle observability. Use the returned state to decide the next lifecycle action (promote, record a run, supersede, or archive)."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reading the lifecycle row of an authored joseki card. get_authored_joseki accepts {joseki_key} and never mutates state.",
+    "error_interpretation": "A missing card is not an error — the result carries found=false. StorageError: the state read failed.",
+    "recovery_guidance": "Storage failures: retry once the platform reports healthy. For a card that reports found=false, register it first if it should exist."
+  }
+}

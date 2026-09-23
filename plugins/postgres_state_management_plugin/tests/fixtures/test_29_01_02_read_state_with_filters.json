@@ -1,0 +1,19 @@
+{
+  "name": "test_read_state_with_filters",
+  "description": "Verify read_state with filters to narrow down results",
+  "process_key": "plugin::postgres_state_management_plugin::read_state",
+  "arguments": {
+    "params": {
+      "namespace": "core",
+      "query": {
+        "table": "key_value_store",
+        "filters": {
+          "scope": "GLOBAL"
+        },
+        "limit": 5
+      }
+    },
+    "state": {}
+  },
+  "timeout_seconds": 30
+}

@@ -1,0 +1,7 @@
+{
+  "process_key": "service_interface::discovery_service::query_process_registry",
+  "arguments": {
+    "query": "generate audio from text",
+    "max_results": 10
+  }
+}

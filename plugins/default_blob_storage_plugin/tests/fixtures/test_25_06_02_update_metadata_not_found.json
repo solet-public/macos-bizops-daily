@@ -1,0 +1,18 @@
+{
+  "name": "test_update_metadata_not_found",
+  "description": "Attempt to update metadata for non-existent blob",
+  "process_key": "plugin::default_blob_storage_plugin::update_blob_metadata",
+  "arguments": {
+    "params": {
+      "namespace": "test_namespace",
+      "blob_id": "gen-nonexistent123",
+      "metadata": {
+        "description": "This should fail"
+      }
+    },
+    "state": {
+      "current_session_id": "test-update-notfound-001"
+    },
+    "timeout_seconds": 30
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "process_key": "service_interface::vault_service::export_encrypted",
+  "display_name": "Export Sealed Secret",
+  "description": "Encrypt a vault secret for a recipient's X25519 public key. Returns ciphertext + plaintext fingerprint; never plaintext.",
+  "embedding_description": "Seal a vault secret for a peer solet using its X25519 public key. Fetches the secret locally, encrypts via libsodium anonymous-sender sealed-box, returns base64 ciphertext + one-way sha256 plaintext fingerprint. Plaintext NEVER appears in return value, audit log, or caller-reachable state. Use during cross-solet credential hand-off.",
+  "result_processor_customizations": {
+    "action_label": "Secret exported (sealed)",
+    "result_type": "sealed_secret_export",
+    "result_description": "Sealed-box ciphertext plus a one-way plaintext fingerprint for transfer-integrity comparison",
+    "presentation_guidance": "Present the ciphertext and plaintext_fingerprint as opaque strings. Do not attempt to decrypt or interpret either value.",
+    "output_action_guidance": "Pass the ciphertext to the recipient solet's import_encrypted call and compare the plaintext_fingerprint with the value returned by that call to confirm an intact transfer."
+  }
+}

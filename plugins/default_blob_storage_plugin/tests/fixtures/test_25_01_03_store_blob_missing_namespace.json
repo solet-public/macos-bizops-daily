@@ -1,0 +1,18 @@
+{
+  "name": "test_store_blob_missing_namespace",
+  "description": "Attempt to store blob without required namespace parameter",
+  "process_key": "plugin::default_blob_storage_plugin::store_blob",
+  "arguments": {
+    "params": {
+      "content": "SGVsbG8gV29ybGQh",
+      "metadata": {
+        "original_name": "test.txt",
+        "mime_type": "text/plain"
+      }
+    },
+    "state": {
+      "current_session_id": "test-store-no-namespace-001"
+    },
+    "timeout_seconds": 30
+  }
+}
