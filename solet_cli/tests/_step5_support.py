@@ -128,7 +128,7 @@ class FakeHost:
         self.ps_calls += 1
         if self.ps_fails:
             raise OSError("process table unavailable")
-        rows = self.processes if self.processes is not None else [{"pid": self.pids[0], "lstart": "Fri Sep 18 12:00:00 2026", "command": "{TARGET}/.venv/bin/python3 -m ananta.cli"}]
+        rows = self.processes if self.processes is not None else [{"pid": self.pids[0], "lstart": "Fri Sep 18 12:00:00 2026", "command": "{TARGET}/.venv/bin/python3 -m ananta.cli --app-home {TARGET}/profile"}]
         lines = [f"{row['pid']} {row['lstart']} {str(row['command']).replace('{TARGET}', str(self.target))}" for row in rows]
         return subprocess.CompletedProcess(("/bin/ps",), 0, "\n".join(lines) + "\n", "")
 
@@ -142,7 +142,7 @@ class FakeHost:
         if verb == "print":
             if not self.loaded:
                 return subprocess.CompletedProcess(("launchctl",), 113, "", "Could not find service")
-            return subprocess.CompletedProcess(("launchctl",), 0, f"\tpid = {self.pids[0]}\n", "")
+            return subprocess.CompletedProcess(("launchctl",), 0, f"\tstate = running\n\tpid = {self.pids[0]}\n", "")
         if verb == "bootout":
             if self.bootout_clears:
                 self.loaded = False

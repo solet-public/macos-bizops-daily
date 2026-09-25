@@ -1,11 +1,11 @@
-"""Step-6 crash sweep, write boundaries slice 1 of 6 (design section 6.1, F-CR-1).
+"""Step-6 crash sweep, write boundaries slice 1 of 12 (design section 6.1, F-CR-1).
 
 A crash is injected after EVERY durable Manager-state write (update journal, inventory, doctor journal) of the single-colour reference run (an enrolled row
 through Step 4, the runtime approval, every runtime stage, the final doctor and
 promotion); after each crash a FRESH ``apply_update`` resumes and the sweep
 asserts the reference terminal ``promoted``, the reference inventory row, the
 reference target/HOME bytes, bounded mutation counters and an immutable journal
-prefix.  This file sweeps slice 1 of 6 of the write boundaries; the six slices partition them exactly.  Runs under the fail-on-call database spy.
+prefix.  This file sweeps slice 1 of 12 of the write boundaries; the twelve slices partition them exactly.  Runs under the fail-on-call database spy.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from _step5_support import build_fixture, db_spy  # noqa: E402
 from _step6_support import CrashSweep, run_to_promoted, sweep_slice  # noqa: E402
 
 _CHECKS = 0
-_PART, _PARTS = 1, 6
+_PART, _PARTS = 1, 12
 
 
 def _check(condition: object, label: str) -> None:

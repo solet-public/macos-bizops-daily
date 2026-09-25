@@ -55,7 +55,7 @@ def probe_public_inputs(
 _LM_STUDIO_PROBES = frozenset(
     f"setup::lm_studio.{suffix}" for suffix in (
         "cli_available", "server_ready", "embedding_artifact_present", "embedding_model_served",
-        "inference_artifact_present", "inference_model_served", "login_agent_valid", "jit_disabled",
+        "inference_artifact_present", "inference_model_indexed", "inference_model_served", "login_agent_valid", "jit_disabled",
     )
 )
 

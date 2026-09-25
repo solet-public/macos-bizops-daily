@@ -24,6 +24,7 @@ from solet_manager.contracts import ContractBundle  # noqa: E402
 from solet_manager.models import CheckpointStatus  # noqa: E402
 
 from bootstrap_adapter.homebrew import (  # noqa: E402
+    HomebrewInstallError,
     _homebrew_plan_is_exact,
     run_homebrew_install_required,
 )
@@ -107,7 +108,7 @@ def _check_fresh_install() -> None:
     )
 
 
-def _check_already_installed_retry() -> None:
+def _check_nonzero_dry_run_warning_is_refused() -> None:
     calls: list[list[str]] = []
 
     def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -118,14 +119,50 @@ def _check_already_installed_retry() -> None:
             return _completed(command, stdout="pgvector 0.8.6\n")
         raise AssertionError(f"unexpected mutation during retry: {command}")
 
-    run_homebrew_install_required(_runtime(run), "/fixture/brew", "pgvector", "pgvector")
+    try:
+        run_homebrew_install_required(_runtime(run), "/fixture/brew", "pgvector", "pgvector")
+    except HomebrewInstallError as exc:
+        _check(
+            exc.outcome.returncode == 1
+            and exc.outcome.stderr == _INSTALLED_WARNING
+            and exc.blocked_upgrades == (),
+            "nonzero dry-run warning is not a verified no-op",
+        )
+    else:
+        raise AssertionError("nonzero dry-run warning was accepted as a verified no-op")
     _check(
-        calls[-1] == ["/fixture/brew", "list", "--versions", "pgvector"],
-        "already-installed warning is confirmed against package state",
+        calls
+        == [
+            ["/fixture/brew", "install", "--dry-run", "pgvector"],
+            ["/fixture/brew", "list", "--versions", "pgvector"],
+        ],
+        "nonzero dry-run warning stops before package mutation despite installed state",
+    )
+
+
+def _check_verified_already_installed_noop() -> None:
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(list(command))
+        if "--dry-run" in command:
+            return _completed(command)
+        if command[1:] == ["list", "--versions", "pgvector"]:
+            return _completed(command, stdout="pgvector 0.8.6\n")
+        raise AssertionError(f"unexpected mutation during verified no-op: {command}")
+
+    outcome = run_homebrew_install_required(_runtime(run), "/fixture/brew", "pgvector", "pgvector")
+    _check(
+        outcome.returncode == 0 and outcome.output_complete and not outcome.stdout and not outcome.stderr,
+        "successful complete empty dry-run and installed state verify a no-op",
     )
     _check(
-        ["/fixture/brew", "install", "pgvector"] not in calls,
-        "already-installed retry never reinstalls pgvector",
+        calls
+        == [
+            ["/fixture/brew", "install", "--dry-run", "pgvector"],
+            ["/fixture/brew", "list", "--versions", "pgvector"],
+        ],
+        "verified no-op performs no package mutation",
     )
 
 
@@ -315,12 +352,13 @@ def main() -> int:
         "digest-pinned legacy resume strengthens the installer pre-probe",
     )
     _check_fresh_install()
-    _check_already_installed_retry()
+    _check_nonzero_dry_run_warning_is_refused()
+    _check_verified_already_installed_noop()
     _check_informational_nonzero_retry()
     _check_later_install_preserves_pgvector()
     _check_versioned_postgresql_dry_run_plan()
     _check_versioned_postgresql_dry_run_applies()
-    print("install_postgresql_preprobe_smoke: 16/16 checks passed")
+    print("install_postgresql_preprobe_smoke: 18/18 checks passed")
     return 0
 
 

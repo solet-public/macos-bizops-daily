@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::managed_dispatch_events",
+  "display_name": "Page managed-dispatch events",
+  "description": "Read-only, tie-safe access to the append-only managed_dispatch_event audit trail. Optional dispatch_id, event_kind, and accepted filters narrow the page. Rows are ordered by event_at then id. A non-null next_cursor means another page exists; callers echo both after_event_at and after_id until next_cursor is null before claiming complete event coverage.",
+  "embedding_description": "Enumerate accepted and rejected managed-dispatch event evidence through StateManagementInterface with a stable event_at/id cursor. Use this bounded read for complete audit, migration, causal-race review, and verification of evidence-bound legacy corrections without raw SQL or truncation guesses.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Managed-dispatch event page read",
+    "result_type": "managed_dispatch_events_result",
+    "result_description": "A bounded events page with returned, truncated, and next_cursor fields.",
+    "presentation_guidance": "State the filters, returned count, and whether next_cursor is null. Distinguish accepted events from rejected audit rows and never call a truncated page complete."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads managed_dispatch_event through StateManagementInterface.query_ordered using the composite event_at/id cursor; the event log remains append-only.",
+    "error_interpretation": "page_limit_invalid means limit is outside 1..250. page_cursor_invalid means only one cursor component was supplied. accepted_filter_invalid means accepted was not boolean.",
+    "recovery_guidance": "Use valid filters and echo both cursor components exactly. Continue paging until next_cursor is null before computing totals or digests."
+  }
+}

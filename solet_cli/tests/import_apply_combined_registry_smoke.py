@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -12,18 +13,20 @@ sys.path[:0] = [str(_ROOT / "solet_cli" / "src"), str(_ROOT / "solet_setup_contr
 
 import solet_manager.import_enrollment as enrollment  # noqa: E402
 from import_enrollment_rerun_smoke import _inspection  # noqa: E402
+from import_v1_already_managed_smoke import _transaction  # noqa: E402
 from solet_manager.errors import ManagedIdentityDriftError, RegistryUniquenessError  # noqa: E402
 from solet_manager.import_enrollment import ImportRequest  # noqa: E402
 from solet_manager.models import InstanceRecord  # noqa: E402
 from solet_manager.paths import ManagerPaths  # noqa: E402
 from solet_manager.registry import InstanceRegistry  # noqa: E402
+from solet_manager.transaction import write_transaction  # noqa: E402
 
 
 def _legacy_record(name: str, target: Path) -> InstanceRecord:
     return InstanceRecord(
         name,
         str(target),
-        str(Path.home() / ".local" / "bin" / name),
+        str(target / "client" / "bin" / name),
         "https://example.invalid/seed.git",
         None,
         "a" * 40,
@@ -96,6 +99,20 @@ def main() -> int:
             assert acquired[:2] == [paths.lock_path("fixture"), paths.registry_lock_path]
             _assert_v2_target_collision(paths, target)
             _assert_v1_name_collision(paths, candidate, legacy_target)
+            create_target = root / "create-target"
+            create_target.mkdir()
+            InstanceRegistry(paths.registry_path).add(_legacy_record("fixturecreate", create_target))
+            transaction = replace(_transaction(create_target), name="fixturecreate")
+            write_transaction(paths.transaction_path("fixturecreate"), transaction)
+            create_request = ImportRequest("fixturecreate", create_target, "stable", paths)
+            create_preview = enrollment.preview_import(create_request)
+            enrollment.enroll_import(create_request, create_preview.fingerprint)
+            _assert_v2_target_collision(paths, create_target)
+            unrelated = root / "unrelated"
+            unrelated.mkdir()
+            InstanceRegistry(paths.registry_path, maintenance_inventory_path=paths.maintenance_inventory_path).add(
+                _legacy_record("unrelated", unrelated)
+            )
         finally:
             enrollment.inspect_existing_install = original_inspection
             enrollment.instance_lock = original_lock

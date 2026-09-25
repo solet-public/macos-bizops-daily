@@ -72,6 +72,7 @@ from .lane_worktrees import (
 )
 from .managed_dispatch import (
     DISPATCH_PREPARING,
+    NEXT_ENSURE_UNIT,
     DispatchError,
     read_managed_dispatch,
     record_first_turn_evidence,
@@ -587,7 +588,6 @@ class SpawnSessionRequest:
     model: str = ""
     effort: str = ""
     report_by_seconds: int = 0
-    ttl_seconds: int = 0
     spawned_by_instance_id: str = ""
     spawned_by_role: str = ""
     directed_by: str = ""
@@ -642,8 +642,8 @@ class SpawnSessionRequest:
     dispatch_kind: str = ""
     reviewed_report_vendor: str = ""
     pair_id: str = ""
-    # Capability-floor scopes the work touches, e.g. ("state_schema",);
-    # see spawn_capability_floors. Omitting a tag never lowers a floor.
+    # Caller-declared work scope, e.g. ("state_schema",), retained as
+    # provenance. See spawn_capability_floors for any configured future floor.
     scope_tags: tuple[str, ...] = ()
     # Every spawn must name its difficulty and carry the exact selector receipt
     # that chose this runtime/model/effort. Empty values are deliberate
@@ -674,6 +674,13 @@ def _validate_prepared_dispatch(
         )
     if row.get("current_agent_instance_id"):
         raise VerbError("dispatch_attempt_exists", "Dispatch already has a current attempt.")
+    # The register Unit is ensured between prepare and spawn (design
+    # unt_57725090 s4.2); no caller may route a spawn around that step.
+    if row.get("next_required_action") == NEXT_ENSURE_UNIT or not str(row.get("unit_id") or ""):
+        raise VerbError(
+            "unit_not_ensured",
+            f"dispatch {req.dispatch_id!r} has no ensured register Unit.",
+        )
     mismatched = _dispatch_contract_mismatches(row, req)
     if mismatched:
         raise VerbError(
@@ -720,7 +727,6 @@ def _dispatch_contract_mismatches(row: Mapping[str, Any], req: SpawnSessionReque
     }
     value_expected: dict[str, object] = {
         "report_by_seconds": req.report_by_seconds,
-        "ttl_seconds": req.ttl_seconds,
         "allow_askuserquestion": req.allow_askuserquestion,
         "degraded_hooks_acknowledged": req.degraded_hooks_acknowledged,
     }
@@ -823,8 +829,6 @@ def _resolve_lane_repo_root(repository_root: str = "") -> Path:
             exc.code,
             str(exc),
         ) from exc
-
-
 
 
 def _provision_spawn_worktree(
@@ -1083,9 +1087,9 @@ def spawn_session(
     brief_snapshot = workbench_brief_snapshot._workbench_brief_snapshot(
         req.brief_ref, req.repository_root, dispatch_row, has_charter=charter is not None,
     )
-    # Model-dispatch policy, with the brief's own text so a floor the brief
-    # triggers applies even when scope_tags omitted it. Everything above this
-    # line is a read or a guard; every side effect is below it.
+    # Model-dispatch policy receives the brief text for any configured future
+    # floor. The retired state_schema floor does not gate this spawn. Everything
+    # above this line is a read or a guard; every side effect is below it.
     applied_floors = validate_spawn_policy(req, brief_snapshot)
     driver, resolved_host = _resolve_spawn_host(req, dispatch_row)
     try:
@@ -1122,7 +1126,6 @@ def spawn_session(
         model=req.model,
         effort=req.effort,
         report_by_seconds=req.report_by_seconds,
-        ttl_seconds=req.ttl_seconds,
         directed_by=req.directed_by,
         dispatch_kind=req.dispatch_kind,
         reviewed_report_vendor=req.reviewed_report_vendor,
@@ -1381,7 +1384,10 @@ def list_sessions(
     except SessionListError as exc:
         raise VerbError(exc.code, exc.message) from exc
     result["sessions"] = [
-        {**row, "coordination_state": _coordination_state_projection(row)}
+        {
+            **{key: value for key, value in row.items() if key != "expires_at"},
+            "coordination_state": _coordination_state_projection(row),
+        }
         for row in result["sessions"]
     ]
     return result
@@ -1402,7 +1408,7 @@ def session_status(state: StateManagementInterface, agent_instance_id: str) -> d
     except SessionNotFoundError as exc:
         raise VerbError("session_not_found", str(exc)) from exc
     liveness, detail = _probe_host_liveness(row)
-    result = dict(row)
+    result = {key: value for key, value in row.items() if key != "expires_at"}
     result.update(
         {
             "ledger_state": str(row.get("lifecycle_state") or ""),

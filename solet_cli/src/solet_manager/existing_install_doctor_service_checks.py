@@ -10,6 +10,8 @@ never because a probe was unavailable.
 from __future__ import annotations
 
 import json
+import plistlib
+import subprocess
 import time
 from pathlib import Path
 from typing import cast
@@ -18,7 +20,7 @@ from .errors import AdapterError, AdapterProtocolError, ManagerError, StateConfl
 from .existing_install_adapters import ATTEST_PROCESS_KEY, KNOWLEDGE_SEARCH_PROCESS_KEY
 from .existing_install_doctor_probe import DoctorProbe, artifact_check, artifact_facts, check, not_applicable, operation_by_ref, probe_status, unbound_reason, unknown, verdict
 from .existing_solet_diagnostics import DiagnosticCheck, DiagnosticStatus
-from .launch_topology import LEGACY_DIRECT, MATERIALIZED_SUPERVISOR
+from .launch_topology import LEGACY_DIRECT, MATERIALIZED_SUPERVISOR, launchagent_plist_path
 from .models import DoctorContractKind, JsonValue
 from .update_runtime_plan import AttestationObservation, knowledge_removed_articles, roster_plugins
 
@@ -71,17 +73,79 @@ def _loaded_check(probe: DoctorProbe, label: str) -> DiagnosticCheck:
     probe.invoked_vectors.append("manager_host:launchctl print")
     if printed.returncode != 0:
         return check("launchagent_loaded", DiagnosticStatus.MISSING, f"LaunchAgent {label} is not loaded.", "manager_host", reason="launchagent_not_loaded", repair="bootstrap_launchagent", observed=printed.returncode)
-    probe.pid_observed = _parse_pid(printed.stdout)
+    output = cast(object, printed.stdout)
+    probe.pid_observed = _parse_pid(output) if isinstance(output, str) else None
     return check("launchagent_loaded", DiagnosticStatus.VERIFIED, f"LaunchAgent {label} is loaded.", "manager_host", observed=probe.pid_observed)
 
 
 def _parse_pid(stdout: str) -> int | None:
-    for line in stdout.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("pid = "):
-            value = stripped.removeprefix("pid = ").strip()
-            return int(value) if value.isdigit() else None
-    return 0
+    """Accept one running state and one positive PID from launchctl print."""
+    fields = _launchd_identity_fields(stdout)
+    if fields is None or len(fields["state"]) != 1 or fields["state"][0] != "running" or len(fields["pid"]) != 1:
+        return None
+    value = fields["pid"][0]
+    if not value.isascii() or not value.isdigit() or int(value) <= 0:
+        return None
+    return int(value)
+
+
+def _job_depth_field(stripped: str) -> tuple[str, str | None] | None:
+    """Match an exact top-level ``state``/``pid`` line.
+
+    Returns ``None`` when the line names neither key (an unrelated field,
+    or a block header like ``pid-local endpoints = {`` -- the match is
+    exact, not a prefix, so this never mistakes it for a malformed ``pid``
+    field). Returns ``(key, None)`` for a malformed line whose key is
+    exactly ``state``/``pid`` but has no ``=``, so the caller fails closed.
+    """
+    key, separator, value = stripped.partition("=")
+    key = key.strip()
+    if key not in ("state", "pid"):
+        return None
+    return (key, value.strip()) if separator == "=" else (key, None)
+
+
+def _launchd_identity_fields(stdout: str) -> dict[str, list[str]] | None:
+    """Collect ``state``/``pid`` only at the top-level job dict's own depth.
+
+    Real ``launchctl print`` output wraps the job in a ``label = {`` header
+    and nests unrelated ``resource coalition``/``jetsam coalition`` blocks
+    that each carry their own ``state = active`` line; a depth-blind scan
+    double-counts those as duplicate top-level fields and fails closed on a
+    healthy target. The flat two-line fixture shape (no header) has always
+    used the outermost depth for its fields, so ``job_depth`` starts there
+    when no header line is present, keeping existing fixtures unchanged.
+
+    Depth is tracked by counting every ``{``/``}`` character on a line, not
+    by matching a line's own leading/trailing brace: an opaque nested value
+    (an XPC event-trigger dump observed in real output) can open and close
+    a sub-dict within one printed line, with no line of its own that is
+    exactly ``}``. A trailing-only close check misses that and never
+    returns to depth 0, failing the whole job closed.
+    """
+    stripped_lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if not stripped_lines:
+        return {"state": [], "pid": []}
+    job_depth = 1 if stripped_lines[0].endswith("{") else 0
+    return _scan_job_depth_fields(stripped_lines, job_depth)
+
+
+def _scan_job_depth_fields(stripped_lines: list[str], job_depth: int) -> dict[str, list[str]] | None:
+    """Walk brace depth across the output, collecting fields only at ``job_depth``."""
+    fields: dict[str, list[str]] = {"state": [], "pid": []}
+    depth = 0
+    for stripped in stripped_lines:
+        if depth == job_depth:
+            field = _job_depth_field(stripped)
+            if field is not None:
+                key, value = field
+                if value is None:
+                    return None
+                fields[key].append(value)
+        depth += stripped.count("{") - stripped.count("}")
+        if depth < 0:
+            return None
+    return None if depth != 0 else fields
 
 
 def _health_check(probe: DoctorProbe) -> DiagnosticCheck:
@@ -158,12 +222,64 @@ def _process_identity(probe: DoctorProbe) -> DiagnosticCheck:
 
 
 def _process_identity_verdict(probe: DoctorProbe, command: str | None, pid: int, before: int | None) -> tuple[bool, str]:
-    under_target = command is not None and f"{probe.target}/.venv/" in command
-    if not under_target:
+    if command is None:
         return False, "runtime_process_outside_target"
     if before is not None and before == pid:
         return False, "runtime_process_not_restarted"
+    label = probe.record.service_identity.launchagent_label
+    interpreter = probe.target / ".venv" / "bin" / "python3"
+    app_home = probe.target / "profile"
+    if not _target_launch_vector(probe, label, interpreter, app_home):
+        return False, "runtime_process_outside_target"
+    if not _target_process_command(command, interpreter, app_home):
+        return False, "runtime_process_outside_target"
+    if not _same_launchd_pid(probe, label, pid):
+        return False, "runtime_process_outside_target"
     return True, "runtime_process_outside_target"
+
+
+def _target_launch_vector(probe: DoctorProbe, label: str, interpreter: Path, app_home: Path) -> bool:
+    """The enrolled job must be configured for this target's direct venv launch."""
+    expected = [str(interpreter), "-m", "ananta.cli", "--app-home", str(app_home)]
+    plist_path = launchagent_plist_path(probe.seams.home, label)
+    try:
+        plist = plistlib.loads(plist_path.read_bytes())
+    except (OSError, ValueError, plistlib.InvalidFileException):
+        return False
+    return isinstance(plist, dict) and plist.get("Label") == label and plist.get("ProgramArguments") == expected
+
+
+def _target_process_command(command: str, interpreter: Path, app_home: Path) -> bool:
+    """Accept the exact venv launch or its macOS framework process display."""
+    suffix = f" -m ananta.cli --app-home {app_home}"
+    if not command.endswith(suffix):
+        return False
+    try:
+        resolved = interpreter.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return False
+    if not resolved.is_file():
+        return False
+    allowed = {str(interpreter), str(resolved)}
+    version_dir = resolved.parent.parent
+    if resolved.parent.name == "bin" and version_dir.parent.name == "Versions" and version_dir.parent.parent.name == "Python.framework":
+        framework_app = version_dir / "Resources" / "Python.app" / "Contents" / "MacOS" / "Python"
+        if framework_app.is_file():
+            allowed.add(str(framework_app))
+    return command[: -len(suffix)] in allowed
+
+
+def _same_launchd_pid(probe: DoctorProbe, label: str, pid: int) -> bool:
+    """Recheck the enrolled job after ps, closing a changed-job observation."""
+    try:
+        printed = probe.seams.launchctl(probe.registry, "print", (f"gui/{probe.seams.uid}/{label}",), 30)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    probe.invoked_vectors.append("manager_host:launchctl print")
+    output = cast(object, printed.stdout)
+    if printed.returncode != 0 or not isinstance(output, str):
+        return False
+    return _parse_pid(output) == pid
 
 
 def _pid_before(probe: DoctorProbe) -> int | None:

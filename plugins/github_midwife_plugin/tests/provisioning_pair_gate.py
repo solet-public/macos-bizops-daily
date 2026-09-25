@@ -191,13 +191,13 @@ def main() -> int:
     _check_salesforce_contract(flow, operation_source, doctor_source)
     _check_stage_and_debt(flow, operation_source)
     _check_lm_studio_contract(flow)
-    print("provisioning_pair_gate OK: coding, Salesforce and seven LM Studio provisioning pairs passed")
+    print("provisioning_pair_gate OK: coding, Salesforce and eight LM Studio provisioning pairs passed")
     return 0
 
 
 def _check_lm_studio_contract(flow: dict[str, object]) -> None:
-    expected = ["install_lm_studio", "start_lm_studio_server", "pull_lm_studio_embedding_model", "load_lm_studio_embedding_model", "pull_lm_studio_inference_model", "load_lm_studio_inference_model", "install_lm_studio_login_agent"]
-    expected_probes = ["lm_studio_cli_available", "lm_studio_server_ready", "lm_studio_embedding_artifact_present", "lm_studio_embedding_model_served", "lm_studio_inference_artifact_present", "lm_studio_inference_model_served", "lm_studio_login_agent_valid", "lm_studio_jit_disabled"]
+    expected = ["install_lm_studio", "start_lm_studio_server", "pull_lm_studio_embedding_model", "load_lm_studio_embedding_model", "pull_lm_studio_inference_model", "ensure_index_lm_studio_inference", "load_lm_studio_inference_model", "install_lm_studio_login_agent"]
+    expected_probes = ["lm_studio_cli_available", "lm_studio_server_ready", "lm_studio_embedding_artifact_present", "lm_studio_embedding_model_served", "lm_studio_inference_artifact_present", "lm_studio_inference_model_indexed", "lm_studio_inference_model_served", "lm_studio_login_agent_valid", "lm_studio_jit_disabled"]
     refs = flow["stages"]["system_dependencies"]["operation_refs"]
     _check(refs[refs.index("install_tmux") + 1:] == expected, "LM Studio must bootstrap before models entry")
     operations = flow["operations"]

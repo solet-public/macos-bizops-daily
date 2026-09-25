@@ -32,6 +32,7 @@ from discovered_decision_barrier_scenarios import (
 )
 from discovered_decision_projection_scenarios import MODEL_BASE_URL, MODEL_SELECTIONS
 from discovered_decision_support import _prepare
+from solet_manager.adapters import OperationRequest
 from solet_manager.config import CreateConfig
 from solet_manager.create import CreateManager
 from solet_manager.errors import StateConflictError
@@ -79,6 +80,31 @@ def _all_terminal_artifacts_activated(after: JsonObject) -> bool:
     )
 
 
+def _check_terminal_lm_inputs(requests: list[OperationRequest]) -> None:
+    completion_requests = [request for request in requests if request.probe_purpose == "completion" and request.operation_ref.startswith("setup::lm_studio.")]
+    expected_probes = {
+        f"setup::lm_studio.{suffix}" for suffix in (
+            "cli_available", "server_ready", "embedding_artifact_present",
+            "embedding_model_served", "inference_artifact_present",
+            "inference_model_indexed", "inference_model_served",
+            "login_agent_valid", "jit_disabled",
+        )
+    }
+    _check(
+        len(completion_requests) == len(expected_probes)
+        and {request.operation_ref for request in completion_requests} == expected_probes
+        and all(
+            request.public_inputs == {
+                "lm_studio_base_url": MODEL_BASE_URL,
+                "embeddings_implementation": "lm_studio",
+                "inference_implementation": "lm_studio",
+            }
+            for request in completion_requests
+        ),
+        "all nine terminal LM Studio probes receive retained URL and selections through the real manager runner",
+    )
+
+
 def _terminal_arm(root: Path, selections: dict[str, str]) -> JsonObject:
     fixture_root = root / "barrier-terminal-fixture"
     _initialize_fixture_state(fixture_root)
@@ -88,8 +114,7 @@ def _terminal_arm(root: Path, selections: dict[str, str]) -> JsonObject:
     _set_invoke_adapter(adapter)
     before = _artifact_census(fixture_root, paths, config.name)
     frontiers, planned_actions, result = _terminal_steps(manager, config, selections)
-    completion_requests = [request for request in adapter.requests if request.probe_purpose == "completion" and request.operation_ref.startswith("setup::lm_studio.")]
-    _check(len(completion_requests) == 8 and all(request.public_inputs.get("lm_studio_base_url") == MODEL_BASE_URL for request in completion_requests), "all eight terminal LM Studio probes receive the retained reviewed URL through the real manager runner")
+    _check_terminal_lm_inputs(adapter.requests)
     after = _artifact_census(fixture_root, paths, config.name)
     apply_requests = [request for request in adapter.requests if request.phase == "apply"]
     canonical_trace = [_canonical_request(request) for request in apply_requests]

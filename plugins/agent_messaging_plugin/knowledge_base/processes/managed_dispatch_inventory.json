@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::managed_dispatch_inventory",
+  "display_name": "Page managed-dispatch inventory",
+  "description": "Read-only, tie-safe managed-dispatch inventory. Optionally filters one exact state and returns up to limit rows ordered by created_at then id. A non-null next_cursor means another page exists; callers must echo both after_created_at and after_id and continue until next_cursor is null before claiming a complete census. Legacy ttl_seconds, expires_at, and expires_at_window_seconds may be null during the F1 compatibility bridge and are returned as null, never coerced to expiry.",
+  "embedding_description": "Enumerate every durable managed-dispatch row through StateManagementInterface with an explicit created_at/id cursor for complete migration inventory, compatibility review, and legacy reconciliation. Use this bounded read instead of raw SQL, fixed ceilings, or a first-page truncation guess.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Managed-dispatch inventory page read",
+    "result_type": "managed_dispatch_inventory_result",
+    "result_description": "A bounded dispatches page with returned, truncated, and next_cursor fields.",
+    "presentation_guidance": "State the returned count and whether next_cursor is null. Never describe a truncated page as the complete inventory. Preserve nullable legacy TTL fields as null."
+  },
+  "error_processor_customizations": {
+    "action_context": "Reads managed_dispatch through StateManagementInterface.query_ordered using the composite created_at/id cursor; no state changes occur.",
+    "error_interpretation": "page_limit_invalid means limit is outside 1..250. page_cursor_invalid means only one cursor component was supplied. state_service_unavailable means the state service is not bound.",
+    "recovery_guidance": "Use a valid page size and echo both cursor components exactly. Restart from the first page if a cursor was copied incompletely."
+  }
+}

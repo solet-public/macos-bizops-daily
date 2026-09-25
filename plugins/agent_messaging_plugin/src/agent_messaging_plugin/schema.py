@@ -793,7 +793,7 @@ def get_managed_session_schema() -> TableSchema:
         table_name=TABLE_MANAGED_SESSION,
         description=(
             "Session lifecycle ledger — identity, lineage, dispatch config, "
-            "host, contract (report-or-die + TTL), and the current-state "
+            "host, independent report contract, and the current-state "
             "lifecycle_state projection (AMEND 2b; full history in "
             "session_transition)."
         ),
@@ -865,7 +865,7 @@ def get_managed_session_schema() -> TableSchema:
             ),
             "dispatch_kind": ColumnDefinition(
                 type=ColumnType.TEXT,
-                description="Required model-dispatch policy kind: diagnose | design | review | fix | infrastructure.",
+                description="Required nonblank unit-kind provenance text; register phase names include design, review, implement, test, and fix. The value does not choose a model pair.",
             ),
             "reviewed_report_vendor": ColumnDefinition(
                 type=ColumnType.TEXT,
@@ -878,8 +878,8 @@ def get_managed_session_schema() -> TableSchema:
             "scope_tags": ColumnDefinition(
                 type=ColumnType.JSON,
                 description=(
-                    "Caller-declared capability-floor scopes (e.g. [\"state_schema\"]) "
-                    "from model_dispatch_policy.v1.json capability_floors (iss_63d91ca9)."
+                    "Caller-declared work scope tags (e.g. [\"state_schema\"]) "
+                    "preserved as provenance; the state_schema model floor is retired (rul_0c6ec7c7)."
                 ),
             ),
             "capability_floors": ColumnDefinition(
@@ -1034,7 +1034,7 @@ def get_managed_session_schema() -> TableSchema:
             ),
             "expires_at": ColumnDefinition(
                 type=ColumnType.DATETIME,
-                description="TTL from spawn_session's ttl_seconds, if any.",
+                description="Retired session lifetime storage; retained for legacy reconciliation only.",
             ),
             "lifecycle_state": ColumnDefinition(
                 type=ColumnType.TEXT,
@@ -1130,6 +1130,7 @@ def get_managed_session_schema() -> TableSchema:
             # before dispatch — indexed so the guard costs one index probe
             # rather than a fleet scan on every spawn.
             IndexDefinition(name="idx_managed_session_local_name", columns=["local_name"]),
+            IndexDefinition(name="idx_managed_session_unit", columns=["unit_id"]),
         ],
     )
 
@@ -1144,11 +1145,16 @@ def get_managed_dispatch_schema() -> TableSchema:
         "work_class": "Work authority classification.",
         "budget_line": "Budget attribution key.",
         "brief_ref": "Exact immutable brief path.",
-        "unit_id": "Optional project-solet work-unit identity resolvable by the spawned lane.",
+        "unit_id": "Register unit identity ensured before spawn.",
         "repository_root": (
             "Optional absolute Git checkout selected for the lane; retained in the immutable "
             "dispatch contract for retries."
         ),
+        # Nullable: rows that predate the register Unit mint (unt_57725090)
+        # carry NULL, which the mint code reads as empty.
+        "unit_mint_state": "How unit_id was ensured: minted, adopted, or verified; empty before.",
+        "unit_mint_key": "Register unit_key pinned at prepare (or the verified Unit's own key).",
+        "unit_repository_id": "Register repository resolved from the lane root, never cwd.",
         "brief_sha256": "SHA-256 of the exact brief bytes.",
         "expected_path": "Exact expected completion artifact.",
         "completion_contract_sha256": "Digest of the structured completion contract.",
@@ -1239,8 +1245,8 @@ def get_managed_dispatch_schema() -> TableSchema:
             "scope_tags": ColumnDefinition(
                 type=ColumnType.JSON,
                 description=(
-                    "Declared capability-floor scopes carried in the immutable contract so a "
-                    "retry cannot drop the declaration that floored the model (iss_63d91ca9)."
+                    "Declared work scope tags carried in the immutable contract so a "
+                    "retry cannot drop provenance, including state_schema (rul_0c6ec7c7)."
                 ),
             ),
             # Defaults on the three receipt columns exist for rows that predate
@@ -1261,6 +1267,17 @@ def get_managed_dispatch_schema() -> TableSchema:
                     "Immutable difficulty score that the spawn receipt must prove. 0.0 is "
                     "the unset value for a non-enforced or pre-enforcement row; the score is "
                     "only meaningful when selection_receipt_enforced is true."
+                ),
+            ),
+            "unit_mint_receipt": ColumnDefinition(
+                type=ColumnType.JSON,
+                description="Verbatim psolet receipt for a minted Unit, or the adoption readback.",
+            ),
+            "unit_mint_request": ColumnDefinition(
+                type=ColumnType.JSON,
+                description=(
+                    "Immutable mint inputs pinned at prepare (expected repository_id, "
+                    "addresses, reference basis) so a retry mints exactly the same Unit."
                 ),
             ),
             "selection_receipt": ColumnDefinition(
@@ -1300,8 +1317,10 @@ def get_managed_dispatch_schema() -> TableSchema:
             ),
             "ttl_seconds": ColumnDefinition(
                 type=ColumnType.INTEGER,
-                not_null=True,
-                description="Attempt-level TTL window passed to the host lifecycle.",
+                description=(
+                    "Retired attempt lifetime storage; retained nullable for legacy "
+                    "reconciliation. Current writers omit this value."
+                ),
             ),
             "attempt_number": ColumnDefinition(
                 type=ColumnType.INTEGER,
@@ -1356,8 +1375,9 @@ def get_managed_dispatch_schema() -> TableSchema:
     ):
         columns[name] = ColumnDefinition(
             type=ColumnType.DATETIME,
-            not_null=name in {"uptake_due_at", "report_by", "watchdog_due_at", "expires_at"},
-            description=f"Managed-dispatch timestamp: {name}.",
+            not_null=name in {"uptake_due_at", "report_by", "watchdog_due_at"},
+            description=("Retired lifetime timestamp; legacy reconciliation only."
+                         if name == "expires_at" else f"Managed-dispatch timestamp: {name}."),
         )
     for name in (
         "uptake_due_at_window_seconds",
@@ -1367,8 +1387,10 @@ def get_managed_dispatch_schema() -> TableSchema:
     ):
         columns[name] = ColumnDefinition(
             type=ColumnType.INTEGER,
-            not_null=True,
-            description=f"Immutable retry window derived at prepare: {name}.",
+            not_null=name != "expires_at_window_seconds",
+            description=("Retired lifetime window; legacy reconciliation only."
+                         if name == "expires_at_window_seconds"
+                         else f"Immutable retry window derived at prepare: {name}."),
         )
     return TableSchema(
         table_name=TABLE_MANAGED_DISPATCH,
@@ -1385,6 +1407,8 @@ def get_managed_dispatch_schema() -> TableSchema:
                 name="idx_managed_dispatch_current",
                 columns=["current_agent_instance_id"],
             ),
+            # "Which dispatches ever carried this Unit" is a lookup (s4.8).
+            IndexDefinition(name="idx_managed_dispatch_unit", columns=["unit_id"]),
         ],
     )
 
@@ -2845,7 +2869,7 @@ def get_session_lifecycle_schema_definition() -> SchemaDefinition:
     D1 is land-able alone)."""
     return SchemaDefinition(
         namespace=AGENT_ROLE_BINDING_NAMESPACE,
-        version="1.11.0",
+        version="1.12.0",
         description=(
             "Fleet session-management Phase B, D1 — L0 schema deltas. "
             "+1.1.0: session_context_status (maintenance-verbs M1). "
@@ -2860,7 +2884,9 @@ def get_session_lifecycle_schema_definition() -> SchemaDefinition:
             "managed_dispatch.repository_root retain the foreign lane checkout root. "
             "+1.10.0: append-only deployment-native Phase-A fleet-liveness and "
             "Phase-B per-workstream progress records. +1.11.0: model capability "
-            "catalog (observation, cell, refresh_run) for cost-aware dispatch."
+            "catalog (observation, cell, refresh_run) for cost-aware dispatch. "
+            "+1.12.0: nullable legacy managed-dispatch TTL storage for the F1 "
+            "blue/green compatibility bridge; current writers remain unchanged."
         ),
         tables={
             TABLE_SESSION_ROLE_CLAIM: get_session_role_claim_schema(),

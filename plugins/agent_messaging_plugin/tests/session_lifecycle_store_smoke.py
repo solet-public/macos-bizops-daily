@@ -600,7 +600,7 @@ def test_written_columns_are_declared() -> None:
             spawned_by_role="Claude-C",
             directed_by="operator:none",
             report_by_seconds=900,
-            ttl_seconds=3600,
+
         ),
     )
     declared = set(get_managed_session_schema().columns)

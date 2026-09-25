@@ -42,9 +42,8 @@ def validate_spawn_policy(
 
     Called twice per spawn: once before anything else (declared ``scope_tags``
     only, ``brief_snapshot=None``) and once more after the workbench brief is
-    read, so a floor the brief's own text triggers applies even when the
-    caller omitted the tag. Both calls precede every host side effect and
-    ledger write.
+    read. A configured floor may use the brief text; the retired state_schema
+    floor does not. Both calls precede every host side effect and ledger write.
     """
     try:
         return validate_spawn_dispatch(

@@ -23,7 +23,11 @@ from .contract_reconciliation_validation import (
     parse_operation_statuses_to_reset,
     reconciliation_entry,
 )
-from .contract_validation import validate_contract_bundle
+from .contract_validation import (
+    declares_knowledge_readiness,
+    validate_contract_bundle,
+    validate_knowledge_readiness,
+)
 from .decision_activation import active_decision_ids
 from .errors import ContractError
 from .models import JsonValue
@@ -450,6 +454,20 @@ class ContractBundle:
             "executor_contracts.start_command",
         )
 
+
+
+def knowledge_readiness_budget(bundle: ContractBundle) -> int:
+    """Return the separately declared parent timeout for knowledge stage exit."""
+    # Older pinned schemas use the ordinary boundary timeout. A schema that
+    # declares the dedicated policy must provide it; malformed policy never
+    # takes this historical execution path.
+    executor = _object(bundle.flow, "executor_contracts")
+    if not declares_knowledge_readiness(bundle.flow_schema) and "knowledge_readiness" not in executor:
+        return 30
+    validate_knowledge_readiness(bundle.flow)
+    source = "executor_contracts.knowledge_readiness"
+    readiness = _json_object(_object(bundle.flow, "executor_contracts").get("knowledge_readiness"), source)
+    return _integer(readiness, "timeout_seconds", source)
 
 def startup_readiness_budget(bundle: ContractBundle) -> StartupReadinessBudget:
     """Return validated startup-readiness authority and consumer lineage."""

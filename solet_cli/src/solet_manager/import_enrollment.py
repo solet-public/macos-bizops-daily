@@ -49,6 +49,7 @@ from .registry import (
 from .release_identity_gate import require_manager_seed_pairing
 from .state_io import instance_lock, write_content_addressed_json
 from .transaction import (
+    Transaction,
     append_maintenance_attempt,
     create_import_maintenance_operation,
     load_transaction,
@@ -94,6 +95,7 @@ class ImportPreview:
     operation_id: str
     idempotency_key: str
     inspection: object
+    management_origin: ManagementOrigin = ManagementOrigin.IMPORT
 
     def to_command_result(self) -> CommandResult:
         return CommandResult(
@@ -250,15 +252,10 @@ def _enroll_import_locked(preview: ImportPreview) -> ImportEnrollmentResult:
     """Enroll only while both Manager registry identities are stable."""
     v1_match = _matching_v1_managed_import(preview)
     if v1_match is not None:
-        return ImportEnrollmentResult(
-            preview,
-            "already_managed",
-            ManagementOrigin.CREATE,
-            v1_match.name,
-        )
-    if _is_finalized_matching_import(preview):
-        return ImportEnrollmentResult(preview, "already_managed")
+        preview = replace(preview, management_origin=ManagementOrigin.CREATE)
     _require_unclaimed_import_identity(preview)
+    if _is_finalized_matching_import(preview):
+        return _enrollment_result(preview, "already_managed", v1_match)
     bundle_digest = canonical_sha256(preview.bundle)
     already_managed = _write_prepared_import_journal(preview, bundle_digest)
     write_content_addressed_json(
@@ -268,10 +265,20 @@ def _enroll_import_locked(preview: ImportPreview) -> ImportEnrollmentResult:
     _publish_inventory(preview, bundle_digest)
     _advance_journal(preview, "inventory_published", "inventory_published", "inventory_published")
     _finalize_import(preview)
-    return ImportEnrollmentResult(preview, "already_managed" if already_managed else "imported")
+    return _enrollment_result(
+        preview, "already_managed" if already_managed or v1_match else "imported", v1_match
+    )
 
 
-def _matching_v1_managed_import(preview: ImportPreview):
+def _enrollment_result(
+    preview: ImportPreview, status: str, v1_match: InstanceRecord | None
+) -> ImportEnrollmentResult:
+    return ImportEnrollmentResult(
+        preview, status, preview.management_origin, None if v1_match is None else v1_match.name
+    )
+
+
+def _matching_v1_managed_import(preview: ImportPreview) -> InstanceRecord | None:
     """Return an exact create-origin match, or fail closed on a partial one."""
     records = InstanceRegistry(preview.request.manager_paths.registry_path).list()
     record = next((item for item in records if item.name == preview.request.name), None)
@@ -279,7 +286,9 @@ def _matching_v1_managed_import(preview: ImportPreview):
         return None
     inspection = cast(ExistingInstallInspectionResult, preview.inspection)
     transaction = load_transaction(preview.request.manager_paths.transaction_path(record.name))
-    if transaction is not None and transaction.status.value != "verified":
+    if transaction is None:
+        raise ManagedIdentityDriftError("create-origin transaction identity is unproven")
+    if transaction.status.value != "verified":
         raise OperationInProgressError("create-origin transaction remains nonterminal")
     if not _v1_record_matches_inspection(record, inspection, transaction):
         raise ManagedIdentityDriftError("create-origin identity does not match inspected import")
@@ -289,7 +298,7 @@ def _matching_v1_managed_import(preview: ImportPreview):
 def _v1_record_matches_inspection(
     record: InstanceRecord,
     inspection: ExistingInstallInspectionResult,
-    transaction: object,
+    transaction: Transaction,
 ) -> bool:
     facts = inspection.facts
     return (
@@ -297,7 +306,7 @@ def _v1_record_matches_inspection(
         and facts.head_commit == record.seed_commit
         and facts.head_tree == record.seed_tree_hash
         and _v1_seed_id(record, inspection) == inspection.channel_identity.seed_id
-        and (transaction is None or _matching_v1_transaction(transaction, record))
+        and _matching_v1_transaction(transaction, record)
     )
 
 
@@ -316,7 +325,7 @@ def _v1_target_matches(record: InstanceRecord, inspection: ExistingInstallInspec
     ) == (inspected.target_device, inspected.target_inode)
 
 
-def _v1_seed_id(record, inspection: ExistingInstallInspectionResult) -> str | None:
+def _v1_seed_id(record: InstanceRecord, inspection: ExistingInstallInspectionResult) -> str | None:
     """Derive the v1 seed identity from its immutable seed fields and channel."""
     channel = inspection.channel_identity
     facts = inspection.facts
@@ -330,13 +339,16 @@ def _v1_seed_id(record, inspection: ExistingInstallInspectionResult) -> str | No
     return channel.seed_id
 
 
-def _matching_v1_transaction(transaction, record) -> bool:
+def _matching_v1_transaction(transaction: Transaction, record: InstanceRecord) -> bool:
+    """Match every immutable seed field persisted by the v1 create registry."""
     return (
         transaction.name == record.name
         and transaction.target == record.target
         and transaction.seed.repository == record.seed_repository
         and transaction.seed.commit == record.seed_commit
         and transaction.seed.tree_hash == record.seed_tree_hash
+        and transaction.seed.release_tag == record.seed_tag
+        and transaction.seed.profile == record.profile
     )
 
 
@@ -355,6 +367,9 @@ def _require_unclaimed_import_identity(preview: ImportPreview) -> None:
     if incumbent is not None:
         if not _same_import_identity(incumbent, record):
             raise ValueError("managed_identity_drift")
+        return
+    if preview.management_origin is ManagementOrigin.CREATE:
+        build_combined_registry_snapshot(snapshot.v1_records, (*snapshot.v2_records, record))
         return
     require_unique_identity(
         snapshot.indexes,
@@ -520,7 +535,7 @@ def _inventory_record(
             FilesystemIdentity(target.target_device, target.target_inode),
             FilesystemIdentity(target.parent_device, target.parent_inode),
         ),
-        ManagementOrigin.IMPORT,
+        preview.management_origin,
         ManagementState.DIAGNOSTIC,
         UpdateEligibility(eligibility, ()),
         ServiceIdentity(
@@ -604,7 +619,7 @@ def _same_import_identity(
         actual.instance_id == expected.instance_id
         and actual.name == expected.name
         and actual.target == expected.target
-        and actual.management_origin is ManagementOrigin.IMPORT
+        and actual.management_origin is expected.management_origin
         and actual.channel == expected.channel
         and actual.observed_provenance == expected.observed_provenance
         and actual.source_release == expected.source_release

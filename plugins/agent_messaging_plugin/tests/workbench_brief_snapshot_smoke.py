@@ -211,36 +211,25 @@ def test_unchanged_paths_and_multiline(root: Path) -> None:
                     session_hosts._REGISTRY[key] = prior  # noqa: SLF001
 
 
-def test_brief_marker_capability_floor(root: Path) -> None:
-    """iss_63d91ca9 member 1: a brief that names a schema identifier floors the spawn's model
-    even when the caller declared no scope_tags and picked infrastructure (allow_any_pair)."""
+def test_brief_marker_has_no_retired_floor(root: Path) -> None:
+    """rul_0c6ec7c7: a schema identifier in a brief no longer constrains model choice."""
     with _Fixture(root) as fixture:
         ref = "workbench/schema_brief.md"
         fixture.source(ref, b"Add a dependency_snapshots TableSchema with a ColumnDefinition per field.\n")
         before = fixture.provisioned
-        refused = ""
-        try:
-            spawn_session(_state(), _spawn_req(
-                host=_TEST_HOST, lane_id="floor-sonnet", brief_ref=ref, repository_root=str(root),
-                dispatch_kind="infrastructure", agent_runtime="claude_code", model="claude-sonnet-5",
-            ))
-        except VerbError as exc:
-            refused = exc.code
-        _check(
-            refused == "capability_floor_violation" and before == fixture.provisioned,
-            "undeclared schema-touching brief under infrastructure refuses claude-sonnet-5 before provision",
-        )
         state = _state()
         spawn_session(state, _spawn_req(
-            host=_TEST_HOST, lane_id="floor-opus", brief_ref=ref, repository_root=str(root),
-            dispatch_kind="infrastructure", agent_runtime="claude_code", model="claude-opus-5",
+            host=_TEST_HOST, lane_id="floor-sonnet", brief_ref=ref, repository_root=str(root),
+            dispatch_kind="infrastructure", agent_runtime="claude_code", model="claude-sonnet-5",
         ))
-        row = list_sessions(state, {"lane_id": "floor-opus"})["sessions"][0]
         _check(
-            row.get("scope_tags") == [] and row.get("capability_floors") == [
-                {"tag": "state_schema", "source": "brief_marker", "detail": "ColumnDefinition"},
-            ],
-            f"the ledger row records the brief-detected floor that governed the model (got {row.get('capability_floors')!r})",
+            fixture.provisioned == before + 1,
+            "schema-touching brief under infrastructure can provision claude-sonnet-5",
+        )
+        row = list_sessions(state, {"lane_id": "floor-sonnet"})["sessions"][0]
+        _check(
+            row.get("scope_tags") == [] and row.get("capability_floors") == [],
+            f"the ledger row records no retired floor (got {row.get('capability_floors')!r})",
         )
 
 
@@ -249,7 +238,7 @@ def main() -> int:
         root = Path(directory)
         test_delivery_and_refusals(root)
     with tempfile.TemporaryDirectory() as directory:
-        test_brief_marker_capability_floor(Path(directory))
+        test_brief_marker_has_no_retired_floor(Path(directory))
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         test_boundaries_drift_and_parent_swap(root)

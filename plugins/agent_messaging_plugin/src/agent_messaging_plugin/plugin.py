@@ -44,6 +44,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Protocol
 
 from ananta.constants import FRAMEWORK_ASYNC_JOBS_TABLE, FRAMEWORK_NAMESPACE
+from ananta.core.actions.action_factory import reject_retired_session_arguments
 from ananta.core.actions.action_metadata import (
     ContextHandling,
     MergeErrorProcessorCustomizations,
@@ -219,6 +220,12 @@ from .managed_dispatch import (
     dispatch_managed_work as lifecycle_dispatch_managed_work,
 )
 from .managed_dispatch import (
+    managed_dispatch_events as lifecycle_managed_dispatch_events,
+)
+from .managed_dispatch import (
+    managed_dispatch_inventory as lifecycle_managed_dispatch_inventory,
+)
+from .managed_dispatch import (
     managed_dispatch_status as lifecycle_managed_dispatch_status,
 )
 from .managed_dispatch import (
@@ -286,6 +293,11 @@ from .peer_registry import (
 )
 from .platform_surface import PlatformSurface
 from .process_exposure import ProcessExportPolicy
+from .register_unit_client import (
+    CONFIG_PSOLET_CLI,
+    PsoletRegisterUnitClient,
+    resolve_psolet_cli,
+)
 from .role_binding_store import (
     RoleBindingMalformedError,
     RoleBindingVacantError,
@@ -371,7 +383,6 @@ from .session_sweep import (
     sweep_managed_dispatches,
     sweep_overdue_sessions,
     sweep_rotation_due_sessions,
-    sweep_ttl_overdue_sessions,
     sweep_unregistered_spawning_sessions,
 )
 from .system_slots import (
@@ -1077,12 +1088,6 @@ class AgentMessagingPlugin(
         # NoticeLatch cannot serve it -- see BandEdgeLatch's docstring for why
         # the difference is a correctness one and not a refinement.
         self._rotation_self_latch: BandEdgeLatch = BandEdgeLatch()
-        # R4 TTL latch — a THIRD independent instance for the same reason, and
-        # the strongest case of the three: one session can be TTL-overdue AND
-        # rotation-due AND dark simultaneously. Unlike the other two, this
-        # condition can never clear on its own (expires_at is frozen, the clock
-        # only advances), so an unlatched leg would notify every tick forever.
-        self._ttl_overdue_latch: NoticeLatch = NoticeLatch()
         self._platform_surface: PlatformSurface | None = None
         # D-IF7/D-IF8 sidecar: per-bridge SessionInferenceProvider keyed
         # by agent_instance_id. Populated post-success in the stdio
@@ -2099,6 +2104,20 @@ class AgentMessagingPlugin(
             ),
             "managed_dispatch_status": EdgeProcessDefinition(
                 name="managed_dispatch_status",
+                result_processor_template_customizations=MergeResultProcessorCustomizations(),
+                error_processor_template_customizations=MergeErrorProcessorCustomizations(
+                    retryable=True,
+                ),
+            ),
+            "managed_dispatch_inventory": EdgeProcessDefinition(
+                name="managed_dispatch_inventory",
+                result_processor_template_customizations=MergeResultProcessorCustomizations(),
+                error_processor_template_customizations=MergeErrorProcessorCustomizations(
+                    retryable=True,
+                ),
+            ),
+            "managed_dispatch_events": EdgeProcessDefinition(
+                name="managed_dispatch_events",
                 result_processor_template_customizations=MergeResultProcessorCustomizations(),
                 error_processor_template_customizations=MergeErrorProcessorCustomizations(
                     retryable=True,
@@ -3463,7 +3482,7 @@ class AgentMessagingPlugin(
                 type=ParameterType.STRING,
             ),
             "dispatch_kind": ParameterMetadata(
-                description="Required assignment kind: diagnose | design | review | fix | infrastructure.",
+                description="Required nonblank unit-kind provenance text; the value does not choose a model pair.",
                 required=True,
                 type=ParameterType.STRING,
             ),
@@ -3488,7 +3507,7 @@ class AgentMessagingPlugin(
                 type=ParameterType.STRING,
             ),
             "scope_tags": ParameterMetadata(
-                description="Capability-floor scopes this work touches, e.g. [\"state_schema\"] for any change that declares or modifies a state-service table (get_schema_definitions / ColumnDefinition). A declared floor restricts the tuple regardless of dispatch_kind. The same floor is applied automatically when the workbench brief names a schema identifier, so omitting the tag never lowers the floor (iss_63d91ca9 / iss_da9e5e67).",
+                description="Caller-declared work scope tags, e.g. [\"state_schema\"] for a state-service table change. Tags preserve provenance and do not by themselves restrict the model; the state_schema model floor is retired (rul_0c6ec7c7).",
                 required=False,
                 type=ParameterType.LIST,
             ),
@@ -3541,11 +3560,6 @@ class AgentMessagingPlugin(
             ),
             "report_by_seconds": ParameterMetadata(
                 description="Initial report-or-die deadline, in seconds from spawn.",
-                required=False,
-                type=ParameterType.INTEGER,
-            ),
-            "ttl_seconds": ParameterMetadata(
-                description="Optional hard TTL, in seconds from spawn.",
                 required=False,
                 type=ParameterType.INTEGER,
             ),
@@ -3626,6 +3640,10 @@ class AgentMessagingPlugin(
         ``host_mechanism_missing``.
         """
         raw = params.get("parameters", params)
+        try:
+            reject_retired_session_arguments("plugin::agent_messaging_plugin::spawn_session", raw)
+        except FrameworkError as exc:
+            return _failure_result(code=str(exc.error_code), message=str(exc))
         state_service = self._get_state_service()
         if state_service is None:
             return _failure_result(
@@ -3657,19 +3675,55 @@ class AgentMessagingPlugin(
             "role_name": ParameterMetadata(required=True, type=ParameterType.STRING),
             "brief_ref": ParameterMetadata(required=True, type=ParameterType.STRING),
             "repository_root": ParameterMetadata(required=False, type=ParameterType.STRING),
+            # Register Unit mint (design unt_57725090 s4.1). Empty unit_id mints a
+            # Unit before spawn; a supplied one is verified against the register.
+            "unit_id": ParameterMetadata(
+                required=False, type=ParameterType.STRING,
+                description="Existing register Unit to verify; empty mints one before spawn.",
+            ),
+            "repository_id": ParameterMetadata(
+                required=False, type=ParameterType.STRING,
+                description="Expected register repository; must equal the one resolved from the lane root.",
+            ),
+            "unit_key": ParameterMetadata(
+                required=False, type=ParameterType.STRING,
+                description="Minted unit_key override; default <lane_id>-<dispatch_id>.",
+            ),
+            "addresses": ParameterMetadata(
+                required=False, type=ParameterType.LIST,
+                description="Issue ids the minted Unit addresses; ignored when unit_id is supplied.",
+            ),
+            "reference_basis": ParameterMetadata(
+                required=False, type=ParameterType.STRING,
+                description="Register reference basis for a minted fix Unit (existing_pattern or no_existing_pattern).",
+            ),
+            "reference_basis_reason": ParameterMetadata(
+                required=False, type=ParameterType.STRING,
+                description="Nonblank reason required by no_existing_pattern.",
+            ),
+            "brief_repository_root": ParameterMetadata(
+                required=False, type=ParameterType.STRING,
+                description=(
+                    "Absolute root of the registered repository holding a brief that lives outside the lane "
+                    "root (psolet --brief-repo). Never inferred: an outside brief without it is refused."
+                ),
+            ),
             "brief_sha256": ParameterMetadata(required=True, type=ParameterType.STRING),
             "expected_path": ParameterMetadata(required=True, type=ParameterType.STRING),
             "completion_contract": ParameterMetadata(required=True, type=ParameterType.OBJECT),
             "work_class": ParameterMetadata(required=True, type=ParameterType.STRING),
             "budget_line": ParameterMetadata(required=True, type=ParameterType.STRING),
             "model": ParameterMetadata(required=True, type=ParameterType.STRING),
-            "dispatch_kind": ParameterMetadata(required=True, type=ParameterType.STRING),
+            "dispatch_kind": ParameterMetadata(
+                required=True, type=ParameterType.STRING,
+                description="Required nonblank unit-kind provenance text; the value does not choose a model pair.",
+            ),
             "difficulty_score": ParameterMetadata(required=True, type=ParameterType.FLOAT),
             "selection_receipt": ParameterMetadata(required=True, type=ParameterType.OBJECT),
             "reviewed_report_vendor": ParameterMetadata(required=False, type=ParameterType.STRING),
             "pair_id": ParameterMetadata(required=False, type=ParameterType.STRING),
             "scope_tags": ParameterMetadata(
-                required=False, type=ParameterType.LIST, description="Capability-floor scopes this work touches, e.g. [\"state_schema\"] for any change that declares or modifies a state-service table (get_schema_definitions / ColumnDefinition). A declared floor restricts the tuple regardless of dispatch_kind. The same floor is applied automatically when the workbench brief names a schema identifier, so omitting the tag never lowers the floor (iss_63d91ca9 / iss_da9e5e67).",
+                required=False, type=ParameterType.LIST, description="Caller-declared work scope tags, e.g. [\"state_schema\"] for a state-service table change. Tags preserve provenance and do not by themselves restrict the model; the state_schema model floor is retired (rul_0c6ec7c7).",
             ),
             "effort": ParameterMetadata(required=True, type=ParameterType.STRING),
             "agent_runtime": ParameterMetadata(required=True, type=ParameterType.STRING),
@@ -3679,7 +3733,6 @@ class AgentMessagingPlugin(
             "visibility": ParameterMetadata(required=True, type=ParameterType.STRING),
             "local_name": ParameterMetadata(required=True, type=ParameterType.STRING),
             "report_by_seconds": ParameterMetadata(required=True, type=ParameterType.INTEGER),
-            "ttl_seconds": ParameterMetadata(required=True, type=ParameterType.INTEGER),
             "allowed_tools": ParameterMetadata(required=True, type=ParameterType.LIST),
             "permission_mode": ParameterMetadata(required=True, type=ParameterType.STRING),
             "transport": ParameterMetadata(required=True, type=ParameterType.STRING),
@@ -3691,7 +3744,6 @@ class AgentMessagingPlugin(
             "uptake_due_at": ParameterMetadata(required=True, type=ParameterType.STRING),
             "report_by": ParameterMetadata(required=True, type=ParameterType.STRING),
             "watchdog_due_at": ParameterMetadata(required=True, type=ParameterType.STRING),
-            "expires_at": ParameterMetadata(required=True, type=ParameterType.STRING),
         },
         output_type="object",
         output_description="Prepared dispatch plus linked current attempt and first-turn evidence.",
@@ -3710,6 +3762,10 @@ class AgentMessagingPlugin(
         state: dict[str, Any],
     ) -> dict[str, Any]:
         raw = params.get("parameters", params)
+        try:
+            reject_retired_session_arguments("plugin::agent_messaging_plugin::dispatch_managed_work", raw)
+        except FrameworkError as exc:
+            return _failure_result(code=str(exc.error_code), message=str(exc))
         state_service = self._get_state_service()
         if state_service is None:
             return _failure_result(
@@ -3734,7 +3790,9 @@ class AgentMessagingPlugin(
                     "Authenticated caller does not hold spawned_by_role.",
                 )
             spec = _dispatch_spec_from_params(raw, spawn_req, directed_by)
-            result = lifecycle_dispatch_managed_work(state_service, spec, spawn_req)
+            result = lifecycle_dispatch_managed_work(
+                state_service, spec, spawn_req, register=self._register_unit_client(),
+            )
         except (DispatchError, VerbError) as exc:
             return _failure_result(
                 code=exc.code,
@@ -3751,19 +3809,37 @@ class AgentMessagingPlugin(
             "requested_role_class": ParameterMetadata(required=False, type=ParameterType.STRING),
             "lane_id": ParameterMetadata(required=True, type=ParameterType.STRING),
             "brief_ref": ParameterMetadata(required=True, type=ParameterType.STRING),
+            "reference_basis": ParameterMetadata(
+                required=False, type=ParameterType.STRING,
+                description="Register reference basis for the minted Unit; required when dispatch_kind is fix.",
+            ),
+            "reference_basis_reason": ParameterMetadata(
+                required=False, type=ParameterType.STRING,
+                description="Nonblank reason required by no_existing_pattern.",
+            ),
+            "brief_repository_root": ParameterMetadata(
+                required=False, type=ParameterType.STRING,
+                description=(
+                    "Absolute root of the registered repository holding a brief that lives outside the lane "
+                    "root (psolet --brief-repo). Never inferred: an outside brief without it is refused."
+                ),
+            ),
             "brief_sha256": ParameterMetadata(required=True, type=ParameterType.STRING),
             "expected_path": ParameterMetadata(required=True, type=ParameterType.STRING),
             "completion_contract": ParameterMetadata(required=True, type=ParameterType.OBJECT),
             "work_class": ParameterMetadata(required=True, type=ParameterType.STRING),
             "budget_line": ParameterMetadata(required=True, type=ParameterType.STRING),
             "model": ParameterMetadata(required=True, type=ParameterType.STRING),
-            "dispatch_kind": ParameterMetadata(required=True, type=ParameterType.STRING),
+            "dispatch_kind": ParameterMetadata(
+                required=True, type=ParameterType.STRING,
+                description="Required nonblank unit-kind provenance text; the value does not choose a model pair.",
+            ),
             "difficulty_score": ParameterMetadata(required=True, type=ParameterType.FLOAT),
             "selection_receipt": ParameterMetadata(required=True, type=ParameterType.OBJECT),
             "reviewed_report_vendor": ParameterMetadata(required=False, type=ParameterType.STRING),
             "pair_id": ParameterMetadata(required=False, type=ParameterType.STRING),
             "scope_tags": ParameterMetadata(
-                required=False, type=ParameterType.LIST, description="Capability-floor scopes this work touches, e.g. [\"state_schema\"] for any change that declares or modifies a state-service table (get_schema_definitions / ColumnDefinition). A declared floor restricts the tuple regardless of dispatch_kind. The same floor is applied automatically when the workbench brief names a schema identifier, so omitting the tag never lowers the floor (iss_63d91ca9 / iss_da9e5e67).",
+                required=False, type=ParameterType.LIST, description="Caller-declared work scope tags, e.g. [\"state_schema\"] for a state-service table change. Tags preserve provenance and do not by themselves restrict the model; the state_schema model floor is retired (rul_0c6ec7c7).",
             ),
             "effort": ParameterMetadata(required=True, type=ParameterType.STRING),
             "agent_runtime": ParameterMetadata(required=True, type=ParameterType.STRING),
@@ -3772,7 +3848,6 @@ class AgentMessagingPlugin(
             "spawned_by_role": ParameterMetadata(required=True, type=ParameterType.STRING),
             "visibility": ParameterMetadata(required=True, type=ParameterType.STRING),
             "report_by_seconds": ParameterMetadata(required=True, type=ParameterType.INTEGER),
-            "ttl_seconds": ParameterMetadata(required=True, type=ParameterType.INTEGER),
             "allowed_tools": ParameterMetadata(required=True, type=ParameterType.LIST),
             "permission_mode": ParameterMetadata(required=True, type=ParameterType.STRING),
             "transport": ParameterMetadata(required=True, type=ParameterType.STRING),
@@ -3784,7 +3859,6 @@ class AgentMessagingPlugin(
             "uptake_due_at": ParameterMetadata(required=True, type=ParameterType.STRING),
             "report_by": ParameterMetadata(required=True, type=ParameterType.STRING),
             "watchdog_due_at": ParameterMetadata(required=True, type=ParameterType.STRING),
-            "expires_at": ParameterMetadata(required=True, type=ParameterType.STRING),
         },
         output_type="object",
         output_description=(
@@ -3816,6 +3890,10 @@ class AgentMessagingPlugin(
         shared first-turn frame always tells named workers to claim first.
         """
         raw = params.get("parameters", params)
+        try:
+            reject_retired_session_arguments("plugin::agent_messaging_plugin::provision_role_session", raw)
+        except FrameworkError as exc:
+            return _failure_result(code=str(exc.error_code), message=str(exc))
         state_service = self._get_state_service()
         if state_service is None:
             return _failure_result(
@@ -3887,6 +3965,7 @@ class AgentMessagingPlugin(
             state_service,
             _dispatch_spec_from_params(spawn_raw, spawn_req, directed_by),
             spawn_req,
+            register=self._register_unit_client(),
         )
         return {
             "provisioning_action": "spawned",
@@ -3988,6 +4067,7 @@ class AgentMessagingPlugin(
                 prior_version=int(raw.get("prior_version") or 0),
                 payload=_as_object(raw.get("payload")),
                 observed_at=datetime.now(UTC),
+                register=self._register_unit_client(),
             )
         except DispatchError as exc:
             return _failure_result(code=exc.code, message=exc.message)
@@ -4022,6 +4102,142 @@ class AgentMessagingPlugin(
             result = lifecycle_managed_dispatch_status(
                 state_service,
                 str(raw.get("dispatch_id") or ""),
+            )
+        except DispatchError as exc:
+            return _failure_result(code=exc.code, message=exc.message)
+        return _success_result(data=result)
+
+    @platform_process(
+        name="managed_dispatch_inventory",
+        processor_policy_category=ProcessorPolicyCategory.EDGE,
+        parameters={
+            "state": ParameterMetadata(
+                required=False,
+                type=ParameterType.STRING,
+                description="Optional exact managed-dispatch state filter.",
+            ),
+            "limit": ParameterMetadata(
+                required=False,
+                type=ParameterType.INTEGER,
+                description="Page size from 1 through 250; defaults to 100.",
+            ),
+            "after_created_at": ParameterMetadata(
+                required=False,
+                type=ParameterType.STRING,
+                description="Echo next_cursor.created_at with after_id.",
+            ),
+            "after_id": ParameterMetadata(
+                required=False,
+                type=ParameterType.STRING,
+                description="Echo next_cursor.id with after_created_at.",
+            ),
+        },
+        output_type="object",
+        output_description="Tie-safe page of managed-dispatch inventory rows.",
+        return_value_schema=ReturnValueSchema(
+            type=ParameterType.OBJECT,
+            description="Managed-dispatch inventory page.",
+            properties={
+                "dispatches": ParameterMetadata(type=ParameterType.LIST),
+                "returned": ParameterMetadata(type=ParameterType.INTEGER),
+                "truncated": ParameterMetadata(type=ParameterType.BOOLEAN),
+                "next_cursor": ParameterMetadata(type=ParameterType.OBJECT),
+            },
+        ),
+    )
+    def managed_dispatch_inventory(
+        self,
+        params: dict[str, Any],
+        state: dict[str, Any],  # noqa: ARG002
+    ) -> dict[str, Any]:
+        raw = params.get("parameters", params)
+        state_service = self._get_state_service()
+        if state_service is None:
+            return _failure_result(
+                code="state_service_unavailable",
+                message="state_service is not bound on this solet.",
+            )
+        try:
+            result = lifecycle_managed_dispatch_inventory(
+                state_service,
+                state_name=str(raw.get("state") or ""),
+                limit=raw.get("limit", 100),
+                after_created_at=raw.get("after_created_at"),
+                after_id=raw.get("after_id"),
+            )
+        except DispatchError as exc:
+            return _failure_result(code=exc.code, message=exc.message)
+        return _success_result(data=result)
+
+    @platform_process(
+        name="managed_dispatch_events",
+        processor_policy_category=ProcessorPolicyCategory.EDGE,
+        parameters={
+            "dispatch_id": ParameterMetadata(
+                required=False,
+                type=ParameterType.STRING,
+                description="Optional owning dispatch filter; omit to enumerate all events.",
+            ),
+            "event_kind": ParameterMetadata(
+                required=False,
+                type=ParameterType.STRING,
+                description="Optional exact event-kind filter.",
+            ),
+            "accepted": ParameterMetadata(
+                required=False,
+                type=ParameterType.BOOLEAN,
+                description="Optional accepted/rejected filter.",
+            ),
+            "limit": ParameterMetadata(
+                required=False,
+                type=ParameterType.INTEGER,
+                description="Page size from 1 through 250; defaults to 100.",
+            ),
+            "after_event_at": ParameterMetadata(
+                required=False,
+                type=ParameterType.STRING,
+                description="Echo next_cursor.event_at with after_id.",
+            ),
+            "after_id": ParameterMetadata(
+                required=False,
+                type=ParameterType.STRING,
+                description="Echo next_cursor.id with after_event_at.",
+            ),
+        },
+        output_type="object",
+        output_description="Tie-safe page of append-only managed-dispatch events.",
+        return_value_schema=ReturnValueSchema(
+            type=ParameterType.OBJECT,
+            description="Managed-dispatch event page.",
+            properties={
+                "events": ParameterMetadata(type=ParameterType.LIST),
+                "returned": ParameterMetadata(type=ParameterType.INTEGER),
+                "truncated": ParameterMetadata(type=ParameterType.BOOLEAN),
+                "next_cursor": ParameterMetadata(type=ParameterType.OBJECT),
+            },
+        ),
+    )
+    def managed_dispatch_events(
+        self,
+        params: dict[str, Any],
+        state: dict[str, Any],  # noqa: ARG002
+    ) -> dict[str, Any]:
+        raw = params.get("parameters", params)
+        state_service = self._get_state_service()
+        if state_service is None:
+            return _failure_result(
+                code="state_service_unavailable",
+                message="state_service is not bound on this solet.",
+            )
+        try:
+            result = lifecycle_managed_dispatch_events(
+                state_service,
+                dispatch_id=str(raw.get("dispatch_id") or ""),
+                event_kind=str(raw.get("event_kind") or ""),
+                accepted=raw["accepted"] if "accepted" in raw else None,
+                limit=raw.get("limit", 100),
+                after_event_at=raw.get("after_event_at"),
+                after_id=raw.get("after_id"),
             )
         except DispatchError as exc:
             return _failure_result(code=exc.code, message=exc.message)
@@ -4743,7 +4959,6 @@ class AgentMessagingPlugin(
                 "host_ref": ParameterMetadata(type=ParameterType.STRING),
                 "capability_report": ParameterMetadata(type=ParameterType.OBJECT),
                 "report_by": ParameterMetadata(type=ParameterType.STRING),
-                "expires_at": ParameterMetadata(type=ParameterType.STRING),
                 "lifecycle_state": ParameterMetadata(type=ParameterType.STRING),
                 "last_transition_at": ParameterMetadata(type=ParameterType.STRING),
                 "directed_by": ParameterMetadata(type=ParameterType.STRING),
@@ -6931,12 +7146,12 @@ class AgentMessagingPlugin(
                 type=ParameterType.FLOAT,
             ),
             "dispatch_kind": ParameterMetadata(
-                description="diagnose | design | review | fix | infrastructure: records dispatch provenance; it never filters the cheapest capability-clearing candidates.",
+                description="Optional nonblank unit-kind provenance text; it never filters the cheapest capability-clearing candidates.",
                 required=False,
                 type=ParameterType.STRING,
             ),
             "scope_tags": ParameterMetadata(
-                description="Capability-floor scopes the work touches (e.g. [\"state_schema\"]): restricts candidates to the floor's own pairs on top of, and independent of, dispatch_kind -- including infrastructure. Same vocabulary as spawn_session/dispatch_managed_work.",
+                description="Caller-declared work scope tags (e.g. [\"state_schema\"]), preserved as provenance. The retired state_schema floor does not restrict candidates; numeric score and fresh catalog acceptance still govern selection. Same vocabulary as spawn_session/dispatch_managed_work.",
                 required=False,
                 type=ParameterType.LIST,
             ),
@@ -8827,54 +9042,6 @@ class AgentMessagingPlugin(
             self._run_rotation_surface_sweep()
         except Exception:  # noqa: BLE001 — one rider's fault must not skip the others
             logger.exception("L4 rotation-surface sweep FAULTED; sweeper continues")
-        try:
-            self._run_ttl_surface_sweep()
-        except Exception:  # noqa: BLE001 — one rider's fault must not skip the others
-            logger.exception("R4 TTL-surface sweep FAULTED; sweeper continues")
-
-    def _run_ttl_surface_sweep(self) -> None:
-        """R4 TTL-surface rider — the notice leg that watches the DECLARED
-        LIFETIME of a session rather than its liveness or its context gauge.
-
-        Its own rider, separately fault-isolated, on its own axis — and the axis
-        is why it is not folded into either neighbour rather than a matter of
-        taste. :meth:`_run_rotation_surface_sweep` separates itself from D1 on
-        "reads the gauge and only notifies" vs "reads lifecycle deadlines and
-        MUTATES". This leg sits across that split: it reads the LIFECYCLE ledger
-        like D1, but only NOTIFIES like L4, so neither existing rider's stated
-        rationale covers it. Adding it to one of them would mean weakening a
-        docstring to admit a member its reasoning does not reach, which is how a
-        rationale rots into decoration. A third rider keeps all three honest, and
-        buys the property that matters anyway: a TTL fault must not cost the
-        gauge leg its tick, or vice versa.
-
-        Its axis, stated so the next reader does not have to infer it: **this
-        rider answers "was this session supposed to be finished by now", a
-        question about the spawn's declared intent, which no other leg asks.**
-        D1 asks whether a session is still alive; L4 asks whether it is getting
-        expensive or has gone dark.
-
-        NOTICE, NEVER REAP — see :data:`EVENT_TTL_OVERDUE_NOTICE`. The platform
-        observes that a lane has outlived its declared TTL; a human-or-seat
-        decides what to do about it. A TTL-overdue lane is frequently one that is
-        mid-landing or holding for a ruling, and reaping it on a timer is a
-        failure this codebase has already paid for once.
-        """
-        state_service = self._get_state_service()
-        if state_service is None:
-            return
-        expired = sweep_ttl_overdue_sessions(
-            state_service,
-            peer_registry=self._peer_registry,
-            bridge_manager=self._bridge_manager,
-            latch=self._ttl_overdue_latch,
-        )
-        if expired:
-            logger.warning(
-                "R4 sweep: notified %d steward(s) of a session past its declared "
-                "TTL (expires_at); nothing was reaped — the decision is theirs",
-                expired,
-            )
 
     def _run_rotation_surface_sweep(self) -> None:
         """L4 rotation-surface rider — the two notice legs that watch the
@@ -10623,6 +10790,13 @@ class AgentMessagingPlugin(
             ),
         )
 
+    def _register_unit_client(self) -> PsoletRegisterUnitClient:
+        """The register client the managed-dispatch Unit mint calls (unt_57725090)."""
+        return PsoletRegisterUnitClient(
+            resolve_psolet_cli(_provider_get(self._resolve_config_provider(), CONFIG_PSOLET_CLI)),
+            solet_name=os.environ["SOLET_NAME"].strip(),
+        )
+
     def _build_session_lifecycle_policy_config(self) -> _SessionLifecyclePolicyConfig:
         provider = self._resolve_config_provider()
         return _SessionLifecyclePolicyConfig(
@@ -11145,7 +11319,6 @@ def _spawn_session_identity_params(raw: dict[str, Any]) -> dict[str, Any]:
 def _spawn_session_lifecycle_params(raw: dict[str, Any], directed_by: str) -> dict[str, Any]:
     return {
         "report_by_seconds": _param_positive_int(raw, "report_by_seconds"),
-        "ttl_seconds": _param_positive_int(raw, "ttl_seconds"),
         "spawned_by_instance_id": _param_text(raw, "spawned_by_instance_id"),
         "spawned_by_role": _param_text(raw, "spawned_by_role"),
         "directed_by": directed_by,
@@ -11202,7 +11375,6 @@ def _dispatch_spec_from_params(
         visibility=req.visibility,
         local_name=req.local_name,
         report_by_seconds=req.report_by_seconds,
-        ttl_seconds=req.ttl_seconds,
         allowed_tools=req.allowed_tools,
         permission_mode=req.permission_mode,
         transport=req.transport,
@@ -11214,7 +11386,6 @@ def _dispatch_spec_from_params(
         uptake_due_at=str(raw.get("uptake_due_at") or ""),
         report_by=str(raw.get("report_by") or ""),
         watchdog_due_at=str(raw.get("watchdog_due_at") or ""),
-        expires_at=str(raw.get("expires_at") or ""),
         dispatch_kind=req.dispatch_kind,
         reviewed_report_vendor=req.reviewed_report_vendor,
         pair_id=req.pair_id,
@@ -11222,6 +11393,12 @@ def _dispatch_spec_from_params(
         difficulty_score=req.difficulty_score,
         selection_receipt=req.selection_receipt or {},
         selection_receipt_enforced=req.enforce_selection_receipt,
+        repository_id=_param_text(raw, "repository_id"),
+        unit_key=_param_text(raw, "unit_key"),
+        addresses=_as_str_tuple(raw.get("addresses"), default=()),
+        reference_basis=_param_text(raw, "reference_basis"),
+        reference_basis_reason=_param_text(raw, "reference_basis_reason"),
+        brief_repository_root=_param_text(raw, "brief_repository_root"),
     )
 
 

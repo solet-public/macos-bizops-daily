@@ -15,6 +15,11 @@ from agent_messaging_plugin import model_dispatch_policy as policy  # noqa: E402
 
 _passed = 0
 _failed: list[str] = []
+REGISTER_MINTED_KINDS = (
+    "DESIGN", "FIX", "build", "design", "diagnose", "docs", "fix", "implement",
+    "implementation", "infrastructure", "integration", "repair", "review",
+    "smoke-test", "test", "test-close",
+)
 
 
 def _check(condition: object, label: str) -> None:
@@ -55,10 +60,10 @@ def test_missing_and_malformed_policy_refuse() -> None:
             policy._POLICY_PATH = original  # type: ignore[misc]  # noqa: SLF001
 
 
-def test_red_mutation_deleting_fix_row_makes_fix_refuse() -> None:
+def test_red_mutation_deleting_dispatch_kinds_section_refuses() -> None:
     original = policy._POLICY_PATH  # noqa: SLF001 -- red mutation fixture
     source = json.loads(original.read_text(encoding="utf-8"))
-    del source["dispatch_kinds"]["fix"]
+    del source["dispatch_kinds"]
     with tempfile.TemporaryDirectory() as raw:
         path = Path(raw) / "policy.json"
         path.write_text(json.dumps(source), encoding="utf-8")
@@ -71,37 +76,40 @@ def test_red_mutation_deleting_fix_row_makes_fix_refuse() -> None:
                         reviewed_report_vendor="", pair_id="",
                     ),
                 ) == "dispatch_policy_invalid",
-                "red mutation deleting the fix row refuses fix dispatch",
+                "red mutation deleting dispatch_kinds section refuses policy loading",
             )
         finally:
             policy._POLICY_PATH = original  # type: ignore[misc]  # noqa: SLF001
 
 
-def test_orchestrator_model_requires_profile_pair() -> None:
+def test_policy_without_retired_orchestrator_section() -> None:
     original = policy._POLICY_PATH  # noqa: SLF001 -- red mutation fixture
     source = json.loads(original.read_text(encoding="utf-8"))
-    source["orchestrator"]["allowed_models"].append("claude-unprofiled-fixture")
+    source["schema_version"] = 2
+    source.pop("orchestrator", None)
     with tempfile.TemporaryDirectory() as raw:
         path = Path(raw) / "policy.json"
         path.write_text(json.dumps(source), encoding="utf-8")
         try:
             policy._POLICY_PATH = path  # type: ignore[misc]  # noqa: SLF001
             _check(
+                _raises_code(lambda: policy.load_dispatch_policy()) == "",
+                "schema v2 policy without retired orchestrator section loads",
+            )
+            source["orchestrator"] = {"role_names": ["Main"], "allowed_models": ["claude-sonnet-5"]}
+            path.write_text(json.dumps(source), encoding="utf-8")
+            _check(
                 _raises_code(lambda: policy.load_dispatch_policy()) == "dispatch_policy_invalid",
-                "orchestrator model without a profile pair refuses policy loading",
+                "obsolete orchestrator allowlist is rejected rather than silently ignored",
             )
         finally:
             policy._POLICY_PATH = original  # type: ignore[misc]  # noqa: SLF001
 
 
-def test_fable_5_1_orchestrator_model_is_allowed() -> None:
-    role_label = chr(65) + "da-Main"
+def test_newer_profiled_model_is_not_seat_gated() -> None:
     _check(
-        policy.orchestrator_model_verdict(role_label=role_label, model="claude-fable-5-1") == (
-            True,
-            ("claude-sonnet-5", "claude-fable-5", "claude-fable-5-1"),
-        ),
-        "claude-fable-5-1 is allowed for the main role",
+        _validate("design", "claude-opus-5-5") == "",
+        "profiled newer Claude model is not seat-gated by dispatch policy",
     )
 
 
@@ -189,17 +197,45 @@ def test_low_score_fix_ticket_reaches_a_cheap_pair() -> None:
     )
 
 
-def test_state_schema_floor_outranks_fix_and_infrastructure() -> None:
-    """iss_63d91ca9 / iev_1850901f recommendations 2 + 3: the floor is independent of
-    dispatch_kind and of the ticket's raw score, and allow_any_pair cannot lower it."""
+def test_register_minted_kinds_are_first_class() -> None:
+    for kind in REGISTER_MINTED_KINDS:
+        _check(_validate(kind, "claude-opus-5") == "", f"register kind {kind!r} is accepted")
+    for kind in ("unknown-test-kind", "test ", "TEST"):
+        _check(_validate(kind, "claude-opus-5") == "", f"open nonblank provenance {kind!r} is accepted")
+    for kind in ("", " ", "\t"):
+        _check(_validate(kind, "claude-opus-5") == "dispatch_kind_required", f"blank kind {kind!r} refuses")
+    for kind in (123,):
+        _check(
+            _raises_code(lambda kind=kind: policy.validate_dispatch_kind(kind)) == "dispatch_policy_violation",
+            f"non-text kind {kind!r} refuses",
+        )
+    _check(
+        _raises_code(lambda: policy.validate_dispatch_kind(None)) == "dispatch_kind_required",
+        "missing kind retains dispatch_kind_required refusal",
+    )
+    _check(
+        _validate("test", "claude-sonnet-5", scope_tags=("state_schema",)) == "",
+        "state_schema provenance does not restrict a profiled model",
+    )
+    _check(
+        _raises_code(lambda: policy.validate_spawn_dispatch(
+            dispatch_kind="test", agent_runtime="codex", model="gpt-6-astra",
+            reviewed_report_vendor="", pair_id="", scope_tags=("state_schema",),
+        )) == "",
+        "Astra is accepted with state_schema provenance",
+    )
+
+
+def test_state_schema_tag_is_provenance() -> None:
+    """rul_0c6ec7c7 retires model gating by state schema scope or brief marker."""
     for kind in ("fix", "infrastructure"):
         for label, extra in (
             ("declared scope_tags", {"scope_tags": ("state_schema",)}),
             ("brief marker", {"brief_text": "declare the table in get_schema_definitions()"}),
         ):
             _check(
-                _validate(kind, "claude-sonnet-5", **extra) == "capability_floor_violation",
-                f"{kind} + {label} refuses claude-sonnet-5",
+                _validate(kind, "claude-sonnet-5", **extra) == "",
+                f"{kind} + {label} accepts profiled claude-sonnet-5",
             )
             for floor_model in ("claude-opus-5", "claude-fable-5-1"):
                 _check(
@@ -211,24 +247,27 @@ def test_state_schema_floor_outranks_fix_and_infrastructure() -> None:
         reviewed_report_vendor="", pair_id="", scope_tags=("state_schema",),
     )
     _check(
-        applied == (policy.AppliedFloor(tag="state_schema", source="declared", detail="scope_tags"),),
-        "the applied floor names its source (declared)",
+        applied == (),
+        "state_schema remains scope provenance without an applied floor",
     )
     _check(
-        _validate("infrastructure", "claude-opus-5", scope_tags=("not_a_floor",)) == "scope_tag_unknown",
-        "an undeclared scope tag refuses rather than silently applying nothing",
+        _validate("infrastructure", "claude-opus-5", scope_tags=("future_scope",)) == "",
+        "new nonblank scope tags remain open provenance",
+    )
+    _check(
+        _validate("infrastructure", "claude-opus-5", scope_tags=(" ",)) == "scope_tag_invalid",
+        "blank scope tags refuse",
     )
 
 
-def test_select_dispatch_tier_uses_only_capability_floors() -> None:
+def test_select_dispatch_tier_has_no_state_schema_floor() -> None:
     """The selector never consults a dispatch-kind pair table."""
     from agent_messaging_plugin import model_capability_verbs as verbs  # noqa: PLC0415
 
-    floor = frozenset({("claude_code", "claude-opus-5"), ("claude_code", "claude-fable-5-1"), ("codex", "gpt-5.6-sol")})
     infra, version, floors = verbs._capability_floor_pairs("infrastructure", ("state_schema",))  # noqa: SLF001
-    _check(infra == floor and version is not None and len(floors) == 1, "infrastructure + state_schema narrows to the floor pairs")
+    _check(infra is None and version is not None and floors == (), "infrastructure + state_schema has no model floor")
     fix, _, _ = verbs._capability_floor_pairs("fix", ("state_schema",))  # noqa: SLF001
-    _check(fix == floor, "fix + state_schema is the floor regardless of kind")
+    _check(fix is None, "fix + state_schema has no model floor")
     plain_fix, _, no_floors = verbs._capability_floor_pairs("fix", ())  # noqa: SLF001
     _check(
         plain_fix is None and no_floors == (),
@@ -252,21 +291,23 @@ def test_red_mutation_deleting_capability_floors_refuses_every_spawn() -> None:
                 _validate("infrastructure", "claude-opus-5") == "dispatch_policy_invalid",
                 "red mutation deleting capability_floors refuses even an infrastructure spawn",
             )
-            renamed = json.loads(json.dumps(source))
-            renamed["capability_floors"] = {"something_else": renamed["capability_floors"]["state_schema"]}
-            path.write_text(json.dumps(renamed), encoding="utf-8")
+            restored = json.loads(json.dumps(source))
+            restored["capability_floors"] = {"state_schema": {
+                "issue_ids": ["iss_fixture"], "reason": "fixture",
+                "brief_markers": ["TableSchema"],
+                "floor_pairs": [{"agent_runtime": "claude_code", "model": "claude-opus-5"}],
+            }}
+            path.write_text(json.dumps(restored), encoding="utf-8")
             _check(
                 _validate("infrastructure", "claude-opus-5") == "dispatch_policy_invalid",
-                "red mutation renaming the required state_schema floor refuses",
+                "red mutation restoring the retired state_schema model floor refuses",
             )
-            cheap = json.loads(json.dumps(source))
-            cheap["capability_floors"]["state_schema"]["floor_pairs"].append(
-                {"agent_runtime": "claude_code", "model": "claude-unprofiled-fixture"},
-            )
-            path.write_text(json.dumps(cheap), encoding="utf-8")
+            malformed = json.loads(json.dumps(source))
+            malformed["capability_floors"] = {"future_scope": {"issue_ids": ["iss_fixture"], "reason": "fixture", "brief_markers": ["FutureMarker"], "floor_pairs": [{"agent_runtime": "claude_code", "model": "claude-unprofiled-fixture"}]}}
+            path.write_text(json.dumps(malformed), encoding="utf-8")
             _check(
                 _validate("infrastructure", "claude-opus-5") == "dispatch_policy_invalid",
-                "a floor pair absent from model_profiles refuses policy loading",
+                "a future floor pair absent from model_profiles refuses policy loading",
             )
         finally:
             policy._POLICY_PATH = original  # type: ignore[misc]  # noqa: SLF001
@@ -274,14 +315,15 @@ def test_red_mutation_deleting_capability_floors_refuses_every_spawn() -> None:
 
 if __name__ == "__main__":
     test_missing_and_malformed_policy_refuse()
-    test_red_mutation_deleting_fix_row_makes_fix_refuse()
-    test_orchestrator_model_requires_profile_pair()
-    test_fable_5_1_orchestrator_model_is_allowed()
+    test_red_mutation_deleting_dispatch_kinds_section_refuses()
+    test_policy_without_retired_orchestrator_section()
+    test_newer_profiled_model_is_not_seat_gated()
     test_solo_dispatch_is_accepted_under_diagnose_design_and_review()
     test_pair_allowlist_cannot_return_to_the_policy()
     test_low_score_fix_ticket_reaches_a_cheap_pair()
-    test_state_schema_floor_outranks_fix_and_infrastructure()
-    test_select_dispatch_tier_uses_only_capability_floors()
+    test_register_minted_kinds_are_first_class()
+    test_state_schema_tag_is_provenance()
+    test_select_dispatch_tier_has_no_state_schema_floor()
     test_red_mutation_deleting_capability_floors_refuses_every_spawn()
     print(f"\n{_passed} passed, {len(_failed)} failed")
     raise SystemExit(1 if _failed else 0)

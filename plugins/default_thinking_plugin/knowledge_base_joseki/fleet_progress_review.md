@@ -78,7 +78,7 @@ EMBEDDING_DESCRIPTION: Run the slower, judgment-heavy fleet progress review. Rea
 - Bind step 3's per-stream metric sources to whatever the living work-stream index (Input Contract) currently names for that stream — the concrete sources differ per stream and drift as streams open, close, or change shape, so this card's own text is never a substitute for reading that index fresh each cycle.
 - Bind step 4's `workstream_id` to the register project id from step 2/3, never to the prose mnemonic alone (a mnemonic like "WS1" has no register-side resolution by itself).
 - Bind step 6's `independent_critique` field structure to a live process-schema lookup before the first run of a pass, the same discipline `fleet_liveness_check` applies to its own persistence call — required fields have drifted before without every card's own text catching up.
-- Bind step 7's dispatch to the operator's standing dispatch-discipline rule (declared model, effort, and TTL matched to the work, never inherited silently) and to whichever vendor/model pairing the current budget policy allows for `dispatch_kind: review` — do not assume a specific model string without checking current policy first.
+- Bind step 7's dispatch to the operator's standing dispatch-discipline rule (declared model and effort matched to the work, with independent report obligations, never inherited silently) and to whichever vendor/model pairing the current budget policy allows for `dispatch_kind: review` — do not assume a specific model string without checking current policy first.
 
 ## Coherence Obligations
 

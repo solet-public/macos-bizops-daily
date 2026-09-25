@@ -388,37 +388,40 @@ def _bootstrap_python_runtime(
     return invoke_adapter(registry, runner="bootstrap", request=request)
 
 
+_LM_SERVED_REFS = frozenset(f"setup::lm_studio.{suffix}" for suffix in (
+    "load_embedding", "load_inference", "embedding_model_served", "inference_model_served",
+))
+
+
 def invoke_adapter(
     registry: AdapterRegistry,
     *,
     runner: str,
     request: OperationRequest,
 ) -> OperationResult:
+    started = time.monotonic()
+    parent_deadline_ns = time.monotonic_ns() + request.timeout_seconds * 1_000_000_000
     request.validate()
     request_payload = request.to_dict()
+    bounded = request.operation_ref in _LM_SERVED_REFS
+    if bounded:
+        request_payload["public_inputs"] = {**request.public_inputs, "lm_studio_parent_deadline_ns": parent_deadline_ns}
+    serialized = json.dumps(request_payload, sort_keys=True, separators=(",", ":"))
     _capture_envelope(request, "request", request_payload)
     command = registry.command_for(runner)
     if command is None:
-        if registry.base_python is None and _is_python_runtime_bootstrap(request, runner):
-            result = _bootstrap_python_runtime(registry, request)
-            _capture_envelope(request, "result", result.to_dict())
-            return result
-        result = OperationResult.blocked(
-            request,
-            error_kind="adapter_missing",
-            repair=f"Install the reviewed {runner!r} target-local adapter and resume.",
-        )
-        _capture_envelope(request, "result", result.to_dict())
-        return result
-    started = time.monotonic()
+        return _missing_adapter(registry, runner, request)
+    remaining = (parent_deadline_ns - time.monotonic_ns()) / 1_000_000_000 if bounded else request.timeout_seconds
+    if remaining <= 0:
+        return _timeout_result(request, int((time.monotonic() - started) * 1000))
     try:
         completed = subprocess.run(  # noqa: S603 - vector comes from closed registry
             list(command),
-            input=json.dumps(request.to_dict(), sort_keys=True, separators=(",", ":")),
+            input=serialized,
             capture_output=True,
             check=False,
             text=True,
-            timeout=request.timeout_seconds,
+            timeout=remaining,
         )
     except subprocess.TimeoutExpired:
         elapsed = int((time.monotonic() - started) * 1000)
@@ -430,8 +433,24 @@ def invoke_adapter(
         result = _exit_result(request, completed, elapsed)
         _capture_envelope(request, "result", result.to_dict())
         return result
+    result = _parsed_adapter_result(request, completed.stdout)
+    if bounded and time.monotonic_ns() >= parent_deadline_ns:
+        return _timeout_result(request, int((time.monotonic() - started) * 1000))
+    return result
+
+
+def _missing_adapter(registry: AdapterRegistry, runner: str, request: OperationRequest) -> OperationResult:
+    if registry.base_python is None and _is_python_runtime_bootstrap(request, runner):
+        result = _bootstrap_python_runtime(registry, request)
+    else:
+        result = OperationResult.blocked(request, error_kind="adapter_missing", repair=f"Install the reviewed {runner!r} target-local adapter and resume.")
+    _capture_envelope(request, "result", result.to_dict())
+    return result
+
+
+def _parsed_adapter_result(request: OperationRequest, stdout: str) -> OperationResult:
     try:
-        raw: object = json.loads(completed.stdout)
+        raw: object = json.loads(stdout)
     except json.JSONDecodeError as exc:
         raise AdapterProtocolError(f"adapter stdout is not one JSON result: {exc}") from exc
     if not isinstance(raw, dict) or not all(isinstance(key, str) for key in raw):

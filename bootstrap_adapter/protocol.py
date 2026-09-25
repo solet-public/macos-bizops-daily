@@ -186,7 +186,19 @@ def _validate_phase(request: Request) -> None:
         raise AdapterRequestError("apply request requires a well-formed approval fingerprint")
 
 
+_LM_SERVED_REFS = frozenset(f"setup::lm_studio.{suffix}" for suffix in (
+    "load_embedding", "load_inference", "embedding_model_served", "inference_model_served",
+))
+
 _LM_STUDIO_PUBLIC_INPUTS = frozenset({"embeddings_implementation", "inference_implementation", "lm_studio_base_url"})
+
+
+def _validate_lm_deadline_input(inputs: dict[str, object]) -> None:
+    if "lm_studio_parent_deadline_ns" not in inputs:
+        return
+    deadline = inputs["lm_studio_parent_deadline_ns"]
+    if type(deadline) is not int or deadline <= 0:
+        raise AdapterRequestError("LM Studio parent deadline must be a positive integer")
 
 
 def validate_route_inputs(request: Request, *, lm_studio_operation_ids: frozenset[str], existing_ref: str) -> None:
@@ -200,6 +212,9 @@ def validate_route_inputs(request: Request, *, lm_studio_operation_ids: frozense
         allowed: set[str] = {"declared_closure"}
     elif request["operation_id"] in lm_studio_operation_ids:
         allowed = set(_LM_STUDIO_PUBLIC_INPUTS)
+        if request["operation_ref"] in _LM_SERVED_REFS:
+            allowed.add("lm_studio_parent_deadline_ns")
+            _validate_lm_deadline_input(inputs)
     else:
         allowed = {"solet_name"} if request["operation_id"] == "configure_postgresql" else set()
     if set(inputs) - allowed:

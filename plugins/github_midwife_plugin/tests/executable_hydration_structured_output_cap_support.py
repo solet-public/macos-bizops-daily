@@ -202,7 +202,7 @@ def run_knowledge_readiness_poll(
         operation_id="knowledge_retrieval_succeeds",
         operation_ref="service_interface::knowledge_service.search",
         probe_purpose="stage_exit",
-        timeout_seconds=4,
+        timeout_seconds=9,
     )
     vector = (
         str(target / ".venv/bin/solet-bridge"),
@@ -310,7 +310,7 @@ def run_knowledge_readiness_poll(
         operation_id="knowledge_retrieval_succeeds",
         operation_ref="service_interface::knowledge_service.search",
         probe_purpose="stage_exit",
-        timeout_seconds=1,
+        timeout_seconds=6,
     )
     runtime.response_sequences[vector] = [empty, empty]
     deadline_clock = Clock()
@@ -330,8 +330,119 @@ def run_knowledge_readiness_poll(
     _assert_parent_budget_cap(
         target, runtime, request, check, nonempty, vector, _wait_for_knowledge_retrieval
     )
+    _assert_extended_readiness(target, runtime, request, check, command_outcome, vector, empty, nonempty)
     runtime.response_sequences.pop(vector)
 
+
+
+def _assert_extended_readiness(
+    target: Path,
+    runtime: Any,
+    request: Callable[..., Any],
+    check: Callable[[object, str], None],
+    command_outcome: Any,
+    vector: tuple[str, ...],
+    empty: Any,
+    nonempty: Any,
+) -> None:
+    from github_midwife_plugin.installation_state_doctor import _wait_for_knowledge_retrieval
+
+    class TimedRuntime:
+        def __init__(self, responses: list[Any], durations: list[float]) -> None:
+            self.home = runtime.home
+            self.responses = responses
+            self.durations = durations
+            self.now = 0.0
+            self.timeouts: list[int] = []
+
+        def monotonic(self) -> float:
+            return self.now
+
+        def sleep(self, seconds: float) -> None:
+            self.now += seconds
+
+        def run(self, *args: Any, **kwargs: Any) -> Any:
+            self.timeouts.append(kwargs["timeout_seconds"])
+            self.now += self.durations.pop(0)
+            return self.responses.pop(0)
+
+    def run(responses: list[Any], durations: list[float], budget: int = 120) -> tuple[Any, TimedRuntime]:
+        timed = TimedRuntime(responses, durations)
+        probe = request(target, operation_id="knowledge_retrieval_succeeds",
+                        operation_ref="service_interface::knowledge_service.search",
+                        probe_purpose="stage_exit", timeout_seconds=budget)
+        response = _wait_for_knowledge_retrieval(
+            probe, timed, monotonic=timed.monotonic, sleep=timed.sleep
+        )
+        return response, timed
+
+    response, timed = run([empty, nonempty], [40.0, 1.0])
+    check(response["checkpoint_status"] == "verified" and timed.now == 41.5,
+          "readiness beyond the old 30-second budget verifies before the new deadline")
+    response, timed = run([empty, nonempty], [60.0, 54.0])
+    check(response["checkpoint_status"] == "verified" and timed.timeouts == [60, 54]
+          and timed.now < 115, "remaining child budget preserves parent launch/result reserve")
+    response, timed = run([nonempty], [115.0])
+    check(response["error_kind"] == "knowledge_retrieval_timeout",
+          "success at the inner deadline cannot verify")
+    response, timed = run([empty], [1.0], 6)
+    check(response["error_kind"] == "knowledge_retrieval_timeout" and timed.now < 6,
+          "persistent empty emits a structured retry-safe timeout before parent termination")
+    response, timed = run([], [], 5)
+    check(response["error_kind"] == "knowledge_retrieval_timeout" and not timed.timeouts,
+          "exhausted reserve before first call never launches")
+    _assert_extended_failures(run, command_outcome, nonempty, check)
+    # An ordinary completion probe stays single-shot, including successful empty.
+    from github_midwife_plugin.installation_state_doctor import knowledge
+    probe = request(target, operation_id="knowledge_retrieval_succeeds",
+                    operation_ref="service_interface::knowledge_service.search",
+                    probe_purpose="completion", timeout_seconds=30)
+    runtime.response_sequences[vector] = [empty, nonempty]
+    response = knowledge(probe, runtime)
+    check(response["checkpoint_status"] != "verified"
+          and len(runtime.response_sequences[vector]) == 1,
+          "ordinary completion remains single-shot")
+
+
+def _assert_extended_failures(
+    run: Callable[..., Any], command_outcome: Any, nonempty: Any,
+    check: Callable[[object, str], None],
+) -> None:
+    from dataclasses import replace
+    negatives = [
+        (replace(nonempty, executable_missing=True), "knowledge_retrieval_executable_missing"),
+        (replace(nonempty, returncode=1), "knowledge_retrieval_transport_failed"),
+        (replace(nonempty, timed_out=True), "knowledge_retrieval_timeout"),
+        (replace(nonempty, stdout_truncated=True, stdout_bytes=nonempty.stdout_bytes + 1), "output_truncated"),
+        (replace(nonempty, stderr_truncated=True, stderr_bytes=1), "output_truncated"),
+    ]
+    negatives.append((command_outcome(0, False, 1,
+                      '{"result":{"success":false,"error":{"message":"private-error"}}}', ""),
+                      "knowledge_retrieval_service_failed"))
+    for envelope in (
+        "not-json", "[]",
+        '{"result":{"success":true,"data":{"count":true,"results":[]}}}',
+        '{"result":{"success":true,"data":{"count":-1,"results":[]}}}',
+        '{"result":{"success":true,"data":{"count":0,"results":{}}}}',
+        '{"result":{"success":true,"action_status":"failed","data":{"count":0,"results":[]}}}',
+    ):
+        negatives.append((command_outcome(0, False, 1, envelope, ""),
+                          "knowledge_retrieval_protocol_invalid"))
+    for field, value in (("score", True), ("score", float("nan")), ("content", None)):
+        payload = json.loads(nonempty.stdout)
+        payload["result"]["data"]["results"][0][field] = value
+        negatives.append((command_outcome(0, False, 1, json.dumps(payload), ""),
+                          "knowledge_retrieval_protocol_invalid"))
+    for field, value in (("status", "failed"), ("error_message", "private-error"), ("status", [])):
+        payload = json.loads(nonempty.stdout)
+        payload[field] = value
+        negatives.append((command_outcome(0, False, 1, json.dumps(payload), ""),
+                          "knowledge_retrieval_protocol_invalid"))
+    for outcome, error in negatives:
+        response, timed = run([outcome, nonempty], [0.0, 0.0])
+        check(response["error_kind"] == error and len(timed.timeouts) == 1,
+              f"{error} fails immediately without retry or late success")
+        check("private-error" not in json.dumps(response), "terminal evidence excludes raw payloads")
 
 def run_plugin_roster_output_cap(
     target: Path,

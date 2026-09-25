@@ -12,15 +12,28 @@ from __future__ import annotations
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "ananta" / "src"))
 sys.path.insert(0, str(ROOT / "plugins" / "agent_messaging_plugin" / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+if TYPE_CHECKING:
+    from ananta.interfaces.state_management_interface import StateManagementInterface
+
+from _real_state_fake import RealShapeState  # noqa: E402
+from ananta.llm.agent_messaging.role_binding import AGENT_ROLE_BINDING_NAMESPACE  # noqa: E402
+
+from agent_messaging_plugin import model_capability_verbs as verbs  # noqa: E402
 from agent_messaging_plugin.dispatch_tier_selection import (  # noqa: E402
     CapabilityCell,
     TierSelectionError,
     select_tier,
 )
+from agent_messaging_plugin.model_capability_store import load_seed_table, seed_catalog  # noqa: E402
+from agent_messaging_plugin.model_dispatch_policy import DispatchPolicyError  # noqa: E402
+from agent_messaging_plugin.schema import CELL_ACCEPTANCE_ACCEPTED, TABLE_MODEL_CAPABILITY_CELL  # noqa: E402
 
 _passed = 0
 _failed: list[str] = []
@@ -183,6 +196,54 @@ def test_refusals_are_distinct() -> None:
     _check(_code(lambda: select_tier(CATALOG, required_score=1, objective="metered_usd", now=_NOW, max_age=_WINDOW, score_margin=-1)) == "parameter_invalid", "negative margin refuses")
 
 
+def test_register_phase_selection_with_state_schema_provenance() -> None:
+    state = RealShapeState()
+    typed = cast("StateManagementInterface", state)
+    now = datetime(2026, 9, 24, 12, tzinfo=UTC)
+    seed_catalog(typed, seed=load_seed_table())
+    for row in state.rows(AGENT_ROLE_BINDING_NAMESPACE, TABLE_MODEL_CAPABILITY_CELL):
+        row["acceptance"] = CELL_ACCEPTANCE_ACCEPTED
+        row["accepted_at"] = now.isoformat()
+        row["measured_at"] = now.isoformat()
+        row["last_refresh_run_id"] = "phase-selector-fixture"
+    kinds = (
+        "DESIGN", "FIX", "build", "design", "diagnose", "docs", "fix", "implement",
+        "implementation", "infrastructure", "integration", "repair", "review",
+        "smoke-test", "test", "test-close",
+    )
+    for kind in kinds:
+        selected = verbs.select_dispatch_tier(
+            typed,
+            {"required_score": 50, "scope_tags": ["state_schema"], "dispatch_kind": kind,
+             "cost_tolerance": 0},
+            now=now,
+        )
+        cell = selected["selected"]
+        _check(
+            (cell["runtime"], cell["model"], cell["effort"], cell["capability_score"])
+            == ("codex", "gpt-6-astra", "medium", 50),
+            f"register kind {kind!r} clears score 50 at Astra medium",
+        )
+        _check(
+            selected["capability_floors"] == []
+            and selected["excluded"]["capability_floor_disallowed"] == 0,
+            f"register kind {kind!r} has no state_schema model floor",
+        )
+    for kind in ("unknown-phase", "test ", "TEST"):
+        selected = verbs.select_dispatch_tier(
+            typed, {"required_score": 50, "dispatch_kind": kind}, now=now,
+        )
+        _check(selected["selected"]["capability_score"] >= 50, f"open nonblank provenance {kind!r} selects")
+    for kind in ("", " ", "\t", 123):
+        try:
+            verbs.select_dispatch_tier(typed, {"required_score": 50, "dispatch_kind": kind}, now=now)
+        except DispatchPolicyError as error:
+            code = error.code
+        else:
+            code = ""
+        _check(code in {"dispatch_policy_violation", "dispatch_kind_required"}, f"malformed kind {kind!r} refuses")
+
+
 if __name__ == "__main__":
     test_operator_dominance_examples()
     test_ladder_shows_diminishing_returns()
@@ -191,5 +252,6 @@ if __name__ == "__main__":
     test_objectives_and_margins()
     test_near_tie_prefers_lower_effort()
     test_refusals_are_distinct()
+    test_register_phase_selection_with_state_schema_provenance()
     print(f"\n{_passed} passed, {len(_failed)} failed")
     raise SystemExit(1 if _failed else 0)

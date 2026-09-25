@@ -241,7 +241,6 @@ def _session_view(
         "classification": classification["classification"],
         "classification_reason": classification["reason"],
         "report_by": _string_or_none(row.get("report_by")),
-        "expires_at": _string_or_none(row.get("expires_at")),
         "holds": classification["holds"],
         "gauge": _gauge_view(state, agent_instance_id, row, now),
     }

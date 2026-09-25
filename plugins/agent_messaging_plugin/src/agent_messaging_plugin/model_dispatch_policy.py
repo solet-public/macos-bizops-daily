@@ -1,6 +1,6 @@
-"""Fail-closed model and vendor policy for every managed spawn.
+"""Fail-closed dispatch provenance and optional capability-floor policy.
 
-The policy is deliberately data-backed: changing an assignment rule means a
+The policy is deliberately data-backed: changing a configured floor means a
 reviewable JSON edit, while this module owns parsing and rejection semantics.
 No policy is cached. A missing or malformed file therefore refuses the first
 spawn after an edit instead of leaving a stale, silently permissive process.
@@ -16,19 +16,7 @@ from typing import Any, Final
 
 _POLICY_PATH: Final[Path] = Path(__file__).resolve().parents[2] / "model_dispatch_policy.v1.json"
 _PROFILE_ROOT: Final[Path] = Path(__file__).resolve().parents[2] / "model_profiles"
-_DISPATCH_KINDS: Final[frozenset[str]] = frozenset(
-    {"diagnose", "design", "review", "fix", "infrastructure"}
-)
 ModelPair = tuple[str, str]
-# Capability floors the policy file MUST declare. A floor is a capability
-# dimension independent of dispatch_kind: when a spawn's declared scope
-# touches it, the (runtime, model) pair must be one of the floor's own pairs
-# whatever dispatch provenance label the caller supplies. Requiring the
-# key here (not merely honouring it when present) is what makes the floor
-# impossible to disable by deleting it from the JSON: a policy missing a
-# required floor refuses EVERY spawn, the same fail-closed shape as a policy
-# missing the ``fix`` row (iss_63d91ca9 / iss_da9e5e67, 2026-09-20).
-_REQUIRED_CAPABILITY_FLOORS: Final[frozenset[str]] = frozenset({"state_schema"})
 _FLOOR_KEYS: Final[frozenset[str]] = frozenset({"issue_ids", "reason", "brief_markers", "floor_pairs"})
 _FLOOR_SOURCE_DECLARED: Final[str] = "declared"
 _FLOOR_SOURCE_BRIEF: Final[str] = "brief_marker"
@@ -70,8 +58,6 @@ class AppliedFloor:
 @dataclass(frozen=True, slots=True)
 class DispatchPolicy:
     policy_version: str
-    orchestrator_role_names: frozenset[str]
-    orchestrator_models: tuple[str, ...]
     capability_floors: dict[str, CapabilityFloor]
 
 
@@ -147,14 +133,17 @@ def _profile_pairs() -> set[ModelPair]:
     return pairs
 
 
-def _policy_sections(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], str]:
-    if raw.get("schema_version") != 1 or not isinstance(raw.get("policy_version"), str):
-        raise DispatchPolicyError("dispatch_policy_invalid", "policy schema_version=1 and policy_version are required.")
+def _policy_sections(raw: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    expected = {"schema_version", "policy_version", "dispatch_kinds", "capability_floors"}
+    if set(raw) != expected or raw.get("schema_version") != 2 or not isinstance(raw.get("policy_version"), str):
+        raise DispatchPolicyError(
+            "dispatch_policy_invalid",
+            "policy schema_version=2, policy_version, dispatch_kinds, and capability_floors are required without extra fields.",
+        )
     kinds = raw.get("dispatch_kinds")
-    orchestrator = raw.get("orchestrator")
-    if not isinstance(kinds, dict) or set(kinds) != set(_DISPATCH_KINDS) or not isinstance(orchestrator, dict):
-        raise DispatchPolicyError("dispatch_policy_invalid", "policy must declare exactly the supported dispatch kinds and orchestrator.")
-    return kinds, orchestrator, str(raw["policy_version"])
+    if not isinstance(kinds, dict):
+        raise DispatchPolicyError("dispatch_policy_invalid", "policy must declare a dispatch_kinds object.")
+    return kinds, str(raw["policy_version"])
 
 
 def _parse_floor_pairs(tag: str, raw_pairs: object, profiles: set[ModelPair]) -> tuple[ModelPair, ...]:
@@ -195,71 +184,56 @@ def _parse_capability_floor(tag: str, raw_floor: object, profiles: set[ModelPair
 
 
 def _parse_capability_floors(raw_floors: object, profiles: set[ModelPair]) -> dict[str, CapabilityFloor]:
-    if not isinstance(raw_floors, dict) or not raw_floors:
-        raise DispatchPolicyError("dispatch_policy_invalid", "policy must declare a non-empty capability_floors object.")
-    missing = _REQUIRED_CAPABILITY_FLOORS - set(raw_floors)
-    if missing:
-        raise DispatchPolicyError(
-            "dispatch_policy_invalid", f"capability_floors is missing required floor(s): {sorted(missing)}.",
-        )
+    if not isinstance(raw_floors, dict):
+        raise DispatchPolicyError("dispatch_policy_invalid", "policy must declare a capability_floors object.")
     floors: dict[str, CapabilityFloor] = {}
     for tag, raw_floor in raw_floors.items():
         if not isinstance(tag, str) or not tag:
             raise DispatchPolicyError("dispatch_policy_invalid", "capability_floors keys must be non-empty strings.")
+        if tag == "state_schema":
+            raise DispatchPolicyError("dispatch_policy_invalid", "state_schema model floor is retired by rul_0c6ec7c7.")
         floors[tag] = _parse_capability_floor(tag, raw_floor, profiles)
     return floors
 
 
 def _validate_dispatch_kinds(kinds: dict[str, Any]) -> None:
-    if any(not isinstance(rule, dict) or rule for rule in kinds.values()):
+    if any(
+        not kind.strip() or not isinstance(rule, dict) or rule
+        for kind, rule in kinds.items()
+    ):
         raise DispatchPolicyError(
             "dispatch_policy_invalid",
-            "dispatch_kinds are provenance labels only and must be empty objects.",
+            "dispatch_kinds may contain only nonblank provenance examples with empty rule objects.",
         )
-
-
-def _parse_orchestrator(orchestrator: dict[str, Any], profiles: set[ModelPair]) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    role_names = _non_empty_strings(orchestrator.get("role_names"), "orchestrator.role_names")
-    models = _non_empty_strings(orchestrator.get("allowed_models"), "orchestrator.allowed_models")
-    if any(("claude_code", model) not in profiles for model in models):
-        raise DispatchPolicyError("dispatch_policy_invalid", "orchestrator names a model absent from claude_code profiles.")
-    return role_names, models
 
 
 def load_dispatch_policy() -> DispatchPolicy:
     """Load and validate the current policy and every named profile pair."""
     raw = _read_json(_POLICY_PATH)
-    kinds, orchestrator, policy_version = _policy_sections(raw)
+    kinds, policy_version = _policy_sections(raw)
     profiles = _profile_pairs()
     _validate_dispatch_kinds(kinds)
-    role_names, models = _parse_orchestrator(orchestrator, profiles)
     return DispatchPolicy(
         policy_version=policy_version,
-        orchestrator_role_names=frozenset(role_names),
-        orchestrator_models=models,
         capability_floors=_parse_capability_floors(raw.get("capability_floors"), profiles),
     )
 
 
-def _validate_dispatch_kind(dispatch_kind: str) -> None:
-    if not dispatch_kind:
+def validate_dispatch_kind(dispatch_kind: object) -> None:
+    """Mirror the register's open, nonblank unit-kind provenance contract."""
+    if dispatch_kind is None or isinstance(dispatch_kind, str) and not dispatch_kind.strip():
         raise DispatchPolicyError("dispatch_kind_required", "spawn_session requires dispatch_kind.")
-    if dispatch_kind not in _DISPATCH_KINDS:
-        raise DispatchPolicyError("dispatch_policy_violation", f"unknown dispatch_kind {dispatch_kind!r}.")
+    if not isinstance(dispatch_kind, str):
+        raise DispatchPolicyError("dispatch_policy_violation", "dispatch_kind must be nonblank text.")
 
 
-def _validate_scope_tags(policy: DispatchPolicy, scope_tags: Iterable[str]) -> tuple[str, ...]:
-    tags = tuple(scope_tags)
-    if any(not tag for tag in tags):
-        raise DispatchPolicyError("scope_tag_invalid", "scope_tags must be non-empty strings.")
-    unknown = sorted(set(tags) - set(policy.capability_floors))
-    if unknown:
-        raise DispatchPolicyError(
-            "scope_tag_unknown",
-            f"scope_tags {unknown} are not capability floors declared by the policy "
-            f"(known: {sorted(policy.capability_floors)}).",
-        )
-    return tags
+def _validate_scope_tags(scope_tags: Iterable[object]) -> tuple[str, ...]:
+    tags: list[str] = []
+    for tag in scope_tags:
+        if not isinstance(tag, str) or not tag.strip():
+            raise DispatchPolicyError("scope_tag_invalid", "scope_tags must be non-empty strings.")
+        tags.append(tag)
+    return tuple(tags)
 
 
 def applied_capability_floors(
@@ -267,12 +241,10 @@ def applied_capability_floors(
 ) -> tuple[AppliedFloor, ...]:
     """Every floor this spawn triggers: declared by the caller OR detected in its brief.
 
-    Detection is the half the caller cannot opt out of: a brief that names a
-    schema-touching identifier floors the spawn whether or not the dispatcher
-    remembered (or chose) to declare the tag. Declared tags are honoured even
-    when the brief is silent, so a truthful declaration never under-floors.
+    Declared tags remain provenance even when no policy floor uses them.
+    Only a configured floor can constrain a model pair.
     """
-    declared = set(_validate_scope_tags(policy, scope_tags))
+    declared = set(_validate_scope_tags(scope_tags))
     applied: list[AppliedFloor] = []
     for tag, floor in sorted(policy.capability_floors.items()):
         if tag in declared:
@@ -314,29 +286,19 @@ def validate_spawn_dispatch(
 ) -> tuple[AppliedFloor, ...]:
     """Raise a named refusal unless one spawn satisfies the policy; return the floors applied.
 
-    Order is load-bearing: capability floors are checked first and never
-    short-circuited by a dispatch kind. ``scope_tags`` is the
-    caller's declared scope; ``brief_text`` is the workbench brief when the
-    caller has one (the detection half -- see ``applied_capability_floors``).
+    Configured capability floors are checked independently of dispatch kind.
+    ``scope_tags`` preserves caller scope even when no floor is configured;
+    ``brief_text`` is the workbench brief when the caller has one.
 
     ``reviewed_report_vendor`` and ``pair_id`` remain optional provenance only;
     neither may constrain the cheapest capability-clearing answer.
     """
     del reviewed_report_vendor, pair_id
-    _validate_dispatch_kind(dispatch_kind)
+    validate_dispatch_kind(dispatch_kind)
     policy = load_dispatch_policy()
     applied = applied_capability_floors(policy, scope_tags=scope_tags, brief_text=brief_text)
     _validate_capability_floors(policy, applied, dispatch_kind, agent_runtime, model)
     return applied
-
-
-def orchestrator_model_verdict(*, role_label: str, model: str) -> tuple[bool, tuple[str, ...]]:
-    """Return whether a policy-governed seat has an allowed transcript model."""
-    policy = load_dispatch_policy()
-    role_name = role_label.rsplit("-", maxsplit=1)[-1]
-    if role_label not in policy.orchestrator_role_names and role_name not in policy.orchestrator_role_names:
-        return True, policy.orchestrator_models
-    return model in policy.orchestrator_models, policy.orchestrator_models
 
 
 __all__ = [
@@ -346,6 +308,5 @@ __all__ = [
     "DispatchPolicy",
     "applied_capability_floors",
     "load_dispatch_policy",
-    "orchestrator_model_verdict",
     "validate_spawn_dispatch",
 ]

@@ -37,6 +37,7 @@ from .model_dispatch_policy import (
     DispatchPolicyError,
     applied_capability_floors,
     load_dispatch_policy,
+    validate_dispatch_kind,
 )
 from .schema import CELL_ACCEPTANCE_ACCEPTED
 from .usage_economics_profiles import (
@@ -202,11 +203,11 @@ def _capability_floor_pairs(
     dispatch_kind: str | None, scope_tags: tuple[str, ...],
 ) -> tuple[frozenset[tuple[str, str]] | None, str | None, tuple[AppliedFloor, ...]]:
     """Capability-floor pairs only; dispatch kind is provenance, never a filter."""
-    if not dispatch_kind and not scope_tags:
+    if dispatch_kind is None and not scope_tags:
         return None, None, ()
     policy = load_dispatch_policy()
-    if dispatch_kind and dispatch_kind not in {"diagnose", "design", "review", "fix", "infrastructure"}:
-        raise DispatchPolicyError("dispatch_policy_violation", f"unknown dispatch_kind {dispatch_kind!r}.")
+    if dispatch_kind is not None:
+        validate_dispatch_kind(dispatch_kind)
     allowed: frozenset[tuple[str, str]] | None = None
     floors = applied_capability_floors(policy, scope_tags=scope_tags, brief_text="")
     for floor in floors:
@@ -286,8 +287,10 @@ def select_dispatch_tier(state: StateManagementInterface, params: dict[str, Any]
     moment = now or datetime.now(UTC)
     required_score = _required_score(params)
     dispatch_kind = params.get("dispatch_kind")
+    if dispatch_kind is not None and not isinstance(dispatch_kind, str):
+        raise DispatchPolicyError("dispatch_policy_violation", f"unknown dispatch_kind {dispatch_kind!r}.")
     floor_pairs, policy_version, floors = _capability_floor_pairs(
-        str(dispatch_kind) if dispatch_kind else None, _scope_tags(params.get("scope_tags")),
+        dispatch_kind, _scope_tags(params.get("scope_tags")),
     )
     rows = read_cells(state)
     catalog = selection_catalog(rows)

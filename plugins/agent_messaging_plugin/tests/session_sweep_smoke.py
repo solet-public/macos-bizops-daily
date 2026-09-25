@@ -110,7 +110,6 @@ from agent_messaging_plugin.session_sweep import (  # noqa: E402
     sweep_managed_dispatches,
     sweep_overdue_sessions,
     sweep_rotation_due_sessions,
-    sweep_ttl_overdue_sessions,
     sweep_unregistered_spawning_sessions,
 )
 
@@ -160,7 +159,7 @@ class _LivenessDriver:
     def spawn(self, spec: dict[str, Any]) -> str:  # noqa: ARG002
         return "managed-host-ref"
 
-    def terminate(self, host_ref: str) -> None:  # noqa: ARG002
+    def terminate(self, host_ref: str, grace_seconds: float = 0) -> None:  # noqa: ARG002
         return
 
     def alive(self, host_ref: str) -> bool:  # noqa: ARG002
@@ -200,7 +199,7 @@ def _dispatch_spec(tmp: Path, dispatch_id: str, *, uptake_seconds: int = 60) -> 
         visibility="headless",
         local_name="Managed-Worker",
         report_by_seconds=900,
-        ttl_seconds=14400,
+
         allowed_tools=("Read",),
         permission_mode="bypassPermissions",
         transport="mcp",
@@ -212,7 +211,7 @@ def _dispatch_spec(tmp: Path, dispatch_id: str, *, uptake_seconds: int = 60) -> 
         uptake_due_at=(T0 + timedelta(seconds=uptake_seconds)).isoformat(),
         report_by=(T0 + timedelta(minutes=15)).isoformat(),
         watchdog_due_at=(T0 + timedelta(minutes=3)).isoformat(),
-        expires_at=(T0 + timedelta(hours=4)).isoformat(),
+
     )
 
 
@@ -1141,23 +1140,14 @@ def test_overdue_record_carries_the_measured_lateness() -> None:
 
 
 def test_overdue_terminates_stuck_spawning_row() -> None:
-    """RED-FIRST (the fix this test proves): a ``spawning`` row -- a
-    ``spawn_session`` call whose host process never registered -- is
-    invisible to today's sweep, which scans only LIFECYCLE_LIVE/IDLE. Its
-    ``report_by`` deadline can pass by any amount with no transition, no
-    steward notice, nothing (live-observed: a probe subject sat in
-    ``spawning`` 8+ hours past deadline while its OS process stayed alive,
-    doing nothing). ``LIFECYCLE_TRANSITIONS[LIFECYCLE_SPAWNING]`` (schema.py)
-    has no legal ``overdue`` edge -- only ``live``/``terminated`` -- so a
-    stuck spawning row has no live session to recover via a late
-    ``report_alive`` and goes straight to ``terminated``, not ``overdue``."""
+    """A definitive native-death observation retains the termination path."""
     state = _state()
     past = (T0 - timedelta(seconds=10)).isoformat()
     _spawn_live(
         state, agent_instance_id="agi-spawn-stuck", lifecycle_state=LIFECYCLE_SPAWNING,
         report_by_override=past,
     )
-    marked = sweep_overdue_sessions(state, now=T0)
+    marked = sweep_overdue_sessions(state, now=T0, host_alive_probe=lambda _row: False)
     _check(
         marked == 1,
         "RED-vs-GREEN: a stuck 'spawning' row past its report_by deadline IS "
@@ -1238,16 +1228,8 @@ def test_overdue_spawning_alive_row_is_extended_not_reaped() -> None:
     )
 
 
-def test_overdue_spawning_alive_past_patience_is_reaped() -> None:
-    """The bound that keeps the alive-branch from regressing the hung-spawn
-    fix (the OTHER live-measured shape: a hung process, alive, 'spawning'
-    8+ hours, doing nothing): an observed-alive row whose spawn timestamp is
-    older than SPAWN_ALIVE_PATIENCE_WINDOWS x its own window is reaped even
-    though its process is alive — liveness cannot distinguish productive from
-    hung, so patience is bounded.
-
-    RED MUTATION: remove the patience bound — this leg's terminated
-    assertion goes red (the row would be extended forever)."""
+def test_overdue_spawning_alive_has_no_lifetime_cap() -> None:
+    """Elapsed report windows never terminate an observed-live host."""
     state = _state()
     past = (T0 - timedelta(seconds=10)).isoformat()
     _spawn_live(
@@ -1261,21 +1243,16 @@ def test_overdue_spawning_alive_past_patience_is_reaped() -> None:
         {"last_transition_at": (T0 - timedelta(seconds=300 * 5)).isoformat()},
     )
     marked = sweep_overdue_sessions(state, now=T0, host_alive_probe=lambda _row: True)
-    _check(marked == 1, "an observed-alive row PAST patience is swept")
+    _check(marked == 0, "an observed-live host remains spawning beyond the old patience limit")
     _check(
         read_managed_session(state, "agi-alive-exhausted")["lifecycle_state"]
-        == LIFECYCLE_TERMINATED,
-        "past patience the reap proceeds even though the process is alive",
+        == LIFECYCLE_SPAWNING,
+        "elapsed time never terminates an observed-live session",
     )
 
 
 def test_overdue_spawning_operator_host_alive_is_not_evidence() -> None:
-    """The operator host driver's ``alive()`` is an unconditional True by
-    design (it observes via registration only) — a NON-observation. The
-    production probe must not treat it as evidence, or every operator-hosted
-    row would earn indefinite patience. This leg runs WITHOUT a probe
-    override: the real probe sees host='operator' and declines to observe,
-    so the established reap proceeds."""
+    """An operator host is unobservable: elapsed time never proves death."""
     state = _state()
     past = (T0 - timedelta(seconds=10)).isoformat()
     _spawn_live(
@@ -1284,10 +1261,38 @@ def test_overdue_spawning_operator_host_alive_is_not_evidence() -> None:
     )
     marked = sweep_overdue_sessions(state, now=T0)
     _check(
-        marked == 1,
-        "an operator-hosted spawning row past deadline is reaped — the "
+        marked == 0,
+        "an unobservable spawning row past deadline is preserved — the "
         "operator driver's vacuous alive() is never liveness evidence",
     )
+
+
+def test_spawning_native_probe_never_infers_death_from_age_or_fault() -> None:
+    key = (session_hosts.AGENT_RUNTIME_CODEX, _TEST_MANAGED_HOST)
+    prior = session_hosts._REGISTRY.get(key)  # noqa: SLF001
+    try:
+        for observation in (True, False, RuntimeError("probe unavailable")):
+            state = _state()
+            session_hosts._REGISTRY[key] = _LivenessDriver(observation)  # noqa: SLF001
+            _spawn_live(state, agent_instance_id="agi-native-proof", lifecycle_state=LIFECYCLE_SPAWNING,
+                        report_by_override=(T0 - timedelta(days=3650)).isoformat())
+            state.update_state(
+                AGENT_ROLE_BINDING_NAMESPACE,
+                {"table": "managed_session", "filters": {"agent_instance_id": "agi-native-proof"}},
+                {"host": _TEST_MANAGED_HOST, "host_ref": "native-proof",
+                 "agent_runtime": session_hosts.AGENT_RUNTIME_CODEX,
+                 "last_transition_at": (T0 - timedelta(days=3650)).isoformat()},
+            )
+            marked = sweep_overdue_sessions(state, now=T0)
+            actual = read_managed_session(state, "agi-native-proof")["lifecycle_state"]
+            expected = LIFECYCLE_TERMINATED if observation is False else LIFECYCLE_SPAWNING
+            _check(actual == expected and marked == int(observation is False),
+                   f"native spawning observation {observation!r} alone controls termination, never age")
+    finally:
+        if prior is None:
+            session_hosts._REGISTRY.pop(key, None)  # noqa: SLF001
+        else:
+            session_hosts._REGISTRY[key] = prior  # noqa: SLF001
 
 
 def test_overdue_spawning_notifies_steward_of_orphan() -> None:
@@ -1310,7 +1315,8 @@ def test_overdue_spawning_notifies_steward_of_orphan() -> None:
         state, agent_instance_id="agi-spawn-orphan", lifecycle_state=LIFECYCLE_SPAWNING,
         report_by_override=past, spawned_by_instance_id="agi-spawn-steward",
     )
-    marked = sweep_overdue_sessions(state, peer_registry=reg, bridge_manager=mgr, now=T0)
+    marked = sweep_overdue_sessions(state, peer_registry=reg, bridge_manager=mgr, now=T0,
+                                    host_alive_probe=lambda _row: False)
     _check(marked == 1, "the orphaned spawning row is still transitioned")
     _, events = mgr.get(steward_bridge_id).events_after(-1)
     _check(
@@ -2243,7 +2249,7 @@ def test_gauge_coverage_still_fires_once_the_grace_expires() -> None:
 
 def test_gauge_coverage_does_not_grant_grace_on_an_unreadable_timestamp() -> None:
     """The fail-toward direction, stated because it is the opposite of
-    _spawn_alive_patience_exhausted's and a reader will expect that one.
+    the former spawning lifetime policy, which no longer exists.
 
     The grace is an EXCEPTION to an alarm, so it may only apply on positive
     evidence that the row is young. A row whose transition timestamp cannot be
@@ -2575,150 +2581,7 @@ def test_a_broken_notice_message_surfaces_instead_of_being_swallowed() -> None:
 
 
 # ---------------------------------------------------------------------------
-# R4 change 2: the TTL leg — expires_at was declared and NEVER READ
 # ---------------------------------------------------------------------------
-
-
-def _expire(state: StateManagementInterface, agent_instance_id: str, when: datetime) -> None:
-    """Set a row's expires_at, which insert_managed_session only writes when the
-    spawn requested ttl_seconds."""
-    state.update_state(
-        AGENT_ROLE_BINDING_NAMESPACE,
-        {"table": "managed_session", "filters": {"agent_instance_id": agent_instance_id}},
-        {"expires_at": when.isoformat()},
-    )
-
-
-def test_ttl_overdue_notifies_the_steward() -> None:
-    """R4's whole point: expires_at had three touch points in the plugin (the
-    column, one write at spawn, one output-schema entry) and ZERO readers. A
-    knob that is never enforced is decoration, and the decoration cost a lane
-    ~4h40m of nobody being told."""
-    state, reg, mgr, bridge_id = _wired()
-    _expire(state, "agi-worker", T0 - timedelta(hours=2))
-    n = sweep_ttl_overdue_sessions(
-        state, now=T0, peer_registry=reg, bridge_manager=mgr,
-    )
-    _check(n == 1, "a past-TTL live session is detected")
-    _, events = mgr.get(bridge_id).events_after(-1)
-    _check(
-        events and events[0].event_type == "ttl_overdue_notice",
-        "delivered under its own event type, distinguishable from the other notices",
-    )
-    _check("agi-worker" in events[0].content, "and it names the session")
-
-
-def test_ttl_notice_names_both_clocks_and_the_measured_overdue() -> None:
-    """The two-clock confusion is the failure mode this text exists to prevent.
-
-    A row can be past expires_at while its report_by sits HOURS LATER, because
-    report_by is re-armed on every report and expires_at is frozen at spawn. A
-    reader who sees only "past TTL" on such a row concludes the notice is buggy.
-    """
-    state, reg, mgr, bridge_id = _wired()
-    _expire(state, "agi-worker", T0 - timedelta(hours=2, minutes=30))
-    sweep_ttl_overdue_sessions(state, now=T0, peer_registry=reg, bridge_manager=mgr)
-    _, events = mgr.get(bridge_id).events_after(-1)
-    body = events[0].content
-    _check("2h30m" in body, "the MEASURED overdue duration, not a bare 'past TTL'")
-    _check("expires_at" in body and "report_by" in body, "BOTH clocks are named")
-    _check(
-        "NOTHING HAS BEEN DONE" in body,
-        "and it says plainly that nothing was reaped — the platform notices, "
-        "the steward decides",
-    )
-
-
-def test_ttl_silent_for_a_row_that_never_requested_a_ttl() -> None:
-    """The load-bearing skip. expires_at is written ONLY when the spawn asked
-    for ttl_seconds, so an absent value means 'unbounded by request' — never
-    'expired at the epoch'. Read the other way, this leg would have fired on
-    every operator-launched and ad-hoc row in the ledger on its first tick."""
-    state, reg, mgr, bridge_id = _wired()  # agi-worker has NO expires_at
-    n = sweep_ttl_overdue_sessions(
-        state, now=T0 + timedelta(days=3650), peer_registry=reg, bridge_manager=mgr,
-    )
-    _check(n == 0, "no TTL requested is not an expiry, even ten years on")
-    _, events = mgr.get(bridge_id).events_after(-1)
-    _check(not events, "and nothing is delivered")
-
-
-def test_ttl_silent_before_the_deadline() -> None:
-    state, reg, mgr, _bridge_id = _wired()
-    _expire(state, "agi-worker", T0 + timedelta(hours=1))
-    n = sweep_ttl_overdue_sessions(
-        state, now=T0, peer_registry=reg, bridge_manager=mgr,
-    )
-    _check(n == 0, "a session inside its TTL is not notified about")
-
-
-def test_ttl_reads_expires_at_and_not_report_by() -> None:
-    """The clock choice, asserted rather than described.
-
-    A lane that keeps reporting re-arms report_by forever. If this leg read
-    report_by, TTL would be structurally unreachable for exactly the sessions it
-    exists to catch — inert in precisely the case it was built for. So: a row
-    whose report_by is far in the FUTURE and whose expires_at is in the PAST
-    must still fire.
-    """
-    state, reg, mgr, _bridge_id = _wired()
-    _expire(state, "agi-worker", T0 - timedelta(hours=6))
-    state.update_state(
-        AGENT_ROLE_BINDING_NAMESPACE,
-        {"table": "managed_session", "filters": {"agent_instance_id": "agi-worker"}},
-        {"report_by": (T0 + timedelta(hours=6)).isoformat()},
-    )
-    n = sweep_ttl_overdue_sessions(
-        state, now=T0, peer_registry=reg, bridge_manager=mgr,
-    )
-    _check(n == 1, "a healthy, chatty, past-TTL lane still expires")
-
-
-def test_ttl_notifies_once_per_episode() -> None:
-    """Latched, and the case is stronger here than for the L4 legs: TTL-overdue
-    can NEVER clear on its own, because expires_at is frozen and the clock only
-    advances. Unlatched, this notifies every tick forever."""
-    state, reg, mgr, bridge_id = _wired()
-    _expire(state, "agi-worker", T0 - timedelta(hours=2))
-    latch = NoticeLatch()
-    first = sweep_ttl_overdue_sessions(
-        state, now=T0, peer_registry=reg, bridge_manager=mgr, latch=latch,
-    )
-    second = sweep_ttl_overdue_sessions(
-        state, now=T0 + timedelta(minutes=5), peer_registry=reg,
-        bridge_manager=mgr, latch=latch,
-    )
-    _check((first, second) == (1, 0), "one notice per episode, not one per tick")
-    _, events = mgr.get(bridge_id).events_after(-1)
-    _check(len(events) == 1, "exactly ONE event across both ticks")
-    _check(latch.suppressed("agi-worker"), "the key stays latched while it holds")
-
-
-def test_ttl_latch_does_not_swallow_an_undelivered_notice() -> None:
-    """Latched on DELIVERY, never on detection — an outage must not silence its
-    own alarm. With no resolvable steward the notice cannot be delivered, so the
-    key must stay un-latched and retry on the next tick."""
-    state, reg, mgr, _bridge_id = _wired()
-    _spawn_live(state, agent_instance_id="agi-orphan", spawned_by_instance_id="agi-nobody")
-    _expire(state, "agi-orphan", T0 - timedelta(hours=1))
-    latch = NoticeLatch()
-    n = sweep_ttl_overdue_sessions(
-        state, now=T0, peer_registry=reg, bridge_manager=mgr, latch=latch,
-    )
-    _check(n == 0, "an unresolvable steward means nothing was delivered")
-    _check(
-        not latch.suppressed("agi-orphan"),
-        "and an undelivered notice is NOT latched — the next tick retries",
-    )
-
-
-def test_ttl_leg_no_ops_without_a_bridge() -> None:
-    """Early-boot posture, matching every sibling: no registry/manager means
-    return 0, never raise."""
-    state = _state()
-    _spawn_live(state, agent_instance_id="agi-worker", spawned_by_instance_id="agi-steward")
-    _expire(state, "agi-worker", T0 - timedelta(hours=1))
-    _check(sweep_ttl_overdue_sessions(state, now=T0) == 0, "TTL leg no-ops with no bridge")
 
 
 def test_latches_are_independent_per_notice_kind() -> None:
@@ -2743,7 +2606,6 @@ def test_l4a_legs_no_op_without_a_bridge() -> None:
     _spawn_live(state, agent_instance_id="agi-worker", spawned_by_instance_id="agi-steward")
     _check(sweep_rotation_due_sessions(state) == 0, "rotation-due leg no-ops with no bridge")
     _check(sweep_gauge_coverage(state) == 0, "gauge-coverage leg no-ops with no bridge")
-
 
 
 # ---------------------------------------------------------------------------
@@ -3353,8 +3215,9 @@ def main() -> int:
     test_overdue_terminates_stuck_spawning_row()
     test_overdue_skips_spawning_row_with_future_deadline()
     test_overdue_spawning_alive_row_is_extended_not_reaped()
-    test_overdue_spawning_alive_past_patience_is_reaped()
+    test_overdue_spawning_alive_has_no_lifetime_cap()
     test_overdue_spawning_operator_host_alive_is_not_evidence()
+    test_spawning_native_probe_never_infers_death_from_age_or_fault()
     test_overdue_spawning_notifies_steward_of_orphan()
     test_deadline_dependency_not_yet_due_skipped()
     test_deadline_dependency_fires_and_delivers()
@@ -3397,15 +3260,6 @@ def main() -> int:
     test_gauge_coverage_notice_says_when_no_reporter_has_run_at_all()
     test_gauge_coverage_notice_names_the_evidence_when_the_session_has_ticked()
 
-
-    test_ttl_overdue_notifies_the_steward()
-    test_ttl_notice_names_both_clocks_and_the_measured_overdue()
-    test_ttl_silent_for_a_row_that_never_requested_a_ttl()
-    test_ttl_silent_before_the_deadline()
-    test_ttl_reads_expires_at_and_not_report_by()
-    test_ttl_notifies_once_per_episode()
-    test_ttl_latch_does_not_swallow_an_undelivered_notice()
-    test_ttl_leg_no_ops_without_a_bridge()
 
     test_rotation_due_notifies_once_per_episode()
     test_rotation_due_latch_rearms_when_the_session_rotates()

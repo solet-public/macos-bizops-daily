@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .dependency import EXISTING_DEPENDENCIES_REF, dependency_closure_route
-from .homebrew import CommandExecutionError, run_homebrew_install_required
+from .homebrew import CommandExecutionError, HomebrewInstallError, run_homebrew_install_required
 from .lm_studio import lm_studio_route
 from .models import (
     FORMULA_KEG_MARKER,
@@ -69,6 +69,7 @@ _ROUTES: dict[str, tuple[str, str]] = {
     "pull_lm_studio_embedding_model": ("setup::lm_studio.pull_embedding", "operation"),
     "load_lm_studio_embedding_model": ("setup::lm_studio.load_embedding", "operation"),
     "pull_lm_studio_inference_model": ("setup::lm_studio.pull_inference", "operation"),
+    "ensure_index_lm_studio_inference": ("setup::lm_studio.ensure_index_inference", "operation"),
     "load_lm_studio_inference_model": ("setup::lm_studio.load_inference", "operation"),
     "install_lm_studio_login_agent": ("setup::lm_studio.install_login_agent", "operation"),
     "install_postgresql": ("bootstrap::postgres.install", "operation"),
@@ -91,6 +92,7 @@ _ROUTES: dict[str, tuple[str, str]] = {
     "lm_studio_embedding_artifact_present": ("setup::lm_studio.embedding_artifact_present", "probe"),
     "lm_studio_embedding_model_served": ("setup::lm_studio.embedding_model_served", "probe"),
     "lm_studio_inference_artifact_present": ("setup::lm_studio.inference_artifact_present", "probe"),
+    "lm_studio_inference_model_indexed": ("setup::lm_studio.inference_model_indexed", "probe"),
     "lm_studio_inference_model_served": ("setup::lm_studio.inference_model_served", "probe"),
     "lm_studio_login_agent_valid": ("setup::lm_studio.login_agent_valid", "probe"),
     "lm_studio_jit_disabled": ("setup::lm_studio.jit_disabled", "probe"),
@@ -122,6 +124,7 @@ _LM_STUDIO_OPERATION_IDS = frozenset(
         "pull_lm_studio_embedding_model",
         "load_lm_studio_embedding_model",
         "pull_lm_studio_inference_model",
+        "ensure_index_lm_studio_inference",
         "load_lm_studio_inference_model",
         "install_lm_studio_login_agent",
         "lm_studio_cli_available",
@@ -129,6 +132,7 @@ _LM_STUDIO_OPERATION_IDS = frozenset(
         "lm_studio_embedding_artifact_present",
         "lm_studio_embedding_model_served",
         "lm_studio_inference_artifact_present",
+        "lm_studio_inference_model_indexed",
         "lm_studio_inference_model_served",
         "lm_studio_login_agent_valid",
         "lm_studio_jit_disabled",
@@ -152,6 +156,11 @@ def _homebrew_failure_result(
 ) -> dict[str, Any]:
     """Retain Homebrew command evidence in the existing closed result fields."""
 
+    if isinstance(error, HomebrewInstallError) and error.unrecognized_line is not None and not error.blocked_upgrades:
+        excerpt = error.unrecognized_line[:160]
+        if len(error.unrecognized_line) > 160:
+            excerpt += "…"
+        repair = f"Unrecognized Homebrew dry-run line {excerpt!r}; no package mutation ran. {repair}"
     if isinstance(error, CommandExecutionError):
         return command_failure_result(
             request,
@@ -566,6 +575,29 @@ def _postgres_install_route(request: Request, runtime: AdapterRuntime) -> dict[s
         )
     try:
         failed_start = apply_postgres_install_actions(runtime, brew, actions)
+    except HomebrewInstallError as exc:
+        if exc.blocked_upgrades:
+            packages = ", ".join(exc.blocked_upgrades)
+            return _homebrew_failure_result(
+                request,
+                error_kind="postgres_dependency_upgrade_blocked",
+                evidence_items=evidence_items,
+                repair=(
+                    f"Homebrew proposed upgrading installed dependencies ({packages}) "
+                    "during PostgreSQL setup; that proposed upgrade was not run. "
+                    "Check the installed versions and the formula's requirements before "
+                    "an explicit, reviewed repair. Preserve compliant dependencies and "
+                    "rerun the setup preview before resuming."
+                ),
+                error=exc,
+            )
+        return _homebrew_failure_result(
+            request,
+            error_kind="postgres_install_failed",
+            evidence_items=evidence_items,
+            repair="Inspect the Homebrew package state and resume after repairing it.",
+            error=exc,
+        )
     except AdapterError as exc:
         return _homebrew_failure_result(
             request,

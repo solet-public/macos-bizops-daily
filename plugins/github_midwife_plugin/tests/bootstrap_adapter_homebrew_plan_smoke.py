@@ -19,7 +19,12 @@ if str(_ROOT) not in sys.path:
 
 _SCHEMA = json.loads((_ROOT / "plugins/github_midwife_plugin/knowledge_base/setup_adapter_envelope.schema.json").read_text())
 
-from bootstrap_adapter.homebrew import _homebrew_plan_is_exact
+from bootstrap_adapter.homebrew import (
+    HomebrewInstallError,
+    _homebrew_plan_is_exact,
+    homebrew_guard_environment,
+    run_homebrew_install_required,
+)
 from bootstrap_adapter.models import AdapterRuntime, PostgresObservation, RolePolicyObservation
 from bootstrap_adapter.routes import _coding_tool_route, _postgres_configure_route, _postgres_install_route
 
@@ -39,6 +44,21 @@ krb5
 """
 _RECEIPT_054_POSTGRES_STDERR = """Warning: `$HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK` is set: not checking for outdated
 dependents or dependents with broken linkage!
+"""
+_R44_POSTGRES_UPGRADE_PLAN = """==> Would install 1 formula:
+postgresql@17
+==> Would install 1 dependency for postgresql@17:
+krb5
+==> Would upgrade 2 dependencies for postgresql@17:
+readline
+xz
+==> Would install 1 formula:
+postgresql@17
+==> Would install 1 dependency for postgresql@17:
+krb5
+==> Would upgrade 2 dependencies for postgresql@17:
+readline
+xz
 """
 
 
@@ -113,12 +133,220 @@ def _check_failure_envelopes() -> None:
         failed_postgres["stdout"] == stdout and failed_postgres["stderr"] == stderr,
         "PostgreSQL Homebrew failure preserves exact captured streams",
     )
+    _check(
+        failed_postgres["error_kind"] == "postgres_install_failed",
+        "non-upgrade PostgreSQL Homebrew failures retain their existing error kind",
+    )
 
     oversized = "x" * 16_385
     bounded = _coding_tool_route(_request("install_codex_cli"), _runtime(oversized, "", 1))
     _check(
         bounded["stdout"] == oversized[:16_384],
         "Homebrew failure stdout is bounded at the envelope schema limit",
+    )
+
+
+def _check_r44_postgres_dependency_upgrade_is_explicitly_blocked(*, installed: bool) -> None:
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        if command[1:] == ["install", "--dry-run", "postgresql@17"]:
+            return subprocess.CompletedProcess(command, 0, _R44_POSTGRES_UPGRADE_PLAN, "")
+        if command[1:] == ["list", "--versions", "postgresql@17"]:
+            return subprocess.CompletedProcess(
+                command,
+                0 if installed else 1,
+                "postgresql@17 17.10\n" if installed else "",
+                "",
+            )
+        raise AssertionError(f"unexpected package mutation: {command}")
+
+    runtime = AdapterRuntime(
+        run=run,
+        which=lambda name: "/fixture/brew" if name == "brew" else None,
+        now=lambda: datetime(2026, 9, 23, tzinfo=UTC),
+        name="fixture",
+        target=Path("/fixture"),
+    )
+    observation = PostgresObservation(True, "/fixture/brew", False, False, None, False, None)
+    with patch("bootstrap_adapter.routes.postgres_observation", return_value=observation):
+        failed = _postgres_install_route(_request("install_postgresql"), runtime)
+    _check(
+        failed["checkpoint_status"] == "failed"
+        and failed["error_kind"] == "postgres_dependency_upgrade_blocked",
+        "r44 dependency upgrades receive a specific fail-closed result",
+    )
+    _check(
+        "readline, xz" in failed["repair"]
+        and "that proposed upgrade was not run" in failed["repair"]
+        and "Preserve compliant dependencies" in failed["repair"],
+        "r44 repair names exact upgrades and requires reviewed continuation",
+    )
+    _check(
+        failed["stdout"] == _R44_POSTGRES_UPGRADE_PLAN
+        and calls == [
+            ["/fixture/brew", "install", "--dry-run", "postgresql@17"],
+            ["/fixture/brew", "list", "--versions", "postgresql@17"],
+        ],
+        "r44 plan is retained and no install, upgrade, or reinstall command runs",
+    )
+    jsonschema.Draft7Validator(_SCHEMA).validate(failed)
+
+
+def _check_incomplete_and_decorated_plans_refuse_before_mutation() -> None:
+    """Incomplete, decorated, and unrecognized plan lines cannot authorize install."""
+
+    head = "==> Would install 1 formula:\npostgresql@17\n"
+    upgrade = "==> Would upgrade 1 dependency for postgresql@17:\nreadline\n"
+    dependency_head = "==> Would install 1 dependency for postgresql@17:\n"
+    raw_control_lines = {
+        "vertical_tab": "postgresql@17\x0b",
+        "form_feed": "postgresql@17\x0c",
+        "next_line": "postgresql@17\x85",
+        "carriage_return": "postgresql@17\r",
+        "line_separator": "postgresql@17\u2028",
+        "paragraph_separator": "postgresql@17\u2029",
+        "stderr_vertical_tab": "metadata\x0b",
+    }
+    blank_only_cases = frozenset(
+        {"blank_stdout_spaces", "blank_stderr_spaces", "blank_stdout_newline", "blank_stderr_newline"}
+    )
+    cases = {
+        "vertical_tab": (head[:-1] + "\x0b\n", ""),
+        "form_feed": (head[:-1] + "\x0c\n", ""),
+        "next_line": (head[:-1] + "\x85\n", ""),
+        "carriage_return": (head[:-1] + "\r\n", ""),
+        "line_separator": (head[:-1] + "\u2028\n", ""),
+        "paragraph_separator": (head[:-1] + "\u2029\n", ""),
+        "stderr_vertical_tab": (head, "metadata\x0b\n"),
+        "blank_stdout_spaces": ("   ", ""),
+        "blank_stderr_spaces": ("", "   "),
+        "blank_stdout_newline": ("\n", ""),
+        "blank_stderr_newline": ("", "\n"),
+        "truncated_stdout": (head + "notice: download metadata\n" * 800 + upgrade, ""),
+        "truncated_stderr": (head, "notice: download metadata\n" * 800 + upgrade),
+        "unprefixed_upgrade_notice": (head + "Upgrading readline\n", ""),
+        "versioned_upgrade_notice": (head + dependency_head + "Upgrading 1.0\n", ""),
+        "versioned_unlink_notice": (head + dependency_head + "Unlinking 1.0\n", ""),
+        "versioned_link_notice": (head + dependency_head + "Linking 1.0\n", ""),
+        "lowercase_unlink_notice": (head + dependency_head + "unlinking 1.0\n", ""),
+        "lowercase_link_notice": (head + dependency_head + "linking 1.0\n", ""),
+        "lowercase_unlisted_gerund": (head + dependency_head + "staging 1.0\n", ""),
+        "titlecase_unlisted_action": (head + dependency_head + "Staging 1.0\n", ""),
+        "unknown_versioned_dependency": (head + dependency_head + "glorp 1.0\n", ""),
+        "unknown_bare_dependency": (head + dependency_head + "glorp\n", ""),
+        "unknown_plan_line": (head + "Other pending operation\n", ""),
+        "ansi": (
+            head
+            + "\x1b[32m==> Would upgrade 1 dependency for postgresql@17:\x1b[0m\n"
+            + "\x1b[32mreadline\x1b[0m\n",
+            "",
+        ),
+        "unrecognized": (head + "==> Would replace 1 dependency for postgresql@17:\nreadline\n", ""),
+        "mixed_case": (head + "==> would upgrade 1 dependency for postgresql@17:\nreadline\n", ""),
+    }
+    for control_name, control in (
+        ("vertical_tab", "\x0b"),
+        ("form_feed", "\x0c"),
+        ("next_line", "\x85"),
+        ("carriage_return", "\r"),
+        ("line_separator", "\u2028"),
+        ("paragraph_separator", "\u2029"),
+    ):
+        for stream in ("stdout", "stderr"):
+            name = f"control_only_{control_name}_{stream}"
+            cases[name] = (control, "") if stream == "stdout" else ("", control)
+            raw_control_lines[name] = control
+
+    def check_case(name: str, stdout: str, stderr: str, *, installed: bool) -> None:
+        calls: list[list[str]] = []
+        state = "installed" if installed else "absent"
+        expected_calls = [
+            ["/fixture/brew", "install", "--dry-run", "postgresql@17"],
+            ["/fixture/brew", "list", "--versions", "postgresql@17"],
+        ]
+
+        def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            calls.append(command)
+            if "--dry-run" in command:
+                return subprocess.CompletedProcess(command, 0, stdout, stderr)
+            if command[1:] == ["list", "--versions", "postgresql@17"]:
+                return subprocess.CompletedProcess(
+                    command,
+                    0 if installed else 1,
+                    "postgresql@17 17.10\n" if installed else "",
+                    "",
+                )
+            raise AssertionError(f"{name}/{state} invoked an unapproved package mutation: {command}")
+
+        runtime = AdapterRuntime(
+            run=run,
+            which=lambda _name: "/fixture/brew",
+            now=lambda: datetime(2026, 9, 23, tzinfo=UTC),
+            name="fixture",
+            target=Path("/fixture"),
+        )
+        output_complete = len(stdout) <= 16_384 and len(stderr) <= 16_384
+        reported_line: str | None = None
+        try:
+            run_homebrew_install_required(runtime, "/fixture/brew", "postgresql@17", "PostgreSQL")
+        except HomebrewInstallError as exc:
+            reported_line = exc.unrecognized_line
+            _check(
+                exc.blocked_upgrades == ()
+                and exc.outcome.stdout == stdout[:16_384]
+                and exc.outcome.stderr == stderr[:16_384]
+                and exc.outcome.output_complete == output_complete,
+                f"{name}/{state} keeps bounded diagnostics without inventing complete upgrade evidence",
+            )
+            _check(
+                (reported_line is not None and "unrecognized dry-run line" in str(exc))
+                if output_complete and name not in blank_only_cases else reported_line is None,
+                f"{name}/{state} reports a complete unrecognized line only with complete evidence",
+            )
+        else:
+            raise AssertionError(f"{name}/{state} was permitted")
+        if name in raw_control_lines:
+            _check(
+                reported_line == raw_control_lines[name],
+                f"{name}/{state} reports the unsplit raw control line",
+            )
+        _check(
+            calls == expected_calls,
+            f"{name}/{state} refused before any mutating Homebrew command",
+        )
+
+        calls.clear()
+        observation = PostgresObservation(True, "/fixture/brew", False, False, None, False, None)
+        with patch("bootstrap_adapter.routes.postgres_observation", return_value=observation):
+            failed = _postgres_install_route(_request("install_postgresql"), runtime)
+        _check(
+            failed["checkpoint_status"] == "failed"
+            and failed["error_kind"] == "postgres_install_failed",
+            f"{name}/{state} route refuses with the generic failure kind",
+        )
+        repair = str(failed["repair"])
+        _check(
+            ("Unrecognized Homebrew dry-run line" in repair and repr(reported_line[:160]) in repair)
+            if reported_line is not None else "Unrecognized Homebrew dry-run line" not in repair,
+            f"{name}/{state} route reports the unrecognized line without guessing an upgrade",
+        )
+        _check(
+            calls == expected_calls,
+            f"{name}/{state} route stops before install or service start",
+        )
+        jsonschema.Draft7Validator(_SCHEMA).validate(failed)
+
+    for name, (stdout, stderr) in cases.items():
+        for installed in (False, True):
+            check_case(name, stdout, stderr, installed=installed)
+
+    with patch.dict("os.environ", {"HOMEBREW_COLOR": "1"}):
+        environment = homebrew_guard_environment()
+    _check(
+        environment["HOMEBREW_NO_COLOR"] == "1" and "HOMEBREW_COLOR" not in environment,
+        "guard disables inherited Homebrew color during dry-run and apply",
     )
 
 
@@ -366,6 +594,15 @@ def main() -> int:
         "receipt-054 repeated PostgreSQL dependency closure and warning are accepted",
     )
     _check(
+        _homebrew_plan_is_exact(
+            "==> Would install 1 formula:\npostgresql@17\n"
+            "==> Would install 1 dependency for postgresql@17:\nreadline 8.3\n",
+            kind="formula",
+            package="postgresql@17",
+        ),
+        "lowercase versioned dependency item remains an approved install plan",
+    )
+    _check(
         not _homebrew_plan_is_exact(
             "==> Would install 2 formulae:\npostgresql@17\nunrelated\n",
             kind="formula",
@@ -406,6 +643,9 @@ def main() -> int:
         "output without a package-plan heading remains refused",
     )
     _check_failure_envelopes()
+    _check_r44_postgres_dependency_upgrade_is_explicitly_blocked(installed=False)
+    _check_r44_postgres_dependency_upgrade_is_explicitly_blocked(installed=True)
+    _check_incomplete_and_decorated_plans_refuse_before_mutation()
     _check_fresh_postgres_plans_pgvector_before_apply()
     _check_postgres_service_readiness_outcomes()
     _check_postgres_configuration_failure_keeps_psql_diagnostics()

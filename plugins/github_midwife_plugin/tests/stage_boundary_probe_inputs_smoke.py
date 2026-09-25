@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -12,12 +15,14 @@ _ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_ROOT / "solet_cli" / "src"))
 sys.path.insert(0, str(_ROOT / "plugins" / "github_midwife_plugin" / "src"))
 
-from github_midwife_plugin.setup_adapter import _ALLOWED_PUBLIC_INPUTS  # noqa: E402
-from solet_manager import stage_boundaries  # noqa: E402
+from github_midwife_plugin.lm_studio_index import LOCAL_SOURCE_REF_KEY  # noqa: E402
+from github_midwife_plugin.setup_adapter import (  # noqa: E402
+    _ALLOWED_PUBLIC_INPUTS,
+    _LOCAL_SOURCE_PROBE_REFS,
+)
+from solet_manager import adapters, stage_boundaries  # noqa: E402
 from solet_manager.adapters import (  # noqa: E402
     AdapterRegistry,
-    OperationRequest,
-    OperationResult,
 )
 from solet_manager.contracts import ContractBundle, startup_readiness_budget  # noqa: E402
 from solet_manager.models import JsonValue  # noqa: E402
@@ -48,18 +53,6 @@ def _capture_boundary_inputs(
 ) -> frozenset[str]:
     """Invoke the real boundary runner and capture its one adapter request."""
 
-    captured: list[OperationRequest] = []
-
-    def capture(
-        _registry: AdapterRegistry,
-        *,
-        runner: str,
-        request: OperationRequest,
-    ) -> OperationResult:
-        _check(runner == str(bundle.probes[probe_id]["runner"]), "runner drift")
-        captured.append(request)
-        return cast(OperationResult, object())
-
     answers = {
         "decisions": {
             "autostart": "enabled",
@@ -73,27 +66,47 @@ def _capture_boundary_inputs(
         Transaction,
         SimpleNamespace(
             name="boundary-inputs",
-            target=Path("/tmp/boundary-inputs"),
+            target="/tmp/boundary-inputs",
             answers=answers,
             answers_fingerprint=canonical_sha256(answers),
         ),
     )
-    # Mirrors stage_boundaries.py:145-153: ordinary non-manager boundary probes
-    # start from an empty public-input set; only a declared startup-readiness
-    # exit can add inputs. Invoke that real source rather than copying its policy.
-    with patch.object(stage_boundaries, "invoke_adapter", capture):
+    # Observe the transport envelope after invoke_adapter has injected any
+    # parent deadline. Intercepting invoke_adapter itself misses runner inputs.
+    before_ns = time.monotonic_ns()
+    with (
+        patch.object(AdapterRegistry, "command_for", return_value=("fixture-adapter",)),
+        patch.object(
+            adapters.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess(
+                ["fixture-adapter"], 1, stdout="", stderr="fixture boundary capture"
+            ),
+        ) as run,
+    ):
         stage_boundaries._invoke_boundary_probe(  # noqa: SLF001
             bundle=bundle,
             transaction=transaction,
-            registry=cast(AdapterRegistry, object()),
+            registry=AdapterRegistry(target=Path(transaction.target)),
             stage_id=stage_id,
             boundary=boundary,
             probe_id=probe_id,
             answers=cast(dict[str, JsonValue], {}),
             attempt=1,
         )
-    _check(len(captured) == 1, f"boundary {stage_id}/{boundary}/{probe_id} did not invoke once")
-    return frozenset(captured[0].public_inputs)
+    after_ns = time.monotonic_ns()
+    _check(run.call_count == 1, f"boundary {stage_id}/{boundary}/{probe_id} did not invoke once")
+    envelope = json.loads(run.call_args.kwargs["input"])
+    _check(envelope["operation_ref"] == bundle.probes[probe_id]["probe_ref"], "probe route drift")
+    public_inputs = envelope["public_inputs"]
+    if "lm_studio_parent_deadline_ns" in public_inputs:
+        deadline = public_inputs["lm_studio_parent_deadline_ns"]
+        budget_ns = envelope["timeout_seconds"] * 1_000_000_000
+        _check(
+            type(deadline) is int and before_ns + budget_ns <= deadline <= after_ns + budget_ns,
+            "transport deadline must be derived from this boundary request budget",
+        )
+    return frozenset(public_inputs)
 
 
 def _render_inputs(values: frozenset[str]) -> str:
@@ -137,6 +150,11 @@ def main() -> int:
                         f"boundary {stage_id}/{boundary}/{probe_id} did not preserve actual startup-readiness inputs",
                     )
                 declared = frozenset(_ALLOWED_PUBLIC_INPUTS.get(probe_ref, frozenset()))
+                # This fixture follows vendor acquisition. A local-source record
+                # is an optional capability carrier, never a required default.
+                if probe_ref in _LOCAL_SOURCE_PROBE_REFS:
+                    _check(LOCAL_SOURCE_REF_KEY not in supplied, "vendor flow must not claim a local attestation")
+                    declared -= {LOCAL_SOURCE_REF_KEY}
                 _check(
                     declared.issubset(supplied),
                     "boundary probe "

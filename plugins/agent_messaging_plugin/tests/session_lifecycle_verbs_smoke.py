@@ -169,8 +169,13 @@ def _prepared_project_req(
     state: StateManagementInterface,
     **overrides: object,
 ) -> SpawnSessionRequest:
-    """Mint the server-side preparing row required by project spawn tests."""
+    """Mint the server-side preparing row required by project spawn tests.
+
+    The row is written as already past its register-Unit step (design
+    unt_57725090): these tests exercise spawn, not the mint.
+    """
     req = _spawn_req(role_class=ROLE_CLASS_PROJECT, **overrides)
+    req = replace(req, unit_id=req.unit_id or "unt_lifecycle-fixture")
     dispatch_id = f"mdp-test-{time.time_ns()}"
     state.write_state(
         AGENT_ROLE_BINDING_NAMESPACE,
@@ -194,7 +199,7 @@ def _prepared_project_req(
                 "model": req.model,
                 "effort": req.effort,
                 "report_by_seconds": req.report_by_seconds,
-                "ttl_seconds": req.ttl_seconds,
+
                 "allowed_hosts": [str(req.host or "headless")],
                 "allowed_tools": list(req.allowed_tools),
                 "permission_mode": req.permission_mode,
@@ -207,6 +212,8 @@ def _prepared_project_req(
                 "spawned_by_role": req.spawned_by_role,
                 "spawned_by_instance_id": req.spawned_by_instance_id,
                 "directed_by": req.directed_by,
+                "unit_id": req.unit_id,
+                "next_required_action": "spawn_current_attempt",
             },
         },
     )
@@ -326,7 +333,7 @@ def test_model_dispatch_policy_refusals_and_allowances() -> None:
         unfiltered = exc.code
     _check(unfiltered != "dispatch_policy_violation", "fix does not restore a pair allowlist")
 
-    floored = None
+    scoped = None
     try:
         spawn_session(
             state,
@@ -336,10 +343,10 @@ def test_model_dispatch_policy_refusals_and_allowances() -> None:
             ),
         )
     except VerbError as exc:
-        floored = exc.code
+        scoped = exc.code
     _check(
-        floored == "capability_floor_violation",
-        "infrastructure (allow_any_pair) with scope_tags=state_schema still refuses claude-sonnet-5",
+        scoped != "capability_floor_violation",
+        "state_schema scope tag does not impose the retired model floor",
     )
 
     allowed = None

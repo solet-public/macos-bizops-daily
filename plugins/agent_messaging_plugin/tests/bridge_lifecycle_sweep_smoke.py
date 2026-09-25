@@ -38,10 +38,6 @@ the roleless lane + the 40+ zombie-row class). Cases:
      attribute raises INSIDE the guard and is logged, not failed — the tick
      goes green while no notice is ever delivered. Asserting invocation is the
      only thing that can tell "composed" from "composed and swallowed".
-     ★ R4 (2026-08-17): and now the TTL-surface rider, the third independently
-     fault-isolated leg, for exactly the same reason and with the same two
-     assertions — it is INVOKED, and its own fault does not cost the other two
-     their tick (F4), just as theirs do not cost it its own.
 
 Run:
     SOLET_NAME=<name>-test .venv/bin/python3 \
@@ -429,7 +425,7 @@ def _sweep_tick_forwarded_rider_cases() -> None:
         _autonomic_assignment=autonomic,
         _run_session_lifecycle_sweep=lambda: swept.append("d1_sweep"),
         _run_rotation_surface_sweep=lambda: swept.append("l4_rotation_surface"),
-        _run_ttl_surface_sweep=lambda: swept.append("r4_ttl_surface"),
+
     )
     AgentMessagingPlugin._on_sweep_tick(cast("Any", fake_self))  # noqa: SLF001
     _check(
@@ -438,9 +434,9 @@ def _sweep_tick_forwarded_rider_cases() -> None:
         "F1 _on_sweep_tick INVOKES both INF-06 forwarded riders (sweep + GC)",
     )
     _check(
-        swept == ["d1_sweep", "l4_rotation_surface", "r4_ttl_surface"],
+        swept == ["d1_sweep", "l4_rotation_surface"],
         "F1 _on_sweep_tick invokes the D1 session sweep AND the L4 rotation-surface "
-        "rider AND the R4 TTL rider -- an un-invoked rider delivers no notice "
+        "rider -- an un-invoked rider delivers no notice "
         "however well it is tested",
     )
 
@@ -459,15 +455,15 @@ def _sweep_tick_forwarded_rider_cases() -> None:
         _autonomic_assignment=autonomic2,
         _run_session_lifecycle_sweep=lambda: swept.append("d1_sweep"),
         _run_rotation_surface_sweep=lambda: swept.append("l4_rotation_surface"),
-        _run_ttl_surface_sweep=lambda: swept.append("r4_ttl_surface"),
+
     )
     AgentMessagingPlugin._on_sweep_tick(cast("Any", fake_self2))  # noqa: SLF001
     _check(
         "forwarded.sweep_serve_timeouts" in calls
         and "forwarded.gc_terminal_rows" in calls
-        and swept == ["d1_sweep", "l4_rotation_surface", "r4_ttl_surface"],
+        and swept == ["d1_sweep", "l4_rotation_surface"],
         "F2 a RAISING INF-02 sweep does not skip the forwarded riders / D1 sweep / "
-        "L4 rotation surface / R4 TTL rider",
+        "L4 rotation surface",
     )
 
     # F3 — the fault-isolation runs BOTH ways: a raising D1 sweep must not cost
@@ -486,12 +482,12 @@ def _sweep_tick_forwarded_rider_cases() -> None:
         _autonomic_assignment=autonomic3,
         _run_session_lifecycle_sweep=_d1_boom,
         _run_rotation_surface_sweep=lambda: swept.append("l4_rotation_surface"),
-        _run_ttl_surface_sweep=lambda: swept.append("r4_ttl_surface"),
+
     )
     AgentMessagingPlugin._on_sweep_tick(cast("Any", fake_self3))  # noqa: SLF001
     _check(
-        swept == ["l4_rotation_surface", "r4_ttl_surface"],
-        "F3 a RAISING D1 sweep does not skip the L4 rotation-surface or R4 TTL riders",
+        swept == ["l4_rotation_surface"],
+        "F3 a RAISING D1 sweep does not skip the L4 rotation-surface rider",
     )
 
     def _l4_boom() -> None:
@@ -505,40 +501,12 @@ def _sweep_tick_forwarded_rider_cases() -> None:
         ),
         _run_session_lifecycle_sweep=lambda: swept.append("d1_sweep"),
         _run_rotation_surface_sweep=_l4_boom,
-        _run_ttl_surface_sweep=lambda: swept.append("r4_ttl_surface"),
+
     )
     AgentMessagingPlugin._on_sweep_tick(cast("Any", fake_self4))  # noqa: SLF001
     _check(
-        swept == ["d1_sweep", "r4_ttl_surface"],
-        "F3 a RAISING L4 rotation-surface rider does not skip the D1 sweep or the "
-        "R4 TTL rider",
-    )
-
-    # F4 — the R4 TTL rider is a THIRD independently fault-isolated rider, so it
-    # gets the same two guarantees as its neighbours: it must be INVOKED, and its
-    # own fault must not cost the others their tick. The invocation half is not
-    # ceremony — the rider sits inside its own try/except, so un-wiring it from
-    # _on_sweep_tick raises INSIDE the guard, is logged, and leaves the tick
-    # green while no TTL notice is ever delivered. Only asserting invocation
-    # separates "composed" from "composed and swallowed".
-    def _r4_boom() -> None:
-        raise RuntimeError("R4 TTL-surface fault")
-
-    swept.clear()
-    fake_self5 = SimpleNamespace(
-        _autonomic_assignment=SimpleNamespace(
-            completions=SimpleNamespace(sweep_serve_timeouts=lambda: None),
-            forwarded=_ForwardedRiderSpy(calls),
-        ),
-        _run_session_lifecycle_sweep=lambda: swept.append("d1_sweep"),
-        _run_rotation_surface_sweep=lambda: swept.append("l4_rotation_surface"),
-        _run_ttl_surface_sweep=_r4_boom,
-    )
-    AgentMessagingPlugin._on_sweep_tick(cast("Any", fake_self5))  # noqa: SLF001
-    _check(
-        swept == ["d1_sweep", "l4_rotation_surface"],
-        "F4 a RAISING R4 TTL rider does not skip the D1 sweep or the L4 rotation "
-        "surface",
+        swept == ["d1_sweep"],
+        "F3 a RAISING L4 rotation-surface rider does not skip the D1 sweep",
     )
 
 

@@ -2,6 +2,41 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-25 — r45: doctor, LM Studio and messaging fixes
+
+**Solet Manager manager-v0.1.0-r45.** This is an automated publish_release cut
+to solet-public/macos-bizops-daily, with manager artifacts in
+dwestgate/homebrew-tap-validate, built from the landed source commit
+containing this entry.
+
+Changes since r44:
+
+- The Manager's doctor runtime identity check reads only the top-level
+  launchd job state and PID, so a healthy LaunchAgent whose venv Python
+  resolves through the Homebrew framework no longer fails, and nested
+  coalition blocks are no longer miscounted as duplicate job states. A job
+  that is waiting but still reports a PID still fails closed.
+- Manager contracts and LM Studio readiness are reconciled, and an LM Studio
+  model pull is judged by the daemon's observed state rather than the pull
+  command's own output.
+- The published r43 seed is recorded as the predecessor for existing-install
+  transitions.
+- Peer messaging routes no longer run on the solet's event loop, removing
+  multi-second stalls and the mass reconnects they caused.
+- A managed dispatch mints its work-register unit atomically.
+
+Fresh-guest installation is a separate post-publish operation. This release
+does not claim a fresh-guest install, solet doctor, or E3 result.
+
+Known limits: the r43 existing-install upgrade router fix is not in this
+release and follows in a later one. The limits disclosed in r43 and r44
+otherwise remain: an update of an existing Solet has not been re-measured end
+to end on a clean guest; there is no automated supported manager-binary
+upgrade path; and there is no abandon/change decision command for a blocked
+transaction.
+
+---
+
 ## 2026-09-23 — r44: first automated release cut
 
 **Solet Manager `manager-v0.1.0-r44`.** This is the first automated

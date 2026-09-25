@@ -7,7 +7,7 @@ Proves the contract that makes the catalog safe to consult:
 * ``select_dispatch_tier`` refuses ``catalog_stale`` while nothing is accepted,
   and serves the operator's verdict once cells are accepted and fresh;
 * re-seeding never downgrades an accepted cell (idempotent, start-up safe);
-* the dispatch policy allowlist filters the catalog by ``dispatch_kind``;
+* the selected answer carries the current dispatch-policy version;
 * the default billing objective is derived from the economics profiles;
 * every seeded record names only declared schema columns (the drift class
   the real-shape fake exists to catch);
@@ -157,7 +157,7 @@ def test_selector_refuses_until_accepted_then_serves() -> None:
     picked = verbs.select_dispatch_tier(_typed(state), params, now=_NOW)
     _check(picked["selected"]["model"] == "gpt-5.6-sol" and picked["selected"]["effort"] == "medium", "review kind, score 38: sol medium (39, $0.50) beats terra xhigh (38, $0.63)")
     _check(picked["excluded"]["quota_unknown"] > 0, "unknown flat-rate quota cells are excluded and counted")
-    _check(picked["policy_version"] == "model-dispatch-policy-v2", "policy version reported when a kind was consulted")
+    _check(picked["policy_version"] == "model-dispatch-policy-v3", "policy version reported when a kind was consulted")
     _check(picked["catalog_run_id"] == "mcr-test-accepted", "the accepting run id rides the answer")
     _check(
         picked["selection_receipt"]["selected"] == {"runtime": "codex", "model": "gpt-5.6-sol", "effort": "medium"},

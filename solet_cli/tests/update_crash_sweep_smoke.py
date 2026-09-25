@@ -3,7 +3,7 @@
 The reference run takes an enrolled row through Step 4, the runtime approval,
 every runtime stage, the final doctor and promotion; the exhaustive crash
 sweeps over EVERY durable write and EVERY apply boundary of that run (F-CR-1/2)
-live in ``update_crash_sweep_writes_{1,2,3,4}_smoke.py`` and
+live in ``update_crash_sweep_writes_{1..12}_smoke.py`` and
 ``update_crash_sweep_applies_smoke.py`` so each stays inside the gate's
 per-smoke budget.  The named boundary fixtures here cover the rows the sweep
 reaches only implicitly: fetch-completed abandon, fast-forward-completed
@@ -71,7 +71,7 @@ def _status(fixture: Fixture) -> str:
 
 def _assert_sweep_reference(root: Path) -> None:
     """The reference run and the boundary counts; the exhaustive write/apply sweeps run in the sibling
-    ``update_crash_sweep_writes_{1,2,3,4}_smoke.py`` and ``update_crash_sweep_applies_smoke.py`` so each stays
+    ``update_crash_sweep_writes_{1..12}_smoke.py`` and ``update_crash_sweep_applies_smoke.py`` so each stays
     inside the gate's per-smoke budget."""
     sweep = CrashSweep(build=lambda path: build_fixture(path), scenario=run_to_promoted, root=root)
     _, writes, applies = sweep.reference()

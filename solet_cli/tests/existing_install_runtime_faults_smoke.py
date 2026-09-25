@@ -3,7 +3,7 @@
 - F-RT-1/3: the router run promotes through ``runtime_attestation``; the single-colour run promotes through
   ``runtime_process_identity`` with the attestation seam poisoned (any attestation call raises) and the
   preview saying there is no zero-downtime rollback;
-- F-RT-2 (in ``existing_install_router_failure_sweep_{1,2,3}_smoke.py``, sliced for the gate's per-smoke
+- F-RT-2 (in ``existing_install_router_failure_sweep_{1..10}_smoke.py`` and ``existing_install_router_failure_sweep_applies_{1,2}_smoke.py``, sliced for the gate's per-smoke
   budget): the router candidate failure under BOTH sweep modes -- every crash point resumes to the reference
   terminal ``failed runtime_candidate_failed`` with at most one ``rec_`` apply and one recover, the runtime axis
   at the baseline, ``needs_attention``, and text naming the router previous as code-only;
@@ -100,7 +100,7 @@ def _assert_stale_processes(root: Path) -> None:
     advance_to_source_advanced(fixture)
     fingerprint = runtime_fingerprint(fixture)
     fixture.host.processes = [
-        {"pid": 4343, "lstart": "Fri Sep 18 12:00:00 2026", "command": "{TARGET}/.venv/bin/python3 -m ananta.cli"},
+        {"pid": 4343, "lstart": "Fri Sep 18 12:00:00 2026", "command": "{TARGET}/.venv/bin/python3 -m ananta.cli --app-home {TARGET}/profile"},
         {"pid": 9001, "lstart": "Mon Jan  1 00:00:00 2024", "command": "{TARGET}/.venv/bin/solet-bridge call x"},
         {"pid": 9002, "lstart": "Mon Jan  1 00:00:00 2024", "command": "{TARGET}/.venv/bin/solet-bridge watch"},
     ]

@@ -17,11 +17,14 @@ from __future__ import annotations
 
 import json
 import os
+import plistlib
 import shutil
+import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -29,11 +32,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _step5_support import ADAPTER_MODULE, FakeHost, Fixture, advance_to_source_advanced, build_fixture, data, db_spy, expect, git, runtime_fingerprint  # noqa: E402
 from _step6_support import SimulatedCrash, byte_map, last_update_journal, run_to_promoted  # noqa: E402
 from solet_manager import existing_install_doctor as doctor_module  # noqa: E402
+from solet_manager import existing_install_doctor_service_checks as service_checks  # noqa: E402
 from solet_manager import maintenance_inventory as inventory_module  # noqa: E402
 from solet_manager import update_execution as execution_module  # noqa: E402
 from solet_manager.doctor_journal import read_doctor_journal  # noqa: E402
 from solet_manager.errors import ManagerError  # noqa: E402
 from solet_manager.existing_install_doctor import run_doctor  # noqa: E402
+from solet_manager.existing_solet_diagnostics import DiagnosticStatus  # noqa: E402
 from solet_manager.models import CommandResult  # noqa: E402
 from solet_manager.rendering import render_human, render_json  # noqa: E402
 from solet_manager.update_execution import apply_update, preview_update_instance  # noqa: E402
@@ -217,6 +222,204 @@ def _assert_terminal_and_pointer_pending(root: Path) -> None:
 # --- F-DOC-1 / F-DOC-4 ----------------------------------------------------------------------------------
 
 
+def _identity_case(root: Path, variant: str) -> DiagnosticStatus:
+    """R5-style venv symlinks with a framework Python.app process display."""
+    root = root.resolve()
+    target = root / "target"
+    home = root / "home"
+    venv_bin = target / ".venv" / "bin"
+    framework = root / "opt" / "homebrew" / "Cellar" / "python@3.13" / "3.13.15" / "Frameworks" / "Python.framework" / "Versions" / "3.13"
+    base_python = framework / "bin" / "python3.13"
+    app_python = framework / "Resources" / "Python.app" / "Contents" / "MacOS" / "Python"
+    for directory in (venv_bin, base_python.parent, app_python.parent, target / "profile"):
+        directory.mkdir(parents=True, exist_ok=True)
+    base_python.write_bytes(b"fixture")
+    app_python.write_bytes(b"fixture")
+    (venv_bin / "python3.13").symlink_to(base_python)
+    venv_python = venv_bin / "python3"
+    venv_python.symlink_to("python3.13")
+    _check(venv_python.resolve() == base_python and app_python != base_python, "R5 venv symlink and Python.app layout are distinct")
+    label = "local.solet.fixture"
+    plist = home / "Library" / "LaunchAgents" / f"{label}.plist"
+    plist.parent.mkdir(parents=True)
+    arguments = [str(venv_python), "-m", "ananta.cli", "--app-home", str(target / "profile")]
+    if variant == "foreign_plist":
+        arguments[0] = str(root / "other" / ".venv" / "bin" / "python3")
+    plist.write_bytes(b"not a plist" if variant == "bad_plist" else plistlib.dumps({"Label": label, "ProgramArguments": arguments}))
+    command = f"{app_python} -m ananta.cli --app-home {target / 'profile'}"
+    if variant == "decoy":
+        command = f"/usr/bin/python3 -m ananta.cli --app-home /other/profile --note {target}/.venv/decoy"
+    elif variant in {"pid_race", "foreign_plist", "bad_plist", "bad_recheck", "duplicate_recheck", "wrong_app_home"}:
+        command = f"{venv_python} -m ananta.cli --app-home {target / 'profile'}"
+    if variant == "wrong_app_home":
+        command = f"{venv_python} -m ananta.cli --app-home {root / 'other' / 'profile'}"
+    row_pid = 9999 if variant == "other_pid" else 3268
+    recheck_pid = 3269 if variant == "pid_race" else 3268
+
+    reads = 0
+
+    def launchctl(_registry: object, _verb: str, _arguments: tuple[str, ...], _timeout: int) -> subprocess.CompletedProcess[str]:
+        nonlocal reads
+        reads += 1
+        output = _identity_launchctl_output(variant, reads, recheck_pid)
+        return subprocess.CompletedProcess(("launchctl",), 0, output, "")
+
+    def run_ps(_timeout: int) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(("ps",), 0, f"{row_pid} Fri Sep 18 12:00:00 2026 {command}\n", "")
+
+    seams = SimpleNamespace(home=home, uid=501, launchctl=launchctl, run_ps=run_ps)
+    record = SimpleNamespace(service_identity=SimpleNamespace(launchagent_label=label))
+    probe = SimpleNamespace(target=target, seams=seams, record=record, registry=None, pid_observed=service_checks._parse_pid(launchctl(None, "print", (), 30).stdout), journal=None, invoked_vectors=[])
+    return service_checks._process_identity(probe).status  # noqa: SLF001 -- focused production seam
+
+
+def _real_shape_base(*, top_state: str | None, duplicate_state: str | None = None) -> list[str]:
+    """Common header lines shared by every real-shape fixture variant below."""
+    lines = ["gui/501/com.example.fixture-target = {\n"]
+    lines.append("\tactive count = 1\n")
+    lines.append("\tpath = /System/Library/LaunchAgents/com.example.fixture-target.plist\n")
+    lines.append("\ttype = LaunchAgent\n")
+    if top_state is not None:
+        lines.append(f"\tstate = {top_state}\n")
+    if duplicate_state is not None:
+        lines.append(f"\tstate = {duplicate_state}\n")
+    lines.append("\n\tprogram = /usr/libexec/example\n")
+    return lines
+
+
+def _real_shape_launchctl(*, top_state: str | None, top_pid: str | None, duplicate_state: str | None = None, coalition_state: str = "active") -> str:
+    """A sanitized real-``launchctl print`` shape combining all three hazards at once: a
+    ``label = {`` header, top-level ``state``/``pid`` fields, a nested ``pid-local
+    endpoints`` block header (real output carries this; it must never be misread as a
+    malformed ``pid`` field), two nested coalition blocks each with their own ``state``
+    (real output carries these; they must never be counted as duplicate top-level
+    state), and one value rendered with its own open and close brace on a single line
+    (real output does this for an opaque nested XPC value; depth tracking must not
+    require every ``}`` to be a line by itself). This is case 4 of 4 (the full combined
+    shape) -- see ``_real_shape_pid_local_only`` and ``_real_shape_one_line_brace_only``
+    below for the two hazards isolated on their own, so each RED-on-R2 result is
+    attributable to exactly one defect rather than a confound of several.
+    All identifiers below are synthetic -- no real host, user, or solet name.
+    """
+    lines = _real_shape_base(top_state=top_state, duplicate_state=duplicate_state)
+    lines.append("\tpid-local endpoints = {\n\t\texample.endpoint => {\n\t\t\tport = 1\n\t\t}\n\t}\n")
+    lines.append('\tdescriptor = {\n\t\t"aux-data" => {\n\t\t\t"a" => \t\t\t\t"b" => \t\t\t}\n\t}\n')
+    if top_pid is not None:
+        lines.append(f"\tpid = {top_pid}\n")
+    lines.append(f"\n\tresource coalition = {{\n\t\tID = 1\n\t\ttype = resource\n\t\tstate = {coalition_state}\n\t\tactive count = 1\n\t}}\n")
+    lines.append(f"\tjetsam coalition = {{\n\t\tID = 2\n\t\ttype = jetsam\n\t\tstate = {coalition_state}\n\t\tactive count = 1\n\t}}\n")
+    lines.append("}\n")
+    return "".join(lines)
+
+
+def _real_shape_pid_local_only(*, top_state: str | None = "running", top_pid: str | None = "3268") -> str:
+    """Case 2 of 4: isolates ONLY the ``pid-local endpoints`` block header hazard --
+    no coalition blocks, no one-line-nested-brace value. R2's word-boundary regex
+    matches the ``pid-local endpoints = {`` line as a malformed ``pid`` field (its key,
+    ``pid-local endpoints``, is not exactly ``pid``) and fails closed on that line
+    alone; this isolates that defect from the (unrelated) coalition duplicate-state and
+    one-line-brace defects.
+    """
+    lines = _real_shape_base(top_state=top_state)
+    lines.append("\tpid-local endpoints = {\n\t\texample.endpoint => {\n\t\t\tport = 1\n\t\t}\n\t}\n")
+    if top_pid is not None:
+        lines.append(f"\tpid = {top_pid}\n")
+    lines.append("}\n")
+    return "".join(lines)
+
+
+def _real_shape_one_line_brace_only(*, top_state: str | None = "running", top_pid: str | None = "3268") -> str:
+    """Case 3 of 4: isolates ONLY the one-line-nested-brace value hazard -- no
+    pid-local block, no coalition blocks. Nothing here trips R2's word-boundary/
+    malformed-key check, so R2 verifies this case too (GREEN); it is the
+    per-character brace-counting fix specifically that this case regression-tests: a
+    parser that still matches braces line-terminally (``endswith("{")`` /
+    ``== "}"``) never sees the value's own close brace as a line by itself, so depth
+    never returns to 0 and the job fails closed.
+    """
+    lines = _real_shape_base(top_state=top_state)
+    lines.append('\tdescriptor = {\n\t\t"aux-data" => {\n\t\t\t"a" => \t\t\t\t"b" => \t\t\t}\n\t}\n')
+    if top_pid is not None:
+        lines.append(f"\tpid = {top_pid}\n")
+    lines.append("}\n")
+    return "".join(lines)
+
+
+# A real `launchctl print gui/<uid>/<solet LaunchAgent label>` capture (2026-09-24), sanitized:
+# label/paths -> synthetic `com.example.fixture-target`/`/Users/fixture/...`; the
+# launchd socket hash, coalition IDs, domain asid, and PID -> generic placeholders
+# (PID -> 3268, matching this fixture's convention). Structure and every other field
+# are byte-identical to the capture. This case has no `pid-local endpoints` block and
+# no one-line-nested-brace value -- unlike `real_shape_healthy` below, it isolates
+# exactly the defect R44's R2 review blocked on: the two nested coalition blocks'
+# own `state = active` lines, double-counted as duplicate top-level `state` by a
+# depth-blind scan.
+_REAL_CAPTURE_TARGET = "gui/501/com.example.fixture-target = {\n\tactive count = 1\n\tpath = /Users/fixture/Library/LaunchAgents/com.example.fixture-target.plist\n\ttype = LaunchAgent\n\tstate = running\n\n\tprogram = /Users/fixture/.local/releases/example/current/venv/bin/python3\n\targuments = {\n\t\t/Users/fixture/.local/releases/example/current/venv/bin/python3\n\t\t-m\n\t\texample_plugin.supervisor\n\t\t--app-home\n\t\t/Users/fixture/workspace/example/profile\n\t}\n\n\tworking directory = /Users/fixture/.local/runtime\n\n\tstdout path = /Users/fixture/.local/logs/example_autostart.log\n\tstderr path = /Users/fixture/.local/logs/example_autostart.log\n\tinherited environment = {\n\t\tSSH_AUTH_SOCK => /var/run/com.apple.launchd.XXXXXXXXXX/Listeners\n\t}\n\n\tdefault environment = {\n\t\tPATH => /usr/bin:/bin:/usr/sbin:/sbin\n\t}\n\n\tenvironment = {\n\t\tOSLogRateLimit => 64\n\t\tSOLET_NAME => example\n\t\tPATH => /opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin\n\t\tXPC_SERVICE_NAME => com.example.fixture-target\n\t}\n\n\tdomain = gui/501 [100000]\n\tasid = 100000\n\tminimum runtime = 10\n\texit timeout = 5\n\truns = 2\n\tpid = 3268\n\timmediate reason = inefficient\n\tforks = 0\n\texecs = 2\n\tinitialized = 1\n\ttrampolined = 1\n\tstarted suspended = 0\n\tproxy started suspended = 0\n\tchecked allocations = 0 (queried = 1)\n\tchecked allocations reason = no host\n\tchecked allocations flags = 0x0\n\tlast exit code = 0\n\n\tresource coalition = {\n\t\tID = 210000\n\t\ttype = resource\n\t\tstate = active\n\t\tactive count = 1\n\t\tname = com.example.fixture-target\n\t}\n\n\tjetsam coalition = {\n\t\tID = 210001\n\t\ttype = jetsam\n\t\tstate = active\n\t\tactive count = 1\n\t\tname = com.example.fixture-target\n\t}\n\n\tspawn type = daemon (3)\n\tjetsam priority = 40\n\tjetsam memory limit (active) = (unlimited)\n\tjetsam memory limit (inactive) = (unlimited)\n\tjetsamproperties category = daemon\n\tjetsam thread limit = 32\n\tcpumon = default\n\n\tproperties = keepalive | runatload | inferred program\n}\n"
+
+
+def _identity_launchctl_output(variant: str, read: int, recheck_pid: int) -> str:
+    output = f"state = running\n pid = {3268 if read == 1 else recheck_pid}\n"
+    if (variant.endswith("_initial") and read != 1) or (variant.endswith("_recheck") and read != 2) or (variant in {"bad_recheck", "duplicate_recheck"} and read != 2):
+        return output
+    cases = {
+        "real_capture_target": _REAL_CAPTURE_TARGET,
+        "real_shape_pid_local_only": _real_shape_pid_local_only(),
+        "real_shape_one_line_brace_only": _real_shape_one_line_brace_only(),
+        "real_shape_healthy": _real_shape_launchctl(top_state="running", top_pid="3268"),
+        "real_shape_waiting": _real_shape_launchctl(top_state="waiting", top_pid="3268"),
+        "real_shape_nested_state_only": _real_shape_launchctl(top_state=None, top_pid="3268", coalition_state="running"),
+        "real_shape_duplicate_state": _real_shape_launchctl(top_state="running", top_pid="3268", duplicate_state="waiting"),
+        "bad_recheck": "malformed",
+        "duplicate_recheck": "state = running\n pid = 3268\n pid = 9999\n",
+        "waiting_initial": "state = waiting\n pid = 3268\n",
+        "waiting_recheck": "state = waiting\n pid = 3268\n",
+        "missing_state_initial": "pid = 3268\n",
+        "missing_state_recheck": "pid = 3268\n",
+        "missing_pid_initial": "state = running\n",
+        "missing_pid_recheck": "state = running\n",
+        "unknown_state_initial": "state = something_else\n pid = 3268\n",
+        "unknown_state_recheck": "state = something_else\n pid = 3268\n",
+        "duplicate_state_initial": "state = running\n state = waiting\n pid = 3268\n",
+        "duplicate_state_recheck": "state = running\n state = waiting\n pid = 3268\n",
+        "duplicate_pid_initial": "state = running\n pid = 3268\n pid = 3268\n",
+        "duplicate_pid_recheck": "state = running\n pid = 3268\n pid = 3268\n",
+        "zero_pid_initial": "state = running\n pid = 0\n",
+        "zero_pid_recheck": "state = running\n pid = 0\n",
+        "negative_pid_initial": "state = running\n pid = -3268\n",
+        "negative_pid_recheck": "state = running\n pid = -3268\n",
+        "text_pid_initial": "state = running\n pid = unknown\n",
+        "text_pid_recheck": "state = running\n pid = unknown\n",
+    }
+    return cases.get(variant, output)
+
+
+def _assert_process_identity_regressions(root: Path) -> None:
+    _check(_identity_case(root / "healthy", "healthy") is DiagnosticStatus.VERIFIED, "R5 framework Python.app from target venv verifies")
+    _check(_identity_case(root / "decoy", "decoy") is DiagnosticStatus.FAILED, "decoy .venv/ argv on foreign interpreter refuses")
+    _check(_identity_case(root / "other_pid", "other_pid") is DiagnosticStatus.FAILED, "unrelated ananta.cli process at another PID refuses")
+    _check(_identity_case(root / "pid_race", "pid_race") is DiagnosticStatus.FAILED, "changed launchd PID after ps refuses")
+    _check(_identity_case(root / "foreign_plist", "foreign_plist") is DiagnosticStatus.FAILED, "plist interpreter outside target venv refuses")
+    _check(_identity_case(root / "bad_plist", "bad_plist") is DiagnosticStatus.FAILED, "malformed plist refuses")
+    _check(_identity_case(root / "bad_recheck", "bad_recheck") is DiagnosticStatus.FAILED, "malformed launchctl PID recheck refuses")
+    _check(_identity_case(root / "duplicate_recheck", "duplicate_recheck") is DiagnosticStatus.FAILED, "conflicting launchctl PID lines refuse")
+    _check(_identity_case(root / "wrong_app_home", "wrong_app_home") is DiagnosticStatus.FAILED, "foreign app-home refuses")
+    for variant in (
+        "waiting_initial", "waiting_recheck", "missing_state_initial", "missing_state_recheck",
+        "missing_pid_initial", "missing_pid_recheck",
+        "unknown_state_initial", "unknown_state_recheck", "duplicate_state_initial", "duplicate_state_recheck",
+        "duplicate_pid_initial", "duplicate_pid_recheck", "zero_pid_initial", "zero_pid_recheck",
+        "negative_pid_initial", "negative_pid_recheck", "text_pid_initial", "text_pid_recheck",
+    ):
+        _check(_identity_case(root / variant, variant) is DiagnosticStatus.FAILED, f"{variant} launchctl read refuses")
+    _check(_identity_case(root / "real_capture_target", "real_capture_target") is DiagnosticStatus.VERIFIED, "case 1/4: sanitized real launchctl-print capture, coalition duplicate-state ONLY (no pid-local block, no one-line-brace value) verifies -- RED on R2 attributable to the coalition depth-blindness defect alone")
+    _check(_identity_case(root / "real_shape_pid_local_only", "real_shape_pid_local_only") is DiagnosticStatus.VERIFIED, "case 2/4: pid-local endpoints block header ONLY (no coalition blocks, no one-line-brace value) verifies -- RED on R2 attributable to the word-boundary/malformed-exact-key defect alone")
+    _check(_identity_case(root / "real_shape_one_line_brace_only", "real_shape_one_line_brace_only") is DiagnosticStatus.VERIFIED, "case 3/4: one-line nested-brace value ONLY (no pid-local block, no coalition blocks) verifies -- GREEN on R2 (this hazard alone never trips R2's checks), RED only on a depth-tracking parser that still matches braces line-terminally, isolating the per-character brace-counting defect alone")
+    _check(_identity_case(root / "real_shape_healthy", "real_shape_healthy") is DiagnosticStatus.VERIFIED, "case 4/4: real launchctl-print shape with all three hazards combined (header, pid-local endpoints, coalition blocks, one-line-nested value) verifies -- GREEN only once all three fixes are applied together")
+    _check(_identity_case(root / "real_shape_waiting", "real_shape_waiting") is DiagnosticStatus.FAILED, "real-shape top-level waiting state refuses")
+    _check(_identity_case(root / "real_shape_nested_state_only", "real_shape_nested_state_only") is DiagnosticStatus.FAILED, "real-shape with only a nested coalition state=running and no top-level state refuses (nested fields are never read as job state)")
+    _check(_identity_case(root / "real_shape_duplicate_state", "real_shape_duplicate_state") is DiagnosticStatus.FAILED, "real-shape duplicate top-level state lines refuse")
+
+
 def _assert_exit_codes(root: Path) -> None:
     fixture = build_fixture(root)
     run_to_promoted(fixture)
@@ -316,6 +519,7 @@ def main() -> int:
         _assert_in_flight(root / "inflight")
         _assert_terminal_and_pointer_pending(root / "terminal")
         _assert_exit_codes(root / "exits")
+        _assert_process_identity_regressions(root / "identity")
         _assert_router_offline(root / "router")
         _assert_rendering(root / "render")
     print(f"existing_install_doctor_smoke OK: {_CHECKS} checks passed")

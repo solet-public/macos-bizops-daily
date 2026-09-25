@@ -979,7 +979,7 @@ def _stage_boundary_scenarios(root: Path) -> None:
     first = manager.preview(config, decision_selections=selections)
     first_count = sum(request.probe_purpose == "preview" for request in chain_adapter.requests)
     _check(
-        first_count == 15,
+        first_count == 16,
         "system-dependencies preview includes the consented tool provisioners",
     )
     manager.create(
@@ -1004,7 +1004,7 @@ def _stage_boundary_scenarios(root: Path) -> None:
         all(
             (
                 first.data.get("frontier") == ["system_dependencies"],
-                first_count == 15,
+                first_count == 16,
                 second.data.get("frontier") == ["genesis"],
                 second_count == 2,
                 third.status == "preview_ready",

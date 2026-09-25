@@ -56,6 +56,10 @@ def validate_contract_bundle(bundle: ContractView) -> None:
     _validate_state_policy(bundle.flow)
     _validate_completion_policy(bundle.flow)
     validate_start_command(bundle.flow)
+    if declares_knowledge_readiness(bundle.flow_schema) or "knowledge_readiness" in _object(
+        bundle.flow, "executor_contracts"
+    ):
+        validate_knowledge_readiness(bundle.flow)
     _validate_contract_schema_identity(
         bundle.answers_schema,
         "https://solet.ai/schemas/setup-answers-v1.json",
@@ -282,6 +286,32 @@ def validate_start_command(flow: dict[str, JsonValue]) -> None:
     _validate_startup_readiness(start)
     _validate_start_postconditions(start)
 
+
+
+def declares_knowledge_readiness(schema: dict[str, JsonValue]) -> bool:
+    """Read the policy generation from the bundle's own pinned schema."""
+    executor = _object(_object(schema, "definitions"), "executor_contracts")
+    properties = _object(executor, "properties")
+    required = _string_tuple(executor.get("required"), "executor_contracts.required")
+    return "knowledge_readiness" in properties or "knowledge_readiness" in required
+
+
+def validate_knowledge_readiness(flow: dict[str, JsonValue]) -> None:
+    """Validate the independent stage-exit retrieval budget, never startup health."""
+    source = "executor_contracts.knowledge_readiness"
+    readiness = _json_object(_object(flow, "executor_contracts").get("knowledge_readiness"), source)
+    expected: dict[str, JsonValue] = {
+        "launch_result_reserve_seconds": 5,
+        "consumer_probe_purposes": ["stage_exit"],
+        "consumer_probe_refs": ["knowledge_retrieval_succeeds"],
+        "release_signal": "canonical_nonempty_retrieval",
+    }
+    if set(readiness) != {*expected, "timeout_seconds"}:
+        raise ContractError(f"{source} differs from the closed shape")
+    _require_exact_readiness_values(readiness, source, expected)
+    timeout = readiness.get("timeout_seconds")
+    if isinstance(timeout, bool) or not isinstance(timeout, int) or not 6 <= timeout <= 900:
+        raise ContractError(f"{source}.timeout_seconds is invalid")
 
 def _validate_start_runner(start: dict[str, JsonValue]) -> None:
     value = start.get("runner")

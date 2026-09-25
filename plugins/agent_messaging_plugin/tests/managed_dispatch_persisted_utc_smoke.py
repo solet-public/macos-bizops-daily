@@ -62,7 +62,6 @@ class _NaiveUtcRoundtripState(RealShapeState):
         "uptake_due_at",
         "report_by",
         "watchdog_due_at",
-        "expires_at",
         "decision_due_at",
         "next_liveness_probe_at",
         "liveness_escalation_due_at",
@@ -167,7 +166,7 @@ def _active_naive(tmp: Path) -> tuple[Any, dict[str, Any]]:
 def test_status_milestone_and_blocker() -> None:
     with tempfile.TemporaryDirectory() as raw:
         state, active = _active_naive(Path(raw))
-        expiry = T0 + timedelta(hours=4)
+        expiry = datetime.fromisoformat(str(active["report_by"]))
         before = managed_dispatch_status(state, "mdp-fixture", now=expiry - timedelta(seconds=1))
         at_utc = managed_dispatch_status(state, "mdp-fixture", now=expiry)
         at_local = managed_dispatch_status(
@@ -175,11 +174,11 @@ def test_status_milestone_and_blocker() -> None:
         )
         after = managed_dispatch_status(state, "mdp-fixture", now=expiry + timedelta(seconds=1))
         _check(
-            not before["deadline_overdue"]["expires_at"]
-            and at_utc["deadline_overdue"]["expires_at"]
-            and after["deadline_overdue"]["expires_at"]
+            not before["deadline_overdue"]["report_by"]
+            and at_utc["deadline_overdue"]["report_by"]
+            and after["deadline_overdue"]["report_by"]
             and at_utc["deadline_overdue"] == at_local["deadline_overdue"],
-            "naive persisted UTC status is identical before/at/after expiry and across zones",
+            "naive persisted UTC status is identical before/at/after the report deadline and across zones",
         )
         milestone = report_managed_dispatch(
             state,
@@ -240,7 +239,7 @@ def test_retry_and_supervision() -> None:
         after_retry = supervise_managed_dispatches(state, now=T0 + timedelta(hours=5, seconds=2))
         _check(
             bool(expired["conditions"])
-            and datetime.fromisoformat(str(retried["expires_at"])) > T0 + timedelta(hours=5)
+            and datetime.fromisoformat(str(retried["report_by"])) > T0 + timedelta(hours=5)
             and not any(item["condition"] == "ttl_expired" for item in after_retry["conditions"]),
             "legal retry refreshes persisted naive UTC deadlines",
         )
@@ -366,7 +365,7 @@ def test_malformed_and_public_inputs_fail_loudly() -> None:
         state = _naive_state()
         _prepare(state, Path(raw))
         cast(RealShapeState, state).rows(AGENT_ROLE_BINDING_NAMESPACE, TABLE_MANAGED_DISPATCH)[0][
-            "expires_at"
+            "uptake_due_at"
         ] = "not-a-timestamp"
         status_code = ""
         try:
@@ -374,7 +373,7 @@ def test_malformed_and_public_inputs_fail_loudly() -> None:
         except DispatchError as exc:
             status_code = exc.code
         _check(
-            status_code == "expires_at_invalid"
+            status_code == "uptake_due_at_invalid"
             and len(supervise_managed_dispatches(state, now=T0)["malformed_rows"]) == 1,
             "malformed persisted timestamp is loud and never healthy",
         )
@@ -383,7 +382,7 @@ def test_malformed_and_public_inputs_fail_loudly() -> None:
         state = _state()
         spec_code = event_code = ""
         try:
-            _prepare(state, Path(raw), expires_at=(T0 + timedelta(hours=4)).replace(tzinfo=None).isoformat())
+            _prepare(state, Path(raw), report_by=(T0 + timedelta(hours=4)).replace(tzinfo=None).isoformat())
         except DispatchError as exc:
             spec_code = exc.code
         _prepare(state, Path(raw))
@@ -409,7 +408,7 @@ def test_malformed_and_public_inputs_fail_loudly() -> None:
         except DispatchError as exc:
             event_code = exc.code
         _check(
-            spec_code == "expires_at_invalid" and event_code == "next_report_deadline_invalid",
+            spec_code == "report_by_invalid" and event_code == "next_report_deadline_invalid",
             "naive public spec and event deadlines remain rejected",
         )
 

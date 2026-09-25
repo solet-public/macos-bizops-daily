@@ -44,6 +44,7 @@ _QUALIFIED_SOURCE_KINDS = {
     "codex_local": "codex_local",
     "claude_code_local": "claude_code_local",
 }
+_KNOWLEDGE_LAUNCH_RESULT_RESERVE_SECONDS = 5
 _KNOWLEDGE_READINESS_POLL_INITIAL_SECONDS = 0.5
 _KNOWLEDGE_READINESS_POLL_MAX_SECONDS = 5.0
 _KNOWLEDGE_RESULT_REQUIRED_FIELDS = frozenset(
@@ -507,34 +508,69 @@ def _wait_for_knowledge_retrieval(
     timeout. Transport and protocol failures remain immediate failures.
     """
 
-    deadline = monotonic() + request.timeout_seconds
+    started = monotonic()
+    deadline = started + request.timeout_seconds - _KNOWLEDGE_LAUNCH_RESULT_RESERVE_SECONDS
     delay = _KNOWLEDGE_READINESS_POLL_INITIAL_SECONDS
     attempts = 0
-    last_outcome: CommandOutcome | None = None
     while True:
         remaining = deadline - monotonic()
         call_timeout = min(60, math.floor(remaining))
         if call_timeout < 1:
-            if last_outcome is None:
-                return _knowledge_timeout_failure(request, attempts, remaining)
-            return _knowledge_probe_result(request, last_outcome, attempts)
+            response = _knowledge_timeout_failure(request, attempts, remaining)
+            terminal = "budget_exhausted"
+            break
         outcome = _knowledge_call(request, runtime, timeout_seconds=call_timeout)
-        last_outcome = outcome
         attempts += 1
-        if outcome.stdout_truncated or outcome.stderr_truncated:
-            return truncated_solet_call_output(
-                request,
-                "service_interface::knowledge_service::search",
-                outcome,
-            )
-        state = _knowledge_state(outcome)
-        if state != "empty":
-            return _knowledge_probe_result(request, outcome, attempts)
         remaining = deadline - monotonic()
+        if outcome.stdout_truncated or outcome.stderr_truncated:
+            response = truncated_solet_call_output(
+                request, "service_interface::knowledge_service::search", outcome
+            )
+            terminal = "output_truncated"
+            break
+        state = _knowledge_state(outcome)
+        if state not in {"empty", "nonempty"}:
+            response = _knowledge_probe_result(request, outcome, attempts)
+            terminal = str(response.get("error_kind"))
+            break
         if remaining <= 0:
-            return _knowledge_probe_result(request, outcome, attempts)
+            response = _knowledge_timeout_failure(request, attempts, remaining)
+            terminal = "late_result"
+            break
+        if state == "nonempty":
+            response = _knowledge_probe_result(request, outcome, attempts)
+            terminal = "nonempty"
+            break
         sleep(min(delay, remaining))
         delay = min(delay * 2, _KNOWLEDGE_READINESS_POLL_MAX_SECONDS)
+    _knowledge_timing(response, request, attempts, monotonic() - started, terminal)
+    return response
+
+
+def _knowledge_timing(
+    response: JsonObject,
+    request: AdapterRequest,
+    attempts: int,
+    elapsed: float,
+    terminal: str,
+) -> None:
+    items = response.get("evidence")
+    if isinstance(items, list):
+        items.append(evidence(
+            evidence_id="knowledge_readiness_timing",
+            kind="behavior",
+            status=str(response["checkpoint_status"]),
+            summary="Bounded retrieval readiness timing; does not prove all KBs hydrated.",
+            observed=[
+                f"attempts={attempts}",
+                f"elapsed_seconds={elapsed:.6f}",
+                f"parent_seconds={request.timeout_seconds}",
+                f"launch_result_reserve_seconds={_KNOWLEDGE_LAUNCH_RESULT_RESERVE_SECONDS}",
+                f"terminal={terminal}",
+            ],
+            expected="canonical nonempty retrieval before inner deadline",
+            source="monotonic:knowledge_stage_exit",
+        ))
 
 
 def _knowledge_probe(request: AdapterRequest, runtime: Runtime) -> JsonObject:
@@ -565,7 +601,9 @@ def _knowledge_call(
 
 
 def _knowledge_state(outcome: CommandOutcome) -> str:
-    if not _call_succeeded(outcome):
+    if outcome.executable_missing or outcome.launch_error:
+        return "failed"
+    if not _call_succeeded(outcome) or not _knowledge_envelope_valid(outcome):
         return "failed"
     payload = _call_payload(outcome)
     data_shape = (payload.get("count"), payload.get("results"))
@@ -575,6 +613,24 @@ def _knowledge_state(outcome: CommandOutcome) -> str:
     return "nonempty" if count > 0 or bool(results) else "empty"
 
 
+
+def _knowledge_envelope_valid(outcome: CommandOutcome) -> bool:
+    """Reject contradictory transport/service status even with a success payload."""
+    raw = json.loads(outcome.stdout)
+    if not isinstance(raw, dict):
+        return False
+    outer = raw.get("result")
+    if not isinstance(outer, dict):
+        return False
+    return (
+        raw.get("status") in (None, "completed")
+        and raw.get("error_message") is None
+        and raw.get("error") is None
+        and raw.get("success", True) is True
+        and outer.get("status") in (None, "success", "completed")
+        and outer.get("action_status") in (None, "completed")
+    )
+
 def _valid_knowledge_payload(
     data_shape: tuple[object, object],
 ) -> TypeGuard[tuple[int, list[object]]]:
@@ -583,10 +639,18 @@ def _valid_knowledge_payload(
         return False
     if not isinstance(results, list) or count != len(results):
         return False
-    return all(
-        isinstance(row, dict) and _KNOWLEDGE_RESULT_REQUIRED_FIELDS <= row.keys()
-        for row in results
-    )
+    return all(_valid_knowledge_row(row) for row in results)
+
+
+def _valid_knowledge_row(row: object) -> bool:
+    if not isinstance(row, dict) or not _KNOWLEDGE_RESULT_REQUIRED_FIELDS <= row.keys():
+        return False
+    if not all(isinstance(row[key], str) for key in _KNOWLEDGE_RESULT_REQUIRED_FIELDS - {"score"}):
+        return False
+    score = row["score"]
+    if isinstance(score, bool):
+        return False
+    return isinstance(score, int) or (isinstance(score, float) and math.isfinite(score))
 
 
 def _knowledge_probe_result(
@@ -596,6 +660,14 @@ def _knowledge_probe_result(
 ) -> JsonObject:
     if outcome.timed_out:
         return _knowledge_timeout_failure(request, attempts)
+    failure_kind = _knowledge_command_failure(outcome)
+    if failure_kind is not None:
+        return _boolean_probe(
+            request, "knowledge_retrieval", False, [f"attempts={attempts}"],
+            "service_interface::knowledge_service::search",
+            "Repair the knowledge bridge or service before retrying.",
+            error_kind=failure_kind,
+        )
     state = _knowledge_state(outcome)
     if state in {"failed", "malformed"}:
         return _knowledge_protocol_failure(request, attempts)
@@ -609,6 +681,22 @@ def _knowledge_probe_result(
         )
     return base
 
+
+
+def _knowledge_command_failure(outcome: CommandOutcome) -> str | None:
+    if outcome.executable_missing:
+        return "knowledge_retrieval_executable_missing"
+    if outcome.launch_error or not outcome.ok:
+        return "knowledge_retrieval_transport_failed"
+    try:
+        raw: object = json.loads(outcome.stdout)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(raw, dict):
+        outer = raw.get("result")
+        if isinstance(outer, dict) and outer.get("success") is False:
+            return "knowledge_retrieval_service_failed"
+    return None
 
 def _knowledge_protocol_failure(request: AdapterRequest, attempts: int) -> JsonObject:
     return _boolean_probe(

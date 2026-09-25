@@ -29,6 +29,25 @@ logger = logging.getLogger(__name__)
 JsonDict = dict[str, Any]
 
 UNKNOWN_ARGUMENTS_ERROR_CODE = "action.unknown_arguments"
+_SESSION_START_PROCESSES = frozenset(
+    f"plugin::agent_messaging_plugin::{name}"
+    for name in ("spawn_session", "dispatch_managed_work", "provision_role_session")
+)
+
+
+def reject_retired_session_arguments(
+    process_key: str, arguments: dict[str, object],
+) -> None:
+    """Reject retired session lifetime inputs before generic schema validation."""
+    if process_key not in _SESSION_START_PROCESSES:
+        return
+    retired = sorted({"ttl_seconds", "expires_at"}.intersection(arguments))
+    if retired:
+        raise FrameworkError(
+            message=f"Session lifetime arguments have been retired: {retired}",
+            error_code="retired_session_ttl_argument",
+            details={CONTEXT_KEY_PROCESS_KEY: process_key, "retired_arguments": retired},
+        )
 
 
 def validate_process_arguments(
@@ -37,6 +56,7 @@ def validate_process_arguments(
     arguments: dict[str, object],
 ) -> None:
     """Reject missing required or undeclared arguments for a registered process."""
+    reject_retired_session_arguments(process_key, arguments)
     declared = list(parameters.keys())
     unknown = [name for name in arguments if name not in parameters]
     if unknown:

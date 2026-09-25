@@ -140,6 +140,26 @@ def emit_drop_column_op(
     )
 
 
+def emit_drop_not_null_op(
+    namespace: str,
+    table_name: str,
+    column_name: str,
+    schema_name: str,
+) -> sql.Composed:
+    """Emit the additive ``NOT NULL`` relaxation for one declared column.
+
+    This preserves the column and every existing value while allowing later
+    bridge runtimes to store ``NULL``. The diff layer admits only this
+    single-axis relaxation; tightened nullability and compound mutations still
+    fail closed.
+    """
+    full_table_name = build_table_name(namespace, table_name)
+    return sql.SQL("ALTER TABLE {} ALTER COLUMN {} DROP NOT NULL").format(
+        sql.Identifier(schema_name, full_table_name),
+        sql.Identifier(column_name),
+    )
+
+
 def build_default_check_constraint_name(
     namespace: str, table_name: str, column_name: str,
 ) -> str:

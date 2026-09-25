@@ -5,14 +5,18 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Callable
-from typing import TextIO
+from typing import Protocol, TextIO
 
 from .existing_install_operations import EXISTING_ALLOWED_PUBLIC_INPUTS
 from .existing_install_operations import operation_handlers as existing_operation_handlers
 from .installation_doctor import READINESS_PUBLIC_INPUT_KEYS, probe_handlers
+from .lm_studio_deadline import PARENT_DEADLINE_KEY, SERVED_REFS
+from .lm_studio_index import LOCAL_SOURCE_REF_KEY, VerifiedLocalSource
 from .lm_studio_provisioning import PUBLIC_INPUT_KEYS as LM_STUDIO_PUBLIC_INPUT_KEYS
 from .lm_studio_provisioning import operation_handlers as lm_studio_operations
+from .lm_studio_provisioning import probe as probe_lm_studio
 from .lm_studio_provisioning import probe_handlers as lm_studio_probes
+from .lm_studio_provisioning import provision as provision_lm_studio
 from .setup_adapter_contract import (
     AdapterInputError,
     AdapterRequest,
@@ -33,8 +37,21 @@ _IDENTITY_INPUT_REFS = {
     "hydration::claude.install_plugin",
     "hydration::codex.install_plugin",
 }
+_LOCAL_SOURCE_OPERATION_REFS = frozenset({
+    "setup::lm_studio.pull_inference",
+    "setup::lm_studio.ensure_index_inference",
+    "setup::lm_studio.load_inference",
+})
+_LOCAL_SOURCE_PROBE_REFS = frozenset({
+    "setup::lm_studio.inference_artifact_present",
+    "setup::lm_studio.inference_model_indexed",
+    "setup::lm_studio.inference_model_served",
+})
+_LOCAL_SOURCE_REFS = _LOCAL_SOURCE_OPERATION_REFS | _LOCAL_SOURCE_PROBE_REFS
 _ALLOWED_PUBLIC_INPUTS: dict[str, frozenset[str]] = {
     **dict.fromkeys((*lm_studio_operations(), *lm_studio_probes()), LM_STUDIO_PUBLIC_INPUT_KEYS),
+    **dict.fromkeys(_LOCAL_SOURCE_REFS, LM_STUDIO_PUBLIC_INPUT_KEYS | {LOCAL_SOURCE_REF_KEY}),
+    **{ref: LM_STUDIO_PUBLIC_INPUT_KEYS | {PARENT_DEADLINE_KEY} | ({LOCAL_SOURCE_REF_KEY} if ref in _LOCAL_SOURCE_REFS else set()) for ref in SERVED_REFS},
     # The existing-install flow's closed handler rows (design section 3.2); the
     # create flow never reaches them and they never reach a genesis handler.
     **EXISTING_ALLOWED_PUBLIC_INPUTS,
@@ -92,12 +109,27 @@ _ALLOWED_PUBLIC_INPUTS: dict[str, frozenset[str]] = {
 }
 
 
-def dispatch_request(request: AdapterRequest, runtime: Runtime) -> JsonObject:
+class LocalSourceResolver(Protocol):
+    """B2 injects a Manager-record resolver; the public ref is never a path."""
+
+    def resolve(self, ref: str, request: AdapterRequest) -> VerifiedLocalSource:
+        """Return a checked typed source or raise on invalid input."""
+        ...
+
+
+def dispatch_request(
+    request: AdapterRequest,
+    runtime: Runtime,
+    *,
+    local_source_resolver: LocalSourceResolver | None = None,
+) -> JsonObject:
     """Dispatch one validated request through the closed reviewed registries."""
 
     input_error = _validate_operation_inputs(request)
     if input_error is not None:
         return input_error
+    if LOCAL_SOURCE_REF_KEY in request.public_inputs:
+        return _dispatch_local_source(request, runtime, local_source_resolver)
     if request.operation_ref.startswith("existing::"):
         # The existing-install vocabulary dispatches through its own closed
         # table and never touches the create registries (design section 3.2),
@@ -121,6 +153,44 @@ def dispatch_request(request: AdapterRequest, runtime: Runtime) -> JsonObject:
         retry_safe=False,
         exit_code=None,
         repair="Add a reviewed handler for the exact flow-declared callable reference.",
+    )
+
+
+def _dispatch_local_source(
+    request: AdapterRequest,
+    runtime: Runtime,
+    resolver: LocalSourceResolver | None,
+) -> JsonObject:
+    ref = request.public_inputs[LOCAL_SOURCE_REF_KEY]
+    if not isinstance(ref, str) or not ref or resolver is None:
+        return _local_source_invalid(request)
+    try:
+        resolved = _checked_local_source(resolver.resolve(ref, request))
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return _local_source_invalid(request)
+    if resolved is None:
+        return _local_source_invalid(request)
+    try:
+        if request.operation_ref in _LOCAL_SOURCE_OPERATION_REFS:
+            return provision_lm_studio(request, runtime, local_source=resolved)
+        if request.operation_ref in _LOCAL_SOURCE_PROBE_REFS:
+            return probe_lm_studio(request, runtime, local_source=resolved)
+    except (OSError, RuntimeError) as exc:
+        return _runtime_failure(request, exc)
+    return _protocol_failure(request)
+
+
+def _checked_local_source(value: object) -> VerifiedLocalSource | None:
+    return value if isinstance(value, VerifiedLocalSource) else None
+
+
+def _local_source_invalid(request: AdapterRequest) -> JsonObject:
+    return result(
+        request,
+        status="blocked",
+        error_kind="lm_studio_local_source_invalid",
+        retry_safe=False,
+        repair="Re-preview and approve the verified local Qwen source before resuming.",
     )
 
 
@@ -237,6 +307,7 @@ def run_once(
     error_stream: TextIO,
     *,
     runtime: Runtime | None = None,
+    local_source_resolver: LocalSourceResolver | None = None,
 ) -> int:
     """Read exactly one request and emit exactly one closed result."""
 
@@ -265,6 +336,7 @@ def run_once(
     response = dispatch_request(
         request,
         SystemRuntime() if runtime is None else runtime,
+        local_source_resolver=local_source_resolver,
     )
     output_stream.write(json.dumps(response, sort_keys=True, separators=(",", ":")))
     output_stream.write("\n")
@@ -281,4 +353,4 @@ if __name__ == "__main__":
     raise SystemExit(main())
 
 
-__all__ = ["dispatch_request", "main", "run_once"]
+__all__ = ["LocalSourceResolver", "dispatch_request", "main", "run_once"]

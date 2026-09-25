@@ -13,6 +13,7 @@ import logging
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "ananta" / "src"))
@@ -22,6 +23,7 @@ from ananta.core.actions.action_factory import (  # noqa: E402
     UNKNOWN_ARGUMENTS_ERROR_CODE,
     ActionFactory,
 )
+from ananta.core.actions.action_metadata import ActionMetadata  # noqa: E402
 from ananta.core.actions.action_processor import ActionProcessor  # noqa: E402
 from ananta.error_handling import FrameworkError  # noqa: E402
 
@@ -30,10 +32,16 @@ from agent_messaging_plugin.platform_surface import (  # noqa: E402
     BridgeError,
     PlatformSurface,
 )
+from agent_messaging_plugin.plugin import AgentMessagingPlugin  # noqa: E402
 from agent_messaging_plugin.process_exposure import ProcessExportPolicy  # noqa: E402
 
 _SERVICE_KEY = "service_interface::knowledge_service::search"
 _PLUGIN_KEY = "plugin::agent_messaging_plugin::peer_identity"
+_SESSION_START_KEYS = (
+    "plugin::agent_messaging_plugin::spawn_session",
+    "plugin::agent_messaging_plugin::dispatch_managed_work",
+    "plugin::agent_messaging_plugin::provision_role_session",
+)
 _FLOW_ID = "flow-unknown-arguments-smoke"
 _passed = 0
 _failed: list[str] = []
@@ -98,8 +106,18 @@ class _BridgeManager:
 
 
 def _registry() -> dict[str, object]:
+    session_processes: dict[str, object] = {}
+    for process_key in _SESSION_START_KEYS:
+        method = getattr(AgentMessagingPlugin, process_key.rsplit("::", 1)[1])
+        metadata = cast(ActionMetadata, getattr(method, "_platform_process_metadata"))  # noqa: B009
+        session_processes[process_key] = {
+            "parameters": {
+                name: parameter.to_dict() for name, parameter in metadata.parameters.items()
+            },
+        }
     return {
         "processes": {
+            **session_processes,
             _SERVICE_KEY: {
                 "parameters": {
                     "query": {"required": True},
@@ -215,6 +233,43 @@ def test_service_processor_rejects_a_bypassed_undeclared_argument() -> None:
         _check(False, "service processor never silently drops a bypassed undeclared argument")
 
 
+def _assert_bridge_argument_error(
+    process_key: str, arguments: dict[str, object], expected_code: str,
+) -> None:
+    factory, recorder = _factory()
+    surface, flows = _surface(factory)
+    label = f"{process_key} {arguments!r}"
+    try:
+        surface.process_call(
+            process_key,
+            arguments,
+            trigger_data={"bridge_id": "agc-unknown-arguments", "session_id": "sess-smoke"},
+            deliver_to_bridge=False,
+        )
+    except BridgeError as exc:
+        _check(exc.code == expected_code, f"{label} preserves {expected_code}")
+    else:
+        _check(False, f"{label} is refused")
+    _check(flows.failed == [(_FLOW_ID, "failed")], f"{label} fails its flow")
+    _check(not recorder.actions, f"{label} never queues a session-start action")
+
+
+def test_retired_session_arguments_survive_the_public_bridge_boundary() -> None:
+    for process_key in _SESSION_START_KEYS:
+        for field in ("ttl_seconds", "expires_at"):
+            for value in (None, 0, "", "not-a-lifetime", {"malformed": True}):
+                _assert_bridge_argument_error(
+                    process_key, {field: value}, "retired_session_ttl_argument",
+                )
+        _assert_bridge_argument_error(
+            process_key, {"unrelated": 1}, "action.unknown_arguments",
+        )
+    for field in ("ttl_seconds", "expires_at"):
+        _assert_bridge_argument_error(
+            _PLUGIN_KEY, {field: None}, "action.unknown_arguments",
+        )
+
+
 def test_declared_arguments_still_pass_and_missing_required_keeps_its_code() -> None:
     factory, recorder = _factory()
     factory.submit_action_definition(_definition(_SERVICE_KEY, {"query": "needle", "top_k": 1}))
@@ -253,6 +308,7 @@ def main() -> int:
     print("process-call undeclared argument refusal smoke")
     test_unknown_arguments_refused_on_both_families_and_surfaces()
     test_service_processor_rejects_a_bypassed_undeclared_argument()
+    test_retired_session_arguments_survive_the_public_bridge_boundary()
     test_declared_arguments_still_pass_and_missing_required_keeps_its_code()
     if _failed:
         print(f"\nFAIL: {len(_failed)} check(s) failed")

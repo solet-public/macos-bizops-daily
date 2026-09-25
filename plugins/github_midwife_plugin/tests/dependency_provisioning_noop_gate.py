@@ -78,7 +78,12 @@ def main() -> int:
     with (
         patch.dict(
             os.environ,
-            {"HOME": "/operator/home", "HOMEBREW_CUSTOM_POLICY": "retained"},
+            {
+                "HOME": "/operator/home",
+                "PATH": "/operator/bin",
+                "HOMEBREW_COLOR": "1",
+                "HOMEBREW_CUSTOM_POLICY": "retained",
+            },
             clear=True,
         ),
         patch(
@@ -92,11 +97,12 @@ def main() -> int:
         == {
             "HOMEBREW_CUSTOM_POLICY": "retained",
             "HOMEBREW_NO_AUTO_UPDATE": "1",
+            "HOMEBREW_NO_COLOR": "1",
             "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK": "1",
             "HOMEBREW_NO_INSTALL_UPGRADE": "1",
             "HOME": "/target/account",
         },
-        "bootstrap Brew guard pins measured HOME-only requirement without ambient HOME or PATH",
+        "bootstrap Brew guard pins target HOME and no-color policy without ambient PATH or color",
     )
 
     with patch.dict(os.environ, {"HOMEBREW_CUSTOM_POLICY": "retained"}, clear=False):

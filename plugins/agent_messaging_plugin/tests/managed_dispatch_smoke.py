@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 from _real_state_fake import RealShapeState  # noqa: E402
 from _recorded_lane_worktree_fixture import RecordedLaneWorktreeFixture  # noqa: E402
+from _register_unit_double import RegisterUnitDouble  # noqa: E402
 from ananta.core.process_registry.invocation_schema_generator import (  # noqa: E402
     InvocationSchemaGenerator,
 )
@@ -49,7 +50,6 @@ from agent_messaging_plugin.managed_dispatch import (  # noqa: E402
     DISPATCH_BLOCKED_INTERNAL,
     DISPATCH_COMPLETED,
     DISPATCH_COMPLETION_REPORTED,
-    DISPATCH_EXPIRED,
     DISPATCH_FAILED_START,
     DISPATCH_UPTAKE_PENDING,
     DISPATCH_UPTAKE_UNCERTAIN,
@@ -202,7 +202,7 @@ def _spec(tmp: Path, **overrides: Any) -> DispatchSpec:
         "visibility": "headless",
         "local_name": "Codex-Fixture-Builder",
         "report_by_seconds": 900,
-        "ttl_seconds": 14400,
+
         "allowed_tools": ("Bash", "Read"),
         "permission_mode": "bypassPermissions",
         "transport": "mcp",
@@ -214,7 +214,7 @@ def _spec(tmp: Path, **overrides: Any) -> DispatchSpec:
         "uptake_due_at": (T0 + timedelta(minutes=2)).isoformat(),
         "report_by": (T0 + timedelta(minutes=15)).isoformat(),
         "watchdog_due_at": (T0 + timedelta(minutes=3)).isoformat(),
-        "expires_at": (T0 + timedelta(hours=4)).isoformat(),
+
         "dispatch_kind": "infrastructure",
     }
     base.update(overrides)
@@ -241,7 +241,7 @@ def _spawn_request(spec: DispatchSpec) -> SpawnSessionRequest:
         model=spec.model,
         effort=spec.effort,
         report_by_seconds=spec.report_by_seconds,
-        ttl_seconds=spec.ttl_seconds,
+
         spawned_by_instance_id=spec.spawned_by_instance_id,
         spawned_by_role=spec.spawned_by_role,
         directed_by=spec.directed_by,
@@ -254,6 +254,7 @@ def _spawn_request(spec: DispatchSpec) -> SpawnSessionRequest:
         dispatch_kind=spec.dispatch_kind,
         reviewed_report_vendor=spec.reviewed_report_vendor,
         pair_id=spec.pair_id,
+        scope_tags=spec.scope_tags,
     )
 
 
@@ -386,7 +387,6 @@ def test_06_atomic_requirements_fail_before_dispatch() -> None:
         "uptake_due_at",
         "report_by",
         "watchdog_due_at",
-        "expires_at",
     )
     for field in required:
         with tempfile.TemporaryDirectory() as raw:
@@ -398,6 +398,49 @@ def test_06_atomic_requirements_fail_before_dispatch() -> None:
             except DispatchError as exc:
                 code = exc.code
             _check(code == f"{field}_required", f"06 missing {field} fails before a dispatch row")
+
+
+def test_register_kinds_reach_managed_spawn_validation() -> None:
+    host = "register-kind-validation-fixture"
+    key = (session_hosts.AGENT_RUNTIME_CODEX, host)
+    prior = session_hosts._REGISTRY.get(key)  # noqa: SLF001
+    session_hosts._REGISTRY[key] = _ReplacementDriver(fail_start=True)  # noqa: SLF001
+    try:
+        for kind, tags, model, expected_code in (
+            ("test", (), "gpt-5.6-sol", "host_cannot_spawn"),
+            ("implement", (), "gpt-5.6-sol", "host_cannot_spawn"),
+            ("implementation", (), "gpt-5.6-sol", "host_cannot_spawn"),
+            ("unknown-test-kind", (), "gpt-5.6-sol", "host_cannot_spawn"),
+            ("test", ("state_schema",), "gpt-5.6-terra", "host_cannot_spawn"),
+            ("test", ("state_schema",), "gpt-6-astra", "host_cannot_spawn"),
+            (" ", (), "gpt-5.6-sol", "dispatch_kind_required"),
+        ):
+            with tempfile.TemporaryDirectory() as raw:
+                state = _state()
+                (Path(raw) / ".git").mkdir()
+                spec = _spec(
+                    Path(raw), host=host, allowed_hosts=[host], local_name="Register-Kind-Fixture",
+                    dispatch_kind=kind, scope_tags=tags, model=model,
+                    unit_id="", repository_root=raw,
+                )
+                try:
+                    dispatch_managed_work(
+                        state, spec, _spawn_request(spec), register=RegisterUnitDouble(), now=T0,
+                    )
+                except DispatchError as exc:
+                    code = exc.code
+                else:
+                    code = ""
+                _check(code == expected_code, f"managed dispatch {kind} with tags {tags} yields {expected_code}")
+                _check(
+                    read_managed_dispatch(state, spec.dispatch_id)["state"] == DISPATCH_FAILED_START,
+                    f"managed dispatch {kind} failure remains recorded",
+                )
+    finally:
+        if prior is None:
+            del session_hosts._REGISTRY[key]  # noqa: SLF001
+        else:
+            session_hosts._REGISTRY[key] = prior  # noqa: SLF001
 
 
 def test_07_silent_internal_blocker_is_supervised_once_per_version() -> None:
@@ -433,7 +476,7 @@ def test_07_silent_internal_blocker_is_supervised_once_per_version() -> None:
         _check(second["notices_emitted"] == 0, "07 unchanged blocker does not duplicate a wake")
 
 
-def test_08_overdue_worker_and_ttl_surface_exact_action() -> None:
+def test_08_overdue_worker_surfaces_exact_action() -> None:
     with tempfile.TemporaryDirectory() as raw:
         state = _state()
         _prepare(state, Path(raw), report_by=(T0 + timedelta(minutes=3)).isoformat())
@@ -451,16 +494,13 @@ def test_08_overdue_worker_and_ttl_surface_exact_action() -> None:
         _check(status["responsible_role"] == "Coordinator-Main", "08 status names the owner")
         _check(status["deadline_overdue"]["watchdog_due_at"], "08 watchdog debt is explicit")
 
-        expired = supervise_managed_dispatches(state, now=T0 + timedelta(hours=4))
-        expired_again = supervise_managed_dispatches(state, now=T0 + timedelta(hours=5))
-        expired_status = managed_dispatch_status(state, "mdp-fixture", now=T0 + timedelta(hours=5))
-        _check(expired["conditions"][0]["condition"] == "ttl_expired", "08 TTL is classified")
-        _check(expired["conditions"][0]["state"] == DISPATCH_EXPIRED, "08 TTL becomes terminal")
+        later = supervise_managed_dispatches(state, now=T0 + timedelta(days=3650))
+        later_status = managed_dispatch_status(state, "mdp-fixture", now=T0 + timedelta(days=3650))
+        _check(later_status["state"] == DISPATCH_ACTIVE, "08 elapsed time never expires work")
         _check(
-            expired_status["state"] == DISPATCH_EXPIRED,
-            "08 TTL cannot remain indefinitely live",
+            all(item["condition"] != "ttl_expired" for item in later["conditions"]),
+            "08 only independent supervision obligations remain",
         )
-        _check(expired_again["conditions"] == [], "08 terminal expiry does not wake every tick")
 
     with tempfile.TemporaryDirectory() as raw:
         state = _state()
@@ -917,7 +957,7 @@ def test_review_f2_prepared_contract_rejects_every_altered_spawn_field() -> None
             model="different-model",
             effort="low",
             report_by_seconds=17,
-            ttl_seconds=18,
+
             spawned_by_instance_id="agi-unrelated",
             spawned_by_role="Not-Coordinator-Main",
             directed_by="external:forged",
@@ -935,7 +975,6 @@ def test_review_f2_prepared_contract_rejects_every_altered_spawn_field() -> None
             "model",
             "effort",
             "report_by_seconds",
-            "ttl_seconds",
             "spawned_by_instance_id",
             "spawned_by_role",
             "directed_by",
@@ -1108,34 +1147,6 @@ def test_review_f5_watchdog_is_operational_and_deduplicated() -> None:
         _check(second["notices_emitted"] == 0, "F5 watchdog notice is deduplicated")
 
 
-def test_review_f6_expired_retry_gets_fresh_bounded_deadlines() -> None:
-    with tempfile.TemporaryDirectory() as raw:
-        state = _state()
-        _prepare(state, Path(raw))
-        expired = supervise_managed_dispatches(state, now=T0 + timedelta(hours=5))
-        row = read_managed_dispatch(state, "mdp-fixture")
-        retried = resolve_managed_dispatch(
-            state,
-            dispatch_id="mdp-fixture",
-            event_id="evt-fresh-retry",
-            action="request_retry",
-            actor=_coordinator_actor(),
-            prior_version=int(row["version"]),
-            payload={"reason": "retry with immutable windows"},
-            observed_at=T0 + timedelta(hours=5, seconds=1),
-        )
-        after = supervise_managed_dispatches(state, now=T0 + timedelta(hours=5, seconds=2))
-        _check(bool(expired["conditions"]), "F6 fixture reaches expiry")
-        _check(
-            datetime.fromisoformat(str(retried["expires_at"])) > T0 + timedelta(hours=5),
-            "F6 retry refreshes TTL",
-        )
-        _check(
-            not any(item["condition"] == "ttl_expired" for item in after["conditions"]),
-            "F6 replacement is not immediately re-expired",
-        )
-
-
 def test_review_f7_failed_start_is_identified_supervised_and_replaced() -> None:
     """F7/F6: a failed start has an address and retry creates a working attempt."""
     host = "repair-round-two-replacement"
@@ -1147,11 +1158,15 @@ def test_review_f7_failed_start_is_identified_supervised_and_replaced() -> None:
         with tempfile.TemporaryDirectory() as raw:
             state = _state()
             tmp = Path(raw)
+            (tmp / ".git").mkdir()
+            register = RegisterUnitDouble()
             spec = _spec(
                 tmp,
                 host=host,
                 allowed_hosts=[host],
                 local_name="Replacement-Fixture",
+                unit_id="",
+                repository_root=raw,
             )
             error_data: dict[str, Any] = {}
             try:
@@ -1159,6 +1174,7 @@ def test_review_f7_failed_start_is_identified_supervised_and_replaced() -> None:
                     state,
                     spec,
                     _spawn_request(spec),
+                    register=register,
                     now=T0,
                 )
             except DispatchError as exc:
@@ -1198,6 +1214,7 @@ def test_review_f7_failed_start_is_identified_supervised_and_replaced() -> None:
                 prior_version=int(failed["version"]),
                 payload={"reason": "configured replacement host"},
                 observed_at=T0 + timedelta(seconds=3),
+                register=register,
             )
             replacement = str(retried["current_agent_instance_id"])
             _seed_binding(
@@ -1234,14 +1251,14 @@ def test_review_f7_failed_start_is_identified_supervised_and_replaced() -> None:
             )
             _check(
                 bool(driver.spawn_specs)
-                and driver.spawn_specs[-1].get("unit_id") == spec.unit_id,
+                and bool(failed["unit_id"])
+                and driver.spawn_specs[-1].get("unit_id") == failed["unit_id"],
                 "unit_id survives the persisted dispatch replay into the replacement host spec",
             )
             _check(
                 active["state"] == DISPATCH_ACTIVE
-                and datetime.fromisoformat(str(active["expires_at"]))
-                > T0 + timedelta(hours=4),
-                "F6 replacement reaches fresh ACK inside the renewed lifecycle",
+                and "expires_at" not in active,
+                "F6 replacement reaches fresh ACK without a lifetime",
             )
     finally:
         if prior is None:
@@ -1538,8 +1555,9 @@ def main() -> int:
             test_02_headless_submission_failure_is_durable()
             test_03_transport_is_not_uptake()
             test_06_atomic_requirements_fail_before_dispatch()
+            test_register_kinds_reach_managed_spawn_validation()
             test_07_silent_internal_blocker_is_supervised_once_per_version()
-            test_08_overdue_worker_and_ttl_surface_exact_action()
+            test_08_overdue_worker_surfaces_exact_action()
             test_08_staggered_milestone_survives_watchdog_version_change()
             test_09_reconnect_and_duplicate_ack_are_idempotent()
             test_10_retry_request_is_idempotent()
@@ -1553,7 +1571,6 @@ def main() -> int:
             test_review_f3_incomplete_completion_evidence_is_rejected()
             test_review_f4_malformed_blocker_is_rejected_before_supervision()
             test_review_f5_watchdog_is_operational_and_deduplicated()
-            test_review_f6_expired_retry_gets_fresh_bounded_deadlines()
             test_review_f7_failed_start_is_identified_supervised_and_replaced()
             test_review_f8_spawn_root_is_in_discoverable_invocation_schema()
             test_28_degraded_hooks_acknowledged_is_in_discoverable_schema()

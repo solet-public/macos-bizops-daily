@@ -24,10 +24,12 @@ sub-phase 2e for the route table and dispatch semantics.
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import logging
 import re
 import secrets
+import threading
 from datetime import datetime as _dt
 from typing import TYPE_CHECKING, Any, Final
 
@@ -129,6 +131,23 @@ _WATCHER_DELIVERY_EVENT_TYPES: Final[frozenset[str]] = frozenset(
 API_PREFIX: Final[str] = "/api/v1/bridge"
 
 _AGENT_ID_RE: Final[re.Pattern[str]] = re.compile(r"[A-Za-z0-9._-]{1,64}")
+
+# iss_87aa81c4: the peer routes whose handlers reach ``dispatch_peer_send`` /
+# ``dispatch_role_send`` (and so ``drive_on_delivery`` and the tmux driver's
+# ``_wait_for_paste_stable``: ``time.sleep`` + ``subprocess.run``, up to 10 s
+# per Claude wake) or a tmux/ps host probe run their synchronous body via
+# ``asyncio.to_thread``. Run inline, that body stalled THIS server's event loop
+# for the whole drive, starving every bridge's ``/events`` long-poll and
+# ``/health`` at once. The collaborators are already worker-thread safe: the
+# same dispatch/claim functions run on the action-queue thread via the plugin
+# verbs, and ``BridgeSessionManager.append_event`` signals the long-poll
+# through the loop it was armed on with ``call_soon_threadsafe``.
+#
+# ``peer/register`` was check-then-act with no ``await`` in between (the
+# session-id conflict refusal and the orphan downgrade read the registry, then
+# register writes it), so the loop serialized two registrations for free.
+# Off-loop, this lock keeps exactly that serialization between registrations.
+_PEER_REGISTER_LOCK: Final[threading.Lock] = threading.Lock()
 
 # Map BridgeError.code → HTTP status.  Anything not in this table maps
 # to 400, matching the platform_surface convention of "bad input"
@@ -640,7 +659,6 @@ def _managed_session_registration_backfill(
                 budget_line="",
                 host=OPERATOR_HOST,
                 report_by_seconds=0,
-                ttl_seconds=0,
                 directed_by="registration",
                 provisioning_mode="operator_existing_checkout",
                 # The effective label is what peer_registry accepted for this
@@ -826,8 +844,7 @@ def _register_peer_routes(
     re_emit_window_s: float = 300.0,
     re_emit_cap: int = 3,
 ) -> None:
-    @app.post(f"{API_PREFIX}/{{bridge_id}}/peer/register")
-    async def peer_register_route(
+    def _peer_register_blocking(
         bridge_id: str,
         body: PeerRegisterBody,
     ) -> JSONResponse:
@@ -1090,6 +1107,20 @@ def _register_peer_routes(
             status_code=200,
         )
 
+    @app.post(f"{API_PREFIX}/{{bridge_id}}/peer/register")
+    async def peer_register_route(
+        bridge_id: str,
+        body: PeerRegisterBody,
+    ) -> JSONResponse:
+        # iss_87aa81c4: the body runs tmux/ps host probes and can fire an
+        # autonomic claim's handover notice (a full dispatch + drive) — off
+        # the loop, serialized against other registrations.
+        def _serialized() -> JSONResponse:
+            with _PEER_REGISTER_LOCK:
+                return _peer_register_blocking(bridge_id, body)
+
+        return await asyncio.to_thread(_serialized)
+
     @app.get(f"{API_PREFIX}/{{bridge_id}}/peer/list")
     async def peer_list_route(bridge_id: str) -> JSONResponse:
         _ = bridge_id
@@ -1135,7 +1166,9 @@ def _register_peer_routes(
         bridge_id: str,
         body: PeerSendBody,
     ) -> JSONResponse:
-        return _peer_send_impl(
+        # iss_87aa81c4: dispatch + drive block; keep them off the loop.
+        return await asyncio.to_thread(
+            _peer_send_impl,
             bridge_id=bridge_id,
             body=body,
             bridge_manager=bridge_manager,
@@ -1149,7 +1182,9 @@ def _register_peer_routes(
         bridge_id: str,
         body: PeerClaimRoleBody,
     ) -> JSONResponse:
-        return _peer_claim_role_impl(
+        # iss_87aa81c4: dispatch + drive block; keep them off the loop.
+        return await asyncio.to_thread(
+            _peer_claim_role_impl,
             bridge_id=bridge_id,
             body=body,
             bridge_manager=bridge_manager,
@@ -1163,7 +1198,9 @@ def _register_peer_routes(
         bridge_id: str,
         body: PeerSendByNameBody,
     ) -> JSONResponse:
-        return _peer_send_by_name_impl(
+        # iss_87aa81c4: dispatch + drive block; keep them off the loop.
+        return await asyncio.to_thread(
+            _peer_send_by_name_impl,
             bridge_id=bridge_id,
             body=body,
             bridge_manager=bridge_manager,

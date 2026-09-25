@@ -681,6 +681,7 @@ plugins/agent_messaging_plugin/tests/workbench_brief_snapshot_smoke.py
 plugins/agent_messaging_plugin/tests/managed_dispatch_smoke.py
 plugins/agent_messaging_plugin/tests/managed_dispatch_cli_actor_smoke.py
 plugins/agent_messaging_plugin/tests/managed_dispatch_persisted_utc_smoke.py
+plugins/agent_messaging_plugin/tests/managed_dispatch_unit_mint_smoke.py
 plugins/agent_messaging_plugin/tests/role_provisioning_smoke.py
 
 # Declarative model-dispatch policy — fail-closed loading and profile
@@ -3458,11 +3459,9 @@ plugins/agent_messaging_plugin/tests/seat_idle_watcher_smoke.py
 # Mutation-proved: breaking the placeholder-skip guard on either side reds
 # exactly that scenario's two targeted assertions, nothing else.
 
-# D-3.2 (2026-09-03) -- orchestrator_model_gate_smoke.py existed, passing,
-# but was the lone unregistered file among the .claude/hooks/tests/ siblings,
-# so it never ran as part of the battery: the control it exercises (refusing
-# a wrong-model orchestrator spawn_session call) was dead in the gate while
-# looking covered by its own presence on disk.
+# Retired Main-seat model gate: this registered smoke protects the temporary
+# callable no-op path for Claude sessions that have not reloaded their hook
+# settings. Remove both the script and this entry after reload is verified.
 
 # fleet-wake-integrity Task 1 (2026-08-08) -- proves the codex wake_capable
 # flag-loss root cause: get_peer_binding_schema()'s persisted columns never
@@ -4519,6 +4518,7 @@ plugins/zuora_plugin/tests/smoke_async_jobs.py
 # exits 1 at the foreign-first assertion. Offline: virtual clock and in-process
 # fakes only, no live solet, no network. Measured cost 5.5s, 72/72 checks.
 plugins/github_midwife_plugin/tests/executable_hydration_smoke.py
+solet_cli/tests/knowledge_readiness_budget_smoke.py
 
 # R3 receipt-qualified Claude coordination ownership: validates complete
 # receipt/owner/cache contract, real shipped heartbeat entrypoint refusal
@@ -4955,7 +4955,6 @@ plugins/agent_messaging_plugin/tests/forwarder_native_notification_smoke.py
 # stale-generation cursor fencing, forwarder-lifetime Claude wire cursors, and
 # replay flow-id parity. Offline Forwarder with mocked boundaries.
 plugins/agent_messaging_plugin/tests/forwarder_reconnect_cursor_smoke.py
-plugins/agent_messaging_plugin/tests/minted_spawn_smoke.py
 plugins/agent_messaging_plugin/tests/model_profile_smoke.py
 plugins/agent_messaging_plugin/tests/oauth_machine_grant_smoke.py
 plugins/agent_messaging_plugin/tests/peer_registry_migration_live_smoke.py
@@ -5051,6 +5050,8 @@ plugins/openai_embeddings_plugin/tests/startup_qualification_smoke.py
 
 # LM Studio provisioning, singleton login and passive diagnostics
 plugins/github_midwife_plugin/tests/lm_studio_provisioning_smoke.py
+plugins/github_midwife_plugin/tests/lm_studio_index_smoke.py
+plugins/github_midwife_plugin/tests/lm_studio_vendor_resume_smoke.py
 plugins/github_midwife_plugin/tests/lm_studio_login_item_smoke.py
 solet_cli/tests/lm_studio_diagnostics_smoke.py
 
@@ -5128,11 +5129,25 @@ solet_cli/tests/update_crash_sweep_writes_3_smoke.py
 solet_cli/tests/update_crash_sweep_writes_4_smoke.py
 solet_cli/tests/update_crash_sweep_writes_5_smoke.py
 solet_cli/tests/update_crash_sweep_writes_6_smoke.py
+solet_cli/tests/update_crash_sweep_writes_7_smoke.py
+solet_cli/tests/update_crash_sweep_writes_8_smoke.py
+solet_cli/tests/update_crash_sweep_writes_9_smoke.py
+solet_cli/tests/update_crash_sweep_writes_10_smoke.py
+solet_cli/tests/update_crash_sweep_writes_11_smoke.py
+solet_cli/tests/update_crash_sweep_writes_12_smoke.py
 solet_cli/tests/update_crash_sweep_applies_smoke.py
 solet_cli/tests/existing_install_router_failure_sweep_1_smoke.py
 solet_cli/tests/existing_install_router_failure_sweep_2_smoke.py
 solet_cli/tests/existing_install_router_failure_sweep_3_smoke.py
 solet_cli/tests/existing_install_router_failure_sweep_4_smoke.py
+solet_cli/tests/existing_install_router_failure_sweep_5_smoke.py
+solet_cli/tests/existing_install_router_failure_sweep_6_smoke.py
+solet_cli/tests/existing_install_router_failure_sweep_7_smoke.py
+solet_cli/tests/existing_install_router_failure_sweep_8_smoke.py
+solet_cli/tests/existing_install_router_failure_sweep_9_smoke.py
+solet_cli/tests/existing_install_router_failure_sweep_10_smoke.py
+solet_cli/tests/existing_install_router_failure_sweep_applies_1_smoke.py
+solet_cli/tests/existing_install_router_failure_sweep_applies_2_smoke.py
 
 # WS5 Step 7 (existing-install real-clone admission and local-state commitment,
 # iss_92419f62 / chg_1407a0bc): the classifier admits Class T (unstaged disjoint
@@ -5230,3 +5245,6 @@ plugins/session_shipper_bootstrap_plugin/tests/session_shipper_render_smoke.py
 # ledger for either).
 plugins/session_bridge_plugin/tests/spool_drain_smoke.py
 plugins/claude_code_cloud_session_source_plugin/tests/normalize_smoke.py
+
+solet_cli/tests/lm_studio_served_deadline_smoke.py
+plugins/agent_messaging_plugin/tests/peer_route_event_loop_offload_smoke.py

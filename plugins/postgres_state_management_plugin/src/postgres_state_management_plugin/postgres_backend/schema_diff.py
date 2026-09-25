@@ -50,6 +50,7 @@ from .ddl_renderer import (
     emit_drop_column_op,
     emit_drop_constraint_op,
     emit_drop_index_op,
+    emit_drop_not_null_op,
     emit_drop_table_op,
     resolve_index_name,
 )
@@ -233,6 +234,9 @@ def _diff_or_refuse_column_changes(
       new superset CHECK. This unblocks the canonical
       ``IngestSourceKind`` (and similar enum) expansions that Tier-B/C/D
       session-source plugins introduce.
+    * **Relaxed nullability**: a non-primary-key column whose ONLY difference
+      is ``not_null=True`` → ``False`` gets ``DROP NOT NULL``. Existing rows
+      remain valid, so the declaration change itself is additive.
     * Any other column shape change → ``NotImplementedError`` per the
       pre-Fix-1 discipline. The error message names every comparison
       field on ``ColumnDefinition`` so future debuggers see the actual
@@ -259,6 +263,16 @@ def _diff_or_refuse_column_changes(
                 declared_col.check, schema_name,
             ))
             continue
+        if _is_nullability_relaxation_only(current_col, declared_col):
+            ops.append(
+                emit_drop_not_null_op(
+                    namespace,
+                    table_name,
+                    col_name,
+                    schema_name,
+                )
+            )
+            continue
         if _is_unique_only_change(current_col, declared_col):
             constraint_name = build_default_unique_constraint_name(
                 namespace, table_name, col_name,
@@ -282,8 +296,8 @@ def _diff_or_refuse_column_changes(
             f"check={current_col.check!r}->{declared_col.check!r}, "
             f"type_params={current_col.type_params!r}->{declared_col.type_params!r}). "
             "Active-update column mutations are not implemented in v1 "
-            "outside the additive-CHECK-enum-expansion path "
-            "(M21-RCA Fix 1, 2026-06-11). "
+            "outside the additive CHECK-enum expansion and single-axis "
+            "NOT NULL relaxation paths. "
             "Drop the column and re-add it with the new shape, or wait for "
             "the retype-with-data-preservation path."
         )
@@ -395,6 +409,24 @@ def _is_unique_only_change(
         and current_col.check == declared_col.check
         and current_col.type_params == declared_col.type_params
         and current_col.unique != declared_col.unique
+    )
+
+
+def _is_nullability_relaxation_only(
+    current_col: ColumnDefinition,
+    declared_col: ColumnDefinition,
+) -> bool:
+    """True only for a non-key ``NOT NULL`` → nullable relaxation."""
+    return (
+        current_col.type == declared_col.type
+        and not current_col.primary_key
+        and not declared_col.primary_key
+        and current_col.not_null
+        and not declared_col.not_null
+        and current_col.default == declared_col.default
+        and current_col.unique == declared_col.unique
+        and current_col.check == declared_col.check
+        and current_col.type_params == declared_col.type_params
     )
 
 

@@ -32,6 +32,7 @@ import json
 import re
 import sys
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, cast
@@ -65,6 +66,18 @@ from bootstrap_adapter import dependency as bootstrap_dependency  # noqa: E402
 from bootstrap_adapter import protocol as bootstrap_protocol  # noqa: E402
 
 _KB = _ROOT / "plugins" / "github_midwife_plugin" / "knowledge_base"
+_PUBLIC_R43_COMMIT = "8207c151255d5b969221886767c0d6d26684f253"
+_PUBLIC_R43_TREE = "6fac8f34f7eb7a4d22cb3b108f915d8d89fb7fff"
+_PUBLIC_R43_PREDECESSOR: dict[str, str | None] = {
+    "repository": "https://github.com/solet-public/macos-bizops.git",
+    "commit": _PUBLIC_R43_COMMIT,
+    "tree": _PUBLIC_R43_TREE,
+    "provenance_sha256": "f683c6c34f501d3983f55d1b255defd39e1c3bffad8faf0ef5f8f494e6004641",
+    "seed_id": "72586d56-7826-5706-a210-68827676ffb0",
+    "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+    "manifest_sha256": "6af4e689b3f1519b5a31eb854172aca354ecb79892acc24c84cd4c08d1c348c7",
+    "legacy_anchor_id": None,
+}
 _MANAGER = _ROOT / "solet_cli" / "src" / "solet_manager"
 _STEP5_MODULES = (
     "update_runtime_execution",
@@ -148,6 +161,25 @@ def _check_shipped_bundle() -> None:
     jsonschema.Draft7Validator(schema).validate(document)
     bundle = parse_transition_bundle((_KB / "existing_install_flow.json").read_bytes())
     _check(bundle.flow_id == "existing-install" and bundle.schema_version == 1, "shipped bundle identity")
+    _check(
+        bundle.predecessor_for(
+            "fab22b6f2c832a5b86176f6916166f6c6bc7677b",
+            "13461a6db6829e5d6546852fe49574adfaf40874",
+        )
+        is not None,
+        "synthetic predecessor remains supported",
+    )
+    _check(
+        bundle.predecessor_for("0" * 40, "0" * 40) is None,
+        "unknown predecessor remains refused",
+    )
+    _check(
+        bundle.predecessor_for(_PUBLIC_R43_COMMIT, "0" * 40) is None,
+        "public r43 commit with wrong tree remains refused",
+    )
+    public_r43 = bundle.predecessor_for(_PUBLIC_R43_COMMIT, _PUBLIC_R43_TREE)
+    _check(public_r43 is not None, "published public r43 predecessor is supported")
+    _check(asdict(public_r43) == _PUBLIC_R43_PREDECESSOR, "public r43 descriptor matches published artefacts")
     _check(all(not artifact.in_target for artifact in bundle.managed_artifacts), "the current release declares no in-target artifact (section 6.3)")
     _check({item.artifact_id for item in bundle.managed_artifacts} == {"instance_launchagent_plist", "shell_startup_block", "user_claude_md_section"}, "shipped artifacts")
     _check(bundle.lifecycle.strategy == "router_preferred", "shipped lifecycle strategy")

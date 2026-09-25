@@ -25,8 +25,12 @@ in this tree, never passed through an agent conversation. Inference stays local
 
 If you have Homebrew, install the global manager first:
 
+The command below is the stable-channel default in a directly assembled seed.
+A published daily release renders this line for the tap selected by that
+release, so use the command shown in the README of your release.
+
 ```console
-brew install solet-public/tap/solet
+brew install dwestgate/tap-validate/solet
 ```
 
 Then begin the separate, reviewed creation transaction:

@@ -44,7 +44,7 @@ The managed contract closes five distinct gaps:
 - A host accepted a first turn but the worker never understood the brief.
 - A session registered or appeared live while its native process had died.
 - A worker hit a blocker and waited silently for a coordinator or operator.
-- A report deadline or TTL passed while the coordinator's plan stayed stale.
+- A report deadline passed while the coordinator's plan stayed stale.
 - A path appeared on disk or a peer claimed completion without exact evidence
   or independent acceptance.
 
@@ -62,17 +62,17 @@ lane_id, role_name, role_class, work_class, budget_line
 brief_ref, brief_sha256
 expected_path, completion_contract
 model, effort, agent_runtime, host, allowed_hosts
-visibility, local_name, report_by_seconds, ttl_seconds
+visibility, local_name, report_by_seconds
 allowed_tools, permission_mode, transport, allow_askuserquestion
 degraded_hooks_acknowledged
 spawned_by_instance_id, spawned_by_role, directed_by
-uptake_due_at, report_by, watchdog_due_at, expires_at
+uptake_due_at, report_by, watchdog_due_at
 ```
 
 The brief exists first. Measure its SHA-256 and bind the exact digest. The
 completion contract names the required evidence and gates, including how a
 skip must be reported. All deadlines are absolute, timezone-aware, future
-timestamps, and TTL follows the other supervision deadlines.
+timestamps; each is validated independently as future.
 
 Coordinator and worker identity comes from the server-provided call context and
 current session binding, rather than names written in the brief. The local CLI
@@ -145,10 +145,10 @@ The four worker event kinds are:
 - `ack`: exact brief digest, held role binding, scope-readback digest, and plan
   digest. This model-authored event is the only transition to `active`.
 - `milestone`: completed work, current evidence, exact next action, and a new
-  future report deadline that precedes TTL.
+  future dispatch report deadline.
 - `blocked`: typed authority class, exact question, non-empty evidence/safe
   options, exact owner, and (for internal blockers) timezone-aware future
-  decision deadline before TTL; operator blockers also name the authority gap.
+  decision deadline; operator blockers also name the authority gap.
 - `completion`: exact artifact path and SHA-256, completion-contract digest,
   allowed verdict, and every declared evidence obligation. A skipped or
   not-applicable obligation requires an explicit reason.
@@ -198,13 +198,21 @@ plan. The platform lifecycle sweep is uncapped across the fleet and:
 4. preserves probe faults and unsupported observations as `unknown`, persists
    a bounded next-probe/escalation obligation, and clears it on recovery;
 5. detects failed-start decisions, overdue uptake, milestone/report-by,
-   watchdog review, internal blocker decision, completion acceptance, and TTL;
+   watchdog review, internal blocker decision, completion acceptance;
 6. emits at most one steward notice per `(dispatch_id, condition,
    causal_version)`.
 
-TTL becomes the explicit terminal error state `expired` with a named
-retry-or-cancel decision. It cannot leave a row indefinitely active and cannot
-silently mint a replacement.
+Elapsed time never terminates a session, expires work, releases scope, or
+completes a dispatch. Existing `expired` records remain legacy correction
+inputs; no supervisor produces that state. Accepted completion, explicit
+cancellation, and native host-loss evidence retain their existing contracts.
+
+There are two independent report clocks. `report_alive`/`drive_session` rearm
+`managed_session.report_by`; the session sweep surfaces missed self-report
+obligations. A version-checked `report_managed_dispatch` milestone rearms only
+`managed_dispatch.report_by`; its coordinator owes `request_worker_milestone`
+when that clock is overdue. A healthy session heartbeat does not clear a
+dispatch milestone obligation. Neither report clock is a lifetime.
 
 Read the decision-oriented aggregate with:
 
@@ -319,3 +327,9 @@ per completed sweep, not the number of landing rows.
   required before a review/landing handoff.
 - `State Interface Filter Grammar` — state access contract; no raw SQL and no
   bare null filters.
+
+Before registration, an observed-alive native host may rearm the session
+report deadline with the distinct `observed_spawning` source. This does not
+prove worker progress or rearm the dispatch clock. There is no patience/age
+limit that terminates an observed-live or unknown host; native death and
+explicit cancellation remain separate evidence-based paths.

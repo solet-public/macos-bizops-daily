@@ -14,11 +14,10 @@ EMBEDDING_DESCRIPTION: Start and supervise a managed worker through one durable 
 
 - An immutable brief that exists before dispatch, plus its measured SHA-256.
 - A bounded lane, role, role class, work class, budget line, model, effort,
-  runtime, host/allowed-host policy, visibility, local name, report/TTL windows,
+  runtime, host/allowed-host policy, visibility, local name, session report windows,
   and tool/permission/transport policy.
 - An exact expected artifact path and structured completion contract.
-- Absolute timezone-aware `uptake_due_at`, `report_by`, `watchdog_due_at`, and
-  `expires_at` deadlines.
+- Absolute timezone-aware `uptake_due_at`, `report_by`, `watchdog_due_at` deadlines.
 - The spawning coordinator's durable role. The server derives its instance and
   session from authenticated call context; callers never authorize themselves.
 
@@ -32,7 +31,7 @@ EMBEDDING_DESCRIPTION: Start and supervise a managed worker through one durable 
   completion events.
 - Tri-state native host liveness (`alive`, `dead`, or `unknown`), bounded
   unknown re-probe/escalation, and explicit supervision conditions for failed
-  starts, uptake, report-by, watchdog, blockers, acceptance, and TTL.
+  starts, uptake, report-by, watchdog, blockers, acceptance.
 - `completed` only after the coordinator re-reads the exact artifact, verifies
   its SHA-256 and contract evidence, and records `accept_completion`.
 
@@ -56,13 +55,13 @@ EMBEDDING_DESCRIPTION: Start and supervise a managed worker through one durable 
 [ ] 4. Report milestones and blockers causally
     RESULT_PROCESSOR_KIND: deterministic_continuation
     a) The worker reports `milestone`, `blocked`, or `completion` through `report_managed_dispatch`, always with the current causal version and attempt identity.
-    b) `blocked_internal` names the coordinator-owned question, evidence, safe options, exact owner, and a timezone-aware future decision deadline before TTL. `blocked_operator` uses owner `operator` and names the authority gap and exact question.
+    b) `blocked_internal` names the coordinator-owned question, evidence, safe options, exact owner, and a timezone-aware future decision deadline. `blocked_operator` uses owner `operator` and names the authority gap and exact question.
     c) The coordinator answers, retries, cancels, or accepts/rejects through `plugin::agent_messaging_plugin::resolve_managed_dispatch`; a stale causal version is rejected and retained for audit.
 
 [ ] 5. Supervise from durable platform state
     RESULT_PROCESSOR_KIND: deterministic_continuation
     a) Read `plugin::agent_messaging_plugin::managed_dispatch_status` when making a decision.
-    b) The platform lifecycle sweep evaluates every nonterminal attempt and dispatch without a coordinator-owned cron: it reconciles native liveness, detects failed-start, uptake, milestone, watchdog, blocker, acceptance, and TTL conditions, and emits one notice per condition and causal version.
+    b) The platform lifecycle sweep evaluates every nonterminal attempt and dispatch without a coordinator-owned cron: it reconciles native liveness, detects failed-start, uptake, milestone, watchdog, blocker, acceptance conditions, and emits one notice per condition and causal version.
     c) `dead` converges the attempt out of a false-live lifecycle state and the dispatch to `worker_lost`. Probe faults remain `unknown` with bounded next-probe/escalation obligations; no sweep silently respawns an ambiguous worker.
 
 [ ] 6. Independently accept exact completion evidence
@@ -98,7 +97,7 @@ EMBEDDING_DESCRIPTION: Start and supervise a managed worker through one durable 
   ACK, blocker, completion, and acceptance semantics are runtime-neutral.
 - `registered/live` is session lifecycle evidence, never a dispatch state.
 - `unknown` liveness is not folded into alive or dead.
-- Worker death, unsupported submission, TTL expiry, and completion rejection
+- Worker death, unsupported submission and completion rejection
   require an explicit coordinator decision. Replacement attempts are created
   only by `resolve_managed_dispatch(action="request_retry")` under the same
   dispatch, with fresh derived deadlines and an actual linked attempt; no
@@ -117,7 +116,22 @@ separate Git-Controller exchange, not an implicit landing request.
 
 Use the state and `next_required_action` returned by
 `managed_dispatch_status`. `uptake_uncertain`, `failed_start`, `worker_lost`,
-and `expired` permit an explicit bounded retry. Internal and operator blockers
+and legacy `expired` permit an explicit retry (no new expiry is generated). Internal and operator blockers
 stay visibly typed until resolved. Completion evidence can be rejected back to
 `active` for repair. Never infer a retry, ACK, resolution, or completion from
 silence.
+
+## Independent report contracts
+
+`report_alive`/`drive_session` rearm the session self-report clock only. A
+causal managed-dispatch milestone rearms the separate dispatch report clock.
+The coordinator acts on each overdue obligation through its named verb.
+Elapsed time alone never terminates work, releases scope, or marks completion.
+Session/unit lifetime arguments are retired; passing `ttl_seconds` or
+`expires_at`, even as null/zero, fails with `retired_session_ttl_argument`.
+
+Before registration, an observed-alive native host may rearm the session
+report deadline with the distinct `observed_spawning` source. This does not
+prove worker progress or rearm the dispatch clock. There is no patience/age
+limit that terminates an observed-live or unknown host; native death and
+explicit cancellation remain separate evidence-based paths.

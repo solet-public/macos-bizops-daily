@@ -75,7 +75,7 @@ recipient and different grammar; sharing the name would make a reader who
 filters on it unable to tell whether a given notice was about them or about a
 worker they are responsible for.
 
-NOTICE, NEVER ACT -- the same contract as `EVENT_TTL_OVERDUE_NOTICE`, and
+NOTICE, NEVER ACT -- the notification does not mutate session lifecycle, and
 here it is load-bearing rather than stylistic. This leg does NOT call
 `drive_on_delivery`, unlike every other notify path in this module. That is
 deliberate and must stay: driving a session's host driver INJECTS a turn, and
@@ -83,7 +83,7 @@ there is a standing ruling that no agent sits in the injection path for a
 context clear. `append_event` alone lands the notice on the session's own
 bridge, where it surfaces at the session's next natural boundary without
 interrupting in-flight work -- which is exactly the non-interrupting surface
-the operator asked for, and is already proven in production by the TTL leg.
+the operator asked for, and remains independent of session liveness.
 """
 
 ROTATION_SELF_NOTICE_FLOOR_S: int = 1200

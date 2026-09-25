@@ -11,6 +11,16 @@
       "origin_id": "123e4567-e89b-12d3-a456-426614174001",
       "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "legacy_anchor_id": "stable-pre-manager-seed-v1"
+    },
+    {
+      "repository": "https://github.com/solet-public/macos-bizops.git",
+      "commit": "8207c151255d5b969221886767c0d6d26684f253",
+      "tree": "6fac8f34f7eb7a4d22cb3b108f915d8d89fb7fff",
+      "provenance_sha256": "f683c6c34f501d3983f55d1b255defd39e1c3bffad8faf0ef5f8f494e6004641",
+      "seed_id": "72586d56-7826-5706-a210-68827676ffb0",
+      "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+      "manifest_sha256": "6af4e689b3f1519b5a31eb854172aca354ecb79892acc24c84cd4c08d1c348c7",
+      "legacy_anchor_id": null
     }
   ],
   "source_operation": {

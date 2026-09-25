@@ -150,22 +150,43 @@ def login_definition_current(home: Path, models: dict[str, ModelArtifact]) -> bo
     return True
 
 
-def login_loaded(runtime: Runtime) -> bool | None:
-    """Distinguish an absent job from an unreadable launchctl state."""
+def _login_load_state(runtime: Runtime) -> str:
+    """Distinguish an absent GUI session from an absent job or failed probe."""
 
-    outcome = runtime.run(("/bin/launchctl", "print", f"gui/{os.getuid()}/{LABEL}"), timeout_seconds=5)
+    uid = os.getuid()
+    outcome = runtime.run(("/bin/launchctl", "print", f"gui/{uid}/{LABEL}"), timeout_seconds=5)
+    if outcome.timed_out or outcome.stdout_truncated or outcome.stderr_truncated:
+        return "unknown"
     if outcome.ok:
-        return True if "state =" in outcome.stdout and LABEL in outcome.stdout else None
-    if not outcome.timed_out and "Could not find service" in outcome.stderr and not outcome.stderr_truncated:
-        return False
-    return None
+        return "loaded" if "state =" in outcome.stdout and LABEL in outcome.stdout else "unknown"
+    return _failed_login_print_state(outcome.stderr, outcome.returncode, uid)
+
+
+def _failed_login_print_state(stderr: str, returncode: int | None, uid: int) -> str:
+    if "Could not find domain" in stderr:
+        if (
+            returncode == 112
+            and f"Could not find domain for user gui: {uid}" in stderr
+            and "Could not find service" not in stderr
+        ):
+            return "gui_session_absent"
+        return "unknown"
+    return "absent" if "Could not find service" in stderr else "unknown"
+
+
+def login_loaded(runtime: Runtime) -> bool | None:
+    """Preserve the tri-state loaded probe for callers checking a job."""
+
+    state = _login_load_state(runtime)
+    return True if state == "loaded" else False if state == "absent" else None
 
 
 def login_classification(runtime: Runtime, models: dict[str, ModelArtifact]) -> str:
     plist, helper = login_paths(runtime.home)
-    loaded = login_loaded(runtime)
-    if loaded is None:
-        return "unknown"
+    state = _login_load_state(runtime)
+    if state in {"unknown", "gui_session_absent"}:
+        return state
+    loaded = state == "loaded"
     if not plist.exists() and not helper.exists() and not loaded:
         return "absent"
     if not login_definition_current(runtime.home, models):
@@ -177,13 +198,13 @@ def install_login_agent(runtime: Runtime, models: dict[str, ModelArtifact]) -> b
     """Upsert and enable the singleton without unload or per-solet ownership."""
 
     classification = login_classification(runtime, models)
-    if classification == "unknown":
+    if classification in {"unknown", "gui_session_absent"}:
         return False
     if classification == "present_already_current":
         return True
-    if classification == "present_but_stale" and login_loaded(runtime) is True:
-        # Replacing a loaded definition needs host-level coordination. Never
-        # unload a shared job merely because this solet's setup runs again.
+    if login_loaded(runtime) is not False:
+        # Only a definite absent job permits a host file write. A loaded or
+        # unreadable second probe needs host-level coordination instead.
         return False
     _write_login_files(runtime, models)
     domain = f"gui/{os.getuid()}"

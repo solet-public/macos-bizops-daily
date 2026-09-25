@@ -47,6 +47,7 @@ from solet_manager.release_lock import SeedLock  # noqa: E402
 from solet_manager.transaction import Transaction, canonical_sha256  # noqa: E402
 
 from bootstrap_adapter.routes import _ROUTES as _BOOTSTRAP_ROUTES  # noqa: E402
+from bootstrap_adapter.routes import _dispatch as _bootstrap_dispatch  # noqa: E402
 
 _KB_ROOT = Path(__file__).resolve().parents[1] / "knowledge_base"
 _SCHEMA_PATH = _KB_ROOT / "setup_flow.schema.json"
@@ -186,8 +187,13 @@ def _check_probe_expectation_advisory_contract(flow: dict[str, Any]) -> None:
         if "expectation" in definition
     ]
     _check(
-        "all 64 probe expectations are declared advisory documentation",
-        len(declared) == 64
+        "Qwen index readback has a declared probe expectation",
+        "lm_studio_inference_model_indexed" in declared,
+        str(declared),
+    )
+    _check(
+        "all 65 probe expectations, including Qwen index readback, are advisory documentation",
+        len(declared) == 65
         and any(
             gap["id"] == "probe_expectations_advisory_only"
             for gap in flow["known_gaps"]
@@ -732,6 +738,17 @@ def _check_derived_implementation_status(flow: dict[str, Any]) -> None:
         "bootstrap resolver statuses are derived from the closed pre-venv registry",
         not bootstrap_errors,
         str(bootstrap_errors),
+    )
+    index_ids = ("ensure_index_lm_studio_inference", "lm_studio_inference_model_indexed")
+    with patch("bootstrap_adapter.routes.lm_studio_route", return_value={"routed": "lm_studio"}) as routed:
+        routed_results = [
+            _bootstrap_dispatch(cast(Any, {"operation_id": item, "operation_ref": _BOOTSTRAP_ROUTES[item][0]}), cast(Any, object()))
+            for item in index_ids
+        ]
+    _check(
+        "Qwen index operation and probe dispatch through the pre-venv LM Studio bridge",
+        routed_results == [{"routed": "lm_studio"}] * 2 and routed.call_count == 2,
+        str({"results": routed_results, "calls": routed.call_count}),
     )
     understated = copy.deepcopy(flow)
     understated["operations"]["request_homebrew_install"][

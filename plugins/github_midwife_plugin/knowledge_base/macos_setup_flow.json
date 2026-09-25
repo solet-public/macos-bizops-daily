@@ -9,6 +9,13 @@
     "adapter_envelope_schema": "setup_adapter_envelope.schema.json",
     "transaction_rollup": "verified_then_failed_then_blocked_then_awaiting_user_then_applying_then_pending",
     "stop_command": "deferred",
+    "knowledge_readiness": {
+      "timeout_seconds": 120,
+      "launch_result_reserve_seconds": 5,
+      "consumer_probe_purposes": ["stage_exit"],
+      "consumer_probe_refs": ["knowledge_retrieval_succeeds"],
+      "release_signal": "canonical_nonempty_retrieval"
+    },
     "start_command": {
       "operation_ref": "lifecycle::start",
       "runner": "hydration",
@@ -471,6 +478,7 @@
                 "install_lm_studio",
                 "start_lm_studio_server",
                 "pull_lm_studio_inference_model",
+                "ensure_index_lm_studio_inference",
                 "load_lm_studio_inference_model",
                 "install_lm_studio_login_agent"
               ],
@@ -1196,6 +1204,7 @@
         "lm_studio_embedding_artifact_present",
         "lm_studio_embedding_model_served",
         "lm_studio_inference_artifact_present",
+        "lm_studio_inference_model_indexed",
         "lm_studio_inference_model_served",
         "lm_studio_login_agent_valid",
         "lm_studio_jit_disabled"
@@ -1206,6 +1215,7 @@
         "pull_lm_studio_embedding_model",
         "load_lm_studio_embedding_model",
         "pull_lm_studio_inference_model",
+        "ensure_index_lm_studio_inference",
         "load_lm_studio_inference_model",
         "install_lm_studio_login_agent"
       ]
@@ -3873,6 +3883,43 @@
       },
       "apply_timeout_seconds": 900
     },
+    "ensure_index_lm_studio_inference": {
+      "name": "Index verified LM Studio inference model",
+      "description": "Hard-link verified Qwen bytes into a reviewed LM Studio index namespace and read back one model key.",
+      "operation_ref": "setup::lm_studio.ensure_index_inference",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "required_when": {
+        "decision_ref": "inference_implementation",
+        "operator": "equals",
+        "value": "lm_studio"
+      },
+      "consent_refs": [
+        "system_change_consent"
+      ],
+      "input_refs": [
+        "lm_studio_base_url"
+      ],
+      "parameters": {
+        "embeddings_implementation": {
+          "decision_ref": "embeddings_implementation"
+        },
+        "inference_implementation": {
+          "decision_ref": "inference_implementation"
+        }
+      },
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": [
+          "lm_studio_inference_model_indexed"
+        ],
+        "postcondition_probe_refs": [
+          "lm_studio_inference_model_indexed"
+        ]
+      }
+    },
     "load_lm_studio_inference_model": {
       "name": "Load lm studio inference model",
       "description": "Explicitly load Qwen3 14B with GPU off and context 8192.",
@@ -4829,6 +4876,25 @@
         "pull_lm_studio_inference_model"
       ]
     },
+    "lm_studio_inference_model_indexed": {
+      "name": "LM Studio inference model indexed",
+      "description": "Require one LM Studio model key bound to the reviewed Qwen bytes and destination inode.",
+      "probe_ref": "setup::lm_studio.inference_model_indexed",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "level": "readiness",
+      "required_when": {
+        "decision_ref": "inference_implementation",
+        "operator": "equals",
+        "value": "lm_studio"
+      },
+      "expectation": {
+        "operator": "truthy"
+      },
+      "remediation_operation_refs": [
+        "ensure_index_lm_studio_inference"
+      ]
+    },
     "lm_studio_inference_model_served": {
       "name": "Lm studio inference model served",
       "description": "Explicitly load Qwen3 14B with GPU off and context 8192.",
@@ -4957,6 +5023,7 @@
         "pull_lm_studio_embedding_model",
         "load_lm_studio_embedding_model",
         "pull_lm_studio_inference_model",
+        "ensure_index_lm_studio_inference",
         "load_lm_studio_inference_model",
         "install_lm_studio_login_agent"
       ],
@@ -4970,6 +5037,7 @@
         "lm_studio_embedding_artifact_present",
         "lm_studio_embedding_model_served",
         "lm_studio_inference_artifact_present",
+        "lm_studio_inference_model_indexed",
         "lm_studio_inference_model_served",
         "lm_studio_login_agent_valid",
         "lm_studio_jit_disabled"
@@ -5293,6 +5361,7 @@
       "lm_studio_embedding_artifact_present",
       "lm_studio_embedding_model_served",
       "lm_studio_inference_artifact_present",
+      "lm_studio_inference_model_indexed",
       "lm_studio_inference_model_served",
       "lm_studio_login_agent_valid",
       "lm_studio_jit_disabled"
@@ -5309,7 +5378,7 @@
   "known_gaps": [
     {
       "id": "probe_expectations_advisory_only",
-      "summary": "All 64 declared probe expectation values are advisory documentation and are not evaluated against observed probe values.",
+      "summary": "All 65 declared probe expectation values are advisory documentation and are not evaluated against observed probe values.",
       "impact": "Doctor reports probe checkpoint status from the probe implementation; expectation declarations do not independently validate or block that status.",
       "status": "open",
       "evidence": [

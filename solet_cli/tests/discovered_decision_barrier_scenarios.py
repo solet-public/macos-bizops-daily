@@ -80,6 +80,7 @@ _GOLDEN_APPLY_TRACE: tuple[tuple[str, str, JsonObject], ...] = (
     ("pull_lm_studio_embedding_model", "setup::lm_studio.pull_embedding", _LM_STUDIO_INPUTS),
     ("load_lm_studio_embedding_model", "setup::lm_studio.load_embedding", _LM_STUDIO_INPUTS),
     ("pull_lm_studio_inference_model", "setup::lm_studio.pull_inference", _LM_STUDIO_INPUTS),
+    ("ensure_index_lm_studio_inference", "setup::lm_studio.ensure_index_inference", _LM_STUDIO_INPUTS),
     ("load_lm_studio_inference_model", "setup::lm_studio.load_inference", _LM_STUDIO_INPUTS),
     ("install_lm_studio_login_agent", "setup::lm_studio.install_login_agent", _LM_STUDIO_INPUTS),
     (
@@ -128,6 +129,7 @@ _GOLDEN_APPLY_TRACE: tuple[tuple[str, str, JsonObject], ...] = (
 _GOLDEN_PLANNED_ORDER = (
     "build_instance_environment",
     "configure_postgresql",
+    "ensure_index_lm_studio_inference",
     "install_claude_cli",
     "install_codex_cli",
     "install_lm_studio",

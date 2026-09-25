@@ -5,9 +5,10 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from .adapters import AdapterRegistry, OperationRequest, OperationResult, invoke_adapter
-from .contracts import ContractBundle, startup_readiness_budget
+from .contracts import ContractBundle, knowledge_readiness_budget, startup_readiness_budget
 from .errors import StateConflictError
 from .flow import unresolved_decision_ids_for_stages
 from .inference_probe_policy import advisory_inference_probe_result
@@ -187,6 +188,8 @@ def _invoke_boundary_probe(
                 consumer_probe_ref=probe_id,
             )
         )
+    if boundary == "exit" and probe_id == "knowledge_retrieval_succeeds":
+        timeout_seconds = knowledge_readiness_budget(bundle)
     request = OperationRequest(
         request_id=str(uuid.uuid4()),
         operation_id=probe_id,
@@ -205,10 +208,10 @@ def _invoke_boundary_probe(
         public_inputs=public_inputs,
     )
     result = invoke_adapter(registry, runner=str(definition["runner"]), request=request)
-    if not isinstance(result, OperationResult):
+    if not isinstance(cast(object, result), OperationResult):
         return result
     answers = getattr(transaction, "answers", {})
-    if not isinstance(answers, dict):
+    if not isinstance(cast(object, answers), dict):
         return result
     return advisory_inference_probe_result(answers, request, result)
 

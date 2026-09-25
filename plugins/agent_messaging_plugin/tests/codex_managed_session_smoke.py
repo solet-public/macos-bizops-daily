@@ -41,6 +41,7 @@ sys.path.insert(0, str(REPO_ROOT / "plugins" / "agent_messaging_plugin" / "src")
 
 from _real_state_fake import RealShapeState  # noqa: E402
 from _recorded_lane_worktree_fixture import RecordedLaneWorktreeFixture  # noqa: E402
+from _register_unit_double import RegisterUnitDouble  # noqa: E402
 from ananta.llm.agent_messaging.role_binding import (  # noqa: E402
     AGENT_ROLE_BINDING_NAMESPACE,
     COL_AGENT_INSTANCE_ID,
@@ -157,6 +158,9 @@ def _composite_spec(
 ) -> DispatchSpec:
     brief = root / f"{dispatch_id}-brief.md"
     brief.write_text("exact managed Codex brief\n", encoding="utf-8")
+    # The register Unit is resolved from the lane root, so the fixture names
+    # its own temp checkout rather than inheriting the runner's APP_HOME.
+    (root / ".git").mkdir(exist_ok=True)
     now = datetime.now(UTC)
     return DispatchSpec(
         dispatch_id=dispatch_id,
@@ -182,7 +186,7 @@ def _composite_spec(
         visibility="visible" if host == "tmux" else "headless",
         local_name=f"{dispatch_id}-Builder",
         report_by_seconds=900,
-        ttl_seconds=14400,
+
         allowed_tools=("Read",),
         permission_mode="bypassPermissions",
         transport="mcp",
@@ -194,8 +198,9 @@ def _composite_spec(
         uptake_due_at=(now + timedelta(minutes=2)).isoformat(),
         report_by=(now + timedelta(minutes=15)).isoformat(),
         watchdog_due_at=(now + timedelta(minutes=3)).isoformat(),
-        expires_at=(now + timedelta(hours=4)).isoformat(),
+
         dispatch_kind="infrastructure",
+        repository_root=str(root),
     )
 
 
@@ -204,6 +209,7 @@ def _composite_spawn_request(spec: DispatchSpec, host: str) -> SpawnSessionReque
         role_class=spec.role_class,
         lane_id=spec.lane_id,
         brief_ref=spec.brief_ref,
+        repository_root=spec.repository_root,
         work_class=spec.work_class,
         budget_line=spec.budget_line,
         agent_runtime=spec.agent_runtime,
@@ -213,7 +219,7 @@ def _composite_spawn_request(spec: DispatchSpec, host: str) -> SpawnSessionReque
         model=spec.model,
         effort=spec.effort,
         report_by_seconds=spec.report_by_seconds,
-        ttl_seconds=spec.ttl_seconds,
+
         spawned_by_instance_id=spec.spawned_by_instance_id,
         spawned_by_role=spec.spawned_by_role,
         directed_by=spec.directed_by,
@@ -347,6 +353,7 @@ def test_claude_headless_and_tmux_use_the_same_composite_state_machine() -> None
                     state,  # type: ignore[arg-type]
                     spec,
                     _composite_spawn_request(spec, host),
+                    register=RegisterUnitDouble(),
                 )
                 attempt_id = str(result["attempt"]["agent_instance_id"])
                 backfill_registration(
@@ -372,7 +379,7 @@ def test_claude_headless_and_tmux_use_the_same_composite_state_machine() -> None
                         f"ases-{attempt_id}",
                         "live_peer_binding",
                     ),
-                    prior_version=1,
+                    prior_version=int(result["dispatch"]["version"]),
                     payload={
                         "brief_sha256": spec.brief_sha256,
                         "role_binding": spec.role_name,
@@ -446,6 +453,7 @@ def test_codex_headless_composite_requires_model_ack() -> None:
                 state,  # type: ignore[arg-type]
                 spec,
                 _composite_spawn_request(spec, "headless"),
+                register=RegisterUnitDouble(),
             )
             attempt_id = str(result["attempt"]["agent_instance_id"])
             backfill_registration(
@@ -476,7 +484,7 @@ def test_codex_headless_composite_requires_model_ack() -> None:
                     agent_session_id=f"ases-{attempt_id}",
                     authority_source="live_peer_binding",
                 ),
-                prior_version=1,
+                prior_version=int(result["dispatch"]["version"]),
                 payload={
                     "brief_sha256": spec.brief_sha256,
                     "role_binding": spec.role_name,
@@ -496,7 +504,7 @@ def test_codex_headless_composite_requires_model_ack() -> None:
                     agent_session_id=f"ases-{attempt_id}",
                     authority_source="live_peer_binding",
                 ),
-                prior_version=1,
+                prior_version=int(result["dispatch"]["version"]),
                 payload={
                     "brief_sha256": spec.brief_sha256,
                     "role_binding": spec.role_name,
@@ -518,7 +526,7 @@ def test_codex_headless_composite_requires_model_ack() -> None:
                         agent_session_id=f"ases-{attempt_id}",
                         authority_source="live_peer_binding",
                     ),
-                    prior_version=1,
+                    prior_version=int(result["dispatch"]["version"]),
                     payload={
                         "brief_sha256": spec.brief_sha256,
                         "role_binding": spec.role_name,
@@ -602,6 +610,7 @@ def test_codex_tmux_disappearance_converges() -> None:
                 state,  # type: ignore[arg-type]
                 spec,
                 _composite_spawn_request(spec, "tmux"),
+                register=RegisterUnitDouble(),
             )
             attempt_id = str(result["attempt"]["agent_instance_id"])
             backfill_registration(

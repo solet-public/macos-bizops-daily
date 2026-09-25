@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _real_state_fake import RealShapeState  # noqa: E402
 from _recorded_lane_worktree_fixture import RecordedLaneWorktreeFixture  # noqa: E402
+from _register_unit_double import RegisterUnitDouble  # noqa: E402
 from ananta.core.services.call_context import CallContext  # noqa: E402
 from ananta.llm.agent_messaging.role_binding import (  # noqa: E402
     AGENT_ROLE_BINDING_NAMESPACE,
@@ -185,7 +186,7 @@ def _raw(tmp: Path, state: Any) -> dict[str, object]:
         "spawned_by_role": "Coordinator-Main",
         "visibility": "headless",
         "report_by_seconds": 900,
-        "ttl_seconds": 3600,
+
         "allowed_tools": [],
         "permission_mode": "bypassPermissions",
         "transport": "mcp",
@@ -194,7 +195,7 @@ def _raw(tmp: Path, state: Any) -> dict[str, object]:
         "uptake_due_at": (now + timedelta(minutes=2)).isoformat(),
         "report_by": (now + timedelta(minutes=15)).isoformat(),
         "watchdog_due_at": (now + timedelta(minutes=3)).isoformat(),
-        "expires_at": (now + timedelta(hours=1)).isoformat(),
+
     }
 
 
@@ -269,14 +270,21 @@ def test_provisioning_and_red_mutation() -> None:
     try:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
-            os.environ["APP_HOME"] = str(tmp / "profile")
+            # The register Unit is resolved from the lane root (APP_HOME's
+            # parent), so the fixture names its own temp checkout, and the
+            # register is a double that can never reach the live psolet.
+            lane_root = tmp / "repo"
+            (lane_root / ".git").mkdir(parents=True)
+            os.environ["APP_HOME"] = str(lane_root / "profile")
             os.environ["SOLET_NAME"] = "fixture"
             plugin = AgentMessagingPlugin()
             plugin.orchestrator_ref = cast(Any, _Orchestrator(state))
             plugin._peer_registry = cast(Any, _Registry())  # noqa: SLF001
+            register = RegisterUnitDouble()
+            plugin._register_unit_client = lambda: register  # type: ignore[method-assign]  # noqa: SLF001
             with RecordedLaneWorktreeFixture(tmp) as fixture:
                 result = plugin.provision_role_session(
-                    {"parameters": _raw(tmp, state)}, _authenticated_state(),
+                    {"parameters": _raw(lane_root, state)}, _authenticated_state(),
                 )
                 data = cast(dict[str, Any], result.get("data", {}))
                 attempt = cast(dict[str, Any], data.get("attempt", {}))
@@ -310,7 +318,7 @@ def test_provisioning_and_red_mutation() -> None:
                 _assert_existing_controller_is_reused(
                     plugin=plugin,
                     state=state,
-                    tmp=tmp,
+                    tmp=lane_root,
                     fixture=fixture,
                     driver=driver,
                 )

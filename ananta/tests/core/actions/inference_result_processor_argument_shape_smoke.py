@@ -35,6 +35,7 @@ from ananta.core.actions.action_factory import ActionFactory, validate_process_a
 from ananta.core.actions.action_queue_poller import ActionQueuePoller  # noqa: E402
 from ananta.core.process_registry.builder import build_process_registry  # noqa: E402
 from ananta.core.services.bootstrap_manager import BootstrapManager  # noqa: E402
+from ananta.error_handling import FrameworkError  # noqa: E402
 from ananta.services.inference_service.interfaces.public import InferenceServiceAPI  # noqa: E402
 
 _RESULTS_KEY = "service_interface::inference_service::process_results"
@@ -213,12 +214,41 @@ def test_error_processor_model_override_stays_inside_params() -> None:
         _check(True, "error template passes strict params/state validation")
 
 
+def test_retired_session_arguments_have_a_scoped_stable_error() -> None:
+    for verb in ("spawn_session", "dispatch_managed_work", "provision_role_session"):
+        process = "plugin::agent_messaging_plugin::" + verb
+        for field in ("ttl_seconds", "expires_at"):
+            for value in (None, 0, "", 3600):
+                code = ""
+                try:
+                    validate_process_arguments(process, {}, {field: value})
+                except FrameworkError as exc:
+                    code = str(exc.error_code)
+                _check(code == "retired_session_ttl_argument", f"{verb} rejects {field}={value!r}")
+        code = ""
+        try:
+            validate_process_arguments(process, {}, {"unrelated": 1})
+        except FrameworkError as exc:
+            code = str(exc.error_code)
+        _check(code == "action.unknown_arguments", f"{verb} keeps generic unknown-argument error")
+    for process in ("plugin::other::spawn_session", "service_interface::oauth::issue_token"):  # wint:negative-fixture
+        validate_process_arguments(process, {"ttl_seconds": {}}, {"ttl_seconds": 3600})
+        _check(True, f"{process} preserves declared unrelated lifetime arguments")
+        code = ""
+        try:
+            validate_process_arguments(process, {}, {"expires_at": None})
+        except FrameworkError as exc:
+            code = str(exc.error_code)
+        _check(code == "action.unknown_arguments", f"{process} retains generic validation")
+
+
 def main() -> int:
     print("iss_20cc187c inference result-processor argument-shape smoke")
     test_runtime_registry_keeps_inference_payload_inside_params()
     test_startup_action_validation_accepts_runtime_error_template()
     test_result_processor_context_is_metadata_not_arguments()
     test_error_processor_model_override_stays_inside_params()
+    test_retired_session_arguments_have_a_scoped_stable_error()
     if _failures:
         print(f"\nFAIL: {len(_failures)} check(s) failed")
         return 1

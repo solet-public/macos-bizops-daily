@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
+import os
 import stat
 import sys
 import tempfile
 import threading
 import time
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+import solet_manager.state_io as state_io  # noqa: E402
 from solet_manager.errors import (  # noqa: E402
     InstanceUnmanagedError,
     StateConflictError,
@@ -322,9 +326,173 @@ def _check_operation_attempt_coverage(
     )
 
 
+def _lock_target_snapshot(path: Path) -> tuple[int, int, int, bytes]:
+    info = path.lstat()
+    contents = path.read_bytes() if stat.S_ISREG(info.st_mode) else b""
+    return info.st_mode, info.st_uid, info.st_nlink, contents
+
+
+def _assert_hostile_lock(root: Path, kind: str) -> None:
+    directory = root / kind
+    directory.mkdir(mode=0o700)
+    target = directory / "operator-owned"
+    target.write_bytes(b"untouched")
+    target.chmod(0o644)
+    lock = directory / "fixture.lock"
+    if kind == "symlink":
+        lock.symlink_to(target)
+    elif kind == "directory":
+        lock.mkdir(mode=0o700)
+    elif kind == "hardlink":
+        os.link(target, lock)
+    else:
+        lock.write_bytes(b"untouched")
+        lock.chmod(0o666)
+        if os.getuid() != 0:
+            print("SKIP foreign-owned lock: changing fixture ownership requires root")
+            return
+        os.chown(lock, 1, -1)
+    before = _lock_target_snapshot(target), _lock_target_snapshot(lock)
+    for create in (True, False):
+        refused = False
+        try:
+            with instance_lock(lock, create=create):
+                pass
+        except StateError:
+            refused = True
+        finally:
+            _check(
+                (_lock_target_snapshot(target), _lock_target_snapshot(lock)) == before,
+                f"{kind} lock refusal preserves target and lock bytes, mode, owner and links",
+            )
+        _check(refused, f"{kind} lock refused with StateError (create={create})")
+
+
+def _assert_hostile_locks(root: Path) -> None:
+    for kind in ("symlink", "directory", "hardlink", "foreign"):
+        _assert_hostile_lock(root, kind)
+
+
+def _assert_unsafe_lock_directory(root: Path, kind: str) -> None:
+    base = root / kind
+    base.mkdir(mode=0o700)
+    outside = base / "outside"
+    outside.mkdir(mode=0o700)
+    marker = outside / "fixture.lock"
+    marker.write_bytes(b"operator-owned")
+    marker.chmod(0o644)
+    state = base / "state"
+    if kind == "state-symlink":
+        state.symlink_to(outside, target_is_directory=True)
+        locks = outside / "locks"
+        locks.mkdir(mode=0o700)
+        marker = locks / "fixture.lock"
+        marker.write_bytes(b"operator-owned")
+        marker.chmod(0o644)
+    else:
+        state.mkdir(mode=0o700)
+        locks = state / "locks"
+        locks.mkdir(mode=0o700)
+        locks.chmod(0o770)
+    before = _lock_target_snapshot(marker)
+    try:
+        with instance_lock(state / "locks" / "fixture.lock"):
+            raise AssertionError(f"{kind} accepted")
+    except StateError:
+        pass
+    finally:
+        _check(_lock_target_snapshot(marker) == before, f"{kind} preserves outside target")
+
+
+def _assert_lock_parent_swap(root: Path) -> None:
+    state = root / "swap-state"
+    state.mkdir(mode=0o700)
+    locks = state / "locks"
+    locks.mkdir(mode=0o700)
+    outside = root / "outside"
+    outside.mkdir(mode=0o700)
+    marker = outside / "fixture.lock"
+    marker.write_bytes(b"operator-owned")
+    marker.chmod(0o644)
+    before = _lock_target_snapshot(marker)
+    original = state_io._open_lock_handle
+
+    def swap_parent(*args: object, **kwargs: object) -> object:
+        locks.rename(state / "original-locks")
+        locks.symlink_to(outside, target_is_directory=True)
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    try:
+        with patch.object(state_io, "_open_lock_handle", side_effect=swap_parent):
+            with instance_lock(locks / "fixture.lock"):
+                pass
+    except StateError:
+        pass
+    finally:
+        _check(_lock_target_snapshot(marker) == before, "swapped parent preserves outside target")
+
+
+def _assert_lock_basename_retry(root: Path) -> None:
+    directory = root / "basename-retry"
+    directory.mkdir(mode=0o700)
+    lock = directory / "fixture.lock"
+    lock.touch(mode=0o600)
+    original = fcntl.flock
+    switched = False
+
+    def replace_before_flock(handle: object, operation: int) -> None:
+        nonlocal switched
+        if operation == fcntl.LOCK_EX and not switched:
+            switched = True
+            lock.rename(directory / "original.lock")
+            lock.touch(mode=0o600)
+        original(handle, operation)  # type: ignore[arg-type]
+
+    with patch.object(state_io.fcntl, "flock", side_effect=replace_before_flock):
+        with instance_lock(lock, create=False) as handle:
+            assert handle is not None
+            held = os.fstat(handle.fileno())
+            named = lock.lstat()
+            _check(switched and (held.st_dev, held.st_ino) == (named.st_dev, named.st_ino), "retry locks the replacement inode")
+            second = os.open(lock, os.O_RDWR | os.O_NOFOLLOW)
+            try:
+                _raises(BlockingIOError, lambda: original(second, fcntl.LOCK_EX | fcntl.LOCK_NB), "replacement inode remains exclusively locked")
+            finally:
+                os.close(second)
+
+
+def _assert_lock_retry_bound(root: Path) -> None:
+    directory = root / "retry-bound"
+    directory.mkdir(mode=0o700)
+    lock = directory / "fixture.lock"
+    original = fcntl.flock
+    attempts = 0
+
+    def replace_every_time(handle: object, operation: int) -> None:
+        nonlocal attempts
+        if operation == fcntl.LOCK_EX:
+            attempts += 1
+            lock.rename(directory / f"original-{attempts}.lock")
+            lock.touch(mode=0o600)
+        original(handle, operation)  # type: ignore[arg-type]
+
+    with patch.object(state_io.fcntl, "flock", side_effect=replace_every_time):
+        try:
+            with instance_lock(lock):
+                raise AssertionError("unstable lock accepted")
+        except StateError:
+            _check(attempts == 3, "unstable lock fails after three attempts")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         root = Path(raw)
+        _assert_lock_retry_bound(root)
+        _assert_lock_basename_retry(root)
+        _assert_lock_parent_swap(root)
+        _assert_unsafe_lock_directory(root, "state-symlink")
+        _assert_unsafe_lock_directory(root, "group-writable")
+        _assert_hostile_locks(root)
         state = root / "state.json"
         atomic_write_json(state, {"schema_version": 1, "value": "ok"})
         _check(stat.S_IMODE(state.stat().st_mode) == 0o600, "atomic state is 0600")

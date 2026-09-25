@@ -4,7 +4,7 @@ A thin orchestration façade around the platform services that the
 former ``claude_code_channel_plugin`` reached through ``orchestrator_ref``.
 Every public method returns a plain ``dict`` ready for JSON serialization
 on the happy path and raises :class:`BridgeError` (carrying a ``.code``
-attribute drawn from the ``bridge.*`` namespace) on failure so the
+attribute identifying a bridge or explicitly preserved argument error) on failure so the
 ``http_routes`` layer can map the token to an HTTP status uniformly.
 
 Ported from ``claude_code_channel_plugin.plugin`` during the bridge-
@@ -59,6 +59,12 @@ ERR_PROCESS_CALL_FAILED: Final[str] = "bridge.process_call_failed"
 ERR_ACTION_RESULT_NOT_FOUND: Final[str] = "bridge.action_result_not_found"
 ERR_DEPENDENCIES_NOT_READY: Final[str] = "bridge.dependencies_not_ready"
 ERR_ATTACHMENT_MISSING: Final[str] = "bridge.attachment_missing"
+
+# Stable caller-input failures retain their public code across submission.
+_ARGUMENT_ERROR_PASSTHROUGH_CODES: Final[frozenset[str]] = frozenset({
+    UNKNOWN_ARGUMENTS_ERROR_CODE,
+    "retired_session_ttl_argument",
+})
 
 # Process keys for the bridge-delivery EDGE_SINK pair.  Kept here (not in
 # constants.py) because the dispatcher contract (process_call's async
@@ -131,7 +137,7 @@ def _role_for_instance(
 class BridgeError(Exception):
     """Failure raised by :class:`PlatformSurface` methods.
 
-    The ``code`` attribute always carries a stable ``bridge.*`` token so
+    The ``code`` attribute carries a stable bridge or preserved argument token so
     the HTTP layer can map the failure to a status code (and the MCP
     client receives the same token verbatim).
     """
@@ -654,7 +660,7 @@ class PlatformSurface:
             self._flow_manager.update_flow_status(flow_id, "failed")
             logger.error("process_call dispatch failed: %s", exc, exc_info=True)
             error_code = getattr(exc, "error_code", None)
-            if error_code == UNKNOWN_ARGUMENTS_ERROR_CODE:
+            if isinstance(error_code, str) and error_code in _ARGUMENT_ERROR_PASSTHROUGH_CODES:
                 raise BridgeError(error_code, str(exc)) from exc
             raise BridgeError(ERR_PROCESS_CALL_FAILED, str(exc)) from exc
         return {

@@ -153,6 +153,88 @@ def write_content_addressed_json(path: Path, value: dict[str, JsonValue], digest
     read_exact_json(path, value)
 
 
+def _checked_lock_directory(path: Path | str, *, parent_fd: int | None = None) -> int:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    descriptor = os.open(path, flags, dir_fd=parent_fd)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
+            raise StateError(f"lock directory must be owned by the current user and not writable by others: {path}")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _open_locks_directory(name: str, anchor_fd: int, *, create: bool) -> int:
+    try:
+        return _checked_lock_directory(name, parent_fd=anchor_fd)
+    except FileNotFoundError:
+        if not create:
+            raise
+    try:
+        os.mkdir(name, 0o700, dir_fd=anchor_fd)
+    except FileExistsError:
+        pass  # A concurrent creator still has to pass the descriptor checks.
+    return _checked_lock_directory(name, parent_fd=anchor_fd)
+
+
+@contextmanager
+def _lock_parent_descriptor(path: Path, *, create: bool) -> Generator[int]:
+    anchor = path.parent.parent
+    if create and not anchor.exists():
+        ensure_private_directory(anchor)
+    try:
+        anchor_fd = _checked_lock_directory(anchor)
+        try:
+            locks_fd = _open_locks_directory(path.parent.name, anchor_fd, create=create)
+            try:
+                yield locks_fd
+            finally:
+                os.close(locks_fd)
+        finally:
+            os.close(anchor_fd)
+    except OSError as error:
+        raise StateError(f"cannot open safe lock directory: {path.parent}: {error}") from error
+
+
+def _open_lock_handle(path: Path, *, create: bool, directory_fd: int) -> IO[str]:
+    flags = os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC | (os.O_CREAT if create else 0)
+    try:
+        descriptor = os.open(path.name, flags, 0o600, dir_fd=directory_fd)
+    except OSError as error:
+        raise StateError(f"cannot open safe instance lock: {path}: {error}") from error
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
+            raise StateError(f"instance lock must be a regular, current-user-owned, single-link file: {path}")
+        os.fchmod(descriptor, 0o600)
+        return os.fdopen(descriptor, "a+", encoding="utf-8")
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _acquire_lock_handle(path: Path, *, create: bool, directory_fd: int) -> IO[str]:
+    for _attempt in range(3):
+        handle = _open_lock_handle(path, create=create, directory_fd=directory_fd)
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            held = os.fstat(handle.fileno())
+            try:
+                named = os.stat(path.name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                named = None
+            if named is not None and (held.st_dev, held.st_ino) == (named.st_dev, named.st_ino):
+                return handle
+        except BaseException:
+            handle.close()
+            raise
+        fcntl.flock(handle, fcntl.LOCK_UN)
+        handle.close()
+    raise StateError(f"instance lock basename changed repeatedly: {path}")
+
+
 @contextmanager
 def instance_lock(path: Path, *, create: bool = True) -> Generator[IO[str] | None]:
     """Serialize mutation for one normalized instance name.
@@ -165,13 +247,9 @@ def instance_lock(path: Path, *, create: bool = True) -> Generator[IO[str] | Non
     if not create and not path.exists():
         yield None
         return
-    ensure_private_directory(path.parent)
-    flags = os.O_RDWR | (os.O_CREAT if create else 0)
-    descriptor = os.open(path, flags, 0o600)
-    os.chmod(path, 0o600)
-    handle = os.fdopen(descriptor, "a+", encoding="utf-8")
+    with _lock_parent_descriptor(path, create=create) as directory_fd:
+        handle = _acquire_lock_handle(path, create=create, directory_fd=directory_fd)
     try:
-        fcntl.flock(handle, fcntl.LOCK_EX)
         yield handle
     finally:
         fcntl.flock(handle, fcntl.LOCK_UN)

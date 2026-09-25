@@ -179,6 +179,17 @@ config:
       config) get their own documented one-line export, not a shell-parses-
       yaml mechanism -- see the KB note this slice ships alongside it.
 
+  psolet_cli:
+    type: string
+    required: false
+    description: |
+      Path to project-solet's psolet CLI, which dispatch_managed_work calls
+      to mint or verify the register Unit before any worker spawns (design
+      unt_57725090). Empty falls back to PROJECT_SOLET_CLI, then the
+      checkout default -- the same precedence as fleet_maintenance_plugin.
+      There is no bypass: an unreachable register refuses the dispatch
+      with unit_register_unavailable.
+
   # --- Bridge / IO surface ------------------------------------------
   # Port is intentionally NOT a config field.  Port allocation is owned
   # by ananta.core.runtime.port_manager (dynamic, per-solet, lowest

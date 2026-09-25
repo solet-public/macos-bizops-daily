@@ -122,7 +122,8 @@
         "journal_schema",
         "adapter_envelope_schema",
         "transaction_rollup",
-        "stop_command"
+        "stop_command",
+        "knowledge_readiness"
       ],
       "properties": {
         "answers_schema": {"const": "setup_answers.schema.json"},
@@ -132,7 +133,42 @@
           "const": "verified_then_failed_then_blocked_then_awaiting_user_then_applying_then_pending"
         },
         "stop_command": {"const": "deferred"},
+        "knowledge_readiness": {"$ref": "#/definitions/knowledge_readiness_contract"},
         "start_command": {"$ref": "#/definitions/lifecycle_command_contract"}
+      }
+    },
+    "knowledge_readiness_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timeout_seconds",
+        "launch_result_reserve_seconds",
+        "consumer_probe_purposes",
+        "consumer_probe_refs",
+        "release_signal"
+      ],
+      "properties": {
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 6,
+          "maximum": 900
+        },
+        "launch_result_reserve_seconds": {
+          "const": 5
+        },
+        "consumer_probe_purposes": {
+          "const": [
+            "stage_exit"
+          ]
+        },
+        "consumer_probe_refs": {
+          "const": [
+            "knowledge_retrieval_succeeds"
+          ]
+        },
+        "release_signal": {
+          "const": "canonical_nonempty_retrieval"
+        }
       }
     },
     "lifecycle_command_contract": {

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .errors import InstanceUnmanagedError, RegistryUniquenessError, StateConflictError, StateError
 from .maintenance_inventory import read_maintenance_inventory_v2
-from .models import SCHEMA_VERSION, InstanceInventoryRecordV2, InstanceRecord, JsonValue
+from .models import SCHEMA_VERSION, InstanceInventoryRecordV2, InstanceRecord, JsonValue, ManagementOrigin
 from .state_io import atomic_write_json, instance_lock, load_json_object
 
 _REGISTRY_KEYS = frozenset({"schema_version", "instances"})
@@ -94,10 +94,36 @@ def build_combined_registry_snapshot(
     indexes: dict[str, dict[object, str]] = {key: {} for key in ("name", "target", "filesystem_identity", "launchagent_label", "named_launcher_path")}
     for record in v1_records:
         _insert_identity(indexes, _v1_identity_keys(record), record.name)
+    seen_v2: set[str] = set()
     for record in v2_records:
-        target = record.target
-        _insert_identity(indexes, RegistryIdentityKeys(record.name, target.canonical_path, (target.filesystem_identity.device, target.filesystem_identity.inode), record.service_identity.launchagent_label, record.service_identity.named_launcher_path), record.instance_id)
+        keys = _v2_identity_keys(record)
+        legacy = next((item for item in v1_records if item.name == record.name), None)
+        if record.name not in seen_v2 and legacy is not None and is_create_origin_alias(legacy, record):
+            # Release/provenance axes advance during updates; only immutable keys identify this alias.
+            seen_v2.add(record.name)
+            continue
+        _insert_identity(indexes, keys, record.instance_id)
+        seen_v2.add(record.name)
     return CombinedRegistrySnapshot(v1_records, v2_records, indexes)
+
+
+def _v2_identity_keys(record: InstanceInventoryRecordV2) -> RegistryIdentityKeys:
+    target = record.target
+    return RegistryIdentityKeys(
+        record.name, target.canonical_path,
+        (target.filesystem_identity.device, target.filesystem_identity.inode),
+        record.service_identity.launchagent_label, str(Path(record.service_identity.named_launcher_path).resolve(strict=False)),
+    )
+
+
+def is_create_origin_alias(legacy: InstanceRecord, record: InstanceInventoryRecordV2) -> bool:
+    """Coalesce only a complete create-origin identity, never mutable release fields."""
+    keys = _v1_identity_keys(legacy)
+    return (
+        record.management_origin is ManagementOrigin.CREATE
+        and keys.filesystem_identity is not None
+        and keys == _v2_identity_keys(record)
+    )
 
 
 def find_managed_instance(snapshot: CombinedRegistrySnapshot, name: str) -> object | None:
@@ -130,8 +156,16 @@ def _v1_identity_keys(record: InstanceRecord) -> RegistryIdentityKeys:
         str(target),
         filesystem_identity,
         f"local.solet.{record.name}",
-        str(Path(record.launcher).resolve(strict=False)),
+        _v1_named_launcher_identity(record),
     )
+
+
+def _v1_named_launcher_identity(record: InstanceRecord) -> str:
+    """Project the create-time client entry point onto its public named slot."""
+    launcher = Path(record.launcher)
+    if launcher == Path(record.target) / "client" / "bin" / record.name:
+        launcher = Path.home() / ".local" / "bin" / record.name
+    return str(launcher.resolve(strict=False))
 
 
 class InstanceRegistry:

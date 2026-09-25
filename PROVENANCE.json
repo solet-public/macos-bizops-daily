@@ -4,12 +4,20 @@
     "name": "macos-bizops",
     "platform": "local"
   },
-  "lineage": [],
+  "lineage": [
+    {
+      "manifest_sha256": "6af4e689b3f1519b5a31eb854172aca354ecb79892acc24c84cd4c08d1c348c7",
+      "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+      "seed_id": "2f1fd68a-2740-5aa8-8b51-56b436248096",
+      "source_commit": "0a7514692be805942b31962128ec4211d1fa9eb2",
+      "source_date": "2026-09-23T15:07:17-07:00"
+    }
+  ],
   "manifest_sha256": "6af4e689b3f1519b5a31eb854172aca354ecb79892acc24c84cd4c08d1c348c7",
   "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
   "schema_version": 1,
-  "seed_id": "2f1fd68a-2740-5aa8-8b51-56b436248096",
+  "seed_id": "66f23e63-7cdb-501f-b090-a26ee954c1f1",
   "signature": null,
-  "source_commit": "0a7514692be805942b31962128ec4211d1fa9eb2",
-  "source_date": "2026-09-23T15:07:17-07:00"
+  "source_commit": "f9f822c5c702e0087ba51126df0939ef216d3fd5",
+  "source_date": "2026-09-25T13:55:45-07:00"
 }

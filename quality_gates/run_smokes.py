@@ -250,9 +250,11 @@ _EXCLUSIVE_GROUPS: tuple[tuple[str, ...], ...] = (
     # mechanism the runner has for bounding heavy-smoke concurrency. Three
     # chains for Step 7 (the matrix + tree + Homebrew rows, and the crash sweep
     # in two halves) and two for the Step-6 sweeps registered just before them
-    # (the same class of work on a smaller fixture; measured in the same
-    # battery at 98-120s pooled against the Step-7 block, 60-80s alone), so at
-    # most five of them run concurrently with the light pool.
+    # (the same class of work on a smaller fixture), so at most five of them
+    # run concurrently with the light pool. The Step-6 sweep files hold at most
+    # five crash points each (about 33s typical, 45s worst standalone): the old
+    # 10-12-point slices ran 57-70s alone, and a transient external host-load
+    # spike pushed two of them past the 120s cap (iss_d1a9649b).
     (
         "solet_cli/tests/update_crash_sweep_smoke.py",
         "solet_cli/tests/update_crash_sweep_writes_1_smoke.py",
@@ -261,6 +263,12 @@ _EXCLUSIVE_GROUPS: tuple[tuple[str, ...], ...] = (
         "solet_cli/tests/update_crash_sweep_writes_4_smoke.py",
         "solet_cli/tests/update_crash_sweep_writes_5_smoke.py",
         "solet_cli/tests/update_crash_sweep_writes_6_smoke.py",
+        "solet_cli/tests/update_crash_sweep_writes_7_smoke.py",
+        "solet_cli/tests/update_crash_sweep_writes_8_smoke.py",
+        "solet_cli/tests/update_crash_sweep_writes_9_smoke.py",
+        "solet_cli/tests/update_crash_sweep_writes_10_smoke.py",
+        "solet_cli/tests/update_crash_sweep_writes_11_smoke.py",
+        "solet_cli/tests/update_crash_sweep_writes_12_smoke.py",
         "solet_cli/tests/update_crash_sweep_applies_smoke.py",
     ),
     (
@@ -268,6 +276,14 @@ _EXCLUSIVE_GROUPS: tuple[tuple[str, ...], ...] = (
         "solet_cli/tests/existing_install_router_failure_sweep_2_smoke.py",
         "solet_cli/tests/existing_install_router_failure_sweep_3_smoke.py",
         "solet_cli/tests/existing_install_router_failure_sweep_4_smoke.py",
+        "solet_cli/tests/existing_install_router_failure_sweep_5_smoke.py",
+        "solet_cli/tests/existing_install_router_failure_sweep_6_smoke.py",
+        "solet_cli/tests/existing_install_router_failure_sweep_7_smoke.py",
+        "solet_cli/tests/existing_install_router_failure_sweep_8_smoke.py",
+        "solet_cli/tests/existing_install_router_failure_sweep_9_smoke.py",
+        "solet_cli/tests/existing_install_router_failure_sweep_10_smoke.py",
+        "solet_cli/tests/existing_install_router_failure_sweep_applies_1_smoke.py",
+        "solet_cli/tests/existing_install_router_failure_sweep_applies_2_smoke.py",
     ),
     (
         "solet_cli/tests/cold_host_matrix_smoke.py",

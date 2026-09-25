@@ -35,6 +35,7 @@ phone's mDNS hostname which won't send Origin).
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import hashlib
@@ -259,8 +260,13 @@ async def _handle_post(
     )
     if isinstance(session_or_err, Response):
         return session_or_err
-    return _dispatch_and_build_response(
-        envelope, session_or_err, dispatch_ctx,
+    # iss_87aa81c4: tools/call reaches dispatch_peer_send / dispatch_role_send,
+    # whose drive_on_delivery blocks (tmux paste-stability wait, up to 10 s per
+    # Claude wake). Inline, that stalled this server's loop and every open
+    # stream on it; the dispatch path is worker-thread safe (it already runs
+    # on the action-queue thread via the plugin verbs).
+    return await asyncio.to_thread(
+        _dispatch_and_build_response, envelope, session_or_err, dispatch_ctx,
     )
 
 

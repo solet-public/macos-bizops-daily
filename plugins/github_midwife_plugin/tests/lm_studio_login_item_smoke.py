@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import plistlib
 import shlex
 import subprocess
@@ -18,10 +19,11 @@ sys.path.insert(0, str(ROOT / "solet_cli/src"))
 
 from github_midwife_plugin.lm_studio_login_agent import LABEL, install_login_agent, login_classification, login_definition_current, login_paths, render_login_agent  # noqa: E402
 from github_midwife_plugin.lm_studio_models import ModelArtifact, cli_path, model_loaded, reviewed_models, served_models  # noqa: E402
+from github_midwife_plugin.lm_studio_provisioning import provision  # noqa: E402
 from github_midwife_plugin.lm_studio_settings import disable_jit, settings_path  # noqa: E402
 from github_midwife_plugin.setup_adapter_contract import JsonObject, JsonValue  # noqa: E402
-from github_midwife_plugin.setup_adapter_runtime import SystemRuntime  # noqa: E402
-from lm_studio_provisioning_smoke import FixtureRuntime, write_artifact  # noqa: E402
+from github_midwife_plugin.setup_adapter_runtime import CommandOutcome, SystemRuntime, bounded_command_outcome  # noqa: E402
+from lm_studio_provisioning_smoke import FixtureRuntime, outcome, request, write_artifact  # noqa: E402
 
 
 def check_singleton() -> None:
@@ -50,6 +52,172 @@ def check_repeated_install(runtime: FixtureRuntime, models: dict[str, ModelArtif
     assert login_classification(runtime, models) == "present_but_stale"
     assert not install_login_agent(runtime, models)
     assert not any("bootout" in command or "unload" in command for command in runtime.commands)
+
+
+class MissingGuiRuntime(FixtureRuntime):
+    def _launchctl(self, argv: tuple[str, ...]) -> CommandOutcome:
+        assert argv[1] == "print", argv
+        return outcome(code=112, error=f"Bad request.\nCould not find domain for user gui: {os.getuid()}")
+
+
+class GuiSessionLostRuntime(FixtureRuntime):
+    def __init__(self, home: Path, absent_prints: int = 1) -> None:
+        super().__init__(home)
+        self.absent_prints = absent_prints
+        self.print_count = 0
+
+    def _launchctl(self, argv: tuple[str, ...]) -> CommandOutcome:
+        if argv[1] == "print":
+            self.print_count += 1
+            if self.print_count <= self.absent_prints:
+                return outcome(code=113, error=f'Could not find service "{LABEL}"')
+        return outcome(code=112, error=f"Bad request.\nCould not find domain for user gui: {os.getuid()}")
+
+
+class TruncatedSuccessRuntime(FixtureRuntime):
+    def _launchctl(self, argv: tuple[str, ...]) -> CommandOutcome:
+        assert argv[1] == "print", argv
+        return bounded_command_outcome(
+            returncode=0,
+            timed_out=False,
+            duration_ms=1,
+            stdout=f"{LABEL} = {{\n state = running\n}}\n" + "x" * 5000,
+            stderr="",
+        )
+
+
+class AmbiguousDomainRuntime(FixtureRuntime):
+    def _launchctl(self, argv: tuple[str, ...]) -> CommandOutcome:
+        return outcome(
+            code=112,
+            error=(
+                f'Could not find service "{LABEL}"\n'
+                f"Could not find domain for user gui: {os.getuid()}"
+            ),
+        )
+
+
+class UnreadableGuiRuntime(FixtureRuntime):
+    def _launchctl(self, argv: tuple[str, ...]) -> CommandOutcome:
+        assert argv[1] == "print", argv
+        return outcome(code=1, error="launchctl state unavailable")
+
+
+def write_fixture_cli(home: Path) -> None:
+    cli = cli_path(home)
+    cli.parent.mkdir(parents=True, exist_ok=True)
+    cli.write_text("fixture executable\n")
+    cli.chmod(0o700)
+
+
+def check_gui_session_required() -> None:
+    reference = "setup::lm_studio.install_login_agent"
+    with tempfile.TemporaryDirectory(prefix="lm-login-gui-") as temporary:
+        home = Path(temporary)
+        models = reviewed_models(ROOT)
+        missing_gui = MissingGuiRuntime(home)
+        assert login_classification(missing_gui, models) == "gui_session_absent"
+        blocked = provision(request(reference, phase="apply"), missing_gui)
+        assert blocked["checkpoint_status"] == "blocked"
+        assert blocked["error_kind"] == "lm_studio_login_agent_gui_session_required"
+        assert "graphical desktop" in blocked["repair"]
+        assert not any(path.exists() for path in login_paths(home))
+        assert all(command[1] == "print" for command in missing_gui.commands)
+
+
+def check_gui_session_lost_during_install() -> None:
+    reference = "setup::lm_studio.install_login_agent"
+    with tempfile.TemporaryDirectory(prefix="lm-login-gui-loss-") as temporary:
+        home = Path(temporary)
+        models = reviewed_models(ROOT)
+        write_fixture_cli(home)
+        lost_gui = GuiSessionLostRuntime(home)
+        blocked = provision(request(reference, phase="apply"), lost_gui)
+        assert blocked["checkpoint_status"] == "blocked"
+        assert blocked["error_kind"] == "lm_studio_login_agent_unavailable"
+        assert not any(path.exists() for path in login_paths(home))
+        assert [command[1] for command in lost_gui.commands] == ["print", "print"]
+
+        missing_gui = MissingGuiRuntime(home)
+        assert not install_login_agent(missing_gui, models)
+        assert not any(path.exists() for path in login_paths(home))
+        assert [command[1] for command in missing_gui.commands] == ["print"]
+
+
+def check_stale_gui_session_lost(*, direct: bool) -> None:
+    reference = "setup::lm_studio.install_login_agent"
+    with tempfile.TemporaryDirectory(prefix="lm-login-stale-gui-loss-") as temporary:
+        home = Path(temporary)
+        models = reviewed_models(ROOT)
+        assert install_login_agent(FixtureRuntime(home), models)
+        plist, helper = login_paths(home)
+        plist.write_text("stale plist\n")
+        helper.write_text("stale helper\n")
+        before = (plist.read_bytes(), helper.read_bytes())
+        write_fixture_cli(home)
+        lost_gui = GuiSessionLostRuntime(home, absent_prints=1 if direct else 2)
+        if direct:
+            assert not install_login_agent(lost_gui, models)
+        else:
+            blocked = provision(request(reference, phase="apply"), lost_gui)
+            assert blocked["checkpoint_status"] == "blocked"
+            assert blocked["error_kind"] == "lm_studio_login_agent_unavailable"
+        assert (plist.read_bytes(), helper.read_bytes()) == before
+        assert [command[1] for command in lost_gui.commands] == ["print"] * (2 if direct else 3)
+
+
+def check_truncated_login_probe() -> None:
+    with tempfile.TemporaryDirectory(prefix="lm-login-truncated-") as temporary:
+        home = Path(temporary)
+        models = reviewed_models(ROOT)
+        assert install_login_agent(FixtureRuntime(home), models)
+        assert_unknown_login_probe(TruncatedSuccessRuntime(home), models)
+
+
+def check_ambiguous_gui_probe() -> None:
+    with tempfile.TemporaryDirectory(prefix="lm-login-ambiguous-") as temporary:
+        home = Path(temporary)
+        models = reviewed_models(ROOT)
+        write_fixture_cli(home)
+        assert_unknown_login_probe(AmbiguousDomainRuntime(home), models)
+
+
+def check_unreadable_login_probe() -> None:
+    with tempfile.TemporaryDirectory(prefix="lm-login-unknown-") as temporary:
+        home = Path(temporary)
+        models = reviewed_models(ROOT)
+        assert_unknown_login_probe(UnreadableGuiRuntime(home), models)
+
+
+def assert_unknown_login_probe(runtime: FixtureRuntime, models: dict[str, ModelArtifact]) -> None:
+    paths = login_paths(runtime.home)
+    before = tuple(path.read_bytes() if path.exists() else None for path in paths)
+    assert login_classification(runtime, models) == "unknown"
+    blocked = provision(request("setup::lm_studio.install_login_agent", phase="apply"), runtime)
+    assert blocked["checkpoint_status"] == "blocked"
+    assert blocked["error_kind"] == "lm_studio_login_agent_valid_unknown"
+    assert tuple(path.read_bytes() if path.exists() else None for path in paths) == before
+    assert all(command[1] == "print" for command in runtime.commands)
+
+
+def check_valid_and_invalid_login_item() -> None:
+    reference = "setup::lm_studio.install_login_agent"
+    with tempfile.TemporaryDirectory(prefix="lm-login-item-") as temporary:
+        home = Path(temporary)
+        models = reviewed_models(ROOT)
+        valid = FixtureRuntime(home)
+        assert install_login_agent(valid, models)
+        before = tuple(valid.commands)
+        assert provision(request(reference, phase="apply"), valid)["checkpoint_status"] == "applied"
+        assert all(command[1] == "print" for command in valid.commands[len(before):])
+        write_fixture_cli(home)
+        login_paths(home)[1].write_text("stale helper\n")
+        before = tuple(valid.commands)
+        invalid = provision(request(reference, phase="apply"), valid)
+        assert invalid["checkpoint_status"] == "blocked"
+        assert invalid["error_kind"] == "lm_studio_login_agent_unavailable"
+        assert login_paths(home)[1].read_text() == "stale helper\n"
+        assert all(command[1] == "print" for command in valid.commands[len(before):])
 
 
 class ModelsHandler(BaseHTTPRequestHandler):
@@ -102,9 +270,17 @@ def check_loopback() -> None:
 
 def main() -> int:
     check_singleton()
+    check_gui_session_required()
+    check_gui_session_lost_during_install()
+    check_stale_gui_session_lost(direct=True)
+    check_stale_gui_session_lost(direct=False)
+    check_truncated_login_probe()
+    check_ambiguous_gui_probe()
+    check_unreadable_login_probe()
+    check_valid_and_invalid_login_item()
     check_loopback()
     check_executed_helper()
-    print("lm_studio_login_item_smoke: singleton, drift, no teardown, collection-only cold boot with per-item 400, exact post-load readback, string JIT refusal, and invalid-state controls passed")
+    print("lm_studio_login_item_smoke: singleton, valid/stale/unknown GUI states, missing GUI repair, race and stale-definition guards, truncated and ambiguous probes, no teardown, cold boot and invalid-state controls passed")
     return 0
 
 
