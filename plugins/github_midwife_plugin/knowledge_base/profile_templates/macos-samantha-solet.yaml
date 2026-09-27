@@ -10,7 +10,7 @@
 profile_name: macos-samantha-solet
 description: |
   Local Samantha solet profile: foundational local services, memory,
-  knowledge, thinking, pgvector, local embeddings, local LM-Studio inference,
+  knowledge, thinking, pgvector, Core AI embeddings, existing local inference,
   agent messaging, scheduling, health diagnostics, local blue-green
   self-deployment, Claude-family session ledger sources, ChatGPT and Claude.ai
   export ingestion, dev tooling, Google Workspace, read-only external Postgres,
@@ -36,9 +36,9 @@ plugins:
   - pgvector_service_plugin
 
   # Embeddings
-  - openai_embeddings_plugin
+  - coreai_embeddings_plugin
 
-  # Local inference (LM Studio, bound as inference_service)
+  # Existing local inference remains bound pending separate caller qualification.
   - default_inference_plugin
 
   # IO surfaces
@@ -79,6 +79,11 @@ plugins:
   - github_midwife_plugin
 
 plugin_config_overrides:
+  # Genesis materializes this target-local root before plugin autostart;
+  # the models setup stage installs and verifies assets in the same directory.
+  coreai_embeddings_plugin:
+    asset_root: ${SOLET_APP_HOME}/data/model-assets
+    compute_preference: gpu
   postgres_state_management_plugin:
     user: ${SOLET_NAME}
   session_ledger_service:
@@ -88,17 +93,6 @@ plugin_config_overrides:
       - "~/.claude/tasks"
 
 address_book_entries:
-  - name: openai_embeddings
-    address_type: api
-    description: OpenAI-compatible embeddings via LM Studio
-    tags: []
-    entries:
-      - field_type: base_url
-        description: LM Studio OpenAI-compatible base URL
-        value: http://localhost:1234/v1
-      - field_type: model
-        description: Embeddings model name
-        value: text-embedding-nomic-embed-text-v1.5-embedding
   - name: pgvector_service_db
     address_type: database
     description: PostgreSQL/pgvector connection for this solet
@@ -138,7 +132,7 @@ service_bindings:
   address_book_service: default_address_book_plugin
   memory_service: actr_memory_plugin
   vector_service: pgvector_service_plugin
-  embedding_service: openai_embeddings_plugin
+  embedding_service: coreai_embeddings_plugin
   inference_service: default_inference_plugin
   blob_storage_service: default_blob_storage_plugin
   knowledge_service: default_knowledge_plugin

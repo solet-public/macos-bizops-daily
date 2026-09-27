@@ -157,6 +157,35 @@
       "why": "Allow the host-shared LM Studio service to start after login."
     },
     {
+      "denial_behavior": "Decline state: `blocked`. Apple Foundation Models cannot be selected until the host attestations are accepted.",
+      "entry_type": "consent",
+      "grant_actor": "operator (explicit assent)",
+      "id": "apple_ai_attestation",
+      "source": {
+        "category": "system_change",
+        "decline": {
+          "allowed": true,
+          "consequence": "Apple Foundation Models cannot be selected until the host attestations are accepted.",
+          "reoffer": "settings_only",
+          "state": "blocked"
+        },
+        "required": false,
+        "required_when": {
+          "decision_ref": "inference_implementation",
+          "operator": "equals",
+          "value": "apple_foundation_models"
+        },
+        "scope": [
+          "Apple Intelligence is enabled",
+          "Apple system-model terms and attestations are accepted"
+        ]
+      },
+      "system_settings_pane": "Not applicable (consent, not a macOS permission entry).",
+      "what": "Confirm Apple Intelligence readiness",
+      "when": "When `inference_implementation` equals `apple_foundation_models`.",
+      "why": "Confirm Apple Intelligence is enabled and its current terms and attestations are accepted on this macOS 27 host."
+    },
+    {
       "denial_behavior": "Decline state: `declined`. The solet remains manual-start only.",
       "entry_type": "consent",
       "grant_actor": "operator (explicit assent)",

@@ -3,12 +3,9 @@
 # Born via github_midwife_plugin from a public clone with NO parent
 # solet present (a "genesis" birth). Inference is declared VACANT
 # (INF-03) — the user's own Claude Code session is the frontier driver;
-# there is no local completion-model requirement. Embeddings are local
-# (LM Server + nomic via the OpenAI-compatible openai_embeddings_plugin —
-# NOT the cloud, no API key, ever; "openai" in the plugin name is the
-# API shape, not the provider). Reference environment (v1): Homebrew
-# Postgres + pgvector, macOS Keychain vault (macos_vault_plugin), LM
-# Server (LM Studio) + nomic. macOS-first.
+# there is no local completion-model requirement. Embeddings use the
+# Core AI Nomic provider on macOS 27, with no API key or local server.
+# The reference environment uses Postgres + pgvector and macOS Keychain.
 #
 
 profile_name: macos-free-solet
@@ -16,7 +13,7 @@ description: |
   Minimal, general, zero-API-key local solet profile for the
   public GitHub genesis path. Foundational services (state, blob,
   address book, vault) + memory/knowledge/thinking (mandatory-real
-  per INF-03b) + pgvector + local embeddings + the REST and
+  per INF-03b) + pgvector + Core AI embeddings + the REST and
   agent-messaging IO surfaces + scheduling + the platform health
   diagnostic + github_midwife_plugin itself (dual-use: this genesis
   entrypoint AND a birth_solet verb for birthing further
@@ -42,9 +39,8 @@ plugins:
   # Vector search
   - pgvector_service_plugin
 
-  # Embeddings (local flavor: OpenAI-compatible endpoint pointed at the
-  # local LM Server + nomic — NOT cloud, NOT the OpenAI API)
-  - openai_embeddings_plugin
+  # Local Nomic embeddings through Core AI; no LM Studio endpoint.
+  - coreai_embeddings_plugin
 
   # IO surfaces
   - agent_messaging_plugin
@@ -59,6 +55,11 @@ plugins:
   - github_midwife_plugin
 
 plugin_config_overrides:
+  # Genesis materializes this target-local root before plugin autostart;
+  # the models setup stage installs and verifies assets in the same directory.
+  coreai_embeddings_plugin:
+    asset_root: ${SOLET_APP_HOME}/data/model-assets
+    compute_preference: gpu
   # Per-solet role isolation (operator override): the newborn's
   # postgres_state_management_plugin must connect as its OWN non-superuser role
   # (== the solet name), never the retired shared `ananta`.
@@ -74,28 +75,9 @@ plugin_config_overrides:
 # address-book plugin auto-seeds at boot (its prepare_for_readiness ->
 # seed_loader.auto_seed_entries_from_file, idempotent skip-by-name).
 #
-# openai_embeddings is MANDATORY for this profile: embedding_service binds
-# openai_embeddings_plugin, whose prepare_for_readiness FAIL-FASTS with
-# "Address book entry 'openai_embeddings' not found" unless this entry exists
-# (finding F9 — verb-mode genesis crash-looped the newborn 64x
-# without it; the entry is Postgres DATA no other genesis step creates).
-#
-# NON-SECRET by construction: the local LM Server's OpenAI-compatible base_url
-# + the nomic embeddings model name only — never an api_key, never a vault
-# reference. "openai" is the API shape, not the provider (the endpoint is the
-# operator's own local LM Server).
+# The Core AI embedding asset is installed and verified separately before
+# readiness. It does not use an embedding address-book endpoint.
 address_book_entries:
-  - name: openai_embeddings
-    address_type: api
-    description: OpenAI-compatible embeddings via LM Studio
-    tags: []
-    entries:
-      - field_type: base_url
-        description: LM Studio OpenAI-compatible base URL
-        value: http://localhost:1234/v1
-      - field_type: model
-        description: Embeddings model name
-        value: text-embedding-nomic-embed-text-v1.5-embedding
   # Finding F11: pgvector_service_plugin resolves its DB
   # connection params (host/port/database/db_schema/user) from THIS entry
   # (_resolve_address_book_overrides reads each sub-entry's `description` as
@@ -158,7 +140,7 @@ service_bindings:
   address_book_service: default_address_book_plugin
   memory_service: actr_memory_plugin
   vector_service: pgvector_service_plugin
-  embedding_service: openai_embeddings_plugin
+  embedding_service: coreai_embeddings_plugin
   blob_storage_service: default_blob_storage_plugin
   knowledge_service: default_knowledge_plugin
   thinking_service: default_thinking_plugin

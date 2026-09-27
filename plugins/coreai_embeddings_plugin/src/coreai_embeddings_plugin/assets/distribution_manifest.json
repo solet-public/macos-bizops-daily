@@ -1,0 +1,41 @@
+{
+  "archive": {
+    "release_name": "nomic-embed-text-v1.5-coreai-fp16-buckets-63d1ab27ccf4.tar",
+    "sha256": "63d1ab27ccf4ce739aa085425ebac4fd15d7b85c62f9b74628175d1dac404c46",
+    "size_bytes": 276613120
+  },
+  "files": {
+    "LICENSE-2.0.txt": {
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "size_bytes": 11358
+    },
+    "NOTICE.txt": {
+      "sha256": "c675daeb562f8fe147ac30862649c5dd0e72a2b5650cdb29a1815e171b100f10",
+      "size_bytes": 441
+    },
+    "model.aimodel/main.hash": {
+      "sha256": "aa632a548cce790e5f2e9ce2cf4175a9466374c4d52a13be38154a1242b86508",
+      "size_bytes": 32
+    },
+    "model.aimodel/main.mlirb": {
+      "sha256": "016241f8a4d80784503c1a2b871afe3edd664e2b4de7282c155ab9cea7192503",
+      "size_bytes": 275879458
+    },
+    "model.aimodel/metadata.json": {
+      "sha256": "07829eae4b49d1d36ab892492d186309f2deec02d4e4564bf0c32396680a04a5",
+      "size_bytes": 252
+    },
+    "tokenizer.json": {
+      "sha256": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+      "size_bytes": 711396
+    }
+  },
+  "license": "Apache-2.0",
+  "model_id": "nomic-ai/nomic-embed-text-v1.5",
+  "source_url": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5",
+  "release_repository": "solet-public/macos-bizops",
+  "release_tag": "model-nomic-embed-text-v1.5-coreai-fp16-buckets-v1",
+  "schema_version": 1,
+  "upstream_revision": "e9b6763023c676ca8431644204f50c2b100d9aab",
+  "variant": "coreai-fp16-buckets-v1"
+}

@@ -138,6 +138,7 @@
         "mode": "decision",
         "decision_ref": "embeddings_implementation",
         "probe_refs": [
+          "coreai_embedding_request_succeeds",
           "embedding_request_succeeds",
           "knowledge_retrieval_succeeds"
         ]
@@ -235,9 +236,7 @@
               "performance": "Coding-agent sessions provide frontier reasoning; the platform inference slot remains vacant."
             },
             "activates": {
-              "plugin_refs": [
-                "openai_embeddings_plugin"
-              ]
+              "plugin_refs": []
             },
             "followup_decision_refs": [
               "embeddings_implementation",
@@ -259,8 +258,6 @@
             },
             "activates": {
               "plugin_refs": [
-                "openai_embeddings_plugin",
-                "default_inference_plugin",
                 "macos_self_deployment_plugin",
                 "platform_dev_surface_plugin",
                 "g_suite_plugin",
@@ -319,11 +316,34 @@
       "required": true,
       "resolution_stage_ref": "decision_review",
       "recommended_option_refs": [
-        "lm_studio"
+        "coreai"
       ],
       "option_source": {
         "mode": "static",
         "options": {
+          "coreai": {
+            "label": "Core AI Nomic embeddings",
+            "description": "Pinned local Nomic v1.5 model using Core AI on macOS 27 Apple Silicon.",
+            "availability": "supported",
+            "implications": {
+              "cost": "No per-call fee; the reviewed model asset is required.",
+              "privacy": "Embedding text remains local.",
+              "security": "One source-pinned model archive must be verified before activation.",
+              "operator_effort": "Approve setup's one pinned 277 MB model download; setup verifies it against its SHA-256 pins.",
+              "performance": "Core AI selects GPU with CPU fallback."
+            },
+            "activates": {
+              "component_refs": ["coreai_nomic_asset"],
+              "plugin_refs": ["coreai_embeddings_plugin"],
+              "operation_refs": ["acquire_coreai_asset", "configure_coreai_embeddings"],
+              "probe_refs": ["apple_host_eligible", "coreai_asset_verified"]
+            },
+            "verification_probe_refs": [
+              "coreai_asset_verified",
+              "coreai_embedding_config_valid",
+              "coreai_embedding_request_succeeds"
+            ]
+          },
           "lm_studio": {
             "label": "LM Studio",
             "description": "Current recommended local OpenAI-compatible endpoint.",
@@ -404,6 +424,11 @@
       "selection_mode": "single",
       "required": true,
       "resolution_stage_ref": "models",
+      "required_when": {
+        "decision_ref": "embeddings_implementation",
+        "operator": "equals",
+        "value": "lm_studio"
+      },
       "option_source": {
         "mode": "discovered",
         "discovery_probe_ref": "selected_embedding_models_discoverable",
@@ -432,6 +457,7 @@
       "resolution_stage_ref": "decision_review",
       "recommended_option_refs": [
         "none",
+        "apple_foundation_models",
         "lm_studio"
       ],
       "option_source": {
@@ -454,6 +480,30 @@
               "performance": "Autonomous flows requiring inference_service remain unavailable."
             },
             "activates": {}
+          },
+          "apple_foundation_models": {
+            "label": "Apple Foundation Models",
+            "description": "Use the macOS system model for qualified local summaries without an LM Studio endpoint.",
+            "available_when": {
+              "decision_ref": "setup_profile",
+              "operator": "equals",
+              "value": "macos-bizops"
+            },
+            "availability": "supported",
+            "implications": {
+              "cost": "No per-call fee or separate model archive.",
+              "privacy": "Summary prompts remain on the Mac.",
+              "security": "Requires macOS 27, enabled Apple Intelligence, and accepted Apple terms.",
+              "operator_effort": "Attest Apple Intelligence settings; VM model unavailability is reported as a warning.",
+              "performance": "Eligible physical Macs provide summaries; an ineligible VM may continue without them."
+            },
+            "activates": {
+              "plugin_refs": ["macos_inference_plugin"],
+              "operation_refs": ["configure_apple_inference"],
+              "probe_refs": ["apple_host_eligible", "apple_model_availability"],
+              "consent_refs": ["apple_ai_attestation"]
+            },
+            "verification_probe_refs": ["apple_inference_config_valid", "apple_model_availability"]
           },
           "lm_studio": {
             "label": "LM Studio",
@@ -528,8 +578,8 @@
       "resolution_stage_ref": "models",
       "required_when": {
         "decision_ref": "inference_implementation",
-        "operator": "not_equals",
-        "value": "none"
+        "operator": "equals",
+        "value": "lm_studio"
       },
       "option_source": {
         "mode": "discovered",
@@ -1184,6 +1234,16 @@
         "postgres_role_policy_valid",
         "pgvector_ready"
       ]
+    },
+    "coreai_nomic_asset": {
+      "name": "Pinned Core AI Nomic asset",
+      "kind": "other",
+      "description": "Setup downloads the reviewed Nomic v1.5 archive from its pinned release into profile/data/model-assets, reuses a valid installed copy, verifies every installed file against the pinned distribution declaration, and blocks when the download fails or an installed copy is corrupt.",
+      "source": "vendor_download",
+      "lifecycle": "managed_by_setup",
+      "install_operation_refs": ["acquire_coreai_asset"],
+      "configure_operation_refs": ["configure_coreai_embeddings"],
+      "probe_refs": ["coreai_asset_verified"]
     },
     "lm_studio": {
       "name": "LM Studio",
@@ -2211,6 +2271,25 @@
         "reoffer": "first_use"
       }
     },
+    "apple_ai_attestation": {
+      "title": "Confirm Apple Intelligence readiness",
+      "prompt": "Confirm Apple Intelligence is enabled and its current terms and attestations are accepted on this macOS 27 host.",
+      "category": "system_change",
+      "scope": ["Apple Intelligence is enabled", "Apple system-model terms and attestations are accepted"],
+      "required": false,
+      "required_when": {
+        "decision_ref": "inference_implementation",
+        "operator": "equals",
+        "value": "apple_foundation_models"
+      },
+      "explicit_assent": true,
+      "decline": {
+        "allowed": true,
+        "state": "blocked",
+        "consequence": "Apple Foundation Models cannot be selected until the host attestations are accepted.",
+        "reoffer": "settings_only"
+      }
+    },
     "lm_studio_background_service_consent": {
       "title": "Run LM Studio after login",
       "prompt": "Authorize the shared LM Studio login job and explicit model loading.",
@@ -2462,6 +2541,32 @@
         "consequence": "Knowledge retrieval cannot meet the current profile contract."
       }
     },
+    "coreai_embeddings_plugin": {
+      "name": "Core AI Nomic embeddings",
+      "description": "Local 768-dimensional Nomic v1.5 embeddings from the pinned Core AI asset.",
+      "installation_policy": "install_when_selected",
+      "configuration_timing": "initial_setup",
+      "documentation_status": "partial",
+      "cardinality": "zero_or_one",
+      "enabled_when": {
+        "decision_ref": "embeddings_implementation",
+        "operator": "equals",
+        "value": "coreai"
+      },
+      "setup_operation_refs": ["acquire_coreai_asset", "configure_coreai_embeddings"],
+      "verification_probe_refs": ["coreai_asset_verified", "coreai_embedding_config_valid", "coreai_embedding_request_succeeds"],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "Pinned local model asset under the solet profile."
+      },
+      "decline": {
+        "allowed": false,
+        "state": "blocked",
+        "consequence": "A supported embedding implementation is required."
+      }
+    },
     "openai_embeddings_plugin": {
       "name": "OpenAI-compatible embeddings",
       "description": "Current embeddings plugin used by the shipped profiles.",
@@ -2520,6 +2625,33 @@
         "allowed": true,
         "state": "not_applicable",
         "consequence": "Choose a supported implementation."
+      }
+    },
+    "macos_inference_plugin": {
+      "name": "Apple Foundation Models summaries",
+      "description": "Qualified local summaries through the Apple system model; unavailable VM summaries are observed as warnings.",
+      "installation_policy": "install_when_selected",
+      "configuration_timing": "initial_setup",
+      "documentation_status": "partial",
+      "cardinality": "zero_or_one",
+      "enabled_when": {
+        "decision_ref": "inference_implementation",
+        "operator": "equals",
+        "value": "apple_foundation_models"
+      },
+      "consent_refs": ["apple_ai_attestation"],
+      "setup_operation_refs": ["configure_apple_inference"],
+      "verification_probe_refs": ["apple_inference_config_valid", "apple_model_availability"],
+      "access_posture": {
+        "reads_external_data": false,
+        "writes_external_data": false,
+        "destructive_actions": false,
+        "rbac_boundary": "macOS system language model on the selected host."
+      },
+      "decline": {
+        "allowed": true,
+        "state": "blocked",
+        "consequence": "The Apple summary binding remains unavailable."
       }
     },
     "default_inference_plugin": {
@@ -3283,6 +3415,66 @@
         "postcondition_probe_refs": []
       }
     },
+    "acquire_coreai_asset": {
+      "name": "Acquire pinned Core AI asset",
+      "description": "Download the pinned Nomic v1.5 Core AI archive from its reviewed release, verify every file against its SHA-256 pin, and activate it at profile/data/model-assets; a valid installed asset is reused and any failure blocks.",
+      "operation_ref": "setup::apple.acquire_coreai_asset",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "required_when": {
+        "decision_ref": "embeddings_implementation",
+        "operator": "equals",
+        "value": "coreai"
+      },
+      "consent_refs": ["system_change_consent"],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": ["coreai_asset_verified"],
+        "postcondition_probe_refs": ["coreai_asset_verified"]
+      },
+      "apply_timeout_seconds": 900
+    },
+    "configure_coreai_embeddings": {
+      "name": "Configure Core AI embeddings",
+      "description": "Verify the setup-acquired pinned Nomic asset and materialize its absolute profile-local asset_root configuration.",
+      "operation_ref": "setup::apple.configure_coreai_embeddings",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "low",
+      "requires_confirmation": false,
+      "required_when": {
+        "decision_ref": "embeddings_implementation",
+        "operator": "equals",
+        "value": "coreai"
+      },
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": ["coreai_asset_verified"],
+        "postcondition_probe_refs": ["coreai_embedding_config_valid"]
+      }
+    },
+    "configure_apple_inference": {
+      "name": "Configure Apple Foundation Models summaries",
+      "description": "Materialize the complete pinned macos_inference_plugin config with no model server or endpoint.",
+      "operation_ref": "setup::apple.configure_inference",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "low",
+      "requires_confirmation": false,
+      "required_when": {
+        "decision_ref": "inference_implementation",
+        "operator": "equals",
+        "value": "apple_foundation_models"
+      },
+      "consent_refs": ["apple_ai_attestation"],
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": ["apple_host_eligible"],
+        "postcondition_probe_refs": ["apple_inference_config_valid"]
+      }
+    },
     "configure_lm_studio_embeddings": {
       "name": "Configure LM Studio embeddings",
       "description": "Write the selected base URL and qualified embedding model into the active profile.",
@@ -3291,6 +3483,11 @@
       "implementation_status": "adapter_required",
       "risk": "low",
       "requires_confirmation": false,
+      "required_when": {
+        "decision_ref": "embeddings_implementation",
+        "operator": "equals",
+        "value": "lm_studio"
+      },
       "input_refs": [
         "lm_studio_base_url"
       ],
@@ -3317,6 +3514,11 @@
       "implementation_status": "adapter_required",
       "risk": "low",
       "requires_confirmation": false,
+      "required_when": {
+        "decision_ref": "inference_implementation",
+        "operator": "equals",
+        "value": "lm_studio"
+      },
       "input_refs": [
         "lm_studio_base_url"
       ],
@@ -4009,6 +4211,64 @@
     }
   },
   "probes": {
+    "apple_host_eligible": {
+      "name": "Apple-native host is eligible",
+      "description": "Requires macOS 27 on Apple Silicon before Apple model or Core AI configuration.",
+      "probe_ref": "setup::apple.host_eligible",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "precondition",
+      "required_when": {
+        "any": [
+          {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "coreai"},
+          {"decision_ref": "inference_implementation", "operator": "equals", "value": "apple_foundation_models"}
+        ]
+      },
+      "expectation": {"operator": "truthy"}
+    },
+    "coreai_asset_verified": {
+      "name": "Pinned Core AI asset verified",
+      "description": "Verify every installed Nomic model, tokenizer, license, and notice file against the source-pinned declaration; missing or corrupt assets block the Apple path.",
+      "probe_ref": "setup::apple.asset_verified",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "required_when": {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "coreai"},
+      "expectation": {"operator": "truthy"},
+      "remediation_operation_refs": ["acquire_coreai_asset"]
+    },
+    "coreai_embedding_config_valid": {
+      "name": "Core AI config and asset root agree",
+      "description": "Require the complete absolute profile-local asset_root and the pinned installed model before use.",
+      "probe_ref": "setup::apple.embedding_config_valid",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "required_when": {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "coreai"},
+      "expectation": {"operator": "truthy"},
+      "remediation_operation_refs": ["configure_coreai_embeddings"]
+    },
+    "apple_inference_config_valid": {
+      "name": "Apple inference config is complete",
+      "description": "Require the macos_inference_plugin config to match its reviewed complete packaged resource.",
+      "probe_ref": "setup::apple.inference_config_valid",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "required_when": {"decision_ref": "inference_implementation", "operator": "equals", "value": "apple_foundation_models"},
+      "expectation": {"operator": "truthy"},
+      "remediation_operation_refs": ["configure_apple_inference"]
+    },
+    "apple_model_availability": {
+      "name": "Apple system-model availability observed",
+      "description": "Observe the actual Apple model reason. DEVICE_NOT_ELIGIBLE on a VM is a specific warning; disabled Apple Intelligence, missing attestations, or a missing SDK block.",
+      "probe_ref": "setup::apple.model_availability",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "required_when": {"decision_ref": "inference_implementation", "operator": "equals", "value": "apple_foundation_models"},
+      "expectation": {"operator": "truthy"}
+    },
     "minimum_physical_memory_valid": {
       "name": "Physical memory meets the supported minimum",
       "description": "Confirms this Mac has at least 24 GB of physical memory before dependency, local-model, or genesis work starts.",
@@ -4219,6 +4479,7 @@
       "runner": "hydration",
       "implementation_status": "adapter_required",
       "level": "discovery",
+      "required_when": {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "lm_studio"},
       "expectation": {
         "operator": "non_empty"
       }
@@ -4236,14 +4497,25 @@
     },
     "embedding_request_succeeds": {
       "name": "Embedding request succeeds",
-      "description": "Confirms the materialized platform configuration reaches the selected implementation and model.",
+      "description": "Legacy LM Studio metadata readiness; selected model qualification is a separate behavioral probe.",
       "probe_ref": "service_interface::embedding_service.get_embedding_dimension",
       "runner": "platform_process",
       "implementation_status": "implemented",
-      "level": "behavior",
+      "level": "readiness",
+      "required_when": {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "lm_studio"},
       "expectation": {
         "operator": "truthy"
       }
+    },
+    "coreai_embedding_request_succeeds": {
+      "name": "Core AI embedding request produces a vector",
+      "description": "After Core AI config and binding materialization, invoke the selected embedding service and require one finite 768-element Nomic vector.",
+      "probe_ref": "setup::apple.embedding_request_succeeds",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "behavior",
+      "required_when": {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "coreai"},
+      "expectation": {"operator": "truthy"}
     },
     "selected_inference_models_discoverable": {
       "name": "Selected implementation exposes inference candidates",
@@ -4252,6 +4524,7 @@
       "runner": "hydration",
       "implementation_status": "adapter_required",
       "level": "discovery",
+      "required_when": {"decision_ref": "inference_implementation", "operator": "equals", "value": "lm_studio"},
       "expectation": {
         "operator": "non_empty"
       }
@@ -4285,6 +4558,7 @@
       "runner": "platform_process",
       "implementation_status": "adapter_required",
       "level": "behavior",
+      "required_when": {"decision_ref": "inference_implementation", "operator": "equals", "value": "lm_studio"},
       "expectation": {
         "operator": "truthy"
       }
@@ -5070,17 +5344,26 @@
       ],
       "checkpoint": true,
       "entry_probe_refs": [
-        "decisions_resolved"
+        "decisions_resolved",
+        "apple_host_eligible"
       ],
       "operation_refs": [
+        "acquire_coreai_asset",
+        "configure_coreai_embeddings",
+        "configure_apple_inference",
         "configure_lm_studio_embeddings",
         "configure_lm_studio_inference",
         "install_launchagent"
       ],
       "exit_probe_refs": [
+        "coreai_asset_verified",
+        "coreai_embedding_config_valid",
+        "apple_inference_config_valid",
+        "apple_model_availability",
         "embedding_request_succeeds",
         "launchagent_running",
-        "router_ready"
+        "router_ready",
+        "coreai_embedding_request_succeeds"
       ]
     },
     "coding_agents": {
@@ -5345,6 +5628,7 @@
       "postgres_role_policy_valid",
       "pgvector_ready",
       "embedding_request_succeeds",
+      "coreai_embedding_request_succeeds",
       "knowledge_retrieval_succeeds",
       "coding_agent_plugins_visible",
       "fresh_session_hooks_active",

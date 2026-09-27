@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "macos_inference_plugin"
+version = "0.1.0"
+description = "Apple Foundation Models summary provider for macOS 27 arm64"
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = ["ananta", "jsonschema>=4.0", "apple-fm-sdk==0.2.1"]
+
+[project.entry-points."ananta.plugins"]
+macos_inference_plugin = "macos_inference_plugin.plugin:Plugin"
+
+[tool.setuptools]
+packages = ["macos_inference_plugin", "macos_inference_plugin.providers", "macos_inference_plugin.resources", "macos_inference_plugin.vendor"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"macos_inference_plugin.vendor" = "vendor"
+
+[tool.setuptools.package-data]
+"macos_inference_plugin.resources" = ["*.json", "*.yaml"]
+"macos_inference_plugin.vendor" = ["*.whl", "*.md"]

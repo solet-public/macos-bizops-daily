@@ -21,6 +21,7 @@ genesis materializes a conservative default here.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,10 @@ _ADDRESS_BOOK_PLUGIN = "default_address_book_plugin"
 # 2026-07-11; extended to plugin_config_overrides for per-role isolation,
 # 2026-07-12).
 _SOLET_NAME_PLACEHOLDER = "${SOLET_NAME}"
+_SOLET_APP_HOME_PLACEHOLDER = "${SOLET_APP_HOME}"
+_PROFILE_OVERRIDE_PLACEHOLDER_PATTERN = re.compile(
+    r"\$\{SOLET_NAME\}|\$\{SOLET_APP_HOME\}"
+)
 
 # The state plugin whose materialized config MUST connect as this newborn's OWN
 # role (per-solet isolation, operator override 2026-07-12) -- verified
@@ -84,6 +89,39 @@ _GLOBAL_SYSTEM_PROMPT_FILENAME = "system.json"
 
 class ConfigMaterializeError(RuntimeError):
     """Raised when a required input is missing or malformed."""
+
+
+def _substitute_profile_override_placeholders(
+    serialized_override: str, name: str, app_home: Path,
+) -> str:
+    """Resolve only the named placeholders in serialized override JSON.
+
+    The legacy `${SOLET_NAME}` path remains its original byte-for-byte
+    serialize/replace/parse operation when `${SOLET_APP_HOME}` is absent.
+    When the new placeholder is present, a single regex pass replaces only
+    those two closed tokens. The app-home replacement is JSON-escaped so
+    quotes, backslashes, and whitespace in a clone path remain valid JSON.
+    """
+    if _SOLET_APP_HOME_PLACEHOLDER not in serialized_override:
+        return serialized_override.replace(_SOLET_NAME_PLACEHOLDER, name)
+
+    if not app_home.is_absolute():
+        raise ConfigMaterializeError(
+            f"{_SOLET_APP_HOME_PLACEHOLDER} requires an absolute target profile path; "
+            f"got {app_home}"
+        )
+
+    replacement_values = {
+        _SOLET_NAME_PLACEHOLDER: json.dumps(name)[1:-1],
+        _SOLET_APP_HOME_PLACEHOLDER: json.dumps(str(app_home))[1:-1],
+    }
+
+    def replace_placeholder(match: re.Match[str]) -> str:
+        return replacement_values[match.group(0)]
+
+    return _PROFILE_OVERRIDE_PLACEHOLDER_PATTERN.sub(
+        replace_placeholder, serialized_override
+    )
 
 
 def load_profile(kb_root: Path, profile_name: str) -> dict[str, Any]:
@@ -170,8 +208,8 @@ def copy_baseline_plugin_configs(
 
 def apply_profile_overrides(target: Path, profile: dict[str, Any], name: str) -> list[Path]:
     """Merge each `plugin_config_overrides` entry into the materialized config,
-    substituting `${SOLET_NAME}` in override values with the newborn's
-    actual name at write time.
+    substituting `${SOLET_NAME}` with the newborn's name and the closed
+    `${SOLET_APP_HOME}` placeholder with the explicit `<target>/profile` path.
 
     The `${SOLET_NAME}` substitution rides the SAME idiom as
     `write_address_book_entries` (one substitution mechanism, two writers): the
@@ -190,7 +228,11 @@ def apply_profile_overrides(target: Path, profile: dict[str, Any], name: str) ->
     for plugin_name, override in overrides.items():
         if not isinstance(override, dict):
             continue
-        substituted = json.loads(json.dumps(override).replace(_SOLET_NAME_PLACEHOLDER, name))
+        serialized_override = json.dumps(override)
+        substituted_json = _substitute_profile_override_placeholders(
+            serialized_override, name, target / "profile"
+        )
+        substituted = json.loads(substituted_json)
         config_path = dest_dir / f"{plugin_name}.json"
         existing: dict[str, Any] = {}
         if config_path.is_file():

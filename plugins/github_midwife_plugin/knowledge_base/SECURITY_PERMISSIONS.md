@@ -83,6 +83,15 @@ An item with no declared System Settings pane or denial behavior says so explici
 
 ## Consents
 
+### Confirm Apple Intelligence readiness (`apple_ai_attestation`)
+
+- WHAT: Confirm Apple Intelligence readiness
+- WHY: Confirm Apple Intelligence is enabled and its current terms and attestations are accepted on this macOS 27 host.
+- WHEN: When `inference_implementation` equals `apple_foundation_models`.
+- WHAT DENIAL DOES: Decline state: `blocked`. Apple Foundation Models cannot be selected until the host attestations are accepted.
+- SYSTEM SETTINGS PANE: Not applicable (consent, not a macOS permission entry).
+- GRANT ACTOR: operator (explicit assent)
+
 ### Run after login (`background_service_consent`)
 
 - WHAT: Run after login

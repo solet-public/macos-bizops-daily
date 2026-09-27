@@ -24,19 +24,37 @@ baseline and then overrides only the fields that vary per newborn.
 | `pgvector_service_plugin.json` | `db_schema`, `host`, `port` | mirrors `write_pgvector_config`, which adds these keys even when the baseline doesn't have them |
 | `default_knowledge_plugin.json` | `knowledge_base_root` | `<clone_root>/knowledge_bases` — absolute, depends on where the user cloned the repo; the plugin has no built-in default and raises `knowledge_base_root not configured` if the key is absent, so Slice D MUST set it (fail-loud otherwise, by design) |
 
-## `default_inference_plugin.json` — `macos-bizops`-profile-only, all-static
+## `default_inference_plugin.json` — preserved existing local inference
 
 Baseline selection is plugin-membership-derived (`seed_resolver`), so this
 file materializes ONLY into profiles whose allowlist includes
-`default_inference_plugin` (the `macos-bizops` profile; the free profile stays
-declared-VACANT per INF-03 and never resolves it). Every field is static
-and universal: the LM Studio OpenAI-compatible localhost endpoint, the
-platform's chosen local inference model, and tuning values mirroring the
-reference environment. Nothing per-solet to inject. GENESIS
-PRECONDITION (consumer's job, fail-loud by design): the plugin's
-`prepare_for_readiness` requires this config AND probes LM Studio
-availability — a newborn with this profile boots only with the local LM
-Studio server running and the named model loadable.
+`default_inference_plugin` (`macos-samantha-solet` among the supported fresh
+profiles; the free profile stays declared-VACANT per INF-03). This file retains
+the existing LM Studio and Qwen settings. Samantha's direct inference callers
+need separate qualification before its binding can move to Apple Foundation
+Models. Existing solets and this baseline are not silently reconfigured.
+
+## `macos_inference_plugin.json` — Apple summaries in BizOps
+
+The macOS 27 BizOps profile selects the new Apple Foundation Models plugin
+for qualified summaries. This static baseline copies all fields from the
+separately frozen plugin's packaged default config resource (SHA-256
+`507745a254cb526a0a6bd19b98b47bc38049086772cee6c0dde7fbd619828d68`).
+It selects `apple-system`, a 1,024-token output limit, an 8,192-token context,
+and disables warming, automatic compaction, and clear. It carries no local
+server address or API key. Autonomous planning remains session-primary and no
+local-provider completion fallback is enabled here. Runnable proof still
+requires the separately owned plugin source to be composed with this profile.
+
+## `coreai_embeddings_plugin` asset configuration
+
+Every supported fresh macOS 27 profile selects the Core AI embedding plugin.
+Its runtime requires an absolute `asset_root` that names a separately verified
+installed asset. This directory depends on the clone/install location and
+cannot be expressed in a static baseline or the current `${SOLET_NAME}`
+override substitution. The matching asset-root materialization and seed-lock
+recipe are separate scoped work; until they are implemented, these profiles
+are source candidates and cannot prove a runnable fresh install.
 
 ## Allowlisted plugins with NO file here — and why
 

@@ -11,6 +11,7 @@ from typing import cast
 
 import yaml
 
+from .apple_setup_adapter import pinned_asset_error
 from .launchagent_status import launchagent_health
 from .setup_adapter_contract import (
     AdapterRequest,
@@ -69,6 +70,8 @@ _ITERM_RETURN_KEY_PROFILE = {
 _ITERM_RETURN_KEY_PROFILE_RELATIVE = Path(
     "Library/Application Support/iTerm2/DynamicProfiles/solet-claude-return-keys.json"
 )
+_RUNTIME_MANIFEST = Path("profile/config/manifest.yaml")
+_COREAI_PLUGIN = "coreai_embeddings_plugin"
 _GENESIS_COMPLETED_STEPS = tuple(step_name for step_name, _runner in GENESIS_STEP_RUNNERS)
 _SOLET_RESULT_ENVELOPE_KEYS = frozenset(
     {
@@ -100,12 +103,20 @@ _AUTHORIZATION_BEARER_VALUE = re.compile(
 def operation_handlers() -> dict[str, OperationHandler]:
     """Return the closed registry of target-local mutation handlers."""
 
+    from .apple_setup_adapter import (
+        acquire_coreai_asset,
+        configure_apple_inference,
+        configure_coreai_embeddings,
+    )
     from .lm_studio_provisioning import operation_handlers as lm_studio_handlers
     from .setup_plugin_operations import plugin_install
     from .setup_session_operations import session_source
     from .setup_shell_operations import shell
 
     return {
+        "setup::apple.acquire_coreai_asset": acquire_coreai_asset,
+        "setup::apple.configure_coreai_embeddings": configure_coreai_embeddings,
+        "setup::apple.configure_inference": configure_apple_inference,
         **lm_studio_handlers(),
         "setup::tmux.install": _tmux,
         "setup::terminal.configure_return_keys": _terminal_return_keys,
@@ -383,9 +394,47 @@ def _acquisition_plan_error(outcome: CommandOutcome, acquisition: HomebrewAcquis
     return homebrew_install_plan_error(outcome, acquisition)
 
 
+class CoreAIRosterError(RuntimeError):
+    """The materialized runtime manifest cannot say whether Core AI loads."""
+
+
+def coreai_autostart_deferral(target: Path) -> str | None:
+    """Return why a Core AI-loading target must not autostart yet, or None.
+
+    The runtime loads every plugin in the materialized manifest, and plugin
+    lifecycle raises CRITICAL while any loaded plugin is unready. Core AI
+    readiness verifies the pinned asset, so a LaunchAgent (``RunAtLoad``)
+    must wait for that same pinned asset. A roster without Core AI keeps the
+    legacy autostart path unchanged.
+    """
+    if _COREAI_PLUGIN not in materialized_plugin_roster(target):
+        return None
+    return pinned_asset_error(target)
+
+
+def materialized_plugin_roster(target: Path) -> tuple[str, ...]:
+    """Read the plugin roster Genesis materialized for the target runtime.
+
+    An absent manifest records no roster, so no Core AI selection; the legacy
+    path is unchanged. A present but unreadable or malformed one fails loud.
+    """
+    path = target / _RUNTIME_MANIFEST
+    if not path.exists() and not path.is_symlink():
+        return ()
+    try:
+        raw: object = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise CoreAIRosterError(f"materialized runtime manifest is unreadable: {path}") from exc
+    plugins = cast(dict[str, object], raw).get("plugins") if isinstance(raw, dict) else None
+    if not isinstance(plugins, list):
+        raise CoreAIRosterError(f"materialized runtime manifest has no plugin roster: {path}")
+    roster = tuple(cast(list[object], plugins))
+    if not all(isinstance(plugin, str) for plugin in roster):
+        raise CoreAIRosterError(f"materialized runtime manifest has a non-string plugin: {path}")
+    return cast(tuple[str, ...], roster)
+
+
 def _genesis(request: AdapterRequest, runtime: Runtime) -> JsonObject:
-    marker = request.target / ".solet" / "genesis.json"
-    plist = runtime.home / "Library" / "LaunchAgents" / f"local.solet.{request.name}.plist"
     autostart = _autostart_enabled(request)
     if autostart is None:
         return _blocked(
@@ -394,15 +443,43 @@ def _genesis(request: AdapterRequest, runtime: Runtime) -> JsonObject:
             "Resolve the selected autostart topology before running genesis.",
         )
     artifacts_valid = genesis_artifacts_valid(request, runtime)
+    try:
+        deferral = _launchagent_deferral(request, autostart=autostart, artifacts_valid=artifacts_valid)
+    except CoreAIRosterError as exc:
+        return _blocked(request, "genesis_artifacts_missing", f"{exc}. Complete genesis, then retry.")
+    if deferral is not None and request.operation_ref == "genesis::autostart.install":
+        return _coreai_asset_pending(request, deferral)
+    if request.phase == "probe":
+        return _genesis_probe(
+            request, runtime, autostart=autostart, artifacts_valid=artifacts_valid, deferral=deferral
+        )
+    return _genesis_apply(request, runtime, autostart)
+
+
+def _genesis_probe(
+    request: AdapterRequest,
+    runtime: Runtime,
+    *,
+    autostart: bool,
+    artifacts_valid: bool,
+    deferral: str | None,
+) -> JsonObject:
+    marker = request.target / ".solet" / "genesis.json"
+    plist = runtime.home / "Library" / "LaunchAgents" / f"local.solet.{request.name}.plist"
     satisfied = artifacts_valid and (
         not autostart
+        or deferral is not None
         or (_launchagent_running(request, runtime) and plist.is_file())
     )
-    if request.phase == "probe":
-        if satisfied:
-            return _verified(request, "genesis_artifacts", "genesis artifacts are present", str(marker))
-        actions = _genesis_actions(request, runtime, marker, plist)
-        return result(request, status="pending", actions=actions, repair="Approve genesis materialization.")
+    if satisfied and deferral is not None:
+        return _deferred_launchagent(request, marker, deferral)
+    if satisfied:
+        return _verified(request, "genesis_artifacts", "genesis artifacts are present", str(marker))
+    actions = _genesis_actions(request, runtime, marker, plist)
+    return result(request, status="pending", actions=actions, repair="Approve genesis materialization.")
+
+
+def _genesis_apply(request: AdapterRequest, runtime: Runtime, autostart: bool) -> JsonObject:
     python = request.target / ".venv" / "bin" / "python3"
     if not python.is_file():
         return _blocked(request, "dependency_closure_missing", "Complete the target venv first.")
@@ -426,6 +503,59 @@ def _genesis(request: AdapterRequest, runtime: Runtime) -> JsonObject:
         },
     )
     return _apply_outcome(request, outcome, "genesis_failed")
+
+
+def _launchagent_deferral(
+    request: AdapterRequest, *, autostart: bool, artifacts_valid: bool
+) -> str | None:
+    """Name the pending Core AI asset that holds the LaunchAgent, if any.
+
+    The scoped LaunchAgent install always reads the materialized roster. A
+    full Genesis request reads it only once Genesis artifacts are valid; before
+    that, Genesis itself applies the same gate when it runs.
+    """
+    if not autostart:
+        return None
+    if request.operation_ref != "genesis::autostart.install" and not artifacts_valid:
+        return None
+    return coreai_autostart_deferral(request.target)
+
+
+def _coreai_asset_pending(request: AdapterRequest, deferral: str) -> JsonObject:
+    return _blocked(
+        request,
+        "coreai_asset_unavailable",
+        f"{deferral}. The LaunchAgent stays deferred because the roster loads Core AI; "
+        "resume setup so acquire_coreai_asset downloads and verifies the pinned asset, then retry.",
+    )
+
+
+def _deferred_launchagent(request: AdapterRequest, marker: Path, deferral: str) -> JsonObject:
+    return result(
+        request,
+        status="verified",
+        evidence_items=[
+            evidence(
+                evidence_id="genesis_artifacts",
+                kind="behavior",
+                status="verified",
+                summary="genesis artifacts are present",
+                observed=True,
+                expected=True,
+                source=str(marker),
+            ),
+            evidence(
+                evidence_id="launchagent_deferred",
+                kind="readiness",
+                status="warning",
+                summary="LaunchAgent deferred: the roster loads Core AI and its pinned asset is unverified",
+                observed=deferral,
+                expected="pinned Core AI asset verified before the LaunchAgent loads",
+                source=request.operation_ref,
+            ),
+        ],
+        repair="Setup's acquire_coreai_asset downloads and verifies the pinned Core AI asset; the models-stage LaunchAgent install then starts the target.",
+    )
 
 
 def _launchagent_running(request: AdapterRequest, runtime: Runtime) -> bool:

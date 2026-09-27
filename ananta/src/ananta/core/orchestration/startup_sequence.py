@@ -1649,6 +1649,41 @@ def start_post_registration_work(orch: Any) -> None:
         ).start()
 
 
+def _start_selected_inference_work(orch: Any) -> dict[str, Any]:
+    """Release only the bound provider; model absence does not undo registration."""
+    from ananta.core.orchestration.service_bindings import ServiceName
+
+    plugin_name = orch.service_bindings.get_plugin_name(ServiceName.INFERENCE_SERVICE)
+    if plugin_name is None:
+        # INF-03 declared-VACANT boot: InferenceService declares the vacancy itself.
+        return {"state": "vacant", "provider": None}
+    if not plugin_name.strip():
+        raise RuntimeError("post-registration inference requires one explicit service binding")
+    inference = orch.plugin_manager.plugins.get(plugin_name)
+    if inference is None:
+        raise RuntimeError(f"bound inference plugin is not loaded: {plugin_name}")
+    active_provider = orch.inference_service.get_inference_provider()
+    if active_provider is not None and active_provider is not inference:
+        raise RuntimeError("inference service provider disagrees with its service binding")
+    start_inference = getattr(inference, "start_post_registration_work", None)
+    if not callable(start_inference):
+        raise RuntimeError("bound inference plugin lacks post-registration hook")
+    start_inference()
+    error = inference.get_readiness_error()
+    if error is not None:
+        return {
+            "state": "pending",
+            "provider": plugin_name,
+            "warning": {
+                "type": "InferenceProviderNotReady",
+                "code": "inference.provider_not_ready",
+                "severity": "WARNING",
+                "message": error,
+            },
+        }
+    return {"state": "started", "provider": plugin_name}
+
+
 def _run_post_registration_work(orch: Any) -> None:
     """Sequence local-model work after activation without delaying router health."""
     try:
@@ -1669,17 +1704,12 @@ def _run_post_registration_work(orch: Any) -> None:
         _reindex_orphaned_memories(orch)
         _auto_install_knowledge_bases(orch)
 
-        inference = plugins.get("default_inference_plugin")
-        if inference is not None:
-            start_inference = getattr(inference, "start_post_registration_work", None)
-            if not callable(start_inference):
-                raise RuntimeError("inference plugin lacks post-registration hook")
-            start_inference()
+        status = _start_selected_inference_work(orch)
     except Exception as exc:
         orch.post_registration_work_status = {"state": "failed", "error": str(exc)}
         logger.exception("Post-registration startup work failed")
     else:
-        orch.post_registration_work_status = {"state": "started"}
+        orch.post_registration_work_status = status
 
 
 def _auto_register_declared_pulling_sources(service: Any) -> None:

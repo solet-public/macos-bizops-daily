@@ -23,6 +23,7 @@ plugins/github_midwife_plugin/tests/genesis_integration_smoke.py``.
 from __future__ import annotations
 
 # ruff: noqa: E402
+import hashlib
 import io
 import json
 import subprocess
@@ -42,6 +43,7 @@ _SELF_DEPLOYMENT_PLUGIN_ROOT = _PLUGIN_ROOT.parent / "macos_self_deployment_plug
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from github_midwife_plugin import apple_setup_adapter  # noqa: E402
 from github_midwife_plugin.autostart import AutostartResult  # noqa: E402
 from github_midwife_plugin.genesis import (  # noqa: E402
     GenesisError,
@@ -53,9 +55,12 @@ from github_midwife_plugin.genesis import (  # noqa: E402
 from github_midwife_plugin.genesis import (
     main as genesis_main,
 )
-from github_midwife_plugin.setup_adapter_contract import AdapterRequest  # noqa: E402
-from github_midwife_plugin.setup_adapter_runtime import SystemRuntime  # noqa: E402
-from github_midwife_plugin.setup_operations import genesis_artifacts_valid  # noqa: E402
+from github_midwife_plugin.setup_adapter_contract import AdapterRequest, JsonObject  # noqa: E402
+from github_midwife_plugin.setup_adapter_runtime import CommandOutcome, SystemRuntime  # noqa: E402
+from github_midwife_plugin.setup_operations import (  # noqa: E402
+    genesis_artifacts_valid,
+    operation_handlers,
+)
 from github_midwife_plugin.steps import GENESIS_STEP_RUNNERS  # noqa: E402
 
 _CHECKS_RUN: list[str] = []
@@ -63,6 +68,11 @@ _SENTINEL_PW = "INTEGRATION_SENTINEL_PW_do_not_leak_54321"
 _VAULT_SENTINEL = "INTEGRATION_SENTINEL_VAULT_PASSPHRASE_do_not_leak_98765"
 _PROFILE_NAME = "fixture-genesis-profile"
 _GENESIS_STEP_NAMES = tuple(step_name for step_name, _runner in GENESIS_STEP_RUNNERS)
+_COREAI_PLUGIN = "coreai_embeddings_plugin"
+_COREAI_DEFERRED = "deferred_coreai_asset_pending"
+_ASSET_MANIFEST = Path(
+    "plugins/coreai_embeddings_plugin/src/coreai_embeddings_plugin/assets/distribution_manifest.json"
+)
 
 
 @dataclass(frozen=True)
@@ -269,8 +279,11 @@ def _run_sandboxed_genesis(
     root: Path,
     *,
     autostart: bool = True,
+    coreai: bool = False,
 ) -> tuple[dict[str, object], Path, FakeKeychain, _FakeLaunchctl, str]:
     clone = _make_fixture_clone(root)
+    if coreai:
+        _add_coreai_selection(clone)
     keychain = FakeKeychain()
     fake_launchctl = _FakeLaunchctl()
     alter_calls: list[str] = []
@@ -324,13 +337,13 @@ def _check_autostart_disabled_skips_install(root: Path) -> None:
             autostart=False,
         )
     _check(
-        install.call_count == 0 and not any(call[1] == "load" for call in fake_launchctl.calls),
         "autostart-disabled Genesis never calls the autostart installer",
+        install.call_count == 0 and not any(call[1] == "load" for call in fake_launchctl.calls),
         str(fake_launchctl.calls),
     )
     _check(
-        result["autostart"] == {"status": "not_requested", "label": None},
         "autostart-disabled Genesis records the selected topology",
+        result["autostart"] == {"status": "not_requested", "label": None},
         str(result.get("autostart")),
     )
 
@@ -350,14 +363,14 @@ def _check_genesis_artifact_content_validation(root: Path) -> None:
     request = _adapter_request(clone)
     runtime = SystemRuntime(home=home)
     _check(
-        genesis_artifacts_valid(request, runtime),
         "valid final Genesis marker and declared artifacts verify",
+        genesis_artifacts_valid(request, runtime),
     )
     marker = clone / ".solet/genesis.json"
     marker.write_text('{"status":"failed"}\n', encoding="utf-8")
     _check(
-        not genesis_artifacts_valid(request, runtime),
         "corrupt Genesis marker content is rejected rather than accepted by existence",
+        not genesis_artifacts_valid(request, runtime),
     )
     _write_genesis_marker(
         name="testhum",
@@ -367,8 +380,8 @@ def _check_genesis_artifact_content_validation(root: Path) -> None:
     )
     launcher.unlink()
     _check(
-        not genesis_artifacts_valid(request, runtime),
         "missing declared named launcher invalidates Genesis artifacts",
+        not genesis_artifacts_valid(request, runtime),
     )
 
 
@@ -918,6 +931,347 @@ def _check_operation_scoped_launchagent_install(root: Path) -> None:
     )
 
 
+def _add_coreai_selection(clone: Path) -> None:
+    """Select Core AI in the fixture roster, as the three macOS profiles do."""
+    profile_path = (
+        clone / "plugins" / "github_midwife_plugin" / "knowledge_base"
+        / "profile_templates" / f"{_PROFILE_NAME}.yaml"
+    )
+    profile = yaml.safe_load(profile_path.read_text())
+    profile["plugins"] = ["github_midwife_plugin", _COREAI_PLUGIN]
+    profile["service_bindings"] = {"embedding_service": _COREAI_PLUGIN}
+    profile_path.write_text(yaml.safe_dump(profile, sort_keys=False))
+    plugin_dir = clone / "plugins" / _COREAI_PLUGIN
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "pyproject.toml").write_text(f"[project]\nname='{_COREAI_PLUGIN}'\n")
+
+
+def _stage_fixture_asset(clone: Path) -> str:
+    """Stage small fixture bytes pinned by a fixture declaration; return its digest.
+
+    These are not the real Nomic model bytes: they prove the gate follows the
+    pinned check, not that a real asset was acquired.
+    """
+    asset = clone / "profile" / "data" / "model-assets" / "nomic-embed-text-v1.5"
+    contents = {
+        "model.aimodel/main.mlirb": b"fixture model",
+        "model.aimodel/main.hash": b"fixture hash",
+        "model.aimodel/metadata.json": b"{}",
+        "tokenizer.json": b"{}",
+        "LICENSE-2.0.txt": b"fixture license",
+        "NOTICE.txt": b"fixture notice",
+    }
+    pins: dict[str, dict[str, str | int]] = {}
+    for relative, content in contents.items():
+        path = asset / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        pins[relative] = {"sha256": hashlib.sha256(content).hexdigest(), "size_bytes": len(content)}
+    declaration = json.dumps(
+        {"model_id": "nomic-ai/nomic-embed-text-v1.5", "files": pins}, sort_keys=True
+    ).encode()
+    source = clone / _ASSET_MANIFEST
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(declaration)
+    return hashlib.sha256(declaration).hexdigest()
+
+
+def _attempt_steps(clone: Path) -> tuple[str, list[dict[str, object]]]:
+    marker = json.loads((clone / "profile" / "data" / "github_midwife" / "attempt.json").read_text())
+    return str(marker.get("status")), list(marker.get("steps", []))
+
+
+def _scoped_install_error(root: Path, clone: Path, launchctl: _FakeLaunchctl) -> GenesisError:
+    try:
+        run_autostart_install(
+            name="testhum",
+            clone_root=clone,
+            plist_dir=root / "LaunchAgents",
+            home_dir=root / "home",
+            launchctl_run=launchctl,
+        )
+    except GenesisError as exc:
+        return exc
+    raise SmokeFailureError("scoped LaunchAgent install did not refuse the unverified Core AI asset")
+
+
+def _check_coreai_genesis_defers_autostart(root: Path) -> None:
+    """_run_autostart_phase: a Core AI roster without its pinned asset is never loaded."""
+    result, clone, _keychain, fake_launchctl, _output = _run_sandboxed_genesis(root, coreai=True)
+    _check(
+        "Core AI Genesis without the pinned asset reports a deferred autostart",
+        result["autostart"] == {"status": _COREAI_DEFERRED, "label": None},
+        str(result.get("autostart")),
+    )
+    _check(
+        "Core AI Genesis without the pinned asset never reaches launchctl",
+        fake_launchctl.calls == [],
+        str(fake_launchctl.calls),
+    )
+    _check(
+        "Core AI Genesis without the pinned asset writes no LaunchAgent plist",
+        not (root / "LaunchAgents" / "local.solet.testhum.plist").exists(),
+    )
+    status, steps = _attempt_steps(clone)
+    deferred = [step for step in steps if step.get("step_name") == "install_autostart"]
+    _check(
+        "the attempt marker records success with one truthful deferred autostart phase",
+        status == "success"
+        and len(deferred) == 1
+        and deferred[0].get("status") == "deferred"
+        and deferred[0].get("reason") == "coreai_asset_pending"
+        and "absent" in str(deferred[0].get("detail")),
+        str(steps),
+    )
+    _check(
+        "Core AI Genesis still materializes its Core AI roster",
+        _COREAI_PLUGIN in yaml.safe_load((clone / "profile/config/manifest.yaml").read_text())["plugins"],
+    )
+
+
+def _check_coreai_scoped_install_waits_for_asset(root: Path) -> None:
+    """run_autostart_install: refuse without the pinned asset, then load once it verifies."""
+    _result, clone, _keychain, _genesis_launchctl, _output = _run_sandboxed_genesis(root, coreai=True)
+    launchctl = _FakeLaunchctl()
+    plist = root / "LaunchAgents" / "local.solet.testhum.plist"
+    missing = _scoped_install_error(root, clone, launchctl)
+    _check(
+        "scoped install refuses a Core AI roster whose pinned asset is absent",
+        "LaunchAgent install refused" in str(missing) and "absent" in str(missing),
+        str(missing),
+    )
+    _check(
+        "scoped install never reaches launchctl load without the pinned asset",
+        launchctl.calls == [] and not plist.exists(),
+        str(launchctl.calls),
+    )
+    digest = _stage_fixture_asset(clone)
+    with patch.object(apple_setup_adapter, "_ASSET_MANIFEST_SHA256", digest):
+        tokenizer = clone / "profile/data/model-assets/nomic-embed-text-v1.5/tokenizer.json"
+        tokenizer.write_bytes(b"corrupt")
+        corrupt = _scoped_install_error(root, clone, launchctl)
+        _check(
+            "scoped install refuses a staged asset that differs from its pin",
+            "differs from its pin" in str(corrupt) and launchctl.calls == [],
+            str(corrupt),
+        )
+        tokenizer.write_bytes(b"{}")
+        installed = run_autostart_install(
+            name="testhum",
+            clone_root=clone,
+            plist_dir=root / "LaunchAgents",
+            home_dir=root / "home",
+            launchctl_run=launchctl,
+        )
+    _check(
+        "scoped install loads the LaunchAgent after the staged asset verifies",
+        installed.label == "local.solet.testhum"
+        and any(call[1] == "load" for call in launchctl.calls)
+        and plist.is_file(),
+        str(launchctl.calls),
+    )
+
+
+def _check_coreai_genesis_with_verified_asset_autostarts(root: Path) -> None:
+    """The gate does not over-block: a verified staged asset autostarts at Genesis."""
+    clone = _make_fixture_clone(root)
+    _add_coreai_selection(clone)
+    digest = _stage_fixture_asset(clone)
+    fake_launchctl = _FakeLaunchctl()
+    with patch("subprocess.run", side_effect=_fake_pip_subprocess_run), \
+         patch("github_midwife_plugin.credential_seed.secrets.token_urlsafe", return_value=_SENTINEL_PW), \
+         patch("github_midwife_plugin.vault_passphrase_seed.token_urlsafe", return_value=_VAULT_SENTINEL), \
+         patch.object(apple_setup_adapter, "_ASSET_MANIFEST_SHA256", digest):
+        result = run_genesis(
+            name="testhum",
+            clone_root=clone,
+            profile_name=_PROFILE_NAME,
+            keychain=FakeKeychain(),
+            alter_role_password=lambda _pw: None,
+            role_authenticates=lambda pw: pw == _SENTINEL_PW,
+            role_exists=lambda: True,
+            plist_dir=root / "LaunchAgents",
+            home_dir=root / "home",
+            launchctl_run=fake_launchctl,
+            command_launcher_bin_dir=root / "bin",
+        )
+    _check(
+        "Core AI Genesis with a verified staged asset installs the LaunchAgent",
+        result["autostart"] == {"status": "success", "label": "local.solet.testhum"}
+        and any(call[1] == "load" for call in fake_launchctl.calls),
+        str(result.get("autostart")),
+    )
+
+
+def _check_coreai_cli_autostart_install_refuses(root: Path) -> None:
+    """The direct CLI scoped operation exits non-zero before any LaunchAgent write."""
+    _result, clone, _keychain, _launchctl, _output = _run_sandboxed_genesis(root, coreai=True)
+    stderr = io.StringIO()
+    with patch("github_midwife_plugin.genesis._resolve_clone_root", return_value=clone), \
+         patch(
+             "github_midwife_plugin.genesis._install_autostart",
+             side_effect=AssertionError("launchctl load must not be reached"),
+         ) as install, \
+         patch.object(sys, "argv", ["genesis"]), \
+         patch.dict("os.environ", {
+             "SOLET_NAME": "testhum",
+             "SOLET_OPERATION_REF": "genesis::autostart.install",
+             "SOLET_AUTOSTART": "enabled",
+         }), \
+         redirect_stderr(stderr):
+        exit_code = genesis_main()
+    _check(
+        "direct CLI LaunchAgent install fails loud for an unverified Core AI asset",
+        exit_code == 1 and "LaunchAgent install refused" in stderr.getvalue() and install.call_count == 0,
+        stderr.getvalue(),
+    )
+
+
+def _check_malformed_roster_fails_loud(root: Path) -> None:
+    """A present but malformed roster is a failure, not a silent legacy pass."""
+    clone = _make_fixture_clone(root)
+    manifest = clone / "profile/config/manifest.yaml"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text("plugins: coreai_embeddings_plugin\n")
+    launchctl = _FakeLaunchctl()
+    error = _scoped_install_error(root, clone, launchctl)
+    _check(
+        "a malformed materialized roster fails the scoped install loud",
+        "could not read the plugin roster" in str(error) and launchctl.calls == [],
+        str(error),
+    )
+
+
+
+class _LaunchctlPrintRuntime(SystemRuntime):
+    """Adapter host fake: ``launchctl print`` reports not-found; nothing else may run."""
+
+    def __init__(self, home: Path) -> None:
+        super().__init__(home=home)
+        self.calls: list[tuple[str, ...]] = []
+
+    def run(
+        self,
+        argv: tuple[str, ...],
+        *,
+        timeout_seconds: int,
+        cwd: Path | None = None,
+        extra_env: dict[str, str] | None = None,
+        input_text: str | None = None,
+        output_limit: int = 4096,
+    ) -> CommandOutcome:
+        del timeout_seconds, cwd, extra_env, input_text, output_limit
+        self.calls.append(argv)
+        if argv[:2] != ("/bin/launchctl", "print"):
+            raise SmokeFailureError(f"unreviewed adapter command: {argv}")
+        return CommandOutcome(113, False, 1, "", f"Could not find service {argv[2]}")
+
+
+def _adapter_target(root: Path, *, coreai: bool) -> tuple[Path, _LaunchctlPrintRuntime]:
+    """Real sandboxed Genesis output plus its final marker and named launcher."""
+    result, clone, _keychain, _launchctl, _output = _run_sandboxed_genesis(root, coreai=coreai)
+    _write_genesis_marker(name="testhum", clone_root=clone, profile_name=_PROFILE_NAME, result=result)
+    runtime = _LaunchctlPrintRuntime(root / "adapter-home")
+    launcher = runtime.home / ".local/bin/testhum"
+    launcher.parent.mkdir(parents=True)
+    launcher.symlink_to(clone / ".venv/bin/solet-bridge")
+    return clone, runtime
+
+
+def _genesis_operation(
+    clone: Path, runtime: _LaunchctlPrintRuntime, reference: str, phase: str = "probe"
+) -> JsonObject:
+    inputs: JsonObject = {"autostart": "enabled", "setup_profile": _PROFILE_NAME}
+    request = AdapterRequest(
+        request_id="0b7f0c55-6f1e-4c47-9a53-6e7b3c1d2a90",
+        operation_id="install_launchagent",
+        operation_ref=reference,
+        phase=phase,
+        probe_purpose="pre_apply" if phase == "probe" else None,
+        attempt=1,
+        name="testhum",
+        target=clone,
+        flow_source_revision="a" * 40,
+        answers_fingerprint="sha256:" + "b" * 64,
+        approval_fingerprint=None if phase == "probe" else "sha256:" + "c" * 64,
+        dry_run=phase == "probe",
+        timeout_seconds=30,
+        public_inputs=inputs,
+    )
+    return operation_handlers()[reference](request, runtime)
+
+
+def _records(value: JsonObject, key: str) -> list[dict[str, object]]:
+    records = value[key]
+    if not isinstance(records, list):
+        raise SmokeFailureError(f"{key} is not a list: {value}")
+    return [record for record in records if isinstance(record, dict)]
+
+
+def _action_ids(value: JsonObject) -> list[object]:
+    return [action.get("id") for action in _records(value, "planned_actions")]
+
+
+def _check_adapter_holds_coreai_launchagent(root: Path) -> None:
+    """setup_operations: the models-stage LaunchAgent waits for the pinned asset."""
+    clone, runtime = _adapter_target(root, coreai=True)
+    for phase in ("probe", "apply"):
+        held = _genesis_operation(clone, runtime, "genesis::autostart.install", phase)
+        _check(
+            f"adapter LaunchAgent {phase} is blocked until the pinned Core AI asset verifies",
+            held["checkpoint_status"] == "blocked" and held["error_kind"] == "coreai_asset_unavailable",
+            str(held),
+        )
+    _check("the held LaunchAgent reaches neither launchctl nor Genesis", runtime.calls == [], str(runtime.calls))
+    genesis = _genesis_operation(clone, runtime, "genesis::solet.run")
+    items = _records(genesis, "evidence")
+    _check(
+        "Genesis verifies complete while truthfully reporting the deferred LaunchAgent",
+        genesis["checkpoint_status"] == "verified"
+        and [item.get("id") for item in items] == ["genesis_artifacts", "launchagent_deferred"]
+        and items[1].get("status") == "warning"
+        and "absent" in str(items[1].get("observed")),
+        str(genesis),
+    )
+    _check_adapter_releases_verified_asset(clone, runtime)
+
+
+def _check_adapter_releases_verified_asset(clone: Path, runtime: _LaunchctlPrintRuntime) -> None:
+    with patch.object(apple_setup_adapter, "_ASSET_MANIFEST_SHA256", _stage_fixture_asset(clone)):
+        released = _genesis_operation(clone, runtime, "genesis::autostart.install")
+        rerun = _genesis_operation(clone, runtime, "genesis::solet.run")
+    _check(
+        "a verified staged asset returns the LaunchAgent to its install plan",
+        released["checkpoint_status"] == "pending"
+        and _action_ids(released) == ["genesis.install_launchagent"]
+        and rerun["checkpoint_status"] == "pending",
+        str(released),
+    )
+
+
+def _check_adapter_legacy_launchagent(root: Path) -> None:
+    """A roster without Core AI keeps the unchanged LaunchAgent plan; bad rosters fail loud."""
+    clone, runtime = _adapter_target(root, coreai=False)
+    scoped = _genesis_operation(clone, runtime, "genesis::autostart.install")
+    full = _genesis_operation(clone, runtime, "genesis::solet.run")
+    _check(
+        "the legacy roster plans the LaunchAgent without consulting a Core AI asset",
+        scoped["checkpoint_status"] == "pending"
+        and _action_ids(scoped) == ["genesis.install_launchagent"]
+        and full["checkpoint_status"] == "pending"
+        and "genesis.install_launchagent" in _action_ids(full)
+        and not (clone / "profile/data/model-assets").exists(),
+        str(scoped),
+    )
+    (clone / "profile/config/manifest.yaml").write_text("plugins: coreai_embeddings_plugin\n")
+    refused = _genesis_operation(clone, runtime, "genesis::autostart.install")
+    _check(
+        "a malformed materialized roster blocks the adapter LaunchAgent",
+        refused["checkpoint_status"] == "blocked" and refused["error_kind"] == "genesis_artifacts_missing",
+        str(refused),
+    )
+
+
 def main() -> int:
     try:
         with tempfile.TemporaryDirectory() as tmp:
@@ -934,6 +1288,20 @@ def main() -> int:
             _check_router_installed_for_blue_green_profile(Path(tmp))
         with tempfile.TemporaryDirectory() as tmp:
             _check_operation_scoped_launchagent_install(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            _check_coreai_genesis_defers_autostart(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            _check_coreai_scoped_install_waits_for_asset(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            _check_coreai_genesis_with_verified_asset_autostarts(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            _check_coreai_cli_autostart_install_refuses(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            _check_malformed_roster_fails_loud(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            _check_adapter_holds_coreai_launchagent(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            _check_adapter_legacy_launchagent(Path(tmp))
         with tempfile.TemporaryDirectory() as tmp:
             _check_phase_failure_writes_failed_marker(Path(tmp))
         with tempfile.TemporaryDirectory() as tmp:

@@ -87,6 +87,7 @@ plugins/github_midwife_plugin/tests/cli_resolution_cask_retry_smoke.py  # owner:
 plugins/github_midwife_plugin/tests/install_launchagent_profile_input_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/iterm2_coding_agent_management_plugin/tests/iterm2_plugin_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/macos_coding_agent_session_plugin/tests/coding_agent_session_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
+plugins/macos_inference_plugin/tests/installed_resources_smoke.py  # owner: iss_3aa20e42 reason: requires an installed macos_inference_plugin distribution absent from the checkout .venv expires: 2026-12-31
 plugins/macos_midwife_plugin/tests/asset_corruption_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/macos_self_deployment_plugin/tests/blue_green_router/bridge_port_lifecycle_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/macos_self_deployment_plugin/tests/blue_green_router/install_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31

@@ -1,0 +1,22 @@
+name: macos_inference_plugin
+description: Apple Foundation Models for bounded local summaries on macOS 27 Apple Silicon
+optional: false
+implements:
+  - interface: InferenceProvider
+config:
+  model:
+    type: string
+    required: true
+    default: apple-system
+  timeout_seconds:
+    type: integer
+    required: true
+    default: 120
+  temperature:
+    type: number
+    required: true
+    default: 0.1
+  max_tokens:
+    type: integer
+    required: true
+    default: 1024

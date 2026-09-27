@@ -359,12 +359,14 @@ def _prepare(
         target=target.resolve(),
         autostart=True,
         decisions={
+            "embeddings_implementation": "lm_studio",
             "inference_implementation": inference_implementation,
             "execution_topology": "solo",
             "git_mutation_control": "single_session",
             "session_sources": [],
         },
         decision_sources={
+            "embeddings_implementation": "config",
             "inference_implementation": "config",
             "execution_topology": "config",
             "git_mutation_control": "config",

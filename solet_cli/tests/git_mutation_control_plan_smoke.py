@@ -39,11 +39,13 @@ def _shell_inputs(git_mutation_control: str) -> dict[str, JsonValue]:
         target=Path("/tmp/git-mutation-control"),
         autostart=True,
         decisions={
+            "embeddings_implementation": "lm_studio",
             "inference_implementation": "lm_studio",
             "execution_topology": "solo",
             "git_mutation_control": git_mutation_control,
         },
         decision_sources={
+            "embeddings_implementation": "config",
             "inference_implementation": "config",
             "execution_topology": "config",
             "git_mutation_control": "config",

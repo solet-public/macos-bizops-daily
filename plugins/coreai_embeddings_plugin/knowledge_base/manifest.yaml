@@ -1,0 +1,11 @@
+name: coreai_embeddings_plugin
+description: Core AI Nomic runtime configuration, lifecycle and limits
+category: plugin-internal
+tags: [plugin_reference, coreai_embeddings]
+content:
+  patterns:
+    include: ["**/*.md"]
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

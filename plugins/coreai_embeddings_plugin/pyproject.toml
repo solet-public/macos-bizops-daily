@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coreai_embeddings_plugin"
+version = "0.1.0"
+description = "Pinned Nomic v1.5 embeddings with Core AI on macOS 27"
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = ["ananta", "coreai-core==1.0.0b3; sys_platform == 'darwin'", "tokenizers>=0.21,<0.23", "numpy>=2,<3"]
+
+[project.entry-points."ananta.plugins"]
+coreai_embeddings_plugin = "coreai_embeddings_plugin.plugin:CoreAIEmbeddingsPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["coreai_embeddings_plugin*"]
+
+[tool.setuptools.package-data]
+"coreai_embeddings_plugin.assets" = ["LICENSE-2.0.txt", "distribution_manifest.json"]

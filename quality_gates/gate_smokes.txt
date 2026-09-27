@@ -4972,11 +4972,11 @@ plugins/macos_self_deployment_plugin/tests/dry_run_default_safety_smoke.py
 # A configured but not-yet-running LM Studio leaves the inference plugin
 # explicitly unready, retries at a bounded rate, and never crashes platform
 # boot. Offline provider fake; no network.
-plugins/default_inference_plugin/tests/boot_optional_dependency_smoke.py
 
 # Cold first-boot knowledge hydration must not delay the runtime action poller
 # or router-registration deadline. Event fixture; no wall-clock sleep.
 ananta/tests/core/orchestration/cold_boot_knowledge_hydration_deferral_smoke.py
+ananta/tests/core/orchestration/selected_inference_startup_smoke.py
 
 # r28 fourth target-readiness mechanism: an identity-seeding startup fatal
 # stops already-started async lifecycle workers before CPython finalization.
@@ -4985,7 +4985,20 @@ ananta/tests/core/plugins/startup_failure_lifecycle_shutdown_smoke.py
 # r38 C2: embedding configuration registers without contacting LM Studio;
 # qualification begins only once the router activates the process and stays
 # visibly pending while the local server is unavailable.
-plugins/openai_embeddings_plugin/tests/startup_qualification_smoke.py
+
+# Apple wave 44 D2 (iss_3aa20e42): CoreAI embeddings native (1,768) finite
+# unit-norm contract, runtime readiness/fallback contract, and wheel resource
+# packaging from a temporary build. Offline; no Core AI runtime or model asset.
+plugins/coreai_embeddings_plugin/tests/native_contract_smoke.py
+plugins/coreai_embeddings_plugin/tests/runtime_contract_smoke.py
+plugins/coreai_embeddings_plugin/tests/wheel_resources_smoke.py
+
+# Apple wave 44 D2 (iss_3aa20e42): macOS Foundation Models provider typed
+# unavailable warnings, plugin contract, and provider isolation. Offline SDK
+# fakes; installed_resources_smoke.py is excluded (needs an installed dist).
+plugins/macos_inference_plugin/tests/apple_fm_provider_smoke.py
+plugins/macos_inference_plugin/tests/plugin_contract_smoke.py
+plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 
 # Batch 4a dark-smoke accounting: excluded paths have one canonical marker here.
 # not registered: plugins/agent_messaging_plugin/tests/v10_live_smoke_driver.py Class C live-agent choreography driver (iss_a5524d6f)
@@ -5047,6 +5060,8 @@ plugins/openai_embeddings_plugin/tests/startup_qualification_smoke.py
 # not shipped: solet_cli/tests/real_style_sweep_writes_7_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/real_style_sweep_writes_8_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/real_style_sweep_applies_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
+# not shipped: plugins/macos_inference_plugin/tests/legacy_plugin_coexistence_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
 
 # LM Studio provisioning, singleton login and passive diagnostics
 plugins/github_midwife_plugin/tests/lm_studio_provisioning_smoke.py
@@ -5248,3 +5263,7 @@ plugins/claude_code_cloud_session_source_plugin/tests/normalize_smoke.py
 
 solet_cli/tests/lm_studio_served_deadline_smoke.py
 plugins/agent_messaging_plugin/tests/peer_route_event_loop_offload_smoke.py
+plugins/github_midwife_plugin/tests/apple_native_fresh_profile_smoke.py
+plugins/github_midwife_plugin/tests/apple_setup_flow_smoke.py
+plugins/github_midwife_plugin/tests/asset_root_materialize_smoke.py
+plugins/github_midwife_plugin/tests/apple_coreai_acquisition_smoke.py

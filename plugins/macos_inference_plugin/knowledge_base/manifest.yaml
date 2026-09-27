@@ -1,0 +1,11 @@
+name: macos_inference_plugin
+description: Apple Foundation Models summary provider configuration, lifecycle and limits
+category: plugin-internal
+tags: [plugin_reference, macos_inference]
+content:
+  patterns:
+    include: ["**/*.md"]
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

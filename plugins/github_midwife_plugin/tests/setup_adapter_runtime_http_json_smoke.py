@@ -342,7 +342,7 @@ def _exercise_http_json() -> None:
             config = target / "profile/config"
             config.mkdir(parents=True)
             (config / "service_bindings.json").write_text(
-                json.dumps({"embedding_service": "openai_embeddings_plugin"}),
+                json.dumps({"embedding_service": "coreai_embeddings_plugin"}),
                 encoding="utf-8",
             )
             qualification = embedding_qualification(
@@ -444,7 +444,7 @@ def _dimension_controls() -> None:
         config = bound_target / "profile/config"
         config.mkdir(parents=True)
         (config / "service_bindings.json").write_text(
-            json.dumps({"embedding_service": "openai_embeddings_plugin"}),
+            json.dumps({"embedding_service": "coreai_embeddings_plugin"}),
             encoding="utf-8",
         )
         unbound_target = fixture_root / "unbound"

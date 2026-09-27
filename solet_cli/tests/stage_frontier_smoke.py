@@ -309,6 +309,9 @@ def _assert_launchagent_follows_models_contract(bundle: ContractBundle) -> None:
     _check(
         models_operations
         == [
+            "acquire_coreai_asset",
+            "configure_coreai_embeddings",
+            "configure_apple_inference",
             "configure_lm_studio_embeddings",
             "configure_lm_studio_inference",
             "install_launchagent",
@@ -323,7 +326,16 @@ def _assert_launchagent_follows_models_contract(bundle: ContractBundle) -> None:
     )
     _check(
         models_exit_probes
-        == ["embedding_request_succeeds", "launchagent_running", "router_ready"],
+        == [
+            "coreai_asset_verified",
+            "coreai_embedding_config_valid",
+            "apple_inference_config_valid",
+            "apple_model_availability",
+            "embedding_request_succeeds",
+            "launchagent_running",
+            "router_ready",
+            "coreai_embedding_request_succeeds",
+        ],
         "models verifies the configured service and router after it starts",
     )
 

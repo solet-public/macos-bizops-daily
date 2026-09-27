@@ -50,6 +50,7 @@ def _build_projection_plan(
     selections: dict[str, str] | None = None,
 ) -> SetupPlan:
     selected = {
+        "embeddings_implementation": "lm_studio",
         "inference_implementation": "lm_studio",
         **MODEL_SELECTIONS,
     }

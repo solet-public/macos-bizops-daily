@@ -86,6 +86,13 @@ READINESS_PUBLIC_INPUT_KEYS = frozenset(
 def probe_handlers() -> dict[str, ProbeHandler]:
     """Return the closed registry of reviewed post-venv probes."""
 
+    from .apple_setup_adapter import (
+        asset_verified,
+        embedding_config_valid,
+        host_eligible,
+        inference_config_valid,
+        model_availability,
+    )
     from .installation_model_doctor import (
         embedding_qualification,
         inference_qualification,
@@ -112,6 +119,12 @@ def probe_handlers() -> dict[str, ProbeHandler]:
     from .lm_studio_provisioning import probe_handlers as lm_studio_handlers
 
     handlers: dict[str, ProbeHandler] = {
+        "setup::apple.host_eligible": host_eligible,
+        "setup::apple.asset_verified": asset_verified,
+        "setup::apple.embedding_config_valid": embedding_config_valid,
+        "setup::apple.embedding_request_succeeds": _apple_embedding_request,
+        "setup::apple.inference_config_valid": inference_config_valid,
+        "setup::apple.model_availability": model_availability,
         **lm_studio_handlers(),
         "setup::tmux.probe": _tmux,
         "hydration::shell.probe_path": shell_path,
@@ -337,6 +350,110 @@ def _generic_process(request: AdapterRequest, runtime: Runtime) -> JsonObject:
             else None
         ),
     )
+
+
+def _apple_embedding_request(request: AdapterRequest, runtime: Runtime) -> JsonObject:
+    """Prove the configured Core AI binding produces one usable vector."""
+
+    from .apple_setup_adapter import _MODEL_ID, embedding_config_valid
+
+    config = embedding_config_valid(request, runtime)
+    if config["checkpoint_status"] != "verified":
+        return blocked(
+            request,
+            "coreai_embedding_config_invalid",
+            "Repair the pinned Core AI asset and plugin config, then retry the behavioral probe.",
+        )
+    if not _coreai_binding_valid(request.target):
+        return blocked(
+            request,
+            "coreai_embedding_binding_invalid",
+            "Bind embedding_service to the selected coreai_embeddings_plugin, then restart and retry.",
+        )
+
+    key = "service_interface::embedding_service::generate_embeddings"
+    outcome = _solet_call(
+        request,
+        runtime,
+        key,
+        {
+            "inputs": ["Apple embedding readiness probe"],
+            "model": _MODEL_ID,
+            "input_type": "text",
+        },
+    )
+    if outcome.stdout_truncated or outcome.stderr_truncated:
+        return truncated_solet_call_output(request, key, outcome)
+    completed, vector_result = _apple_inference_result(outcome)
+    if not completed:
+        return blocked(
+            request,
+            "coreai_embedding_inference_failed",
+            "The selected Core AI provider did not produce an embedding; repair its runtime and retry.",
+        )
+    if not _valid_apple_embedding_result(vector_result, _MODEL_ID):
+        return blocked(
+            request,
+            "coreai_embedding_vector_invalid",
+            "The selected Core AI provider returned no finite 768-element vector; repair its runtime and retry.",
+        )
+    return _boolean_probe(
+        request,
+        "coreai_embedding_behavior",
+        True,
+        "one finite 768-element vector",
+        key,
+        "The selected Core AI provider must return one finite 768-element vector.",
+        duration_ms=outcome.duration_ms,
+    )
+
+
+def _coreai_binding_valid(target: Path) -> bool:
+    path = target / "profile/config/service_bindings.json"
+    if path.is_symlink() or not path.is_file():
+        return False
+    try:
+        binding: object = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(binding, dict)
+        and binding.get("embedding_service") == "coreai_embeddings_plugin"
+    )
+
+
+def _apple_inference_result(outcome: CommandOutcome) -> tuple[bool, object]:
+    payload = _call_result(outcome)
+    if payload is None or payload.get("action_status") != "completed":
+        return False, None
+    if payload.get("error") is not None or (
+        "success" in payload and payload["success"] is not True
+    ):
+        return False, None
+    data = payload.get("data")
+    return True, data.get("result") if isinstance(data, dict) else None
+
+
+def _valid_apple_embedding_result(value: object, model: str) -> bool:
+    if not isinstance(value, dict):
+        return False
+    if value.get("model") != model or type(value.get("dimension")) is not int:
+        return False
+    if value["dimension"] != 768:
+        return False
+    vectors = value.get("embeddings")
+    if not isinstance(vectors, list) or len(vectors) != 1:
+        return False
+    return _finite_apple_vector(vectors[0])
+
+
+def _finite_apple_vector(vector: object) -> bool:
+    if not isinstance(vector, list) or len(vector) != 768:
+        return False
+    try:
+        return all(type(item) in (int, float) and math.isfinite(item) for item in vector)
+    except (OverflowError, TypeError, ValueError):
+        return False
 
 
 def _generic_process_readiness(

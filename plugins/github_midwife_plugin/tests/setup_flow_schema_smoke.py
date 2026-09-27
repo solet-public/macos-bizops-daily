@@ -18,6 +18,7 @@ import copy
 import inspect
 import json
 import sys
+import tempfile
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -35,6 +36,7 @@ from github_midwife_plugin.installation_doctor import probe_handlers  # noqa: E4
 from github_midwife_plugin.setup_adapter import _ALLOWED_PUBLIC_INPUTS  # noqa: E402
 from github_midwife_plugin.setup_adapter_contract import AdapterRequest, JsonObject  # noqa: E402
 from github_midwife_plugin.setup_operations import _manual_connector, operation_handlers  # noqa: E402
+from solet_manager.adapters import AdapterRegistry  # noqa: E402
 from solet_manager.answer_validation import validate_normalized_answers  # noqa: E402
 from solet_manager.config import CreateConfig  # noqa: E402
 from solet_manager.contracts import ContractBundle  # noqa: E402
@@ -192,8 +194,8 @@ def _check_probe_expectation_advisory_contract(flow: dict[str, Any]) -> None:
         str(declared),
     )
     _check(
-        "all 65 probe expectations, including Qwen index readback, are advisory documentation",
-        len(declared) == 65
+        "all 71 probe expectations, including Qwen index readback, are advisory documentation",
+        len(declared) == 71
         and any(
             gap["id"] == "probe_expectations_advisory_only"
             for gap in flow["known_gaps"]
@@ -821,6 +823,21 @@ def _bootstrap_implementation_status_errors(flow: dict[str, Any]) -> list[str]:
 
 
 def _check_stage_frontier_contract(flow: dict[str, Any]) -> None:
+    """Check where decisions resolve and which runner owns each frontier probe.
+
+    The three groups run in their original order and keep their check labels.
+    """
+    _check_decision_resolution_stages(flow)
+    _check_decision_checkpoint_boundaries(flow)
+    _check_model_probe_frontier(flow)
+
+
+def _check_decision_resolution_stages(flow: dict[str, Any]) -> None:
+    """Model choices resolve at models; every other decision resolves at review.
+
+    Model discovery needs the selected implementation installed, so only the
+    two model decisions may wait for the models stage.
+    """
     resolution_stages = {
         decision_id: definition["resolution_stage_ref"]
         for decision_id, definition in flow["decisions"].items()
@@ -840,6 +857,14 @@ def _check_stage_frontier_contract(flow: dict[str, Any]) -> None:
         ),
         str(resolution_stages),
     )
+
+
+def _check_decision_checkpoint_boundaries(flow: dict[str, Any]) -> None:
+    """Pin the pre-venv runners and the reused decision checkpoint boundaries.
+
+    The checkout probe runs before any target venv exists, and the decision
+    checkpoint guards both the review exit and the models entry.
+    """
     _check(
         "pre-venv checkout and manager decision runners are pinned",
         flow["probes"]["git_checkout_valid"]["runner"] == "bootstrap"
@@ -856,11 +881,73 @@ def _check_stage_frontier_contract(flow: dict[str, Any]) -> None:
         flow["stages"]["decision_review"]["exit_probe_refs"]
         == ["decisions_resolved"]
         and flow["stages"]["models"]["entry_probe_refs"]
-        == ["decisions_resolved"],
+        == ["decisions_resolved", "apple_host_eligible"],
         str(
             {
                 "decision_review": flow["stages"]["decision_review"],
                 "models": flow["stages"]["models"],
+            }
+        ),
+    )
+    unrunnable = _pre_venv_boundary_probes_without_adapter(flow)
+    _check("no boundary probe before the target venv needs a venv-bound runner", not unrunnable, str(unrunnable))
+
+
+def _pre_venv_boundary_probes_without_adapter(flow: dict[str, Any]) -> list[str]:
+    """Name boundary probes that run before build_instance_environment yet need its venv.
+
+    The runner rule is read from the real adapter registry on a seeded target
+    that has bootstrap.py but no .venv, so it cannot drift from the runtime.
+    """
+    stages = flow["stages"]
+    venv_sequence = next(
+        stage["sequence"] for stage in stages.values()
+        if "build_instance_environment" in stage.get("operation_refs", [])
+    )
+    probe_ids = [
+        probe_id
+        for stage in stages.values()
+        for key, bound in (("entry_probe_refs", venv_sequence), ("exit_probe_refs", venv_sequence - 1))
+        if stage["sequence"] <= bound
+        for probe_id in stage.get(key, [])
+    ]
+    with tempfile.TemporaryDirectory() as raw:
+        target = Path(raw)
+        (target / "bootstrap.py").touch()
+        registry = AdapterRegistry(target=target, base_python=Path(sys.executable))
+        return [
+            probe_id for probe_id in probe_ids
+            if flow["probes"][probe_id]["runner"] != "manager"
+            and registry.command_for(flow["probes"][probe_id]["runner"]) is None
+        ]
+
+
+def _check_model_probe_frontier(flow: dict[str, Any]) -> None:
+    """Keep model probes at the frontier that can actually answer them.
+
+    The Core AI vector probe follows router readiness, raw qualification stays
+    at hydration, and the configured embedding probe uses the bound service.
+    """
+    coreai_embedding_probe = flow["probes"]["coreai_embedding_request_succeeds"]
+    models_exit_probes = flow["stages"]["models"]["exit_probe_refs"]
+    _check(
+        "CoreAI embedding request uses its selected handler after router readiness",
+        coreai_embedding_probe["required_when"]
+        == {
+            "decision_ref": "embeddings_implementation",
+            "operator": "equals",
+            "value": "coreai",
+        }
+        and coreai_embedding_probe["probe_ref"]
+        == "setup::apple.embedding_request_succeeds"
+        and "router_ready" in models_exit_probes
+        and "coreai_embedding_request_succeeds" in models_exit_probes
+        and models_exit_probes.index("coreai_embedding_request_succeeds")
+        > models_exit_probes.index("router_ready"),
+        str(
+            {
+                "probe": coreai_embedding_probe,
+                "models_exit_probe_refs": models_exit_probes,
             }
         ),
     )

@@ -59,6 +59,7 @@ from .git_init import GitInitError, git_init_worktree
 from .manifest_marker import build_marker_payload, write_marker
 from .profile_install import ProfileInstallError, install_profile_allowlist, load_plugin_allowlist
 from .router_install import RouterInstallError, RouterInstallResult, install_router_at_birth
+from .setup_operations import CoreAIRosterError, coreai_autostart_deferral
 from .steps import GenesisContext, run_steps
 from .vault_passphrase_seed import (
     clear_vault_passphrase_stale_check_pending,
@@ -74,6 +75,7 @@ _FULL_GENESIS_OPERATION_REF = "genesis::solet.run"
 _AUTOSTART_INSTALL_OPERATION_REF = "genesis::autostart.install"
 _STALE_VAULT_PRECHECK_ARGUMENT = "--check-vault-stale-state"
 _PROVENANCE_FILENAME = "PROVENANCE.json"
+_COREAI_ASSET_PENDING_STATUS = "deferred_coreai_asset_pending"
 _PROFILE_TEMPLATE_BY_BUNDLE = {
     "macos_free_minimal": "macos-free-solet",
     "macos-bizops": "macos-bizops",
@@ -374,8 +376,24 @@ def run_autostart_install(
     ``genesis::autostart.install`` is a repair operation, not a request to
     replay birth.  In particular it must not run the profile installer, spine,
     router installer, command-launcher writer, marker writer, or git init.
+    A roster that loads Core AI is refused until its pinned asset verifies:
+    loading a ``RunAtLoad`` job starts the target at once, and an unready Core
+    AI plugin fails plugin lifecycle readiness.
     """
+    deferral = _coreai_deferral(clone_root)
+    if deferral is not None:
+        raise GenesisError(
+            f"LaunchAgent install refused: {deferral}; the roster loads Core AI, so "
+            "the target must not start until its pinned asset verifies"
+        )
     return _install_autostart(name, clone_root, plist_dir, home_dir, launchctl_run)
+
+
+def _coreai_deferral(clone_root: Path) -> str | None:
+    try:
+        return coreai_autostart_deferral(clone_root)
+    except CoreAIRosterError as exc:
+        raise GenesisError(f"autostart gate could not read the plugin roster: {exc}") from exc
 
 
 def _install_autostart(
@@ -417,6 +435,15 @@ def _run_autostart_phase(
         })
         return "not_requested", None
     try:
+        deferral = _coreai_deferral(clone_root)
+        if deferral is not None:
+            phases.append({
+                "step_name": "install_autostart",
+                "status": "deferred",
+                "reason": "coreai_asset_pending",
+                "detail": deferral,
+            })
+            return _COREAI_ASSET_PENDING_STATUS, None
         installed = _install_autostart(name, clone_root, plist_dir, home_dir, launchctl_run)
     except GenesisError as exc:
         phases.append({"step_name": "install_autostart", "status": "failed", "error": str(exc)})

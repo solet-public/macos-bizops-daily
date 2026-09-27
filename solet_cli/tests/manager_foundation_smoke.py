@@ -988,6 +988,7 @@ def _preview_and_contract_checks(
         flag_target=target,
         flag_autostart=True,
         flag_decisions={
+            "embeddings_implementation": "lm_studio",
             "inference_implementation": "lm_studio",
             "execution_topology": "solo",
             "git_mutation_control": "single_session",
@@ -1180,9 +1181,10 @@ def main() -> int:
         )
         _check(
             all((
-                len(bundle.completion_probe_ids) == 27,
+                len(bundle.completion_probe_ids) == 28,
                 "instance_environment_dependency_closure_valid" in bundle.completion_probe_ids,
                 "lm_studio_inference_model_indexed" in bundle.completion_probe_ids,
+                "coreai_embedding_request_succeeds" in bundle.completion_probe_ids,
             )),
             "dependency closure probe is pinned as required completion evidence",
         )

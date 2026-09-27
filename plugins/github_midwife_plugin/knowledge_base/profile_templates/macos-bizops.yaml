@@ -1,12 +1,13 @@
 # macos-bizops profile — business-operations solet, private genesis.
 #
 # Extends macos-free-solet.yaml (see that file's header for the shared
-# foundation rationale: local LM-Server embeddings, macOS-first; the free
+# foundation rationale: local Core AI embeddings on macOS 27; the free
 # profile's VACANT-inference posture does NOT carry over — this profile binds
-# local LM-Studio inference real). This profile adds the "full functionality,
+# Apple Foundation Models for qualified summaries). This profile adds the
+# "full functionality,
 # minus anything that lets someone clone a solet or run one in AWS, minus
 # creative/media content" tier the operator ratified: local blue-green
-# self-deployment, local inference, the Claude-family session-ledger source
+# self-deployment, qualified local summaries, the Claude-family session-ledger source
 # family (so multi-session peer-coordination work is searchable), dev tooling
 # (code vetting, platform dev surface, coding-agent session management), and
 # the six business-system connectors + Google Workspace. github_midwife_plugin still ships (the seed
@@ -26,8 +27,8 @@ profile_name: macos-bizops
 description: |
   Full-functionality local business-ops solet: everything
   macos-free-solet.yaml ships, plus local blue-green self-deployment,
-  local LM-Studio inference (bound real, for autonomous completions with no
-  live driving session), the Claude-family session-ledger source family
+  Apple Foundation Models summaries (bound real; autonomous planning remains
+  with the frontier session), the Claude-family session-ledger source family
   (filesystem transcripts, history, tasks, cloud backfill, Claude.ai export
   ingest, the platform's own peer-messaging ledger source, and the
   cross-machine pushed-source/shipper pair — enabling the same multi-session
@@ -59,15 +60,13 @@ plugins:
   # Vector search
   - pgvector_service_plugin
 
-  # Embeddings (local flavor — see macos-free-solet.yaml header)
-  - openai_embeddings_plugin
+  # Core AI Nomic embeddings — see macos-free-solet.yaml header.
+  - coreai_embeddings_plugin
 
-  # Local inference (LM Studio, bound as inference_service — NOT vacant in this
-  # profile, unlike the free profile). GENESIS PRECONDITION: the local LM
-  # Studio server must be running with the model named in
-  # profile_baseline/default_inference_plugin.json loaded — the plugin
-  # fail-fasts at boot (config required, availability probed, no fallback).
-  - default_inference_plugin
+  # Apple Foundation Models for qualified summaries, bound as inference_service.
+  # Unavailable Apple summaries are reported without failing profile boot.
+  # Autonomous planning remains session-primary; local-provider fallback is off.
+  - macos_inference_plugin
 
   # IO surfaces
   - agent_messaging_plugin
@@ -125,6 +124,11 @@ plugins:
   - github_midwife_plugin
 
 plugin_config_overrides:
+  # Genesis materializes this target-local root before plugin autostart;
+  # the models setup stage installs and verifies assets in the same directory.
+  coreai_embeddings_plugin:
+    asset_root: ${SOLET_APP_HOME}/data/model-assets
+    compute_preference: gpu
   # Per-solet role isolation (same as the free profile — see that file's
   # comment for the full rationale).
   postgres_state_management_plugin:
@@ -146,8 +150,7 @@ plugin_config_overrides:
 # auto-seed mechanism as the free profile).
 #
 # Only entries with a NON-SECRET, universally-correct value at genesis time
-# are templated here (openai_embeddings, pgvector_service_db — identical to
-# the free profile, both mandatory for the same reasons documented there).
+# are templated here (pgvector_service_db, identical to the free profile).
 #
 # The six business connectors + Google Workspace are DELIBERATELY NOT
 # templated with address-book entries here: each needs an operator-specific,
@@ -160,17 +163,6 @@ plugin_config_overrides:
 # bootstrap runbooks. Each connector plugin fails loud at first use (not at
 # boot) if its address-book entry is missing, naming the entry it needs.
 address_book_entries:
-  - name: openai_embeddings
-    address_type: api
-    description: OpenAI-compatible embeddings via LM Studio
-    tags: []
-    entries:
-      - field_type: base_url
-        description: LM Studio OpenAI-compatible base URL
-        value: http://localhost:1234/v1
-      - field_type: model
-        description: Embeddings model name
-        value: text-embedding-nomic-embed-text-v1.5-embedding
   - name: pgvector_service_db
     address_type: database
     description: PostgreSQL/pgvector connection for this solet
@@ -218,10 +210,9 @@ starting_actions:
 
 # Service bindings written to profile/config/service_bindings.json.
 # inference_service is bound REAL in this profile (sheet-ratified 2026-07-21;
-# unlike the free profile's declared-VACANT INF-03 boot): default_inference
-# ships exactly so the solet can run autonomous completions with no live
-# driving session, and that requires the binding. Local LM Studio, not a
-# cloud key — see the genesis precondition on the plugins list above.
+# unlike the free profile's declared-VACANT INF-03 boot): macos_inference_plugin
+# ships for qualified Apple summaries. Autonomous planning uses the frontier
+# session and the profile does not enable local-provider completion fallback.
 service_bindings:
   state_service: postgres_state_management_plugin
   plugin_schema_service: postgres_state_management_plugin
@@ -229,8 +220,8 @@ service_bindings:
   address_book_service: default_address_book_plugin
   memory_service: actr_memory_plugin
   vector_service: pgvector_service_plugin
-  embedding_service: openai_embeddings_plugin
-  inference_service: default_inference_plugin
+  embedding_service: coreai_embeddings_plugin
+  inference_service: macos_inference_plugin
   blob_storage_service: default_blob_storage_plugin
   knowledge_service: default_knowledge_plugin
   thinking_service: default_thinking_plugin

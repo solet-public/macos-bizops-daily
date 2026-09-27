@@ -1,0 +1,14 @@
+name: coreai_embeddings_plugin
+description: Nomic v1.5 embeddings using Core AI on macOS 27
+optional: true
+implements:
+  - interface: EmbeddingServiceInterface
+config:
+  asset_root:
+    type: string
+    required: true
+    description: Absolute directory containing the verified Nomic asset installation
+  compute_preference:
+    type: string
+    default: gpu
+    description: GPU preference with explicit CPU fallback, or cpu for CPU-only execution

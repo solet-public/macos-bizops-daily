@@ -1463,6 +1463,7 @@ def _future_model_carrier_scenario(root: Path) -> None:
         target=target.resolve(),
         autostart=True,
         decisions={
+            "embeddings_implementation": "lm_studio",
             "inference_implementation": "lm_studio",
             "execution_topology": "solo",
             "git_mutation_control": "single_session",
@@ -1471,6 +1472,7 @@ def _future_model_carrier_scenario(root: Path) -> None:
             "inference_model": "inference_model.recommended",
         },
         decision_sources={
+            "embeddings_implementation": "config",
             "inference_implementation": "config",
             "execution_topology": "config",
             "git_mutation_control": "config",
@@ -1509,12 +1511,14 @@ def _future_model_carrier_scenario(root: Path) -> None:
         target=config.target,
         autostart=config.autostart,
         decisions={
+            "embeddings_implementation": "lm_studio",
             "inference_implementation": "lm_studio",
             "execution_topology": "solo",
             "git_mutation_control": "single_session",
             "session_sources": [],
         },
         decision_sources={
+            "embeddings_implementation": "config",
             "inference_implementation": "config",
             "execution_topology": "config",
             "git_mutation_control": "config",
@@ -1604,12 +1608,14 @@ def _materialization_scenario(
         target=target.resolve(),
         autostart=True,
         decisions={
+            "embeddings_implementation": "lm_studio",
             "inference_implementation": "lm_studio",
             "execution_topology": "solo",
             "git_mutation_control": "single_session",
             "session_sources": [],
         },
         decision_sources={
+            "embeddings_implementation": "config",
             "inference_implementation": "config",
             "execution_topology": "config",
             "git_mutation_control": "config",

@@ -21,6 +21,22 @@ Checks:
      must be bound or exactly allowlisted, and every configured registered
      service must select an enabled plugin that actually declares it. Wrong or
      disabled providers, new omissions, and stale/wildcard entries fail.
+     Per the shipped-smoke contract's own "every predicate runs against ONE
+     assembled bundle" discipline: inside a sealed tree, a binding is skipped
+     only when its profile template belongs to a DIFFERENT bundle than the
+     one sealed here (per this tree's own `PROVENANCE.json`, mapped through
+     `_PROFILE_TEMPLATE_BUNDLE`) — never merely because the configured plugin
+     happens to be physically absent. The sealed bundle's OWN template is
+     always checked in full, absent plugin or not, which is exactly
+     iss_104fec15's shape (a shipped profile binding a service to a plugin
+     outside its own bundle) and the reason this scoping exists at all. A
+     sealed single-bundle tree carries every profile template regardless (the
+     birth spine ships them all so any of them can be genesis'd later) but
+     only its OWN bundle's plugin code, so a genuinely foreign template's
+     bindings are not this run's to assert — that template's own bundle's
+     sealed run is where they are checked. In an unsealed dev checkout (no
+     `PROVENANCE.json`), nothing is ever foreign and every template is fully
+     checked, exactly as before this scoping existed.
 
 Run directly: ``.venv/bin/python3
 plugins/github_midwife_plugin/tests/macos_free_profile_smoke.py``.
@@ -56,6 +72,27 @@ _PROCESS_ROOT = _REPO_ROOT / "ananta" / "knowledge_base" / "processes"
 _SERVICE_BINDING_ALLOWLIST = (
     Path(__file__).resolve().parent / "shipped_profile_service_binding_allowlist.json"
 )
+_PROVENANCE_PATH = _REPO_ROOT / "PROVENANCE.json"
+# seed_factory_plugin is NO-FACTORY (capability_bundles.yaml §"SHIP INVARIANTS"
+# in that file) — never shipped in any sealed bundle, so this path, and the
+# authoritative bundle->profile_template mapping it holds, is unreadable from
+# inside a sealed tree. _PROFILE_TEMPLATE_BUNDLE below is the sealed-safe copy
+# of that same mapping; _check_profile_template_bundle_mapping_is_current
+# guards it against drift whenever this file IS present (dev checkout).
+_CAPABILITY_BUNDLES_PATH = (
+    _REPO_ROOT / "plugins" / "seed_factory_plugin" / "knowledge_base" / "capability_bundles.yaml"
+)
+# Bundle name (capability_bundles.yaml key, e.g. via `psolet`... no — via that
+# file's own top-level `bundles:` mapping) -> profile_template stem, mirrored
+# statically because capability_bundles.yaml itself is not shipped:
+#   macos_free_minimal  -> macos-free-solet   (capability_bundles.yaml:31,39)
+#   macos-bizops        -> macos-bizops       (capability_bundles.yaml:73,91)
+#   macos_samantha      -> macos-samantha-solet (capability_bundles.yaml:144,156)
+_PROFILE_TEMPLATE_BUNDLE: dict[str, str] = {
+    "macos-free-solet.yaml": "macos_free_minimal",
+    "macos-bizops.yaml": "macos-bizops",
+    "macos-samantha-solet.yaml": "macos_samantha",
+}
 
 _OPERATOR_PATH_PATTERN = re.compile(r"/Users/[A-Za-z0-9_.-]+")
 _SECRET_KEY_PATTERN = re.compile(r'"(api_key|password|secret)"\s*:', re.IGNORECASE)
@@ -232,6 +269,104 @@ def _profile_binding_violations(
     )
 
 
+def _sealed_bundle_name() -> str | None:
+    """The bundle sealed into THIS tree, or ``None`` in an unsealed dev
+    checkout (no ``PROVENANCE.json`` at the repo root at all).
+
+    ``bundle_name`` is a required ``ProvenanceStamp`` field
+    (``plugins/seed_factory_plugin/src/seed_factory_plugin/provenance.py:103-116``),
+    written to ``PROVENANCE.json``'s ``bundle.name`` at the seed root by
+    ``assemble.py``'s deterministic-provenance step (``provenance.py:43``
+    ``PROVENANCE_FILENAME``; ``assemble.py:548`` writes it "at the seed
+    root"). A sealed macos-bizops tree's own ``PROVENANCE.json`` carries
+    ``{"bundle": {"name": "macos-bizops", ...}}``, confirmed by direct
+    inspection of ``bundle-1``'s root.
+    """
+    if not _PROVENANCE_PATH.is_file():
+        return None
+    raw = json.loads(_PROVENANCE_PATH.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise SmokeFailureError(f"PROVENANCE.json did not parse to a mapping: {_PROVENANCE_PATH}")
+    bundle = raw.get("bundle")
+    if not isinstance(bundle, dict):
+        raise SmokeFailureError(f"PROVENANCE.json 'bundle' is not a mapping: {_PROVENANCE_PATH}")
+    name = bundle.get("name")
+    if not isinstance(name, str) or not name:
+        raise SmokeFailureError(f"PROVENANCE.json bundle.name is missing or empty: {_PROVENANCE_PATH}")
+    return name
+
+
+def _template_bundle_name(profile_path: Path) -> str:
+    bundle_name = _PROFILE_TEMPLATE_BUNDLE.get(profile_path.name)
+    if bundle_name is None:
+        raise SmokeFailureError(
+            f"{profile_path.name}: no entry in _PROFILE_TEMPLATE_BUNDLE — add one, "
+            "matching capability_bundles.yaml's profile_template field"
+        )
+    return bundle_name
+
+
+def _template_is_foreign(profile_path: Path) -> bool:
+    """Whether ``profile_path`` belongs to a DIFFERENT bundle than the one
+    sealed into this tree.
+
+    False (never skip) for the sealed bundle's own template — its bindings
+    are checked in full here regardless of whether a misconfigured provider
+    happens to be physically present, which is exactly the class this check
+    exists to catch (iss_104fec15's shape: a shipped profile binding a
+    service to a plugin outside its own bundle). False everywhere in an
+    unsealed dev checkout too, so every template is fully checked there
+    exactly as before this scoping existed. True only for another bundle's
+    template inside a sealed tree — github_midwife_plugin ships every
+    profile template regardless of which bundle was sealed (so any of them
+    can be genesis'd from a birth spine later), but a sealed tree carries
+    only its own bundle's plugin code, so a foreign template's bindings are
+    not this run's to assert — its own bundle's sealed run is where they are
+    checked.
+    """
+    sealed = _sealed_bundle_name()
+    if sealed is None:
+        return False
+    return _template_bundle_name(profile_path) != sealed
+
+
+def _check_profile_template_bundle_mapping_is_current() -> None:
+    """Dev-checkout-only drift guard for ``_PROFILE_TEMPLATE_BUNDLE``.
+
+    capability_bundles.yaml is the authoritative bundle->profile_template
+    mapping but is never shipped (seed_factory_plugin is NO-FACTORY —
+    capability_bundles.yaml's own "SHIP INVARIANTS" section), so
+    ``_PROFILE_TEMPLATE_BUNDLE`` is a sealed-safe static mirror of it.
+    Nothing else keeps that mirror honest; this check does, and only runs
+    where the authoritative file is actually readable (never inside a sealed
+    tree, always in a dev checkout).
+    """
+    if not _CAPABILITY_BUNDLES_PATH.is_file():
+        return
+    raw = _load_mapping(_CAPABILITY_BUNDLES_PATH)
+    bundles = raw.get("bundles")
+    if not isinstance(bundles, dict):
+        raise SmokeFailureError(
+            f"capability_bundles.yaml 'bundles' is not a mapping: {_CAPABILITY_BUNDLES_PATH}"
+        )
+    authoritative: dict[str, str] = {}
+    for bundle_name, entry in bundles.items():
+        if not isinstance(entry, dict):
+            raise SmokeFailureError(f"capability_bundles.yaml bundle {bundle_name!r} is not a mapping")
+        template = entry.get("profile_template")
+        if not isinstance(template, str) or not template:
+            raise SmokeFailureError(
+                f"capability_bundles.yaml bundle {bundle_name!r} has no profile_template"
+            )
+        authoritative[f"{template}.yaml"] = bundle_name
+    _check(
+        "profile-template-bundle-mapping-matches-capability-bundles",
+        _PROFILE_TEMPLATE_BUNDLE == authoritative,
+        "_PROFILE_TEMPLATE_BUNDLE is stale against capability_bundles.yaml: "
+        f"mirror={_PROFILE_TEMPLATE_BUNDLE!r} authoritative={authoritative!r}",
+    )
+
+
 def _binding_to_declaration_violations(
     profile_path: Path,
     bindings: dict[str, str],
@@ -244,6 +379,8 @@ def _binding_to_declaration_violations(
         if service_name not in registered_services:
             continue
         if service_name in provided_services.get(configured_plugin, set()):
+            continue
+        if _template_is_foreign(profile_path):
             continue
         enabled_declarers = tuple(
             sorted(
@@ -604,6 +741,7 @@ def _check_multi_declarer_allowlist_controls() -> None:
 
 
 def _check_shipped_profile_service_closure() -> None:
+    _check_profile_template_bundle_mapping_is_current()
     service_by_interface = _registered_service_by_interface()
     actual = _binding_violations(service_by_interface)
     allowed = _load_binding_allowlist()

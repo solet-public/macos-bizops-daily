@@ -2,6 +2,51 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-27 — r46: Apple-native local inference on macOS 27
+
+**Solet Manager manager-v0.1.0-r46.** This is an automated publish_release cut
+to solet-public/macos-bizops-daily, with manager artifacts in
+dwestgate/homebrew-tap-validate, built from the landed source commit
+containing this entry.
+
+Changes since r45:
+
+- New `coreai_embeddings_plugin`: Nomic embed text v1.5, converted to Apple
+  Core AI, runs in the solet's own process on macOS 27, on the GPU with a CPU
+  fallback. It replaces the OpenAI-compatible local-server embeddings in the
+  macOS profiles, and setup now selects it by default. The model (about
+  277 MB) is downloaded by setup from a pinned release asset and verified
+  against its SHA-256 before use. A valid copy already installed is reused
+  without a download; a failed download or a corrupt installed copy stops
+  setup with repair text instead of continuing.
+- New `macos_inference_plugin`: Apple Foundation Models summaries on eligible
+  macOS 27 hosts. It replaces LM Studio as the local summary provider in the
+  macos-bizops profile. Planning and other frontier work stay with the frontier
+  session.
+- Setup does not start the solet's LaunchAgent until the pinned Core AI model
+  is verified. Until then the LaunchAgent install reports blocked with repair
+  text and Genesis records the deferral as a warning, never as a started
+  service.
+- Setup checks for macOS 27 on Apple Silicon when model setup begins, before
+  any Apple-native model is configured or downloaded.
+- Fresh macOS profiles materialize the model folder under the solet's own
+  data directory.
+- An intentionally vacant inference binding now starts as vacant instead of
+  failing startup; an explicit but broken binding still fails closed.
+
+Fresh-guest installation is a separate post-publish operation. This release
+does not claim a fresh-guest install, solet doctor, or E3 result.
+
+Known limits: Apple Foundation Models needs an Apple Intelligence-eligible
+host; on an ineligible Mac or virtual machine, summaries are unavailable and
+setup warns rather than fails. Core AI embeddings require macOS 27. Choosing
+LM Studio embeddings is not supported in the shipped macOS profiles in this
+release: they no longer carry the OpenAI-compatible embeddings plugin, and
+their LaunchAgent still waits for the Core AI model. The limits disclosed in
+r43 to r45 otherwise remain.
+
+---
+
 ## 2026-09-25 — r45: doctor, LM Studio and messaging fixes
 
 **Solet Manager manager-v0.1.0-r45.** This is an automated publish_release cut

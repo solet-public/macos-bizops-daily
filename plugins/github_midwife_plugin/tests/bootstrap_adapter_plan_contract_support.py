@@ -40,8 +40,8 @@ def _plan_operation_ids(root: Path, contracts: Path) -> list[str]:
         name="bootstrap-plan",
         target=root / "target",
         autostart=True,
-        decisions={"inference_implementation": "lm_studio"},
-        decision_sources={"inference_implementation": "config"},
+        decisions={"embeddings_implementation": "lm_studio", "inference_implementation": "lm_studio"},
+        decision_sources={"embeddings_implementation": "config", "inference_implementation": "config"},
     )
     bundle = ContractBundle.load(source_revision=seed.commit, directory=contracts)
     plan = build_setup_plan(
