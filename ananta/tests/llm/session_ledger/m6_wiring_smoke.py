@@ -521,8 +521,8 @@ def test_d8_custom_title_seed_reaches_push_summary_chunk() -> None:
         f"(got {len(inference.calls)})",
     )
     _check(
-        outcome == "summarized",
-        f"seeded session counted as summarized (got {outcome!r})",
+        outcome == "seeded",
+        f"seeded session returns the 'seeded' outcome (got {outcome!r})",
     )
     _check(
         len(writer.pushes) == 1,
@@ -607,11 +607,11 @@ def test_d8_inference_path_uses_inferred_discriminator() -> None:
         "les-cc-infer-disc-001", existing_summary_text=None, source_kind=None,
     )
     _check(
-        outcome == "summarized"
+        outcome == "inferred"
         and len(writer.pushes) == 1
         and writer.pushes[0]["generated_by_client_id"]
         == "internal:auto_summarize:inferred",
-        f"inference path uses inferred discriminator "
+        f"inference path returns 'inferred' and uses the inferred discriminator "
         f"(got {outcome!r}, {writer.pushes})",
     )
 
@@ -651,8 +651,8 @@ def test_d8_away_summary_extraction_skips_inference() -> None:
         f"inference NOT invoked on extraction path (got {len(inference.calls)})",
     )
     _check(
-        outcome == "summarized",
-        f"extraction counted as summarized (got {outcome!r})",
+        outcome == "extracted",
+        f"extraction returns the 'extracted' outcome (got {outcome!r})",
     )
     _check(
         len(writer.pushes) == 1 and writer.pushes[0]["summary_text"] == "Recap: shipped slice X.",
@@ -693,8 +693,8 @@ def test_d8_no_away_summary_falls_back_to_inference() -> None:
         f"(got {len(inference.calls)})",
     )
     _check(
-        outcome == "summarized",
-        f"synchronous inference fallback counted as summarized (got {outcome!r})",
+        outcome == "inferred",
+        f"synchronous inference fallback returns the 'inferred' outcome (got {outcome!r})",
     )
     _check(
         len(writer.pushes) == 1 and "Stub summary" in writer.pushes[0]["summary_text"],
@@ -822,8 +822,8 @@ def test_d8_codex_session_falls_back_to_inference() -> None:
         f"(got {len(inference.calls)})",
     )
     _check(
-        outcome_a == "summarized" and outcome_b == "summarized",
-        f"both sessions summarized via synchronous inference fallback "
+        outcome_a == "inferred" and outcome_b == "inferred",
+        f"both sessions return 'inferred' via synchronous inference fallback "
         f"(got {outcome_a!r}, {outcome_b!r})",
     )
 

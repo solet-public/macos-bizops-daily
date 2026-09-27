@@ -2135,8 +2135,9 @@ class ThinkingServiceAPI(ABC):
     @abstractmethod
     def resume_thinking_completion(
         self,
-        params: dict[str, Any],
-        state: dict[str, Any],
+        *,
+        request_id: str,
+        state: dict[str, Any] | None = None,
     ) -> ActionResult: ...
 
     # ------------------------------------------------------------------

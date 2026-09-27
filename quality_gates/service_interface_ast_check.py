@@ -30,6 +30,29 @@ Checks (a/b/c, per design §1):
       or removed without sweeping the JSON (kb_overlay_loader silent
       skip, per design §0.2).
 
+  (d) For every ``@service_interface_process(parameters={...})``-decorated
+      method, every parameter the FUNCTION requires with no default
+      (excluding ``self`` and ``state`` — ``state`` is auto-injected by
+      the queued-action dispatch path, ``ActionExecutionEngine.
+      _prepare_action_execution``) must be a key of the decorator's own
+      ``parameters`` dict. A required parameter absent from the schema
+      can never be supplied by either live call path — the bare
+      ``execute_service`` dispatch (``ActionExecutionEngine.
+      execute_service`` -> ``_execute_service_function``, which calls
+      ``function(**filtered_params)`` with exactly the caller's
+      schema-declared arguments and nothing else) or the queued
+      ``execute_action`` path — so the verb is permanently broken by
+      construction (``inference_service::qualify``, iss_64999dbe: a
+      zero-parameter EDGE schema paired with a hard-required positional
+      ``params`` argument copied from the unrelated plugin ``(params,
+      state)`` dispatch convention, which every ``@platform_process``
+      method DOES use — see ``quality_gates/service_interface_ast_check.
+      py`` check (d) design note; that convention is bespoke per plugin
+      via each plugin's own ``_execute_action`` and is out of scope here).
+      Skipped (not a finding) when the decorator's ``parameters=`` value
+      isn't a literal dict (e.g. built via ``**`` dict-merge) — no
+      false positive on an unresolvable schema.
+
 The gate joins the CRITICAL bucket in ``code_quality_check.py``
 alongside ``god_class``, ``radon_cc``, ``radon_mi``, ``whole_tree_
 integration``. Exit codes: 0 clean, 2 blocking findings, 64 invocation
@@ -46,6 +69,7 @@ Allowlist entry shape per check (design §4.2):
   (a) ``a::<file_posix_path>::<class_name>::<function_name>``
   (b) ``b::<file_posix_path>::<class_name>::<function_name>``
   (c) ``c::<provider>::<json_stem>``
+  (d) ``d::<file_posix_path>::<class_name>::<function_name>``
 
 Suffix-match on file path; exact match on class/function/provider/stem.
 """
@@ -244,6 +268,78 @@ def _check_a_name_match(
     return finding, registered_entry
 
 
+def _decorator_parameters_keys(dec: ast.Call) -> tuple[set[str], bool]:
+    """Extract the decorator's ``parameters={...}`` literal-dict keys.
+
+    Returns ``(keys, resolved)``. ``resolved`` is False when the keyword is
+    absent, or its value isn't a plain ``ast.Dict`` of string-constant keys
+    (e.g. a ``**``-merged dict) — callers must skip rather than false-flag.
+    """
+    for kw in dec.keywords:
+        if kw.arg != "parameters":
+            continue
+        if isinstance(kw.value, ast.Dict):
+            keys: set[str] = set()
+            for k in kw.value.keys:
+                if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                    keys.add(k.value)
+                else:
+                    return set(), False
+            return keys, True
+        return set(), False
+    return set(), False
+
+
+def _required_function_params(item: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """Return parameter names the function requires (no default), minus ``self``."""
+    args = item.args
+    all_pos = args.posonlyargs + args.args
+    n_no_default = len(all_pos) - len(args.defaults)
+    required = {a.arg for a in all_pos[:n_no_default] if a.arg != "self"}
+    required.update(
+        a.arg
+        for a, d in zip(args.kwonlyargs, args.kw_defaults, strict=True)
+        if d is None
+    )
+    return required
+
+
+def _check_d_schema_signature_match(
+    sip: ast.Call,
+    item: ast.FunctionDef | ast.AsyncFunctionDef,
+    class_node: ast.ClassDef,
+    public_py: Path,
+    posix: str,
+) -> Finding | None:
+    """Run check (d) for one ``@service_interface_process``-decorated method."""
+    keys, resolved = _decorator_parameters_keys(sip)
+    if not resolved:
+        return None
+    missing = _required_function_params(item) - keys - {"state"}
+    if not missing:
+        return None
+    return Finding(
+        check="d",
+        file=public_py,
+        line=item.lineno,
+        identifier=f"d::{posix}::{class_node.name}::{item.name}",
+        message=(
+            f"def {item.name} requires {sorted(missing)} with no default, "
+            f"but @service_interface_process(parameters=...) declares only "
+            f"{sorted(keys)} — no live call path can ever supply "
+            f"{sorted(missing)}"
+        ),
+        recommend=(
+            f"Either add {sorted(missing)} to the decorator's `parameters=` "
+            "dict (if the dispatcher's queued-action path truly supplies "
+            "them, e.g. via an action_definition_template literal, as "
+            "process_error does), or change the method signature to accept "
+            "only what the schema declares — never the unrelated plugin "
+            "(params, state) dispatch convention."
+        ),
+    )
+
+
 def _check_b_bare_abstractmethod(
     item: ast.FunctionDef | ast.AsyncFunctionDef,
     class_node: ast.ClassDef,
@@ -298,6 +394,9 @@ def _check_method_decorators(
         )
         if a_finding is not None:
             findings.append(a_finding)
+        d_finding = _check_d_schema_signature_match(sip, item, class_node, public_py, posix)
+        if d_finding is not None:
+            findings.append(d_finding)
     elif is_abstract:
         findings.append(_check_b_bare_abstractmethod(item, class_node, public_py, posix))
 

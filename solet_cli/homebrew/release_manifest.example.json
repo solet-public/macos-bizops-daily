@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "release_label": null,
+  "manager_release_tag": null,
+  "seed": {
+    "repository": "https://github.com/solet-public/macos-bizops.git",
+    "release_tag": "release-2026-08-21",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "tree_hash": "89abcdef0123456789abcdef0123456789abcdef",
+    "seed_id": "123e4567-e89b-12d3-a456-426614174000",
+    "manifest_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "source_commit": "0123456789abcdef0123456789abcdef01234567",
+    "profile": "macos-bizops",
+    "channel_id": "stable",
+    "provenance": {"schema_version": 1, "provenance_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "seed_id": "123e4567-e89b-12d3-a456-426614174000", "origin_id": "123e4567-e89b-12d3-a456-426614174001", "manifest_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "bundle_name": "macos-bizops", "platform": "local", "source_commit": "0123456789abcdef0123456789abcdef01234567", "source_date": "2026-09-15T00:00:00+00:00"}
+  },
+  "components": null,
+  "bundle_verdict": null,
+  "guest_validation": null,
+  "manager": {
+    "source_repository": "https://github.com/solet-public/solet.git",
+    "source_commit": "e25c3f0ffaa8f98cbefe21901c411c4eaea3475f",
+    "source_tree_hash": "d5c05c572bd6bff7b1ca7139498e7bd955f028a8",
+    "version": "0.1.0",
+    "payload_asset": {
+      "name": "solet-0.1.0.tar.gz",
+      "url": "https://github.com/solet-public/macos-bizops/releases/download/release-2026-08-21/solet-0.1.0.tar.gz",
+      "sha256": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    "file_digests": {},
+    "contract_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "transition_bundle_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "allow_manager_seed_skew": null
+  },
+  "tap": null,
+  "surface_digests": null,
+  "produced_by": null,
+  "factory_signature": null
+}

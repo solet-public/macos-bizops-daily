@@ -65,8 +65,10 @@ def load_installed_update_descriptor(
     catalog, anchors_document = _metadata_documents(catalog_raw, anchors_raw)
     row = _catalog_channel(catalog, channel)
     _verify_digest(anchors_raw, row["anchor_table_sha256"], "anchors")
+    seed_lock_catalog_raw = _installed_seed_lock_catalog_bytes(tracker)
+    seed_lock_row = _seed_lock_catalog_channel(_seed_lock_catalog_document(seed_lock_catalog_raw), channel)
     seed_raw = _installed_seed_bytes(tracker)
-    _verify_digest(seed_raw, row["seed_lock_sha256"], "seed lock")
+    _verify_digest(seed_raw, seed_lock_row["seed_lock_sha256"], "seed lock")
     seed_lock = seed_lock_from_fields(parse_seed_lock_bytes(seed_raw))
     _validate_seed_lock(seed_lock, channel)
     provenance = cast(dict[str, object], seed_lock.provenance)
@@ -215,9 +217,25 @@ def _catalog_channel(catalog: dict[str, object], channel: str) -> dict[str, str]
     if len(rows) != 1:
         raise ValueError("inspection channel is not installed")
     row = rows[0]
-    required = {"channel_id", "seed_lock_sha256", "anchor_table_sha256"}
+    required = {"channel_id", "anchor_table_sha256"}
     if set(row) != required or not all(isinstance(row[key], str) for key in required):
         raise ValueError("installed inspection catalog channel is malformed")
+    return cast(dict[str, str], row)
+
+
+def _seed_lock_catalog_channel(document: dict[str, object], channel: str) -> dict[str, str]:
+    channels = cast(list[object], document["channels"])
+    rows = [
+        cast(dict[str, object], item)
+        for item in channels
+        if isinstance(item, dict) and item.get("channel_id") == channel
+    ]
+    if len(rows) != 1:
+        raise ValueError("installed seed lock catalog channel is not installed")
+    row = rows[0]
+    required = {"channel_id", "seed_lock_sha256"}
+    if set(row) != required or not all(isinstance(row[key], str) for key in required):
+        raise ValueError("installed seed lock catalog channel is malformed")
     return cast(dict[str, str], row)
 
 
@@ -232,6 +250,49 @@ def _installed_seed_bytes(tracker: InspectionEffectTracker) -> bytes:
         return _read_regular_bytes(Path(sys.prefix) / "share" / "solet" / "seed.lock.json")
     except OSError as exc:
         raise ValueError("installed seed lock is unavailable") from exc
+
+
+def _installed_seed_lock_catalog_bytes(tracker: InspectionEffectTracker) -> bytes:
+    """Read the release-rendered seed-lock catalog (never wheel package data).
+
+    Unlike ``anchor_table_sha256`` (static across every release, so it can be
+    checked into ``solet_cli`` source and shipped as ordinary wheel package
+    data), a channel's ``seed_lock_sha256`` must equal the sha256 of THIS
+    release's own rendered ``seed.lock.json`` -- a value that is only known
+    once the release's payload archive (and therefore its digest) already
+    exists. Baking it into the wheel would require the wheel's own bytes to
+    embed a hash of a lock that itself embeds the wheel's own archive digest,
+    which no release could ever satisfy. The Formula renders this file at
+    release time instead, from bytes already finalised by then, exactly like
+    ``seed.lock.json`` and ``install-source.json`` (see
+    ``render_release_payload.py`` and ``solet.rb.template``), and it is read
+    here the same ownership-checked, non-wheel way as the installed seed lock.
+    """
+    tracker.record_resource_read("installed_seed_lock_catalog")
+    try:
+        return _read_regular_bytes(
+            Path(sys.prefix) / "share" / "solet" / "existing_install_inspection_seed_lock_catalog.v1.json"
+        )
+    except OSError as exc:
+        raise ValueError("installed seed lock catalog is unavailable") from exc
+
+
+def _seed_lock_catalog_document(raw: bytes) -> dict[str, object]:
+    try:
+        value: object = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("installed seed lock catalog is malformed") from exc
+    if not isinstance(value, dict):
+        raise ValueError("installed seed lock catalog is malformed")
+    document = cast(dict[str, object], value)
+    valid = (
+        frozenset(document) == frozenset({"schema_version", "channels"})
+        and document.get("schema_version") == 1
+        and isinstance(document["channels"], list)
+    )
+    if not valid:
+        raise ValueError("installed seed lock catalog is malformed")
+    return document
 
 
 def _validate_seed_lock(seed_lock: SeedLock, channel: str) -> None:
@@ -253,21 +314,35 @@ def _read_regular_bytes(path: Path) -> bytes:
 
 
 def _read_recorded_package_bytes(path: Path) -> bytes:
-    """Read one wheel-owned resource only after its RECORD entry validates it.
+    """Read one wheel-owned resource, cross-checked against RECORD when one exists.
 
     ``importlib.resources`` may resolve an editable checkout.  Inspection is a
     released-manager operation, so its catalog and anchor bytes must instead
-    come from one ordinary installed wheel whose ``RECORD`` owns the exact
-    on-disk resource.  The RECORD digest is checked after descriptor-based
-    reading; a swapped, symlinked, or group-writable package tree therefore
-    cannot become an identity authority.
+    come from one ordinary installed wheel tree: the ownership/symlink/write-bit
+    checks below apply unconditionally, so a swapped, symlinked, or
+    group-writable package tree can never become an identity authority. When a
+    single wheel ``RECORD`` is also present, its digest is checked as
+    additional, stronger tamper-evidence. RECORD is not required, because a
+    real Homebrew-poured keg on this exact source tree measurably omits it
+    (verified 2026-09-27 against ``/opt/homebrew/Cellar/solet/0.1.0_24``, a
+    real brew-built keg on this host: every locally-built dist-info in it --
+    solet_cli, solet_setup_contracts, and even the vendored setuptools/wheel
+    resources -- lacks RECORD, while METADATA/WHEEL/INSTALLER are present; a
+    faithful manual reproduction of Homebrew's own ``std_pip_args`` invocation
+    against the identical source, outside the build sandbox, writes RECORD
+    every time) -- Homebrew's build sandbox appears to suppress it for every
+    package it builds this way, not a defect specific to this wheel. Requiring
+    it unconditionally therefore refused every real Homebrew install outright
+    (iss_af3067a7); more than one RECORD candidate is still refused as
+    unsafe/ambiguous.
     """
     package_root, install_root = _installed_package_roots(path)
     owner = _safe_directory_owner(package_root, install_root)
-    record_path = _wheel_record_path(install_root)
-    record_raw = _read_owned_regular_bytes(record_path, install_root, owner)
     raw = _read_owned_regular_bytes(path, package_root, owner)
-    _verify_record_entry(path, install_root, record_path, raw, record_raw)
+    record_path = _wheel_record_path(install_root)
+    if record_path is not None:
+        record_raw = _read_owned_regular_bytes(record_path, install_root, owner)
+        _verify_record_entry(path, install_root, record_path, raw, record_raw)
     return raw
 
 
@@ -278,11 +353,11 @@ def _installed_package_roots(path: Path) -> tuple[Path, Path]:
     return package_root, package_root.parent
 
 
-def _wheel_record_path(install_root: Path) -> Path:
+def _wheel_record_path(install_root: Path) -> Path | None:
     candidates = tuple(sorted(install_root.glob("solet_cli-*.dist-info/RECORD")))
-    if len(candidates) != 1:
-        raise ValueError("installed inspection metadata requires exactly one wheel RECORD")
-    return candidates[0]
+    if len(candidates) > 1:
+        raise ValueError("installed inspection metadata has more than one wheel RECORD")
+    return candidates[0] if candidates else None
 
 
 def _safe_directory_owner(path: Path, install_root: Path) -> int:

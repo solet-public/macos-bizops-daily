@@ -37,6 +37,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 _REPOSITORY = _ROOT.parents[1]
 _RENDERER = _ROOT / "scripts" / "render_release_payload.py"
 _EXAMPLE = _ROOT / "release_metadata.example.json"
+_EXAMPLE_MANIFEST = _ROOT / "release_manifest.example.json"
 _checks = 0
 
 sys.path.insert(0, str(_REPOSITORY / "solet_cli" / "src"))
@@ -54,6 +55,8 @@ def _check(condition: object, label: str) -> None:
 def _run_renderer(
     metadata_path: Path,
     output: Path,
+    *,
+    manifest_path: Path = _EXAMPLE_MANIFEST,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
@@ -61,6 +64,8 @@ def _run_renderer(
             str(_RENDERER),
             "--metadata",
             str(metadata_path),
+            "--manifest",
+            str(manifest_path),
             "--output-root",
             str(output),
         ],
@@ -120,6 +125,7 @@ def _check_formula_boundary(
     _check_formula_install_shape(formula, lock)
     _check_rendered_identity(formula, lock, metadata)
     _check_install_source_receipt(formula, metadata)
+    _check_release_manifest_receipt(formula)
     brewfile = (_ROOT / "ci" / "Brewfile.enterprise.example").read_text(encoding="utf-8")
     _check(
         'trusted: { formula: "solet" }' in brewfile and "trusted: true" not in brewfile,
@@ -162,7 +168,7 @@ def _check_formula_install_shape(formula: str, lock: dict[str, object]) -> None:
 
 
 def _check_install_source_receipt(formula: str, metadata: dict[str, object]) -> None:
-    marker = '(libexec/"share"/"solet"/"install-source.json").write <<~JSON\n'
+    marker = '(libexec/"share"/"solet"/"install-source.json").write <<~\'JSON\'\n'
     start = formula.find(marker)
     end = formula.find("    JSON\n", start + len(marker))
     _check(start != -1 and end != -1, "formula writes an installed source receipt")
@@ -180,8 +186,24 @@ def _check_install_source_receipt(formula: str, metadata: dict[str, object]) -> 
     )
 
 
+def _check_release_manifest_receipt(formula: str) -> None:
+    """iss_18c47206: the Formula must install the exact same stage-5 draft
+    manifest into the keg (`share/solet/release_manifest.json`) as was passed
+    to the renderer -- that installed copy is what the consumption-side
+    pairing gate (`solet_manager.release_identity_gate`) reads."""
+    marker = '(libexec/"share"/"solet"/"release_manifest.json").write <<~\'JSON\'\n'
+    start = formula.find(marker)
+    end = formula.find("    JSON\n", start + len(marker))
+    _check(start != -1 and end != -1, "formula writes a release manifest into the keg")
+    if start == -1 or end == -1:
+        return
+    embedded: object = json.loads(formula[start + len(marker) : end])
+    expected = json.loads(_EXAMPLE_MANIFEST.read_text(encoding="utf-8"))
+    _check(embedded == expected, "formula's embedded release manifest matches the staged draft byte-for-byte")
+
+
 def _check_seeds_symlink_shape(formula: str, lock: dict[str, object]) -> None:
-    lock_marker = '(libexec/"share"/"solet"/"seed.lock.json").write <<~JSON\n'
+    lock_marker = '(libexec/"share"/"solet"/"seed.lock.json").write <<~\'JSON\'\n'
     lock_at = formula.find(lock_marker)
     seeds_at = formula.find(
         'install_symlink Pathname(__dir__).parent/"solet_cli"/"homebrew"/"seeds" => "seeds"'

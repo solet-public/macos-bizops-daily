@@ -89,7 +89,7 @@ def _service(provider: _RecordedProvider) -> InferenceService:
 
 def _success_case() -> None:
     provider = _RecordedProvider()
-    result = _service(provider).qualify({}, {})
+    result = _service(provider).qualify(state={})
     data = result.get("data", {})
     _check(result.get("action_status") == "completed", "Q1 request completes")
     _check(data == {
@@ -104,8 +104,21 @@ def _success_case() -> None:
     _check(request.use_structured_output is True, "Q5 request requires structured output")
 
 
+def _bare_dispatch_shape_case() -> None:
+    """Q0: qualify is EDGE with parameters={}; the real dispatcher's bare
+    ``execute_service`` path (ActionExecutionEngine.execute_service ->
+    _execute_service_function) calls ``function(**filtered_params)`` where
+    filtered_params is exactly the caller's schema-declared arguments — an
+    empty dict here, never a positional ``params``/``state`` pair (iss_64999dbe).
+    """
+    provider = _RecordedProvider()
+    filtered_params: dict[str, Any] = {}
+    result = _service(provider).qualify(**filtered_params)
+    _check(result.get("action_status") == "completed", "Q0 bare **{} dispatch shape succeeds")
+
+
 def _invalid_structure_case() -> None:
-    result = _service(_RecordedProvider('{"unexpected":true}')).qualify({}, {})
+    result = _service(_RecordedProvider('{"unexpected":true}')).qualify(state={})
     data = result.get("data", {})
     _check(
         result.get("action_status") == "completed"
@@ -117,6 +130,7 @@ def _invalid_structure_case() -> None:
 
 def main() -> int:
     print("Inference qualifier smoke:")
+    _bare_dispatch_shape_case()
     _success_case()
     _invalid_structure_case()
     print(f"\n{_passed} passed, {len(_failed)} failed")

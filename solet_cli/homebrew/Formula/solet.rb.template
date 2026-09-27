@@ -56,7 +56,7 @@ class Solet < Formula
     # Homebrew's build sandbox forbids reading the tap checkout while a Formula
     # installs. Render the same reviewed lock bytes into the Formula so the
     # default lock remains non-circular without crossing that sandbox boundary.
-    (libexec/"share"/"solet"/"seed.lock.json").write <<~JSON
+    (libexec/"share"/"solet"/"seed.lock.json").write <<~'JSON'
       {
         "schema_version": 3,
         "channel_id": "{{SEED_CHANNEL_ID}}",
@@ -71,16 +71,49 @@ class Solet < Formula
         "allowed_repository_migrations": {{ALLOWED_REPOSITORY_MIGRATIONS}}
       }
     JSON
+    # The bundled catalog's anchor_table_sha256 is static wheel package data
+    # (solet_cli/src/solet_manager/released_metadata/), but a channel's
+    # seed_lock_sha256 must equal sha256 of the file above, which embeds this
+    # release's own payload digest -- unknowable until the payload already
+    # exists. Render it here, release-side, like the lock itself, instead of
+    # baking an impossible self-reference into the wheel.
+    (libexec/"share"/"solet"/"existing_install_inspection_seed_lock_catalog.v1.json").write <<~'JSON'
+      {
+        "schema_version": 1,
+        "channels": [
+          {
+            "channel_id": "{{SEED_CHANNEL_ID}}",
+            "seed_lock_sha256": "{{EXISTING_INSTALL_SEED_LOCK_SHA256}}"
+          }
+        ]
+      }
+    JSON
     # This installed receipt distinguishes a worktree-payload experiment from
     # a published manager/seed pair.  It is deliberately independent of the
     # seed lock: the latter authenticates the seed, while this records how the
     # manager archive itself reached this keg.
-    (libexec/"share"/"solet"/"install-source.json").write <<~JSON
+    (libexec/"share"/"solet"/"install-source.json").write <<~'JSON'
       {
         "schema_version": 1,
         "mode": "{{INSTALL_MODE}}",
         "source_commit": "{{MANAGER_SOURCE_COMMIT}}"
       }
+    JSON
+    # The stage-5 draft `release_manifest.json` (design §7.1) `stage_release.py`
+    # writes beside this Formula, unchanged. `solet_manager.release_identity_gate`
+    # reads its manifest from this exact keg path -- installing it is what lets
+    # a manifest-recorded `allow_manager_seed_skew` reason reach the gate
+    # (iss_18c47206). The `tap`/`surface_digests`/... sections a later
+    # `publish_release` stage would own are already `null` in this draft.
+    # QUOTED heredoc delimiter deliberately (`<<~'JSON'`, not `<<~JSON`): an
+    # unquoted heredoc is double-quote semantics in Ruby, so `\`/`"`/newline
+    # in a free-text `allow_manager_seed_skew` reason get re-escaped into an
+    # unparseable keg manifest, and `#{...}` in that reason would execute as
+    # Ruby when this Formula installs -- a code-injection sink in a shipped
+    # Formula. Verified with Homebrew's own portable Ruby (review of this
+    # unit, BLOCK, `reissue_manifest_in_keg_review.md`).
+    (libexec/"share"/"solet"/"release_manifest.json").write <<~'JSON'
+      {{RELEASE_MANIFEST_JSON}}
     JSON
     # `install_symlink` records a path, not bytes — safe for a source build,
     # where __dir__ resolves to this tap. Do NOT add a `bottle do...end`
@@ -117,7 +150,9 @@ class Solet < Formula
     assert_match '"status": "preview_ready"', preview
     assert_match '"dry_run_writes": 0', preview
     assert_path_exists libexec/"share"/"solet"/"seed.lock.json"
+    assert_path_exists libexec/"share"/"solet"/"existing_install_inspection_seed_lock_catalog.v1.json"
     assert_path_exists libexec/"share"/"solet"/"install-source.json"
+    assert_path_exists libexec/"share"/"solet"/"release_manifest.json"
     assert_path_exists libexec/"share"/"solet"/"contracts"/"macos_setup_flow.json"
     refute_path_exists testpath/"Solets"/"brew-test"
   end

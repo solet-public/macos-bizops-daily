@@ -58,6 +58,9 @@ from ananta.llm.session_ledger.types import (  # noqa: E402
     EventType,
     SourceVendor,
 )
+from ananta.services.state_service.ordered_query import (  # noqa: E402
+    parse_ordered_query,
+)
 from postgres_state_management_plugin.plugin import (  # noqa: E402
     _PostgresStateTransaction,
 )
@@ -99,7 +102,15 @@ def _envelope(data: dict[str, Any]) -> dict[str, Any]:
 class _LiveStateAdapter:
     """Minimal StateManagementInterface stand-in over a real provider.
 
-    The two migrated reads call only ``query_state``; ``transactional`` is
+    ``query_state`` backs ``find_session_id_by_external_session_id``.
+    ``query_ordered`` backs ``find_latest_away_summary_for_session`` as of
+    the iss_8b8a970b fix (2026-09-27): that read moved off the unbounded
+    ``query_state`` primitive (which trips the 100-row cap on any
+    conversation group with a large sibling) onto the bounded
+    ``query_ordered`` primitive — mirrors the real
+    ``postgres_state_management_plugin.plugin.query_ordered`` implementation
+    (``parse_ordered_query`` + ``provider.select_ordered``) rather than
+    reinventing the ordering/cursor semantics here. ``transactional`` is
     present so the concrete ``SessionLedgerRepository`` constructs cleanly.
     """
 
@@ -114,6 +125,20 @@ class _LiveStateAdapter:
             conditions=cast("dict[str, Any]", filters) if isinstance(filters, dict) else None,
         )
         return _envelope({"records": rows, "count": len(rows)})
+
+    def query_ordered(self, namespace: str, data: dict[str, Any]) -> dict[str, Any]:
+        spec = parse_ordered_query(data)
+        rows = self._provider.select_ordered(
+            namespace=namespace,
+            table=spec.table,
+            conditions=spec.filters,
+            order_columns=spec.order_columns,
+            direction=spec.direction,
+            limit=spec.limit,
+            after=spec.after,
+            include_deleted=spec.include_deleted,
+        )
+        return _envelope({"records": rows, "count": len(rows), "table": spec.table})
 
     @contextmanager
     def transactional(self) -> Any:

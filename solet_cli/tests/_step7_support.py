@@ -214,7 +214,13 @@ class FakeKeg:
 
     def layout(self) -> tuple[str, ...]:
         """The listing section 8.1 binds the unit slice and the VM slice to."""
-        rows = ["bin/solet", "bin/solet-manager", "share/solet/seed.lock.json", "share/solet/install-source.json"]
+        rows = [
+            "bin/solet",
+            "bin/solet-manager",
+            "share/solet/seed.lock.json",
+            "share/solet/existing_install_inspection_seed_lock_catalog.v1.json",
+            "share/solet/install-source.json",
+        ]
         rows.extend(sorted(str(item.relative_to(self.prefix)) for item in self.site.glob("solet_cli-*.dist-info/RECORD")))
         return tuple(rows)
 
@@ -974,7 +980,7 @@ def build_keg(root: Path, *, seed_lock: bytes, anchors: dict[str, JsonValue], ve
     metadata = package / "src" / "solet_manager" / "released_metadata"
     anchors_raw = (json.dumps(anchors, indent=2, sort_keys=True) + "\n").encode()
     (metadata / "existing_install_inspection_anchors.v1.json").write_bytes(anchors_raw)
-    catalog = {"schema_version": 1, "channels": [{"channel_id": "stable", "seed_lock_sha256": hashlib.sha256(seed_lock).hexdigest(), "anchor_table_sha256": hashlib.sha256(anchors_raw).hexdigest()}]}
+    catalog = {"schema_version": 1, "channels": [{"channel_id": "stable", "anchor_table_sha256": hashlib.sha256(anchors_raw).hexdigest()}]}
     (metadata / "existing_install_inspection_catalog.v1.json").write_text(json.dumps(catalog, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if version != "0.1.0":
         pyproject = package / "pyproject.toml"
@@ -992,6 +998,17 @@ def build_keg(root: Path, *, seed_lock: bytes, anchors: dict[str, JsonValue], ve
     share = prefix / "share" / "solet"
     share.mkdir(parents=True, exist_ok=True)
     (share / "seed.lock.json").write_bytes(seed_lock)
+    # The release-rendered seed-lock catalog (solet.rb.template): unlike
+    # anchor_table_sha256 above, seed_lock_sha256 must equal sha256 of THIS
+    # lock, which embeds this release's own payload digest -- unknowable at
+    # manager-source-commit time, so it cannot live in the wheel (iss_42749563).
+    seed_lock_catalog = {
+        "schema_version": 1,
+        "channels": [{"channel_id": "stable", "seed_lock_sha256": hashlib.sha256(seed_lock).hexdigest()}],
+    }
+    (share / "existing_install_inspection_seed_lock_catalog.v1.json").write_text(
+        json.dumps(seed_lock_catalog, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     # The receipt the real Formula writes (solet.rb.template), paired with the seed lock's own
     # provenance.source_commit so the design section 7.3 consumption gate sees one cut, not two.
     receipt = {"schema_version": 1, "mode": "release", "source_commit": cast(dict[str, Any], json.loads(seed_lock))["provenance"]["source_commit"]}

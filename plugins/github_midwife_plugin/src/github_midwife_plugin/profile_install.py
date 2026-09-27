@@ -25,6 +25,7 @@ import yaml
 from .constants import BUILD_BACKEND_PACKAGES, PIP_INSTALL_TIMEOUT_S
 
 _SEED_PACKAGE_NAME = "github_midwife_plugin"
+_VENDOR_DIRNAME = "vendor"
 
 
 class ProfileInstallError(RuntimeError):
@@ -117,8 +118,31 @@ def _editable_present(venv_python: Path, package_dir: Path) -> bool:
     return False
 
 
+def _vendor_find_links_args(package_dir: Path) -> list[str]:
+    """Point pip at a plugin's own `vendor/` wheels, when it has any.
+
+    Driven purely by the presence of `vendor/*.whl` — not by any package
+    name — so a pinned dependency that ships a prebuilt wheel there (e.g.
+    one needing a toolchain the target machine may lack, like Xcode for
+    Swift C bindings) resolves from it instead of falling back to a PyPI
+    sdist build. pip prefers a wheel over an sdist at the same version, so
+    adding this find-links source is enough; no `--no-index` is passed, so
+    a package with no vendored wheel is unaffected and still resolves
+    normally (iss_7994d8bb).
+    """
+    vendor_dir = package_dir / _VENDOR_DIRNAME
+    if vendor_dir.is_dir() and any(vendor_dir.glob("*.whl")):
+        return ["--find-links", str(vendor_dir)]
+    return []
+
+
 def _install_editable(venv_python: Path, package_dir: Path, package_label: str) -> bool:
-    """`pip install --no-build-isolation -e <package_dir>` — raises loud on failure."""
+    """`pip install --no-build-isolation -e <package_dir>` — raises loud on failure.
+
+    Adds `--find-links <package_dir>/vendor` when that directory ships a
+    prebuilt wheel, so a pinned dependency needing one is never resolved
+    from an sdist the target machine cannot build (iss_7994d8bb).
+    """
     if not package_dir.is_dir():
         raise ProfileInstallError(
             f"{package_label}: package directory not found: {package_dir}"
@@ -132,6 +156,7 @@ def _install_editable(venv_python: Path, package_dir: Path, package_label: str) 
             [
                 str(venv_python), "-m", "pip", "install",
                 "--no-build-isolation", "-e", str(package_dir),
+                *_vendor_find_links_args(package_dir),
             ],
             check=True, capture_output=True, text=True,
             timeout=PIP_INSTALL_TIMEOUT_S,

@@ -677,27 +677,27 @@ class SessionLedgerReadMixin(SessionLedgerRepositoryBase):
         ``content_json->>'subtype'`` so the M6 auto-summarizer can reuse the
         recap text — zero inference, ~74% of claude_code sessions.
 
-        Returns the trimmed recap text, or ``None`` when no away_summary event
-        exists for this conversation. The lookup spans the canonical session AND
-        its cross-source siblings (:meth:`_resolve_conversation_group`) — the
-        recap is ingested on a sibling source row while M6 summarizes the
-        canonical, so a canonical-only lookup misses it (the 2026-06-30 zero-reuse
-        bug). SQL-lockdown Slice 6 narrows to SYSTEM events carrying a JSON
-        payload via the ``= ANY`` / ``is_not_null`` query, then applies the
-        ``away_summary`` subtype match + ``event_at`` DESC recency pick in
-        :func:`_select_latest_away_summary` (the SQL's
-        ``content_json->>'subtype'`` JSONB-path filter the flat grammar cannot
-        express). The per-conversation SYSTEM-event set is small, so pulling it
-        to Python is cheap.
+        Returns the trimmed recap text, or ``None`` if none exists. The lookup
+        spans the canonical session AND its cross-source siblings
+        (:meth:`_resolve_conversation_group`), where recaps are ingested (the
+        2026-06-30 zero-reuse bug); :func:`_select_latest_away_summary` does
+        the subtype match and recency pick.
+
+        The read is bounded to the newest 100 SYSTEM events with a JSON payload
+        (``event_at`` DESC, ``sequence`` DESC): an unbounded read tripped the
+        row cap on large groups, deterministically (iss_8b8a970b). Known
+        limitation: if a group's newest 100 such events are all non-recap
+        traffic, the recap is missed and the inference fallback runs instead.
         """
-        rows = self._query(
+        rows = self._query_ordered(
             TABLE_EVENT,
-            {
+            filters={
                 "session_id": self._resolve_conversation_group(session_id),
                 "event_type": EventType.SYSTEM.value,
-                "is_deleted": 0,
                 "content_json": {"op": "is_not_null"},
             },
+            order_by=[["event_at", "desc"], ["sequence", "desc"]],
+            limit=100,
         )
         return _select_latest_away_summary(rows)
 

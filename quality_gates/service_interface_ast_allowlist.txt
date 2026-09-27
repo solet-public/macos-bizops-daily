@@ -15,3 +15,22 @@
 # scanner fix — investigate the underlying cause before allowlisting.
 #
 # Strict-by-default: 0 entries at landing (platform-state is clean).
+#
+# check (d) tracked debt (iss_64999dbe groom, 2026-09-27): these 8 ABC
+# abstractmethod stubs in interfaces/public.py have drifted from their
+# concrete implementation's real signature — the abstract method itself
+# is dead code (it's overridden by a working concrete method with
+# session_id/params defaulted and resolved via _resolve_acting_session
+# or built internally), so these are NOT live dispatch bugs like
+# inference_service::qualify or thinking_service::resume_thinking_completion
+# (both fixed, not allowlisted). Fixing the ABC stub signature to match
+# the concrete implementation is legitimate follow-up cleanup, filed as
+# iss_64999dbe follow-ups rather than expanded into this unit's scope.
+d::ananta/src/ananta/services/discovery_service/interfaces/public.py::DiscoveryServiceAPI::query_process_registry  # owner: service-interface-ast-debt reason: dead ABC abstractmethod stub whose signature drifted from its working concrete override (not a live dispatch bug); stub-signature cleanup tracked as iss_3e638509 expires: 2027-03-27
+d::ananta/src/ananta/services/discovery_service/interfaces/public.py::DiscoveryServiceAPI::get_service_health  # owner: service-interface-ast-debt reason: dead ABC abstractmethod stub whose signature drifted from its working concrete override (not a live dispatch bug); stub-signature cleanup tracked as iss_3e638509 expires: 2027-03-27
+d::ananta/src/ananta/services/discovery_service/interfaces/public.py::DiscoveryServiceAPI::execute_embeddings_search  # owner: service-interface-ast-debt reason: dead ABC abstractmethod stub whose signature drifted from its working concrete override (not a live dispatch bug); stub-signature cleanup tracked as iss_3e638509 expires: 2027-03-27
+d::ananta/src/ananta/services/discovery_service/interfaces/public.py::DiscoveryServiceAPI::get_process_schema  # owner: service-interface-ast-debt reason: dead ABC abstractmethod stub whose signature drifted from its working concrete override (not a live dispatch bug); stub-signature cleanup tracked as iss_3e638509 expires: 2027-03-27
+d::ananta/src/ananta/services/memory_service/interfaces/public.py::MemoryServiceAPI::focus  # owner: service-interface-ast-debt reason: dead ABC abstractmethod stub whose signature drifted from its working concrete override (not a live dispatch bug); stub-signature cleanup tracked as iss_3e638509 expires: 2027-03-27
+d::ananta/src/ananta/services/memory_service/interfaces/public.py::MemoryServiceAPI::unfocus  # owner: service-interface-ast-debt reason: dead ABC abstractmethod stub whose signature drifted from its working concrete override (not a live dispatch bug); stub-signature cleanup tracked as iss_3e638509 expires: 2027-03-27
+d::ananta/src/ananta/services/memory_service/interfaces/public.py::MemoryServiceAPI::get_focused  # owner: service-interface-ast-debt reason: dead ABC abstractmethod stub whose signature drifted from its working concrete override (not a live dispatch bug); stub-signature cleanup tracked as iss_3e638509 expires: 2027-03-27
+d::ananta/src/ananta/services/thinking_service/interfaces/public.py::ThinkingServiceAPI::upsert_plan  # owner: service-interface-ast-debt reason: dead ABC abstractmethod stub whose signature drifted from its working concrete override (not a live dispatch bug); stub-signature cleanup tracked as iss_3e638509 expires: 2027-03-27

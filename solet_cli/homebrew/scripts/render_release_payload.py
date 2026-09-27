@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import uuid
@@ -37,6 +38,28 @@ _V3_PROVENANCE_KEYS = frozenset(
 )
 _V3_CONTRACT_KEYS = frozenset({"flow_id", "flow_schema_version", "bundle_digest"})
 _MIGRATION_KEYS = frozenset({"from_repository", "to_repository"})
+# The exact closed key set of a schema-v1 release manifest (design §7.1),
+# duplicated here rather than imported: this script ships in the manager
+# payload and stays dependency-free, same as its own metadata validators
+# below. `seed_factory_plugin.release_manifest` and
+# `solet_manager.release_identity` each hold their own copy for the same
+# reason; the three must be kept in agreement by hand.
+_MANIFEST_KEYS = frozenset(
+    {
+        "schema_version",
+        "release_label",
+        "manager_release_tag",
+        "seed",
+        "components",
+        "bundle_verdict",
+        "guest_validation",
+        "manager",
+        "tap",
+        "surface_digests",
+        "produced_by",
+        "factory_signature",
+    }
+)
 _REQUIRED = frozenset(
     {
         "formula_revision",
@@ -69,6 +92,7 @@ class _RepositoryIdentity:
 def main() -> int:
     args = _parser().parse_args()
     metadata = _load_metadata(args.metadata)
+    manifest = _load_manifest(args.manifest)
     substitutions = {
         "INSTALL_MODE": metadata["install_mode"],
         "MANAGER_URL": metadata["manager_url"],
@@ -91,16 +115,33 @@ def main() -> int:
         "ALLOWED_REPOSITORY_MIGRATIONS": json.dumps(
             metadata["allowed_repository_migrations"], separators=(",", ":"), sort_keys=True
         ),
+        # iss_18c47206: the consumption-side pairing gate
+        # (`solet_manager.release_identity_gate`) reads its manifest from the
+        # KEG (`sys.prefix/share/solet/release_manifest.json`), never from a
+        # release asset -- nothing previously installed one there, so the
+        # stage-5 `allow_manager_seed_skew` escape hatch never reached the
+        # gate. Ship the same stage-5 draft `stage_release.py` already writes
+        # beside the Formula; its `seed`/`manager` sections are exactly what
+        # the gate compares, and the sections a later `publish_release` stage
+        # owns (`tap`, `surface_digests`, ...) are already `null` in the draft.
+        "RELEASE_MANIFEST_JSON": json.dumps(manifest, separators=(",", ":"), sort_keys=True),
     }
     root = Path(__file__).resolve().parents[1]
+    lock_destination = args.output_root / "solet_cli" / "homebrew" / "seed.lock.json"
+    _render(root / "seed.lock.json.template", lock_destination, substitutions)
+    # existing_install_inspection_seed_lock_catalog.v1.json's seed_lock_sha256
+    # must equal sha256 of the lock exactly as it will actually ship (which
+    # embeds this release's own payload digest), so it can only be computed
+    # AFTER the lock above is rendered -- never baked into wheel package data
+    # at manager-source-commit time (iss_42749563: that would need the wheel's
+    # own bytes to already contain a hash of a lock that itself hashes the
+    # wheel, which no release could ever satisfy).
+    substitutions["EXISTING_INSTALL_SEED_LOCK_SHA256"] = hashlib.sha256(
+        lock_destination.read_bytes()
+    ).hexdigest()
     _render(
         root / "Formula" / "solet.rb.template",
         args.output_root / "Formula" / "solet.rb",
-        substitutions,
-    )
-    _render(
-        root / "seed.lock.json.template",
-        args.output_root / "solet_cli" / "homebrew" / "seed.lock.json",
         substitutions,
     )
     # The Formula's ``seeds`` symlink exposes this tap catalog to
@@ -119,14 +160,50 @@ def main() -> int:
         ),
         substitutions,
     )
+    _verify_existing_install_seed_lock_catalog(args.output_root, lock_destination)
     return 0
+
+
+def _verify_existing_install_seed_lock_catalog(output_root: Path, lock_destination: Path) -> None:
+    """Refuse the release if the rendered Formula's catalog entry and the
+    rendered lock it must match ever disagree (design ask, iss_42749563):
+    re-derive both independently from what actually landed on disk rather
+    than trusting the substitution dict this process already built."""
+    expected = hashlib.sha256(lock_destination.read_bytes()).hexdigest()
+    formula_text = (output_root / "Formula" / "solet.rb").read_text(encoding="utf-8")
+    match = re.search(r'"seed_lock_sha256":\s*"([0-9a-f]{64})"', formula_text)
+    if match is None:
+        raise SystemExit(
+            "rendered Formula is missing the existing-install seed lock catalog entry"
+        )
+    if match.group(1) != expected:
+        raise SystemExit(
+            f"rendered Formula's existing-install catalog seed_lock_sha256 {match.group(1)!r} "
+            f"does not match sha256 of the rendered seed.lock.json {expected!r}"
+        )
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--metadata", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     return parser
+
+
+def _load_manifest(path: Path) -> dict[str, object]:
+    try:
+        raw: object = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"release manifest is unreadable: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise SystemExit("release manifest must be a JSON object")
+    manifest = cast(dict[str, object], raw)
+    if frozenset(manifest) != _MANIFEST_KEYS:
+        raise SystemExit("release manifest must contain exactly " + ", ".join(sorted(_MANIFEST_KEYS)))
+    if not isinstance(manifest.get("manager"), dict) or not isinstance(manifest.get("seed"), dict):
+        raise SystemExit("release manifest must carry closed 'manager' and 'seed' sections")
+    return manifest
 
 
 def _load_metadata(path: Path) -> dict[str, object]:

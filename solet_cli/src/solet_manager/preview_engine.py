@@ -31,6 +31,7 @@ from .errors import (
     StateError,
 )
 from .flow import (
+    PlannedOperation,
     SetupPlan,
     active_discovered_decision_ids,
     approval_fingerprint,
@@ -50,7 +51,7 @@ from .operation_reconciliation import (
     load_transaction_for_operation_reconciliation,
     reconcile_pinned_operation_attempt,
 )
-from .operation_records import next_attempt, operation_request
+from .operation_records import next_attempt, operation_probe_request, operation_request
 from .paths import ManagerPaths
 from .permission_preflight import (
     permission_preflight_fingerprint_content,
@@ -884,6 +885,8 @@ def _probe_operations(
 ) -> tuple[dict[str, OperationResult], list[str]]:
     results: dict[str, OperationResult] = {}
     failures: list[str] = []
+    runnable_ids: set[str] = set()
+    remediation_observations: dict[str, OperationResult] = {}
     for operation in plan.operations:
         request = operation_request(
             transaction,
@@ -901,9 +904,119 @@ def _probe_operations(
             invoke_adapter(registry, runner=operation.runner, request=request),
         )
         results[operation.operation_id] = result
-        if _operation_probe_blocks(operation.requires_confirmation, result):
+        blocks = (
+            _operation_probe_blocks(operation.requires_confirmation, result)
+            and not _precondition_remediation_scheduled(bundle, operation, runnable_ids)
+            and not _scheduled_peer_remediates_block(
+                transaction,
+                bundle,
+                plan,
+                registry,
+                result,
+                runnable_ids,
+                remediation_observations,
+            )
+        )
+        if blocks:
             failures.append(operation.operation_id)
+        else:
+            runnable_ids.add(operation.operation_id)
     return results, failures
+
+
+def _precondition_remediation_scheduled(
+    bundle: ContractBundle,
+    operation: PlannedOperation,
+    runnable_ids: set[str],
+) -> bool:
+    """True when this round already carries the fix for the block.
+
+    A precondition probe can name the operation(s) that resolve it
+    (``remediation_operation_refs``); if one of those is already scheduled
+    earlier in this same frontier and is itself runnable, the block is not
+    a genuine external blocker -- it is this operation waiting its turn
+    behind a peer that will satisfy the precondition once applied. Mirrors
+    the self-remediation exception ``operation_executor._pre_apply_stop``
+    already grants at apply time, generalized to any preceding peer.
+    """
+    for probe_id in operation.precondition_probe_ids:
+        probe = bundle.probes.get(probe_id)
+        if probe is None:
+            continue
+        remediation_refs = probe.get("remediation_operation_refs")
+        if not isinstance(remediation_refs, list):
+            continue
+        if any(ref in runnable_ids for ref in remediation_refs if isinstance(ref, str)):
+            return True
+    return False
+
+
+def _scheduled_peer_remediates_block(
+    transaction: Transaction,
+    bundle: ContractBundle,
+    plan: SetupPlan,
+    registry: AdapterRegistry,
+    result: OperationResult,
+    runnable_ids: set[str],
+    observations: dict[str, OperationResult],
+) -> bool:
+    """True when a runnable peer's own postcondition is this block's reason.
+
+    An adapter can block on a condition its flow entry does not name as a
+    precondition (the Core AI LaunchAgent deferral holds
+    ``install_launchagent`` on the unverified pinned asset). The block is not
+    an external blocker when a peer already runnable in this round declares a
+    postcondition probe that remediates to that peer, and that probe
+    currently blocks with the same ``error_kind``: applying the peer is what
+    clears it. Fail-closed: a blocked peer is never runnable, an unobserved
+    or passing probe excuses nothing, and a different reason stays blocked.
+    """
+    if result.checkpoint_status is not CheckpointStatus.BLOCKED or not result.error_kind:
+        return False
+    for peer in plan.operations:
+        if peer.operation_id not in runnable_ids:
+            continue
+        for probe_id in peer.postcondition_probe_ids:
+            if not _probe_names_remediation(bundle, probe_id, peer.operation_id):
+                continue
+            observed = observations.get(probe_id)
+            if observed is None:
+                observed = _observe_remediation_probe(transaction, bundle, registry, peer, probe_id)
+                observations[probe_id] = observed
+            if (
+                observed.checkpoint_status is CheckpointStatus.BLOCKED
+                and observed.error_kind == result.error_kind
+            ):
+                return True
+    return False
+
+
+def _probe_names_remediation(bundle: ContractBundle, probe_id: str, operation_id: str) -> bool:
+    probe = bundle.probes.get(probe_id)
+    remediation_refs = None if probe is None else probe.get("remediation_operation_refs")
+    return isinstance(remediation_refs, list) and operation_id in remediation_refs
+
+
+def _observe_remediation_probe(
+    transaction: Transaction,
+    bundle: ContractBundle,
+    registry: AdapterRegistry,
+    peer: PlannedOperation,
+    probe_id: str,
+) -> OperationResult:
+    runner, request = operation_probe_request(
+        transaction,
+        bundle,
+        peer,
+        probe_id=probe_id,
+        purpose="preview",
+        attempt=next_attempt(transaction, probe_id),
+    )
+    return advisory_inference_probe_result(
+        transaction.answers,
+        request,
+        invoke_adapter(registry, runner=runner, request=request),
+    )
 
 
 def _operation_probe_blocks(
@@ -1129,7 +1242,12 @@ def _setup_preview_result(
     return CommandResult(
         kind="create_preview",
         status="verified" if verified else "awaiting_user" if blocking else "preview_ready",
-        message=_preview_message(config, evaluated.decision_errors),
+        message=_preview_message(
+            config,
+            evaluated.decision_errors,
+            evaluated.unresolved_actions,
+            evaluated.operation_results,
+        ),
         exit_code=(ExitCode.OK if verified or not blocking else ExitCode.HUMAN_ACTION),
         error_kind=(
             "decisions_required"
@@ -1143,6 +1261,8 @@ def _setup_preview_result(
             blocking,
             keys,
             evaluated.decision_errors,
+            evaluated.unresolved_actions,
+            evaluated.operation_results,
         ),
         data=data,
     )
@@ -1185,6 +1305,8 @@ def _preview_repair(
     blocking: bool,
     keys: list[str],
     errors: list[JsonValue],
+    unresolved_actions: list[str],
+    operation_results: dict[str, OperationResult],
 ) -> str | None:
     unavailable_ids = _decision_error_ids(errors, "adapter_missing")
     if unavailable_ids:
@@ -1200,9 +1322,31 @@ def _preview_repair(
         return _candidate_set_empty_repair(errors)
     if decision_required:
         return "Add these exact [decisions] keys: " + ", ".join(keys) + "; then re-run preview."
+    if unresolved_actions:
+        return _unresolved_action_repair(unresolved_actions, operation_results)
     if blocking:
         return "Resolve every listed consent, adapter probe, and host action before approval."
     return None
+
+
+def _unresolved_action_repair(
+    unresolved_actions: list[str],
+    operation_results: dict[str, OperationResult],
+) -> str:
+    return " ".join(
+        _named_action_reason(operation_id, operation_results.get(operation_id))
+        for operation_id in sorted(set(unresolved_actions))
+    )
+
+
+def _named_action_reason(operation_id: str, result: OperationResult | None) -> str:
+    if result is None:
+        return f"{operation_id} is unresolved."
+    reason = result.error_kind or result.checkpoint_status.value
+    detail = f"{operation_id} is {result.checkpoint_status.value} ({reason})."
+    if result.repair:
+        detail += f" {result.repair}"
+    return detail
 
 
 def _adapter_missing_repair(ids: list[str], errors: list[JsonValue]) -> str:
@@ -1234,7 +1378,12 @@ def _candidate_set_empty_repair(errors: list[JsonValue]) -> str:
     )
 
 
-def _preview_message(config: CreateConfig, errors: list[JsonValue]) -> str:
+def _preview_message(
+    config: CreateConfig,
+    errors: list[JsonValue],
+    unresolved_actions: list[str],
+    operation_results: dict[str, OperationResult],
+) -> str:
     unavailable_ids = _decision_error_ids(errors, "adapter_missing")
     if unavailable_ids:
         decisions = ", ".join(repr(item) for item in unavailable_ids)
@@ -1258,6 +1407,11 @@ def _preview_message(config: CreateConfig, errors: list[JsonValue]) -> str:
             f"Required decision {decisions} expected discovery to return at least "
             "one candidate; found zero. No decision value can be supplied until "
             "the declared provider returns a candidate."
+        )
+    if unresolved_actions:
+        return (
+            f'Solet "{config.name}" setup is blocked: '
+            + _unresolved_action_repair(unresolved_actions, operation_results)
         )
     return f'Resume Solet "{config.name}" at {config.target}'
 

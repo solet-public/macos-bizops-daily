@@ -8,7 +8,10 @@ and a draft ``release_manifest.json`` (schema v1 per the `publish_release`
 design §7.1 — seed and manager sections only; the remaining sections are
 finalised by later stages of that verb, out of this script's job), and then
 calls the existing ``render_release_payload.py`` to produce the real
-``Formula/solet.rb`` and ``solet_cli/homebrew/seed.lock.json``.
+``Formula/solet.rb`` and ``solet_cli/homebrew/seed.lock.json`` -- the Formula
+also installs this same draft into the keg as
+``share/solet/release_manifest.json``, which is what lets the consumption-side
+pairing gate (``solet_manager.release_identity_gate``) read it (iss_18c47206).
 
 Deliberately does not touch git, GitHub, or any credential: it reads a
 worktree that has already been checked out (by the workflow, or by hand for
@@ -294,7 +297,7 @@ def stage(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
-    _render(metadata_path, output_root)
+    _render(metadata_path, manifest_path, output_root)
 
     return StageResult(
         output_root=output_root,
@@ -869,7 +872,7 @@ def _git(checkout: Path, *args: str) -> str:
     return result.stdout
 
 
-def _render(metadata_path: Path, output_root: Path) -> None:
+def _render(metadata_path: Path, manifest_path: Path, output_root: Path) -> None:
     renderer = Path(__file__).resolve().parent / "render_release_payload.py"
     subprocess.run(
         [
@@ -877,6 +880,8 @@ def _render(metadata_path: Path, output_root: Path) -> None:
             str(renderer),
             "--metadata",
             str(metadata_path),
+            "--manifest",
+            str(manifest_path),
             "--output-root",
             str(output_root),
         ],

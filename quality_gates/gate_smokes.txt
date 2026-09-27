@@ -1014,6 +1014,32 @@ ananta/tests/llm/session_ledger/quiescent_drain_smoke.py
 # preserved and the downstream limit still honoured.
 ananta/tests/llm/session_ledger/quiescent_read_bounds_smoke.py
 
+# away_summary_bounded_read_smoke (iss_8b8a970b, 2026-09-27): the SAME class of
+# defect as quiescent_read_bounds_smoke above, one call deeper —
+# find_latest_away_summary_for_session's cross-sibling event query hit the
+# unbounded read_state cap on every drain, live in production 420 times
+# 2026-09-24..27 for one conversation group with a 7,860-event sibling. Pins the
+# fix (bounded query_ordered, newest-100-by-event_at page) against a fake state
+# that models the SAME cap-refusal production enforces (not a shortcut that
+# assumes it away), proves the OLD unbounded shape still raises on the same
+# fixture (so the fake is faithful), and documents the fix's known bounded-miss
+# limitation as an explicit assertion, not a silent gap.
+ananta/tests/llm/session_ledger/away_summary_bounded_read_smoke.py
+
+# summarize_outcome_visibility_smoke (iss_b535985b, 2026-09-27): the drain's
+# outcome counters and logging, split by branch (seeded/extracted/inferred/
+# marked_trivial/skipped_empty/errored) so a DETERMINISTIC per-session failure
+# (never self-clears) is distinguishable from a TRANSIENT one and both are
+# loud (WARNING), not folded into one silent "skipped" bucket. Pins: a clean
+# drain logs no WARNING; errored vs skipped_empty counted and warned
+# separately (with back-compat aggregates preserved); a per-session
+# consecutive-failure streak that increments across drains and resets on
+# recovery, never sentinel-marking the failing session; and the inference
+# branch (branch 3) accepts the REAL macos_inference_plugin Apple FM result
+# envelope shape (read directly from
+# apple_fm_provider.py's generate_completion, not an idealized stub).
+ananta/tests/llm/session_ledger/summarize_outcome_visibility_smoke.py
+
 # LED-01 event-content embedding producer + search (2026-07-06). Pins: the
 # operator scope filter incl. the Codex reasoning-subtype EXCLUSION (red-first:
 # neutralizing the subtype check flips it) and worklog INCLUSION; window+overlap
@@ -1361,6 +1387,17 @@ plugins/github_midwife_plugin/tests/macos_free_profile_smoke.py
 # (incl. loading the real Slice A profile template). Offline
 # (subprocess.run mocked throughout; no real pip/network).
 plugins/github_midwife_plugin/tests/profile_install_faildloud_smoke.py
+# profile_install_vendor_find_links_smoke (iss_7994d8bb, 2026-09-27): pins the
+# --find-links-from-vendor/ fix to install_profile_allowlist/_install_editable
+# -- a plugin's own vendor/*.whl now beats a PyPI sdist that may need a
+# toolchain (e.g. Xcode) the target machine lacks. RED loads the pre-fix
+# profile_install.py blob from commit a4d968ed7 via `git show` (read-only) and
+# proves it built the pip command with no --find-links; GREEN proves the
+# current code adds it, keyed only on vendor/*.whl presence, never a package
+# name; two negative controls prove a plugin with no vendor/ wheel gets no
+# --find-links and that a genuine pip failure for it still raises loud.
+# Offline (subprocess.run mocked throughout; no real pip/network; the one git
+# call is a read-only `git show` of already-committed history).
 plugins/github_midwife_plugin/tests/dependency_provisioning_noop_gate.py
 
 # github_midwife_plugin genesis Slice C (2026-07-09, RISKY — flagged for a
@@ -4337,6 +4374,18 @@ solet_cli/tests/precondition_subset_siblings_smoke.py
 solet_cli/tests/source_acquisition_smoke.py
 solet_cli/tests/stage_frontier_smoke.py
 
+# iss_b37a1814 (2026-09-27): an operation blocked only by a not-yet-run peer
+# already scheduled in the same frontier round (here, configure_coreai_embeddings
+# waiting on acquire_coreai_asset) must not be folded into unresolved_actions --
+# doing so froze solet create's preview at awaiting_user forever, since
+# cli_commands.run_create_command never attempts anything unless status is
+# exactly preview_ready. Offline; red-first against the pre-fix code.
+# Recurrence (2026-09-27, R47 macOS 27 guest): install_launchagent's own adapter
+# defers on the unacquired Core AI asset, a block the flow declares no
+# precondition for. The smoke now drives the REAL plan-builder models stage
+# (not a hand-picked two-op plan) and is red against 4f03dd218's engine.
+solet_cli/tests/apple_preview_deadlock_smoke.py
+
 # iss_7d9c5f5a (2026-09-06): an empty operation plan is approval-ready only
 # when the frontier is empty and every stage is verified/not_applicable. The
 # smoke proves normal completion then promotes the transaction, while pending
@@ -4976,7 +5025,6 @@ plugins/macos_self_deployment_plugin/tests/dry_run_default_safety_smoke.py
 # Cold first-boot knowledge hydration must not delay the runtime action poller
 # or router-registration deadline. Event fixture; no wall-clock sleep.
 ananta/tests/core/orchestration/cold_boot_knowledge_hydration_deferral_smoke.py
-ananta/tests/core/orchestration/selected_inference_startup_smoke.py
 
 # r28 fourth target-readiness mechanism: an identity-seeding startup fatal
 # stops already-started async lifecycle workers before CPython finalization.
@@ -4992,6 +5040,12 @@ ananta/tests/core/plugins/startup_failure_lifecycle_shutdown_smoke.py
 plugins/coreai_embeddings_plugin/tests/native_contract_smoke.py
 plugins/coreai_embeddings_plugin/tests/runtime_contract_smoke.py
 plugins/coreai_embeddings_plugin/tests/wheel_resources_smoke.py
+
+# iss_0a40ccfc: fresh-boot order (prepare_for_readiness before the real
+# config loads via initialize()) and reload_plugin_config both left the
+# plugin invalidated with nothing to re-prepare it. Offline; fakes the
+# runtime at the model boundary.
+plugins/coreai_embeddings_plugin/tests/boot_order_readiness_smoke.py
 
 # Apple wave 44 D2 (iss_3aa20e42): macOS Foundation Models provider typed
 # unavailable warnings, plugin contract, and provider isolation. Offline SDK
@@ -5060,8 +5114,10 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/real_style_sweep_writes_7_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/real_style_sweep_writes_8_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/real_style_sweep_applies_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: ananta/tests/core/orchestration/selected_inference_startup_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin; absent from macos_free_minimal and macos_samantha, which ship default_inference_plugin instead (iss_76ae2d4d, cross_bundle_transition)
 # not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
 # not shipped: plugins/macos_inference_plugin/tests/legacy_plugin_coexistence_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
+# not shipped: plugins/github_midwife_plugin/tests/profile_install_vendor_find_links_smoke.py requires repository history (its RED fixture reads one pinned pre-fix commit's blob via `git show`); a born clone is a git-archive extract with no .git (repository_hygiene)
 
 # LM Studio provisioning, singleton login and passive diagnostics
 plugins/github_midwife_plugin/tests/lm_studio_provisioning_smoke.py

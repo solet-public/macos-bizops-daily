@@ -37,6 +37,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[1]
 _RENDERER = _ROOT / "scripts" / "render_release_payload.py"
 _EXAMPLE = _ROOT / "release_metadata.example.json"
+_EXAMPLE_MANIFEST = _ROOT / "release_manifest.example.json"
 _REPOSITORY = _ROOT.parents[1]
 
 _RESOURCE_BLOCK = re.compile(
@@ -107,6 +108,8 @@ def _render_formula(root: Path) -> str:
             str(_RENDERER),
             "--metadata",
             str(_EXAMPLE),
+            "--manifest",
+            str(_EXAMPLE_MANIFEST),
             "--output-root",
             str(output),
         ],

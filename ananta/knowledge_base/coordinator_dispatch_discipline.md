@@ -261,6 +261,12 @@ After accepted dispatch completion, request Git-Controller landing separately
 with the exact scoped paths and the registered gate evidence. Later ancestry,
 deployment, publication, and cold-host proof remain distinct boundaries.
 
+Retiring the lane here is item (d) of the canonical [[Change Close-Out
+Checklist — Landing and Cutover Are Not "Done"]]; that article's items (a)–(c)
+— issue disposition, the doc-impact statement, and reviewer follow-ups filed
+with ids — are the coordinator's other close-out obligations after the same
+cutover, not separate later sweeps.
+
 ## 8. Coordinator plan is a projection
 
 The coordinator may maintain a plan or task list for operator readability, but

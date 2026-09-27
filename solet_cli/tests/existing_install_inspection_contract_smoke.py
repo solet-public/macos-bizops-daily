@@ -457,8 +457,10 @@ def _assert_installed_wheel_record_proof() -> None:
                 resource.chmod(0o666)
                 expected_error = "writable by group or other"
             elif case == "missing_record":
+                # A real Homebrew-poured keg measurably omits RECORD (see
+                # _read_recorded_package_bytes); the loader falls back to the
+                # ownership/symlink/write-bit checks alone and succeeds.
                 record.unlink()
-                expected_error = "requires exactly one wheel RECORD"
             completed = _run_installed_wheel_reader(site)
             if expected_error:
                 assert completed.returncode != 0
@@ -505,7 +507,23 @@ def _assert_released_pre_manager_anchor_proof() -> None:
         )
         seed = site / "share" / "solet" / "seed.lock.json"
         seed.parent.mkdir(parents=True)
-        seed.write_bytes(_installed_seed_lock_bytes())
+        seed_bytes = _installed_seed_lock_bytes()
+        seed.write_bytes(seed_bytes)
+        catalog = site / "share" / "solet" / "existing_install_inspection_seed_lock_catalog.v1.json"
+        catalog.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "channels": [
+                        {
+                            "channel_id": "stable",
+                            "seed_lock_sha256": hashlib.sha256(seed_bytes).hexdigest(),
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
         target = root / "target"
         _create_released_anchor_target(target)
         completed = _run_installed_anchor_inspection(site, target)

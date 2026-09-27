@@ -139,8 +139,8 @@ def _qualify_provider(
 class _InferenceQualificationMixin:
     """Keeps the public provider probe outside the orchestration wrapper."""
 
-    def qualify(self, params: dict[str, Any], state: dict[str, Any]) -> ActionResult:
-        del params, state
+    def qualify(self, *, state: dict[str, Any] | None = None) -> ActionResult:
+        del state
         service = cast("InferenceService", self)
         plugin = service._ensure_provider_ready()
         return _qualify_provider(

@@ -35,16 +35,19 @@ class InferenceServiceAPI(ABC):
     )
     def qualify(
         self,
-        params: dict[str, Any],
-        state: dict[str, Any],
+        *,
+        state: dict[str, Any] | None = None,
     ) -> ActionResult:
         """Issue one bounded structured request against the bound provider.
 
         SessionInferenceProvider inherits this decorated registration surface
         but cannot perform a local provider probe; the concrete service wrapper
-        owns the bound-provider implementation.
+        owns the bound-provider implementation. Registered with zero schema
+        parameters (EDGE, bare-call convention): the signature must accept
+        only what a bare ``service_interface::inference_service::qualify``
+        call actually supplies, never a positional ``params`` dict (iss_64999dbe).
         """
-        del params, state
+        del state
         raise NotImplementedError("qualify is implemented by InferenceService")
 
     @service_interface_process(

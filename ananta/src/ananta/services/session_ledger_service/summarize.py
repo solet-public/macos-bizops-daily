@@ -146,6 +146,20 @@ _AUTO_SUMMARIZE_TRIVIAL_MIN_EVENTS = 4
 # conversation and noise-only sessions are correctly marked trivial.
 _CONVERSATION_ROLES = frozenset({MessageRole.USER.value, MessageRole.ASSISTANT.value})
 
+# iss_8b8a970b / iss_b535985b fix (2026-09-27): a deterministic per-session
+# failure (an exception raised from inside ``_summarize_one_session``, caught
+# by ``_summarize_row``) must not retry silently forever — the "transient skip
+# self-clears on a later drain" invariant this module otherwise relies on is
+# false for a failure whose cause never changes drain to drain. The singleton
+# drain guard (``BoundedSummaryExecutor``) ensures at most one drain runs at a
+# time, so a plain module-level dict is the smallest sound mechanism: no
+# locking, no schema change, no new state-service table. It is intentionally
+# process-lifetime only (resets on restart) — durable tracking would need a
+# real column and this is a visibility aid, not a correctness mechanism (the
+# session's actual eligibility is still governed by the sentinel/idempotency
+# rules, untouched by this counter).
+_CONSECUTIVE_ERROR_COUNTS: dict[str, int] = {}
+
 
 class SessionLedgerSummarizeMixin(SessionLedgerSummarizeAPI):
     """M6 summarization surface: codex-stage1 seed lift + auto-summarize cron.
@@ -352,9 +366,14 @@ class SessionLedgerSummarizeMixin(SessionLedgerSummarizeAPI):
         * LIVENESS (termination): ``attempted`` holds every id tried this drain;
           each pass processes only the fresh (not-yet-attempted) rows and stops
           when a page surfaces none. It grows ≥1 per pass over a finite universe,
-          so the loop always terminates — even for a ``"skipped"`` return, which
-          (in the transient inference-empty case) writes neither a ``__summary``
-          row nor a sentinel and would otherwise re-list forever.
+          so the loop always terminates — even for a ``"skipped_empty"`` or
+          ``"errored"`` return, neither of which writes a ``__summary`` row or a
+          sentinel and would otherwise re-list forever. ``"errored"`` additionally
+          gets a per-session consecutive-failure counter (module-level
+          ``_CONSECUTIVE_ERROR_COUNTS``) so a session whose failure is actually
+          DETERMINISTIC (never self-clears, unlike a transient
+          ``"skipped_empty"``) is visible at WARNING level instead of retrying
+          silently forever (iss_8b8a970b/iss_b535985b, 2026-09-27).
         * COVERAGE: progress requires processed rows to LEAVE eligibility.
           Summarized (→ ``__summary`` row) AND deterministic no-content skips
           (→ sentinel via ``_mark_unsummarizable``) both do, so no persistent
@@ -365,7 +384,14 @@ class SessionLedgerSummarizeMixin(SessionLedgerSummarizeAPI):
           re-picks it once the backend recovers.
         """
         attempted: set[str] = set()
-        counts = {"summarized": 0, "marked_trivial": 0, "skipped": 0}
+        # Per-branch outcome counts (iss_b535985b: the aggregate "summarized"/
+        # "skipped" buckets hid which branch actually ran and, since 09-24,
+        # hid that "skipped" was overwhelmingly a deterministic error, not a
+        # transient one — see _summarize_row and _request_inference_summary).
+        counts = {
+            "seeded": 0, "extracted": 0, "inferred": 0,
+            "marked_trivial": 0, "skipped_empty": 0, "errored": 0,
+        }
         iterations = 0
         while True:
             candidates = self._repository.list_quiescent_sessions(
@@ -389,17 +415,39 @@ class SessionLedgerSummarizeMixin(SessionLedgerSummarizeAPI):
                 session_id = str(row.get("id"))
                 attempted.add(session_id)
                 counts[_summarize_row(self._summarize_one_session, session_id, row)] += 1
+        summarized = counts["seeded"] + counts["extracted"] + counts["inferred"]
+        skipped = counts["skipped_empty"] + counts["errored"]
         logger.info(
-            "auto-summarize DRAIN complete: examined=%d summarized=%d "
-            "marked_trivial=%d skipped=%d iterations=%d (quiescence=%dm, batch=%d)",
-            len(attempted), counts["summarized"], counts["marked_trivial"],
-            counts["skipped"], iterations, quiescence_minutes, batch_size,
+            "auto-summarize DRAIN complete: examined=%d seeded=%d extracted=%d "
+            "inferred=%d marked_trivial=%d skipped_empty=%d errored=%d "
+            "iterations=%d (quiescence=%dm, batch=%d)",
+            len(attempted), counts["seeded"], counts["extracted"],
+            counts["inferred"], counts["marked_trivial"], counts["skipped_empty"],
+            counts["errored"], iterations, quiescence_minutes, batch_size,
         )
+        # Standing guidance: provider/backend outages fail LOUDLY, never
+        # silently. The INFO line above is easy to skim past; a WARNING fires
+        # whenever this drain produced ANY non-clean outcome so an operator
+        # watching only WARNING+ still sees it.
+        if counts["errored"] or counts["skipped_empty"]:
+            logger.warning(
+                "auto-summarize DRAIN had non-clean outcomes: errored=%d "
+                "skipped_empty=%d (of %d examined) — see per-session ERROR/"
+                "WARNING lines above for which session_id(s) and why "
+                "(quiescence=%dm, batch=%d)",
+                counts["errored"], counts["skipped_empty"], len(attempted),
+                quiescence_minutes, batch_size,
+            )
         return {
             "sessions_examined": len(attempted),
-            "sessions_summarized": counts["summarized"],
+            "sessions_summarized": summarized,
+            "sessions_seeded": counts["seeded"],
+            "sessions_extracted": counts["extracted"],
+            "sessions_inferred": counts["inferred"],
             "sessions_marked_trivial": counts["marked_trivial"],
-            "sessions_skipped": counts["skipped"],
+            "sessions_skipped": skipped,
+            "sessions_skipped_empty": counts["skipped_empty"],
+            "sessions_errored": counts["errored"],
             "drain_iterations": iterations,
         }
 
@@ -419,9 +467,10 @@ class SessionLedgerSummarizeMixin(SessionLedgerSummarizeAPI):
            sentinel), push that text through ``push_summary_chunk`` so it
            becomes searchable too — Architect's authoritative-title
            mapping was previously the silent reason claude_code sessions
-           never got embedded by M6.
+           never got embedded by M6. Returns ``"seeded"``.
         1. Cheap SQL for an existing claude_code ``away_summary`` recap —
            if present, write it as the summary chunk (zero inference).
+           Returns ``"extracted"``.
         2. DETERMINISTICALLY unsummarizable → write the trivial sentinel and
            return ``"marked_trivial"`` so the session LEAVES eligibility (never
            re-listed). Three cases: below the trivial floor (< 4 events OR no
@@ -431,16 +480,25 @@ class SessionLedgerSummarizeMixin(SessionLedgerSummarizeAPI):
         3. Otherwise build a transcript and run the inference fallback
            SYNCHRONOUSLY (this method only ever runs on the drain's daemon
            thread, so the model call cannot park the action queue). A usable
-           completion is pushed and returns ``"summarized"``; an empty/failed
-           completion is a TRANSIENT skip → returns ``"skipped"`` WITHOUT a
-           sentinel (summary_text stays NULL → deliberately re-picked on a later
-           drain so a recovered backend self-resolves it).
+           completion is pushed and returns ``"inferred"``; an empty/failed
+           completion is a TRANSIENT skip → returns ``"skipped_empty"`` WITHOUT
+           a sentinel (summary_text stays NULL → deliberately re-picked on a
+           later drain so a recovered backend self-resolves it) — and logs a
+           per-session WARNING naming the provider result shape it could not
+           extract text from (iss_b535985b, 2026-09-27).
 
         Returns one of
-        ``{"summarized", "marked_trivial", "skipped"}``.
-        The ``generated_by_client_id`` on each push attributes which
-        branch produced the summary so post-hoc audits can split
-        custom_title seeds, extracted recaps, and inference output.
+        ``{"seeded", "extracted", "inferred", "marked_trivial", "skipped_empty"}``
+        — the caller (:func:`_summarize_row`) adds a sixth, ``"errored"``, for
+        an exception raised anywhere in this method. The finer split (2026-09-27,
+        iss_b535985b) replaces the old three-bucket ``{"summarized",
+        "marked_trivial", "skipped"}``; the drain's DRAIN-complete log line and
+        return dict still report the old aggregates too
+        (``summarized = seeded + extracted + inferred``,
+        ``skipped = skipped_empty + errored``) so existing consumers of the
+        aggregate counts are unaffected. The ``generated_by_client_id`` on each
+        push attributes which branch produced the summary so post-hoc audits can
+        split custom_title seeds, extracted recaps, and inference output.
         M19 added ``source_kind`` so branch 0 can pick a source-specific
         seed discriminator (e.g. Codex state_5 → ``codex_state_title_seed``)
         per v2 §5.5; sources not present in
@@ -460,7 +518,7 @@ class SessionLedgerSummarizeMixin(SessionLedgerSummarizeAPI):
                 summary_text=existing_summary_text,
                 generated_by_client_id=seed_discriminator,
             )
-            return "summarized"
+            return "seeded"
 
         extracted = self._repository.find_latest_away_summary_for_session(
             session_id,
@@ -472,7 +530,7 @@ class SessionLedgerSummarizeMixin(SessionLedgerSummarizeAPI):
                 summary_text=extracted,
                 generated_by_client_id=_AUTO_SUMMARIZE_CLIENT_ID_EXTRACTED,
             )
-            return "summarized"
+            return "extracted"
 
         events = self._repository.get_session_timeline(
             session_id=session_id,
@@ -505,19 +563,22 @@ class SessionLedgerSummarizeMixin(SessionLedgerSummarizeAPI):
         summary_text = _request_inference_summary(
             inference_service=self._inference_service,
             transcript=transcript,
+            session_id=session_id,
         )
         if not summary_text:
             # TRANSIENT skip (backend empty/down): deliberately NOT sentinel-marked
             # → re-picked on a later drain so it self-resolves. The attempted-set
             # prevents an intra-drain spin; a same-fire stall self-clears next fire.
-            return "skipped"
+            # _request_inference_summary already logged a per-session WARNING
+            # naming the provider result shape it could not extract text from.
+            return "skipped_empty"
         self._summary_writer.push_summary_chunk(
             session_id=session_id,
             chunk_index=0,
             summary_text=summary_text,
             generated_by_client_id=_AUTO_SUMMARIZE_CLIENT_ID_INFERRED,
         )
-        return "summarized"
+        return "inferred"
 
     def ensure_periodic_summarize_schedule(
         self,
@@ -557,12 +618,27 @@ def _summarize_row(
     session_id: str,
     row: dict[str, object],
 ) -> str:
-    """Summarize one drain row; map any per-session error to ``"skipped"``.
+    """Summarize one drain row; map any per-session error to ``"errored"``.
 
     A module-level free function (not a method) so it stays off
     ``SessionLedgerSummarizeMixin``'s god-class LOC budget. It owns the
     per-session ``try/except`` so the drain's counting never sees an
     exception leak past here — one bad session cannot kill the drain.
+
+    iss_8b8a970b/iss_b535985b (2026-09-27): an exception here is NOT assumed
+    transient the way an empty inference completion is — some causes (e.g. a
+    conversation group whose event volume permanently exceeds a bounded read's
+    window) never self-clear, and the session is never sentinel-marked on this
+    path (doing so would misrepresent a real failure as "successfully assessed
+    as trivial"), so it retries every drain forever by design. That is only
+    safe if a permanently-failing session is VISIBLE, not just silently
+    retried: this tracks a per-session consecutive-failure count
+    (``_CONSECUTIVE_ERROR_COUNTS``) and logs it at WARNING (in addition to the
+    existing per-exception ``logger.exception`` traceback), so "same failure
+    N consecutive drains" is greppable without reading every traceback. The
+    counter resets on any non-error outcome for that session_id — a session
+    that eventually succeeds or resolves deterministically is no longer
+    "stuck" and should not keep inflating a stale count.
     """
     existing_summary = row.get("summary_text")
     existing_summary_text = (
@@ -571,7 +647,7 @@ def _summarize_row(
     row_source_kind = row.get("source_kind")
     source_kind = row_source_kind if isinstance(row_source_kind, str) else None
     try:
-        return summarize_one(
+        outcome = summarize_one(
             session_id,
             existing_summary_text=existing_summary_text,
             source_kind=source_kind,
@@ -581,7 +657,18 @@ def _summarize_row(
             "auto-summarize failed for session_id=%s; continuing drain",
             session_id,
         )
-        return "skipped"
+        streak = _CONSECUTIVE_ERROR_COUNTS.get(session_id, 0) + 1
+        _CONSECUTIVE_ERROR_COUNTS[session_id] = streak
+        logger.warning(
+            "auto-summarize session_id=%s errored — same failure %d "
+            "consecutive drain(s); it is NOT sentinel-marked and will be "
+            "retried on the next drain (deterministic causes never "
+            "self-clear — see the traceback just logged above)",
+            session_id, streak,
+        )
+        return "errored"
+    _CONSECUTIVE_ERROR_COUNTS.pop(session_id, None)
+    return outcome
 
 
 def _log_drain_stall(candidates: list[dict[str, object]]) -> None:
@@ -669,15 +756,29 @@ def _is_trivial_session(events: list[dict[str, object]]) -> bool:
     )
 
 
-def _request_inference_summary(*, inference_service: Any, transcript: str) -> str:
+def _request_inference_summary(
+    *, inference_service: Any, transcript: str, session_id: str,
+) -> str:
     """Call ``inference_service.generate_completion`` for a 2-4 sentence summary.
 
     Returns an empty string when the inference call fails or returns nothing
     usable — the caller treats that as a skip, not a fatal error. The cron
-    re-tries on the next firing.
+    re-tries on the next firing. iss_b535985b (2026-09-27): an empty result is
+    ALSO logged here at WARNING, naming ``session_id`` and the actual result
+    envelope's shape — the caller's aggregate ``skipped_empty`` count says
+    something happened, but only this line says which session and what shape
+    the current provider (e.g. ``macos_inference_plugin``) actually returned,
+    which is what a real extractor mismatch would need to diagnose.
     """
     result = _call_inference_chat(inference_service, transcript)
-    return _extract_summary_text(result)
+    text = _extract_summary_text(result)
+    if not text:
+        logger.warning(
+            "auto-summarize: inference returned no usable text for "
+            "session_id=%s; result envelope shape: %s",
+            session_id, _describe_result_shape(result),
+        )
+    return text
 
 
 def _call_inference_chat(inference_service: Any, transcript: str) -> Any:
@@ -732,6 +833,32 @@ def _envelope_payload(result: Any) -> dict[str, Any] | None:
         return None
     data = result.get("data") if isinstance(result.get("data"), dict) else result
     return data if isinstance(data, dict) else None
+
+
+def _describe_result_shape(result: Any) -> str:
+    """Cheap, log-safe description of a ``generate_completion`` return value.
+
+    Never raises and never includes the (potentially large) completion text
+    itself — only the shape (top-level / envelope / data keys, error, and
+    action_status), so a provider-mismatch diagnosis doesn't need a debugger
+    attached, just the WARNING line this feeds (iss_b535985b, 2026-09-27).
+    """
+    if result is None:
+        return "None (generate_completion raised — see the exception logged above)"
+    if not isinstance(result, dict):
+        return f"non-dict result of type {type(result).__name__}"
+    envelope_keys = sorted(result.keys())
+    if result.get("error"):
+        return f"envelope keys={envelope_keys} error={result.get('error')!r}"
+    action_status = result.get("action_status")
+    if action_status not in (None, "completed"):
+        return f"envelope keys={envelope_keys} action_status={action_status!r}"
+    data = result.get("data") if isinstance(result.get("data"), dict) else result
+    data_keys = sorted(data.keys()) if isinstance(data, dict) else None
+    return (
+        f"envelope keys={envelope_keys} action_status={action_status!r} "
+        f"data keys={data_keys!r}"
+    )
 
 
 def _strip_or_empty(value: Any) -> str:

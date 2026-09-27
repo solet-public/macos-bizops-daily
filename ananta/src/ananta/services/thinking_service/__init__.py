@@ -665,11 +665,12 @@ class ThinkingService:
 
     def resume_thinking_completion(
         self,
-        params: dict[str, Any],
-        state: dict[str, Any],
+        *,
+        request_id: str,
+        state: dict[str, Any] | None = None,
     ) -> ActionResult:
         return self._ensure_ready().resume_thinking_completion(
-            params=params, state=state,
+            params={"request_id": request_id}, state=state or {},
         )
 
     # ------------------------------------------------------------------

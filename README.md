@@ -56,11 +56,15 @@ Three things to know before the first `solet create`:
   pass that exits with code 3 and `"status": "awaiting_user"` has not failed;
   it has finished a stage or needs an input. Read its `message` and `repair`,
   then preview again. Drive it with `--json`.
-- **The models stage needs LM Studio and two models provisioned by hand in
-  this release.** The manager discovers models from a running LM Studio
-  server and does not yet install it. The exact commands, the bundled-model
-  trap to avoid, and stage-by-stage recovery are in the Homebrew install
-  troubleshooting runbook that ships in this tree:
+- **The models stage is automated for both implementation choices.** The
+  recommended, Apple-native options (Core AI Nomic embeddings, Apple
+  Foundation Models inference — macOS 27 on Apple-silicon hardware, with
+  Apple Intelligence available) download and verify a SHA-256-pinned model
+  archive with a single operator approval. LM Studio remains an available
+  alternative; if selected instead, the manager installs it, pulls the
+  required models, and loads them automatically. Stage-by-stage detail and
+  recovery for both paths are in the Homebrew install troubleshooting
+  runbook that ships in this tree:
   `plugins/github_midwife_plugin/knowledge_base/09_homebrew_install_troubleshooting_runbook.md`
   (searchable as "solet create troubleshooting" once the solet is up). The
   tap's README at `solet-public/homebrew-tap` carries the same guide for

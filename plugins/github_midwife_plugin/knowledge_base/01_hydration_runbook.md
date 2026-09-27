@@ -923,14 +923,18 @@ verb `service_interface::session_ledger_service::drain_event_embeddings` runs th
 job on demand) — individual transcript and message content is embedded and becomes
 searchable via knowledge-base search, not merely a rolled-up digest.
 
-**Where the embedding is sent depends on your bind.** The shipped default binds a
-**local** embedding endpoint (`openai_embeddings_plugin` is OpenAI-*compatible*, not
-OpenAI — it points at an LM Server + nomic model on this machine and takes no API key).
-On that default, ingested content never leaves the machine. Re-binding to a cloud
-embedding provider (for example `titanv2_embeddings_plugin`) sends ingested content —
-including anything a business connector has already read into a session, and peer
-message bodies regardless of what any verb returns — to that provider. Check your own
-bind before assuming either way; this runbook states the default, not your deployment.
+**Where the embedding is sent depends on your bind.** The shipped Apple-native
+profiles' default binds a **local** embedding endpoint (`coreai_embeddings_plugin`,
+a pinned Nomic v1.5 model served on-host through Apple's Core AI on macOS 27 Apple
+Silicon). `openai_embeddings_plugin` — OpenAI-*compatible*, not OpenAI; typically an
+LM Studio + nomic model on this machine, taking no API key — remains an
+optional/legacy provider, still what the `local` profile template and a manual
+`bootstrap.py` genesis provision. On either local default, ingested content never
+leaves the machine. Re-binding to a cloud embedding provider (for example
+`titanv2_embeddings_plugin`) sends ingested content — including anything a business
+connector has already read into a session, and peer message bodies regardless of
+what any verb returns — to that provider. Check your own bind before assuming either
+way; this runbook states the default, not your deployment.
 
 **Do not rely on a hand-listed source count here — it drifts.** The set of local
 session-source plugins a solet ships changes release to release, and a static list

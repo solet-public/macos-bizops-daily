@@ -37,12 +37,19 @@ class CoreAIEmbeddingsPlugin(PluginBase, EmbeddingServiceInterface):
         return {EmbeddingServiceInterface: EmbeddingServiceInterface.INTERFACE_VERSION}
 
     def initialize(self, config: dict[str, object]) -> None:
-        """Replace configuration before preparation; never retain a stale model."""
+        """Adopt new configuration and re-prepare with it immediately.
+
+        Fresh boot runs ``prepare_for_readiness()`` (platform Phase 1) before
+        this method ever sees the real config, and this plugin is not
+        ``LifecycleManaged`` so nothing downstream re-invokes
+        ``prepare_for_readiness()`` on its behalf afterward — the same is
+        true of ``reload_plugin_config``, which also calls only this method.
+        Re-preparing here, rather than only invalidating, is what lets the
+        plugin actually reach ready on the config this method received.
+        """
         with self._lock:
-            self._close()
             self.config = dict(config)
-            self._last_error = EmbeddingError(ErrorCode.UNAVAILABLE, "Configuration changed; prepare runtime again")
-            self.set_error(str(self._last_error))
+            self.prepare_for_readiness()
 
     def prepare_for_readiness(self) -> None:
         """Missing assets leave an honest warning and a retryable preparation path."""
