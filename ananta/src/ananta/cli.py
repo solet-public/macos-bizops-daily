@@ -22,6 +22,7 @@ from ananta.core.config.environment_config import EnvironmentConfig
 from ananta.core.event_orchestrator import EventOrchestrator
 from ananta.core.plugins.plugin_contracts import ActionStatus, ErrorCode, ErrorSeverity
 from ananta.core.root_manifest.diagnostic import emit_startup_diagnostic
+from ananta.core.runtime.stack_dump import install_stack_dump_handler
 from ananta.error_handling import (
     AnantaError,
     ResourceError,
@@ -567,6 +568,8 @@ def sync_main() -> None:
     """Main entry point for synchronous CLI execution."""
     args = parse_cli_arguments()
     app_home = _setup_environment_or_exit(args)
+    # `kill -USR1 <pid>` dumps every Python thread's stack (iss_e0648481).
+    install_stack_dump_handler(app_home)
     _run_orchestrator_or_exit(app_home, args)
 
 

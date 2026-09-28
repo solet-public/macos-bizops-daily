@@ -119,6 +119,22 @@ def _action(process_key: str, flow_id: str | None, action_id: str) -> QueuedActi
     )
 
 
+def _failed_writes_guarded_on_processing(state: RecordingStateService) -> bool:
+    """Every action_events failure write carries the status='processing' guard.
+
+    The drop acts on a claimed row, so its write must be guarded like every
+    other post-claim failure write (iss_30fb08fd review N1); with the fixture
+    now returning the real state-plugin envelope, the guard is exercised.
+    """
+    writes = [
+        call["query"].get("filters", {})
+        for call in state.update_calls
+        if call["query"].get("table") == "action_events"
+        and call["updates"].get("status") == "failed"
+    ]
+    return bool(writes) and all(f.get("status") == "processing" for f in writes)
+
+
 def _failed_action_ids(state: RecordingStateService) -> list[str]:
     """Action ids the poller marked failed via update_state (no dispatch)."""
     ids: list[str] = []
@@ -176,6 +192,10 @@ def main() -> int:
     checker.check(
         "ae-sib-err" in _failed_action_ids(state_b),
         "B2: dropped sibling is marked failed (terminal, no re-poll)",
+    )
+    checker.check(
+        _failed_writes_guarded_on_processing(state_b),
+        "B3: the drop's failure write is guarded on status='processing' (claimed row)",
     )
 
     # ── Case C: process_results sibling of a tombstoned flow is DROPPED ──

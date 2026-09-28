@@ -1,7 +1,8 @@
 """Prove a Manager-created instance against the Manager's own create record (iss_836499b3).
 
-``solet create`` records in its v1 registry row, and in its verified create transaction, exactly
-which seed release it installed.  An inspection that compares that instance with the *installed*
+``solet create`` records in its v1 registry row, and in its create transaction, exactly which seed
+release it installed.  The transaction must show the install over (every stage final, every completion
+check answered); a create blocked only at completion is eligible (iss_fcbfabb7).  An inspection that compares that instance with the *installed*
 channel release can prove it only while nothing is left to update: after a Manager upgrade the
 instance is one release behind and classifies ``source_identity_unproven``.  This module makes the
 Manager's own record the inspection contract instead -- the move ``update_execution.enrolled_metadata``
@@ -46,12 +47,15 @@ from .existing_install_inspection import (
     InstalledInspectionMetadataLoader,
     TargetFilesystemIdentity,
 )
-from .models import InstanceRecord
+from .models import CheckpointStatus, InstanceRecord, JsonValue, TransactionStatus
 from .paths import ManagerPaths
 from .registry import InstanceRegistry
 from .transaction import Transaction, load_transaction
 
 _PROVENANCE = "PROVENANCE.json"
+_SETTLED_STAGE = frozenset({CheckpointStatus.VERIFIED, CheckpointStatus.DECLINED, CheckpointStatus.NOT_APPLICABLE})
+_ANSWERED_CHECK = frozenset({CheckpointStatus.VERIFIED, CheckpointStatus.BLOCKED, CheckpointStatus.FAILED})
+_ELIGIBLE_STATUS = frozenset({TransactionStatus.VERIFIED, TransactionStatus.BLOCKED, TransactionStatus.FAILED})
 _FOREIGN_SEED_REPAIR = (
     "This Solet was created from a different seed than the installed Manager serves; "
     "it cannot be updated from this channel."
@@ -63,15 +67,59 @@ def find_create_origin_record(paths: ManagerPaths, name: str) -> InstanceRecord 
     return next((item for item in InstanceRegistry(paths.registry_path).list() if item.name == name), None)
 
 
-def require_verified_create_origin(paths: ManagerPaths, record: InstanceRecord) -> None:
-    """Refuse a create row whose transaction is missing, nonterminal, or disagrees with it."""
+@dataclass(frozen=True, slots=True)
+class CreateOriginEligibility:
+    """What an update-eligible create transaction proves, and which completion checks it never verified."""
+
+    create_status: TransactionStatus
+    unverified_checks: tuple[str, ...]
+
+    def disclosure(self) -> dict[str, JsonValue]:
+        return {"status": self.create_status.value, "unverified_completion_checks": list(self.unverified_checks)}
+
+
+def require_update_eligible_create_origin(paths: ManagerPaths, record: InstanceRecord) -> CreateOriginEligibility:
+    """The one create-origin gate ``update`` and ``import`` share, at preview and at apply (iss_fcbfabb7).
+
+    Refuse a create row whose transaction is missing or disagrees with it, then apply
+    :func:`create_origin_eligibility`.
+    """
     transaction = load_transaction(paths.transaction_path(record.name))
     if transaction is None:
         raise ManagedIdentityDriftError("create-origin transaction identity is unproven")
-    if transaction.status.value != "verified":
-        raise OperationInProgressError("create-origin transaction remains nonterminal")
     if not create_transaction_matches_record(transaction, record):
         raise ManagedIdentityDriftError("create-origin transaction does not match its v1 registry record")
+    return create_origin_eligibility(transaction)
+
+
+def create_origin_eligibility(transaction: Transaction) -> CreateOriginEligibility:
+    """An installed Solet is update-eligible once its install is over, whatever its completion checks said.
+
+    Eligible exactly when every install stage is final (``verified``, ``declined``,
+    ``not_applicable`` -- the set ``journal_rollup`` rolls up as final) and every bound completion
+    check ran to an answer (``verified``, ``blocked`` or ``failed``).  The transaction is then
+    ``verified``, or ``blocked``/``failed`` at completion only.  Completion checks are read-only probes
+    of the running Solet; the ones r46-r48 creates left blocked (the embeddings defect, iss_2eefe356)
+    are what the update repairs, and the update's final doctor re-runs its own checks against the new
+    release.  A stage that is not final, or a check still ``pending``, ``applying``,
+    ``awaiting_user`` or otherwise unanswered, is an install in flight: refused.  The recorded status
+    must agree (``load_transaction`` already refuses one the roll-up contradicts).
+    """
+    unsettled = _outside(transaction.stages, _SETTLED_STAGE)
+    unanswered = _outside(transaction.completion, _ANSWERED_CHECK)
+    recorded = transaction.status in _ELIGIBLE_STATUS and bool(transaction.stages) and bool(transaction.completion)
+    if unsettled or unanswered or not recorded:
+        raise OperationInProgressError(
+            f"create-origin transaction remains nonterminal ({transaction.status.value}): "
+            f"install stages not final {unsettled}, completion checks not run {unanswered}",
+            repair=f"Resume with: solet create {transaction.name}",
+        )
+    unverified = _outside(transaction.completion, frozenset({CheckpointStatus.VERIFIED}))
+    return CreateOriginEligibility(transaction.status, tuple(unverified))
+
+
+def _outside(statuses: dict[str, CheckpointStatus], allowed: frozenset[CheckpointStatus]) -> list[str]:
+    return sorted(key for key, status in statuses.items() if status not in allowed)
 
 
 def create_transaction_matches_record(transaction: Transaction, record: InstanceRecord) -> bool:

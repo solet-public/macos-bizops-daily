@@ -94,15 +94,20 @@ class KnowledgeSearchInterface(ABC):
         active_knowledge_bases: list[str] | None = None,
         fail_fast: bool = False,
     ) -> dict[str, Any]:
-        """Audit retrieval quality across the whole corpus.
+        """Audit retrieval quality across the whole corpus, in the background.
 
-        Walks every ``*.retrieval_test.yaml`` under ``corpus_root``, runs the
-        per-article retrieval test against each, aggregates DRIFT, OVERREACH,
-        and STALE_PROCESS_KEY findings, and writes a timestamped Markdown
-        report under ``report_dir``. Only active knowledge bases are audited;
-        ``active_knowledge_bases`` narrows that to a subset of the active set.
-        ``fail_fast`` stops after the first failing article. Returns an
-        AuditReport wrapped in ``{"status", "data"}``.
+        Submits a walk of every ``*.retrieval_test.yaml`` under ``corpus_root``
+        to a single-slot background executor: the walk runs the per-article
+        retrieval test against each, aggregates DRIFT, OVERREACH,
+        STALE_PROCESS_KEY and LEGACY_KEY findings, and writes a timestamped
+        Markdown report under ``report_dir``. Only active knowledge bases are
+        audited; ``active_knowledge_bases`` narrows that to a subset of the
+        active set (validated before submission). ``fail_fast`` stops after
+        the first failing article. Returns immediately with
+        ``{"status", "data": {"audit": "started"|"already_running",
+        "report_dir"}}`` -- read the report for the findings. The walk takes
+        many minutes and must never run inline on the serial action-queue
+        poller (iss_30fb08fd).
         """
         ...
 

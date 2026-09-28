@@ -3,6 +3,7 @@ import logging
 from datetime import UTC
 from typing import Any, TypedDict, cast
 
+from ananta.core.actions import action_event_resolution
 from ananta.core.actions.action_metadata import (
     ContextHandling,
     ErrorCase,
@@ -2322,6 +2323,88 @@ class SchedulingPlugin(ServicePlugin, StateAwarePlugin, EdgeProcessProvider):
             )
 
     # Text fields (display_name, description, embedding_description) are defined in
+    # knowledge_base/processes/fail_action_event.json — the builder merges them at
+    # startup, overwriting any values set here in the decorator.
+    @platform_process(
+        name="fail_action_event",
+        processor_policy_category=ProcessorPolicyCategory.EDGE,
+        # Operator recovery tool, called by key; not offered to models (review N3).
+        is_discoverable=False,
+        error_processor_customizations=MergeErrorProcessorCustomizations(retryable=False),
+        parameters={
+            "action_id": ParameterMetadata(
+                description="Id of the action_events row to fail (e.g. ae-2pq5ejq20uksc).",
+                required=True,
+                type=ParameterType.STRING,
+            ),
+            "reason": ParameterMetadata(
+                description="Why this action is being failed; recorded in its error_message.",
+                required=True,
+                type=ParameterType.STRING,
+            ),
+        },
+        output_type="object",
+        output_description="The failed action's id, process key, previous and new status",
+        return_value_schema=ReturnValueSchema(
+            type=ParameterType.OBJECT,
+            description="Resolution of one queued or processing action_events row",
+            properties={
+                "action_id": ParameterMetadata(
+                    type=ParameterType.STRING, description="The failed action's id",
+                ),
+                "process_key": ParameterMetadata(
+                    type=ParameterType.STRING, description="The failed action's process key",
+                ),
+                "previous_status": ParameterMetadata(
+                    type=ParameterType.STRING, description="queued or processing",
+                ),
+                "status": ParameterMetadata(
+                    type=ParameterType.STRING, description="Always failed",
+                ),
+                "error_message": ParameterMetadata(
+                    type=ParameterType.STRING,
+                    description="The error_message written to the row, carrying the reason",
+                ),
+            },
+        ),
+    )
+    def fail_action_event(
+        self,
+        params: dict[str, Any],
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Fail one orphaned action row by id (iss_6069cf22).
+
+        For a row left ``processing`` by a dead or replaced process. It cannot
+        reach a handler running in this process: this call queues behind it on
+        the same serial queue. See ``ananta.core.actions.action_event_resolution``
+        for the scope and the refusals. Hosted here because the scheduling
+        plugin owns the action queue's operator surface; the logic is core.
+        """
+        _ = state
+        if self.state_service is None:
+            raise RuntimeError(f"{PLUGIN_NAME}: state_service not set; fail_action_event cannot run")
+        try:
+            p = ScheduleFactory.extract_params(params)
+            data = action_event_resolution.fail_action_event(
+                self.state_service,
+                action_id=str(p.get("action_id", "")),
+                reason=str(p.get("reason", "")),
+            )
+        except action_event_resolution.ActionEventResolutionError as e:
+            return build_response(
+                ActionStatus.ERROR.value,
+                {},
+                {
+                    "type": "plugin_error",
+                    "code": SchedulerErrorCode.INVALID_PARAMETERS,
+                    "message": str(e),
+                    "plugin_name": PLUGIN_NAME,
+                },
+            )
+        return build_response(ActionStatus.COMPLETED.value, dict(data))
+
+    # Text fields (display_name, description, embedding_description) are defined in
     # knowledge_base/processes/ensure_kb_retrieval_audit_schedule.json — the builder merges
     # them at startup, overwriting any values set here in the decorator.
     @platform_process(
@@ -2591,6 +2674,11 @@ class SchedulingPlugin(ServicePlugin, StateAwarePlugin, EdgeProcessProvider):
                 name="ensure_global_heartbeat",
                 result_processor_template_customizations=MergeResultProcessorCustomizations(),
                 error_processor_template_customizations=MergeErrorProcessorCustomizations(retryable=True),
+            ),
+            "fail_action_event": EdgeProcessDefinition(
+                name="fail_action_event",
+                result_processor_template_customizations=MergeResultProcessorCustomizations(),
+                error_processor_template_customizations=MergeErrorProcessorCustomizations(retryable=False),
             ),
             # Declared-side half of the EdgeProcessProvider decorated<->declared
             # parity contract. An EDGE process that is decorated but not declared

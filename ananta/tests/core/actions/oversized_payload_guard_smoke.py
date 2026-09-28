@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -265,6 +266,8 @@ class _ReaperSpy:
         self._rows = rows
         self.query: dict[str, object] | None = None
         self.updates: list[tuple[str, object]] = []
+        self.messages: dict[str, str] = {}
+        self.moved: set[str] = set()
 
     def query_ordered(self, namespace: str, data: dict[str, object]) -> dict[str, object]:
         _ = namespace
@@ -280,39 +283,69 @@ class _ReaperSpy:
         _ = namespace
         filters = query.get("filters", {})
         action_id = filters.get("id") if isinstance(filters, dict) else None
+        # The reaper's write is guarded on status='processing' (review N1): a
+        # row listed in ``self.moved`` left processing after the read, so the
+        # guarded write touches nothing. Real state-plugin envelope shape.
+        if isinstance(filters, dict) and filters.get("status") != "processing":
+            raise AssertionError(f"reaper write is not guarded on processing: {filters}")
+        if str(action_id) in self.moved:
+            return {"action_status": "completed", "data": {"result": {"updated": 0}}}
         self.updates.append((str(action_id), updates.get("status")))
-        return {"data": {}}
+        self.messages[str(action_id)] = str(updates.get("error_message"))
+        return {"action_status": "completed", "data": {"result": {"updated": 1}}}
 
 
-def test_reaper_fails_oversized_and_requeues_small() -> None:
-    print("\n[7] reaper FAILS oversized orphans and only requeues small ones")
+def _check_reap_messages(messages: dict[str, str]) -> None:
+    """The reaper's error_message must be legible, name the age, and keep a size reason."""
+    small = messages.get("ae-small", "")
+    needles = ("abandoned by a dead poller", "still processing after 7200s", "resubmit")
+    _check(
+        all(needle in small for needle in needles),
+        f"the error_message is legible and names the orphan age ({small!r})",
+    )
+    oversized = messages.get("ae-oversized", "")
+    _check(
+        all(needle in oversized for needle in ("bytes", "abandoned by a dead poller")),
+        "an oversized orphan keeps its size reason alongside the age",
+    )
+
+
+def test_reaper_fails_every_orphan_and_never_requeues() -> None:
+    print("\n[7] reaper FAILS every stale orphan (oversized or not) and never requeues")
     oversized = "q" * (MAX_ACTION_PARAMETERS_BYTES + 2048)
+    two_hours_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=2)
     spy = _ReaperSpy(
         [
             {
                 "id": "ae-oversized",
                 "process_key": "plugin::agent_messaging_plugin::deliver_result",
                 "parameters": oversized,
+                "updated_at": two_hours_ago,
             },
             {
                 "id": "ae-small",
-                "process_key": "plugin::agent_messaging_plugin::deliver_result",
+                "process_key": "service_interface::knowledge_service::audit_retrieval_corpus",
                 "parameters": '{"result_payload": {"ok": true}}',
+                "updated_at": two_hours_ago.isoformat(),
             },
         ],
     )
     counts = reap_orphaned_processing_actions(spy)
 
-    _check(counts["failed"] == 1, "the oversized orphan was FAILED")
-    _check(counts["requeued"] == 1, "the small orphan was requeued")
+    _check(counts == {"examined": 2, "failed": 2, "oversized": 1}, f"both orphans FAILED ({counts})")
     _check(
         ("ae-oversized", "failed") in spy.updates,
         "D13: an oversized orphan is never returned to queued (that re-wedges)",
     )
     _check(
-        ("ae-small", "queued") in spy.updates,
-        "a recoverable orphan does return to queued",
+        ("ae-small", "failed") in spy.updates,
+        "iss_30fb08fd: a small orphan is failed too — a requeue re-runs what killed its poller",
     )
+    _check(
+        all(status != "queued" for _, status in spy.updates),
+        "no row is ever written back to queued",
+    )
+    _check_reap_messages(spy.messages)
 
     filters = (spy.query or {}).get("filters", {})
     assert isinstance(filters, dict)
@@ -335,6 +368,21 @@ def test_reaper_fails_oversized_and_requeues_small() -> None:
     )
 
 
+def test_reaper_leaves_a_row_that_left_processing() -> None:
+    print("\n[8] reaper's guarded write leaves a row that completed after the read")
+    two_hours_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=2)
+    spy = _ReaperSpy(
+        [{"id": "ae-late", "process_key": "p::k", "parameters": "{}", "updated_at": two_hours_ago}],
+    )
+    spy.moved.add("ae-late")
+    counts = reap_orphaned_processing_actions(spy)
+    _check(
+        counts == {"examined": 1, "failed": 0, "oversized": 0},
+        f"a row that left processing is not counted as failed ({counts})",
+    )
+    _check(spy.updates == [], "and nothing was overwritten")
+
+
 def main() -> int:
     print("Oversized-payload guard smoke (INCIDENT.md 2026-08-15 D1/D2/D5/D8)")
     test_enqueue_guard_refuses_oversized_payload()
@@ -343,7 +391,8 @@ def main() -> int:
     test_read_limit_refuses_over_cap_without_consent()
     test_unbounded_read_refuses_rather_than_truncating()
     test_liveness_stale_age_alone_is_stalled()
-    test_reaper_fails_oversized_and_requeues_small()
+    test_reaper_fails_every_orphan_and_never_requeues()
+    test_reaper_leaves_a_row_that_left_processing()
 
     if _failures:
         print(f"\nFAIL: {len(_failures)} check(s) failed")
@@ -351,7 +400,7 @@ def main() -> int:
             print(f"  - {failure}")
         return 1
     print("\nPASS: payload bounds fire pre-parse; reads refuse over cap; "
-          "liveness alarms on stale poll age alone; reaper fails rather than re-wedges")
+          "liveness alarms on stale poll age alone; reaper fails, never requeues")
     return 0
 
 

@@ -5149,6 +5149,7 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/create_origin_update_path_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/create_origin_supersede_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/target_git_hardening_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/create_origin_blocked_create_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: ananta/tests/core/orchestration/selected_inference_startup_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin; absent from macos_free_minimal and macos_samantha, which ship default_inference_plugin instead (iss_76ae2d4d, cross_bundle_transition)
 # not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
 # not shipped: plugins/macos_inference_plugin/tests/legacy_plugin_coexistence_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
@@ -5359,6 +5360,14 @@ plugins/github_midwife_plugin/tests/apple_setup_flow_smoke.py
 plugins/github_midwife_plugin/tests/asset_root_materialize_smoke.py
 plugins/github_midwife_plugin/tests/apple_coreai_acquisition_smoke.py
 
+# 2026-09-28 action-path stall fix (iss_30fb08fd, iss_6069cf22, iss_e0648481):
+# fail_action_event accept/refuse paths + evidence-row safety; SIGUSR1 stack
+# dump file, in-flight action fields on the liveness snapshot, SLOW_ACTION log.
+# (The direct-verb receipt and fail-not-requeue reaper are covered by the
+# already-registered audit_retrieval_corpus_cron_smoke and
+# oversized_payload_guard_smoke.)
+ananta/tests/core/actions/action_event_resolution_smoke.py
+ananta/tests/core/actions/action_path_diagnosability_smoke.py
 # r49, iss_4b22fdeb / iss_7f4ce644: real list_plugins rows (ready, degraded
 # with a warning, error with last_error, uninitialized) through the real roster
 # doctor parser; degraded is ready and its warning survives. Offline.
@@ -5375,3 +5384,6 @@ plugins/github_midwife_plugin/tests/apple_model_availability_warning_smoke.py
 # driver runs under inspect, import or update (raw-git controls prove each surface is live).
 # iss_836499b3 review R2-2: an enrollment interrupted before it finished, then a Manager upgrade, is
 # superseded and finished by `update --yes` (and by the printed `import` repair), never a raw error.
+# iss_fcbfabb7: a create blocked only at completion (the r46-r48 embeddings checks) updates and
+# promotes; one predicate gates update and import at preview and apply; installs in flight and identity
+# mismatches still refuse; the predicate is proven over every checkpoint assignment.

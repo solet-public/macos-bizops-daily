@@ -69,7 +69,22 @@ you'd rather do it.
   needs attention and what to do about it — and sort that out before
   updating. A solet created by an earlier Manager that has not been updated
   yet is reported as a create instance; check it with `solet doctor <name>`
-  instead.
+  instead. On a solet created before r49, `solet doctor` usually says
+  `blocked` on its knowledge-search and model checks
+  (`coreai_embedding_request_succeeds`, `knowledge_retrieval_succeeds`,
+  `plugin_roster_matches_plan`). That alone does not stop the update: its
+  preview lists those checks under `create_transaction`, and the update's
+  own final check runs them again on the new release. If they still fail
+  there, the update stops before it finishes, your solet is marked as
+  needing attention, and nothing is rolled back; follow the repair it
+  prints and run the same `--yes` command again
+  (`solet-manager reconcile <name> --dry-run` tells you the same). If the
+  preview refuses with `operation_in_progress`, the install itself never
+  finished; run `solet create <name>` to finish it first.
+- Once a solet has been updated, check it with `solet-manager doctor
+  <name>`. The older `solet status <name>` may keep showing `blocked`, and
+  `solet doctor <name>` may refuse with a contract error; neither changes
+  anything on your machine (iss_0a10e6db).
 - You'll need a terminal window and about 10 minutes, most of which is
   waiting.
 

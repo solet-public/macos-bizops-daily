@@ -63,6 +63,13 @@ from datetime import UTC, datetime
 # a slow cycle.
 DEFAULT_STALL_THRESHOLD_SECONDS = 120.0
 
+# A single dispatched action that runs longer than this is logged loudly
+# (``SLOW_ACTION``) when it returns. Handlers must return promptly (the
+# action-queue fast-return contract); ten seconds is already far past a
+# compliant dispatch, and the per-action duration is the cheapest slice of the
+# sync-verb remediation ruling's Phase 0 instrumentation.
+SLOW_ACTION_THRESHOLD_SECONDS = 10.0
+
 
 @dataclass
 class ActionPathLiveness:
@@ -93,6 +100,37 @@ class ActionPathLiveness:
     #: ``time.monotonic()`` at construction, so age is well-defined before the
     #: first poll completes rather than being unknowable.
     started_monotonic: float = field(default_factory=time.monotonic)
+
+    #: The action the serial drain loop is inside right now, or ``None``
+    #: between actions (iss_30fb08fd). Set before ``_process_action`` and
+    #: cleared after it, so a stalled path names its stuck action directly
+    #: instead of only by the absence of completions.
+    in_flight_action_id: str | None = None
+    in_flight_process_key: str | None = None
+    in_flight_started_at: str | None = None
+    in_flight_started_monotonic: float | None = None
+
+    def begin_action(self, *, action_id: str, process_key: str) -> None:
+        """Record that the drain loop has entered ``action_id``."""
+        self.in_flight_started_monotonic = time.monotonic()
+        self.in_flight_started_at = datetime.now(UTC).isoformat()
+        self.in_flight_process_key = process_key
+        self.in_flight_action_id = action_id
+
+    def end_action(self) -> float:
+        """Clear the in-flight action; return how long it ran, in seconds."""
+        started = self.in_flight_started_monotonic
+        elapsed = 0.0 if started is None else max(0.0, time.monotonic() - started)
+        self.in_flight_action_id = None
+        self.in_flight_process_key = None
+        self.in_flight_started_at = None
+        self.in_flight_started_monotonic = None
+        return elapsed
+
+    def in_flight_age_seconds(self) -> float | None:
+        """Seconds the current in-flight action has run, or ``None`` if idle."""
+        started = self.in_flight_started_monotonic
+        return None if started is None else max(0.0, time.monotonic() - started)
 
     def record_poll_cycle(self, *, queue_depth: int, dispatched: int) -> None:
         """Stamp the completion of one poll cycle.
@@ -145,8 +183,11 @@ class ActionPathLiveness:
 
         Ships the derived ``action_path_stalled`` verdict alongside the raw
         numbers so a consumer does not have to re-derive the stale-age check
-        (and get it wrong) to know whether the action path is alive.
+        (and get it wrong) to know whether the action path is alive. The
+        ``in_flight_*`` fields name the action the drain loop is inside, so a
+        stalled snapshot says what it is stalled on.
         """
+        in_flight_age = self.in_flight_age_seconds()
         return {
             "action_path_stalled": self.stalled(threshold_seconds=threshold_seconds),
             "poll_age_seconds": round(self.poll_age_seconds(), 3),
@@ -154,6 +195,12 @@ class ActionPathLiveness:
             "last_poll_at_utc": self.last_poll_at_utc,
             "total_dispatched": self.total_dispatched,
             "stall_threshold_seconds": threshold_seconds,
+            "in_flight_action_id": self.in_flight_action_id,
+            "in_flight_process_key": self.in_flight_process_key,
+            "in_flight_started_at": self.in_flight_started_at,
+            "in_flight_age_seconds": (
+                None if in_flight_age is None else round(in_flight_age, 3)
+            ),
         }
 
 
@@ -167,5 +214,6 @@ ACTION_PATH_LIVENESS = ActionPathLiveness()
 __all__ = [
     "ACTION_PATH_LIVENESS",
     "DEFAULT_STALL_THRESHOLD_SECONDS",
+    "SLOW_ACTION_THRESHOLD_SECONDS",
     "ActionPathLiveness",
 ]

@@ -46,11 +46,18 @@ from ananta.constants import (
     TEMPLATE_VAR_RESULT,
     TEMPLATE_VAR_SESSION_ID,
 )
-from ananta.core.actions.action_path_liveness import ACTION_PATH_LIVENESS
+from ananta.core.actions.action_path_liveness import (
+    ACTION_PATH_LIVENESS,
+    SLOW_ACTION_THRESHOLD_SECONDS,
+)
 from ananta.core.actions.orphan_reaper import reap_orphaned_processing_actions
 from ananta.core.actions.payload_bounds import (
     OversizedActionPayloadError,
     check_claimed_parameters_size,
+)
+from ananta.core.actions.state_update_result import (
+    StateUpdateResultError,
+    updated_row_count,
 )
 from ananta.core.contexts.normalization import normalize_flow_id, normalize_session_id
 from ananta.core.domain.enums import JobStatus
@@ -286,6 +293,53 @@ def _typed_error_detail(value: object) -> Mapping[str, object] | None:
     if isinstance(value, Mapping) and value.get("code"):
         return value
     return None
+
+
+def _log_if_slow(action: QueuedAction, elapsed_seconds: float) -> None:
+    """Log loudly when one dispatched action held the serial drain loop too long.
+
+    Every action queued behind it waited that long too; see the action-queue
+    fast-return contract and iss_30fb08fd.
+    """
+    if elapsed_seconds <= SLOW_ACTION_THRESHOLD_SECONDS:
+        return
+    logger.error(
+        "SLOW_ACTION: action %s (%s) held the serial dispatch loop for %.1fs "
+        "(threshold %.0fs); every queued action waited behind it",
+        action.id,
+        action.process_key,
+        elapsed_seconds,
+        SLOW_ACTION_THRESHOLD_SECONDS,
+    )
+
+
+def _terminal_write_landed(
+    result: ActionResult, action_id: str, status: str, expected_status: str,
+) -> bool:
+    """Whether a guarded terminal status write changed the row; log when it did not.
+
+    Never raises: this runs inside the drain loop, and a raise from a failure
+    write would re-enter failure handling. A malformed or failed state result
+    is logged at ERROR; a zero-row write means the row was not in
+    ``expected_status`` and is kept as it is. This function cannot know who
+    moved it, so the log line does not guess.
+    """
+    try:
+        updated = updated_row_count(result, what=f"terminal write of {action_id}")
+    except StateUpdateResultError as exc:
+        logger.error("TERMINAL_WRITE_UNCONFIRMED: action %s -> %s: %s", action_id, status, exc)
+        return True
+    if updated == 0:
+        logger.warning(
+            "TERMINAL_WRITE_SKIPPED: action %s was not '%s' when this process tried "
+            "to mark it '%s'; the row was left unchanged (another writer changed "
+            "or removed it)",
+            action_id,
+            expected_status,
+            status,
+        )
+        return False
+    return True
 
 
 class ActionQueuePoller:
@@ -921,6 +975,11 @@ class ActionQueuePoller:
                 # after our bounded queue read.  This poller did not acquire
                 # it, so it must never execute it.
                 continue
+            # Name the in-flight action for /health before entering it, so a
+            # handler that never returns is identified, not just inferred.
+            ACTION_PATH_LIVENESS.begin_action(
+                action_id=action.id, process_key=action.process_key,
+            )
             try:
                 await self._process_action(action)
                 self.total_actions_processed += 1
@@ -933,6 +992,8 @@ class ActionQueuePoller:
                 self._mark_action_failed(
                     action.id, str(e), error_detail=_typed_error_detail(e),
                 )
+            finally:
+                _log_if_slow(action, ACTION_PATH_LIVENESS.end_action())
 
         # Stamped only after the drain loop returns. That placement is the
         # signal: a handler that holds the GIL (the 2026-08-15 failure mode)
@@ -1100,7 +1161,9 @@ class ActionQueuePoller:
                         row.get("process_key"),
                         exc,
                     )
-                    self._mark_action_failed(exc.action_id, str(exc))
+                    self._mark_action_failed(
+                        exc.action_id, str(exc), expected_status=ActionStatus.QUEUED,
+                    )
             return actions
 
         except Exception as e:
@@ -1516,6 +1579,18 @@ class ActionQueuePoller:
         if not self._prepare_action_for_execution(action):
             return
 
+        # Whether THIS execution's own completion write has landed. Result
+        # processing runs after that write and can raise (e.g. a bridge
+        # delivery over the payload bound, ae-2ppdpjk823r7d); the failure write
+        # below must then expect ``completed``, not ``processing``, or its
+        # status guard matches nothing and the row keeps ``completed`` with an
+        # error result -- the #9 split envelope (review R1, uev_da66ccd7).
+        completion_written = False
+
+        def _note_completion_written() -> None:
+            nonlocal completion_written
+            completion_written = True
+
         try:
             self._resolve_io_context(action)
 
@@ -1533,7 +1608,12 @@ class ActionQueuePoller:
             # The actual work (like inference) happens asynchronously and creates new actions for responses
             is_success = bool(result.get("success", False))
             if is_success:
-                self._mark_action_completed(action.id, result, action.flow_token_id)
+                self._mark_action_completed(
+                    action.id,
+                    result,
+                    action.flow_token_id,
+                    on_status_written=_note_completion_written,
+                )
             else:
                 # Only mark as failed if there was an immediate error during dispatch
                 error_value = result.get("error", "Unknown error")
@@ -1555,13 +1635,17 @@ class ActionQueuePoller:
             # self._record_tool_use(action, result, is_success)
 
         except Exception as e:
-            # Immediate dispatch failure
+            # Immediate dispatch failure, or result processing raising after
+            # this execution already marked the row completed.
             logger.error(f"Failed to dispatch action {action.id}: {e}", exc_info=True)
             self._mark_action_failed(
                 action.id,
                 str(e),
                 action.flow_token_id,
                 error_detail=_typed_error_detail(e),
+                expected_status=(
+                    ActionStatus.COMPLETED if completion_written else ActionStatus.PROCESSING
+                ),
             )
 
     def _prepare_action_for_execution(self, action: QueuedAction) -> bool:
@@ -1669,7 +1753,11 @@ class ActionQueuePoller:
 
         The status write stays faithful (``WHERE id =``) and zero-affected
         stays tolerated: a status write that misses a deleted/cancelled row
-        must never raise inside the drain loop.
+        must never raise inside the drain loop. It is deliberately NOT guarded
+        on ``status='processing'``: that guard (review N1 of the iss_30fb08fd
+        fix) would keep a failed row failed while this execution's success
+        result is still stored and delivered -- the split envelope of #9 again.
+        Held for a decision; see the unit report.
         """
         stale_error = self._read_stale_error_message(action_id)
         self.state_service.update_state(
@@ -3066,9 +3154,14 @@ class ActionQueuePoller:
         action_id: str,
         result: dict[str, object],
         flow_token_id: str | None = None,
+        on_status_written: Callable[[], None] | None = None,
     ) -> None:
         """
         Mark action as successfully completed with pure database-first result storage and template processing.
+
+        ``on_status_written`` is called right after the completed status write,
+        before result processing, so ``_process_action`` knows its own write
+        landed if a later step raises (review R1).
 
         ARCHITECTURAL SIMPLIFICATION: This method handles all result processing directly without events.
         REFACTORED: Extracted helper methods to reduce complexity from E(31) to manageable level.
@@ -3077,6 +3170,8 @@ class ActionQueuePoller:
 
         # Step 1: Update action status to completed
         self._update_action_status_to_completed(action_id)
+        if on_status_written is not None:
+            on_status_written()
 
         # Step 2: Get action details for result processing
         action_details = self._retrieve_action_details(action_id)
@@ -3329,15 +3424,32 @@ class ActionQueuePoller:
             self._result_processing_error_dispatcher = build_error_dispatcher(self)
         return self._result_processing_error_dispatcher
 
-    def _update_action_status_to_failed(self, action_id: str, error_message: str) -> None:
-        """Update action status to failed in database (tolerate zero-affected)."""
-        self.state_service.update_state(
+    def _update_action_status_to_failed(
+        self,
+        action_id: str,
+        error_message: str,
+        expected_status: ActionStatus = ActionStatus.PROCESSING,
+    ) -> None:
+        """Fail the action, guarded on its current status (tolerate zero-affected).
+
+        ``expected_status`` is ``processing`` for every claimed row; only the
+        pre-claim oversized-payload path passes ``queued``. The guard stops a
+        late write from overwriting a row that already reached a terminal state
+        elsewhere (review N1 of the iss_30fb08fd fix).
+        """
+        result = self.state_service.update_state(
             namespace="core",
-            query={"table": "action_events", "filters": {"id": action_id}},
+            query={
+                "table": "action_events",
+                "filters": {"id": action_id, "status": expected_status.value},
+            },
             updates={
                 "status": ActionStatus.FAILED.value,
                 "error_message": error_message,
             },
+        )
+        _terminal_write_landed(
+            result, action_id, ActionStatus.FAILED.value, expected_status.value,
         )
 
     def _retrieve_failed_action_details(
@@ -3429,6 +3541,7 @@ class ActionQueuePoller:
         flow_token_id: str | None = None,
         canonical_schema: dict[str, object] | None = None,
         error_detail: Mapping[str, object] | None = None,
+        expected_status: ActionStatus = ActionStatus.PROCESSING,
     ) -> None:
         """Mark action as failed with error message and invoke error_processor if present.
 
@@ -3446,7 +3559,7 @@ class ActionQueuePoller:
         failures genuinely have no typing to carry. The parameter ADDS typing
         where typing exists; it never invents it.
         """
-        self._update_action_status_to_failed(action_id, error_message)
+        self._update_action_status_to_failed(action_id, error_message, expected_status)
 
         details = self._retrieve_failed_action_details(action_id)
         if not details:

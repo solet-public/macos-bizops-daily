@@ -10,12 +10,12 @@ from solet_setup_contracts import canonical_sha256
 
 from .create_origin_enrollment import (
     CreateOriginMetadataLoader,
-    create_transaction_matches_record,
     find_create_origin_record,
     recorded_target_identity,
     require_create_origin_target,
+    require_update_eligible_create_origin,
 )
-from .errors import ManagedIdentityDriftError, OperationInProgressError
+from .errors import ManagedIdentityDriftError
 from .existing_install_inspection import (
     ChannelInspectionIdentity,
     ExistingInstallInspectionRequest,
@@ -57,10 +57,8 @@ from .registry import (
 from .release_identity_gate import require_manager_seed_pairing
 from .state_io import instance_lock, write_content_addressed_json
 from .transaction import (
-    Transaction,
     append_maintenance_attempt,
     create_import_maintenance_operation,
-    load_transaction,
     maintenance_evidence,
     read_maintenance_operation,
     transition_maintenance_operation,
@@ -288,6 +286,9 @@ def inspect_for_import(
     created = find_create_origin_record(request.manager_paths, request.name)
     if created is None:
         return ImportInspection(_inspect(request, loader), ManagementOrigin.IMPORT, None)
+    # The one create-origin gate (iss_fcbfabb7); apply re-runs it under the registry lock
+    # (``_matching_v1_managed_import``), so an import preview and its apply cannot disagree.
+    require_update_eligible_create_origin(request.manager_paths, created)
     recorded = require_create_origin_target(created, request.target)
     proof = CreateOriginMetadataLoader(created, recorded.path, loader)
     result = _inspect(replace(request, target=recorded.path), proof)
@@ -417,28 +418,19 @@ def _matching_v1_managed_import(preview: ImportPreview) -> InstanceRecord | None
     if record is None:
         return None
     inspection = cast(ExistingInstallInspectionResult, preview.inspection)
-    transaction = load_transaction(preview.request.manager_paths.transaction_path(record.name))
-    if transaction is None:
-        raise ManagedIdentityDriftError("create-origin transaction identity is unproven")
-    if transaction.status.value != "verified":
-        raise OperationInProgressError("create-origin transaction remains nonterminal")
-    if not _v1_record_matches_inspection(record, inspection, transaction):
+    require_update_eligible_create_origin(preview.request.manager_paths, record)
+    if not _v1_record_matches_inspection(record, inspection):
         raise ManagedIdentityDriftError("create-origin identity does not match inspected import")
     return record
 
 
-def _v1_record_matches_inspection(
-    record: InstanceRecord,
-    inspection: ExistingInstallInspectionResult,
-    transaction: Transaction,
-) -> bool:
+def _v1_record_matches_inspection(record: InstanceRecord, inspection: ExistingInstallInspectionResult) -> bool:
     facts = inspection.facts
     return (
         _v1_target_matches(record, inspection)
         and facts.head_commit == record.seed_commit
         and facts.head_tree == record.seed_tree_hash
         and _v1_seed_id(record, inspection) == inspection.channel_identity.seed_id
-        and create_transaction_matches_record(transaction, record)
     )
 
 

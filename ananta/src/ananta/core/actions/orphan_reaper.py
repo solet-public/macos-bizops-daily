@@ -1,4 +1,4 @@
-"""Reap actions stuck in ``processing`` forever (D8).
+"""Reap actions stuck in ``processing`` forever (D8) by failing them.
 
 At the time of the 2026-08-15 incident, 60 rows sat in ``processing``, the
 oldest from 2026-05-29. An action claimed by a poller that then died is never
@@ -9,19 +9,28 @@ re-claimed the June rows in seven weeks, which independently proves
 
 ## Fail, do not requeue — this is the load-bearing decision
 
-The intuitive reap is "return it to ``queued`` so it gets another try". For an
-oversized payload that is **exactly how the platform re-wedges**: D13 in
-INCIDENT.md records that neutralising the two originally-stuck deliveries was
-not enough, because the underlying oversized results were still in the queue
-and generated fresh oversized deliveries that froze the poller a SECOND time
-within four minutes of recovery. A requeued oversized row is a scheduled
-outage.
+The intuitive reap is "return it to ``queued`` so it gets another try". Every
+stale row is FAILED instead, with a legible ``error_message`` naming its orphan
+age, and is never re-run. Two incidents each proved requeueing wrong:
 
-So the reaper is size-aware: a stale row whose payload exceeds
-``MAX_ACTION_PARAMETERS_BYTES`` is FAILED with a legible reason and never
-retried; only a row under the bound returns to ``queued``. This is why item 1's
-byte bound must land with or before this reaper — without it, "reap" and
-"re-wedge" are the same operation.
+- **Oversized payloads (D13, 2026-08-15).** Neutralising the two
+  originally-stuck deliveries was not enough, because the underlying oversized
+  results were still in the queue and generated fresh oversized deliveries
+  that froze the poller a SECOND time within four minutes of recovery. A
+  requeued oversized row is a scheduled outage.
+- **Long inline handlers (iss_30fb08fd, 2026-09-28).** A 17-20 minute inline
+  corpus audit was SIGKILLed mid-run, leaving its row ``processing``. An hour
+  later this reaper requeued it, the next poll re-ran the audit and stalled the
+  serial dispatch path again, and a second SIGKILL re-armed the same loop. A
+  requeue re-runs whatever killed the last process.
+
+And a requeue helps nobody: by the time a row is an hour stale its caller has
+long since timed out (the CLI waits 120 s), so the re-run's result is delivered
+to no one. A caller that still wants the work resubmits it. An oversized row
+keeps its size-specific reason (the payload bound is still measured pre-parse,
+so classifying it never pays the cost that made it an orphan). A single row
+can also be resolved deliberately, without waiting for the age threshold, with
+``fail_action_event`` in ``action_event_resolution``.
 
 ## Two hazards this module handles explicitly
 
@@ -53,6 +62,7 @@ from ananta.core.actions.payload_bounds import (
     OversizedActionPayloadError,
     check_claimed_parameters_size,
 )
+from ananta.core.actions.state_update_result import updated_row_count
 from ananta.core.domain.types import ActionResult
 
 logger = logging.getLogger(__name__)
@@ -111,6 +121,29 @@ def _extract_records(result: ActionResult) -> list[dict[str, object]]:
     return [row for row in records if isinstance(row, dict)]
 
 
+def _orphan_age_seconds(updated_at: object, now: datetime) -> float:
+    """Seconds since a row's naive-UTC ``updated_at``, which the query bound.
+
+    The state layer returns the column as a ``datetime`` or, through some
+    serialisers, an ISO-8601 string; anything else is a contract break and
+    raises rather than guessing an age for the error message.
+    """
+    if isinstance(updated_at, str):
+        updated_at = datetime.fromisoformat(updated_at)
+    if not isinstance(updated_at, datetime):
+        raise TypeError(f"action_events.updated_at is not a timestamp: {updated_at!r}")
+    return (now - updated_at.replace(tzinfo=None)).total_seconds()
+
+
+def abandoned_error_message(age_seconds: float, orphan_age_seconds: float) -> str:
+    """The legible reason written to a reaped row's ``error_message``."""
+    return (
+        f"abandoned by a dead poller: still processing after {age_seconds:.0f}s "
+        f"with no progress (orphan threshold {orphan_age_seconds:.0f}s); failed, "
+        "not re-run — resubmit if the work is still wanted"
+    )
+
+
 def reap_orphaned_processing_actions(
     state_service: _OrderedReader,
     *,
@@ -118,14 +151,16 @@ def reap_orphaned_processing_actions(
     page_limit: int = DEFAULT_REAP_PAGE_LIMIT,
     bound_bytes: int = MAX_ACTION_PARAMETERS_BYTES,
 ) -> dict[str, int]:
-    """Return abandoned ``processing`` actions to ``queued``, or fail them.
+    """Fail abandoned ``processing`` actions; never return them to ``queued``.
 
     Returns:
-        Counts of ``{"examined", "requeued", "failed"}`` for logging. A pass
-        that finds nothing returns zeros and logs nothing — this runs
+        Counts of ``{"examined", "failed", "oversized"}`` for logging
+        (``oversized`` is the subset of ``failed`` over the payload bound). A
+        pass that finds nothing returns zeros and logs nothing — this runs
         periodically and must stay silent when there is no work.
     """
-    cutoff = _naive_utc_now() - timedelta(seconds=orphan_age_seconds)
+    now = _naive_utc_now()
+    cutoff = now - timedelta(seconds=orphan_age_seconds)
 
     # Two predicates on two DIFFERENT columns, because the filter grammar
     # allows one op per column: staleness on ``updated_at``, evidence
@@ -147,8 +182,8 @@ def reap_orphaned_processing_actions(
     )
 
     rows = _extract_records(result)
-    requeued = 0
     failed = 0
+    oversized = 0
 
     for row in rows:
         action_id = row.get("id")
@@ -158,6 +193,7 @@ def reap_orphaned_processing_actions(
         process_key_str = process_key if isinstance(process_key, str) else "<unknown>"
         raw_parameters = row.get("parameters")
         parameters_str = raw_parameters if isinstance(raw_parameters, str) else "{}"
+        age_seconds = _orphan_age_seconds(row.get("updated_at"), now)
 
         try:
             # Pre-parse byte check, same guard the dispatch path uses. Nothing
@@ -170,53 +206,71 @@ def reap_orphaned_processing_actions(
                 bound=bound_bytes,
             )
         except OversizedActionPayloadError as exc:
-            # D13: requeueing this would re-wedge the poller on the next claim.
             logger.error(
                 "ORPHAN_REAP_FAILED: action %s (%s) is %d bytes, over the %d "
-                "bound — failing instead of requeueing so it cannot re-wedge "
-                "the poller",
+                "bound, and was abandoned %.0fs ago — failing it so it cannot "
+                "re-wedge the poller",
                 action_id,
                 process_key_str,
                 exc.size,
                 exc.bound,
+                age_seconds,
             )
+            error_message = f"{exc}; {abandoned_error_message(age_seconds, orphan_age_seconds)}"
+            is_oversized = True
+        else:
+            logger.error(
+                "ORPHAN_REAP_FAILED: action %s (%s) was claimed and abandoned "
+                "(no progress for %.0fs, threshold %.0fs); failing it, not "
+                "requeueing — a re-run would repeat whatever killed its poller",
+                action_id,
+                process_key_str,
+                age_seconds,
+                orphan_age_seconds,
+            )
+            error_message = abandoned_error_message(age_seconds, orphan_age_seconds)
+            is_oversized = False
+
+        # Guarded on ``status='processing'`` (review N1): if the row completed
+        # or was failed by someone else between the read above and this write,
+        # the write touches nothing and this pass leaves it alone.
+        updated = updated_row_count(
             state_service.update_state(
                 namespace="core",
-                query={"table": "action_events", "filters": {"id": action_id}},
-                updates={"status": "failed", "error_message": str(exc)},
+                query={
+                    "table": "action_events",
+                    "filters": {"id": action_id, "status": "processing"},
+                },
+                updates={"status": "failed", "error_message": error_message},
+            ),
+            what=f"orphan reap of {action_id}",
+        )
+        if updated == 0:
+            logger.warning(
+                "ORPHAN_REAP_SKIPPED: action %s left processing before it could be "
+                "failed; leaving it as it is",
+                action_id,
             )
-            failed += 1
             continue
-
-        logger.warning(
-            "ORPHAN_REAP_REQUEUED: action %s (%s) was claimed and abandoned "
-            "(no progress for >%.0fs); returning it to queued",
-            action_id,
-            process_key_str,
-            orphan_age_seconds,
-        )
-        state_service.update_state(
-            namespace="core",
-            query={"table": "action_events", "filters": {"id": action_id}},
-            updates={"status": "queued"},
-        )
-        requeued += 1
+        failed += 1
+        oversized += int(is_oversized)
 
     if rows:
         logger.info(
-            "ORPHAN_REAP: examined=%d requeued=%d failed=%d (cutoff=%s UTC)",
+            "ORPHAN_REAP: examined=%d failed=%d oversized=%d (cutoff=%s UTC)",
             len(rows),
-            requeued,
             failed,
+            oversized,
             cutoff.isoformat(),
         )
 
-    return {"examined": len(rows), "requeued": requeued, "failed": failed}
+    return {"examined": len(rows), "failed": failed, "oversized": oversized}
 
 
 __all__ = [
     "DEFAULT_ORPHAN_AGE_SECONDS",
     "DEFAULT_REAP_PAGE_LIMIT",
     "EVIDENCE_FLOOR_CREATED_AT",
+    "abandoned_error_message",
     "reap_orphaned_processing_actions",
 ]

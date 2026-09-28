@@ -1,14 +1,21 @@
 """DefaultKnowledgePlugin search + retrieval-quality sub-Mixin (W5.T).
 
-Five KSI search/retrieval-quality methods plus one private helper:
+Five KSI search/retrieval-quality methods plus two private helpers:
 search / search_planning_references / test_retrieval / audit_retrieval_corpus /
-audit_retrieval_corpus_cron / _run_single_audit. The first four (plus the
-helper) are lifted byte-for-byte from the W5.T-pre-decomposition
-``DefaultKnowledgePlugin``. Inherited via MI from the residual class.
+audit_retrieval_corpus_cron / _run_corpus_audit / _run_single_audit. The first
+three and ``_run_single_audit`` are lifted byte-for-byte from the
+W5.T-pre-decomposition ``DefaultKnowledgePlugin``; ``_run_corpus_audit`` is the
+former inline body of ``audit_retrieval_corpus``. Inherited via MI from the
+residual class.
 
 Audit-report path helpers (_AUDIT_REPORT_DIR, _AUDIT_REPORT_STEM_FORMAT,
 _resolve_repo_relative) are co-located with the audit_retrieval_corpus method
 that uses them — Search-only per the W5.T inventory cross-mixin scan.
+
+``audit_retrieval_corpus`` (the direct verb, 2026-09-28, iss_30fb08fd) and
+``audit_retrieval_corpus_cron`` both submit the blocking walk
+(``_run_corpus_audit``) to the same single-slot executor; the direct verb
+returns a receipt naming the report directory instead of inline results.
 
 ``audit_retrieval_corpus_cron`` (2026-07-26, B-M6) is the EDGE_SINK
 scheduler-fired sibling: it submits the corpus walk to the plugin's
@@ -177,11 +184,58 @@ class KnowledgeSearchPluginMixin:
         active_knowledge_bases: list[str] | None = None,
         fail_fast: bool = False,
     ) -> dict[str, Any]:
+        """Submit the corpus audit to the single-slot background executor.
+
+        Returns a ``started``/``already_running`` receipt plus the resolved
+        report directory in milliseconds; the walk itself (17-20 min on the
+        full corpus) runs ``_run_corpus_audit`` on a daemon thread and its
+        durable output is the timestamped Markdown report under
+        ``report_dir``. Running the walk inline held the serial action-queue
+        poller for its whole duration (iss_30fb08fd). Arguments that can be
+        checked cheaply -- a configured KB root and an ``active_knowledge_bases``
+        subset of the active set -- are validated here, so a bad call still
+        fails loudly to its caller rather than inside the background thread.
+        """
+        if self._kb_root is None:
+            raise RuntimeError(f"{PLUGIN_NAME}: knowledge_base_root not configured")
+        if active_knowledge_bases is not None:
+            active_names = set(get_active_names(self._state_service))
+            missing = sorted(kb for kb in active_knowledge_bases if kb not in active_names)
+            if missing:
+                raise ValueError(f"Requested knowledge bases are not active: {missing}")
+        report_path_base = _resolve_repo_relative(report_dir, self._kb_root.parent).resolve()
+        accepted = self._kb_audit_executor.submit(
+            lambda: self._run_corpus_audit(
+                corpus_root=corpus_root,
+                report_dir=report_dir,
+                active_knowledge_bases=active_knowledge_bases,
+                fail_fast=fail_fast,
+            ),
+        )
+        return {
+            "status": "success",
+            "data": {
+                "audit": "started" if accepted else "already_running",
+                "report_dir": str(report_path_base),
+            },
+        }
+
+    def _run_corpus_audit(
+        self,
+        corpus_root: str = "knowledge_bases",
+        report_dir: str = _AUDIT_REPORT_DIR,
+        active_knowledge_bases: list[str] | None = None,
+        fail_fast: bool = False,
+    ) -> dict[str, Any]:
         """Walk every ``*.retrieval_test.yaml`` under ``corpus_root``, run the
         per-article retrieval test against each under the ratified split scope
         (``retrieval_audit.RATIFIED_SCOPE_PLAN``), aggregate DRIFT, OVERREACH,
         STALE_PROCESS_KEY, and LEGACY_KEY findings, and write a Markdown report
         under ``report_dir``.
+
+        Blocking: runs for the full walk. Only the background executor calls
+        it (via ``audit_retrieval_corpus`` / ``audit_retrieval_corpus_cron``);
+        never call it from a dispatched handler.
         """
         if self._kb_root is None:
             raise RuntimeError(f"{PLUGIN_NAME}: knowledge_base_root not configured")
@@ -244,11 +298,12 @@ class KnowledgeSearchPluginMixin:
 
         Submits the default-corpus walk to the single-slot background
         executor and returns immediately; the walk itself runs
-        ``audit_retrieval_corpus`` with its schema defaults on the daemon
+        ``_run_corpus_audit`` with its schema defaults on the daemon
         worker thread. A fire that lands while a prior pass is still running
         is a no-op (``already_running``) — see ``BoundedSummaryExecutor``.
+        The direct verb shares the same slot, so the two never overlap.
         """
-        accepted = self._kb_audit_executor.submit(self.audit_retrieval_corpus)
+        accepted = self._kb_audit_executor.submit(self._run_corpus_audit)
         return {
             "status": "success",
             "data": {"audit": "started" if accepted else "already_running"},

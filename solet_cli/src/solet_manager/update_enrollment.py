@@ -1,12 +1,14 @@
 """Inline enrollment of a Manager-created instance by ``solet-manager update`` (iss_836499b3).
 
-A Solet that ``solet create`` installed has a v1 create row and a verified create transaction but,
-before this change, no v2 maintenance row -- so ``update`` refused it as unmanaged.  ``update`` is the
+A Solet that ``solet create`` installed has a v1 create row and a create transaction but, before
+this change, no v2 maintenance row -- so ``update`` refused it as unmanaged.  ``update`` is the
 single user-facing verb for it: when no v2 row names the instance and the Manager's own create record
 does, ``--dry-run`` proves the instance against that record (``create_origin_enrollment``), renders the
 ordinary update preview from the would-be row, and discloses the enrollment; ``--yes`` enrolls and
 continues the same apply.  The approval fingerprint binds the enrollment, and an unproven identity is
-refused loud, never routed around.
+refused loud, never routed around.  The create transaction need not be ``verified``: one whose install
+is over but whose completion checks stayed blocked (the r46-r48 embeddings defect) enrolls, and the
+dry-run's ``enrollment.create_transaction`` names those checks (iss_fcbfabb7).
 
 An enrollment interrupted after its row was published but before it was finalized (review B3) leaves a
 create-origin row whose active operation is that import.  ``update`` resumes it: the fresh proof must
@@ -24,7 +26,7 @@ from pathlib import Path
 from typing import Never
 
 from ._existing_install_inspection_metadata import installed_channel_ids
-from .create_origin_enrollment import find_create_origin_record, require_verified_create_origin
+from .create_origin_enrollment import CreateOriginEligibility, find_create_origin_record, require_update_eligible_create_origin
 from .errors import OperationInProgressError, ProbeDriftError, UpdateBlockedError
 from .existing_install_inspection import (
     ExistingInstallInspectionResult,
@@ -59,6 +61,8 @@ class PendingEnrollment:
 
     preview: ImportPreview
     record: InstanceInventoryRecordV2
+    #: What the create transaction proves; a create blocked only at completion is disclosed, never hidden.
+    create: CreateOriginEligibility
     #: The row is already published and this enrollment finishes it (an interrupted apply or create).
     resuming: bool = False
 
@@ -77,11 +81,12 @@ class PendingEnrollment:
             "instance_id": self.preview.instance_id,
             "channel_id": self.preview.request.channel,
             "proven_release": {"commit": self.record.source_release.commit, "tree": self.record.source_release.tree},
+            "create_transaction": self.create.disclosure(),
         }
 
 
 def plan_create_origin_enrollment(request: UpdateRequest) -> PendingEnrollment | None:
-    """``None`` unless a verified create record names an instance with no finished v2 row; refuse loud if unproven."""
+    """``None`` unless an update-eligible create record names an instance with no finished v2 row; refuse loud if unproven."""
     paths = request.manager_paths
     row = next((item for item in read_maintenance_inventory_v2(paths.maintenance_inventory_path) if item.name == request.name), None)
     if row is not None and not _unfinished_create_enrollment(row):
@@ -89,14 +94,14 @@ def plan_create_origin_enrollment(request: UpdateRequest) -> PendingEnrollment |
     created = find_create_origin_record(paths, request.name)
     if created is None:
         return None
-    require_verified_create_origin(paths, created)
+    eligibility = require_update_eligible_create_origin(paths, created)
     import_request = ImportRequest(request.name, Path(created.target), _installed_channel(created), paths)
     inspected = inspect_for_import(import_request, installed_loader=_paired_descriptor_loader(request))
     _require_proven(created, inspected.result)
     preview = preview_from_inspection(import_request, inspected)
     if row is not None:
         _require_resumable(row, preview)
-    return PendingEnrollment(preview, pending_inventory_record(preview), resuming=row is not None)
+    return PendingEnrollment(preview, pending_inventory_record(preview), eligibility, resuming=row is not None)
 
 
 def _require_proven(created: InstanceRecord, result: ExistingInstallInspectionResult) -> None:

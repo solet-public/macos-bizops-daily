@@ -2,6 +2,59 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-28 — r50: updates for solets whose install never fully verified
+
+**Solet Manager manager-v0.1.0-r50.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows only after a fresh macOS 27 install round and an existing-solet
+update round both reach their end state on this build.
+
+Requires macOS 27 on Apple-silicon hardware, as r49 does.
+
+Changes since r49 (source `bad6e42e0`):
+
+- **Solets installed by r46–r48 can now actually be updated.** r49 taught
+  `solet-manager update` to recognize a solet the Manager created, but it
+  still refused to enroll one unless that solet's original `solet create`
+  had ended fully verified. On real r46–r48 installs it never did: the last
+  three checks of that install (`coreai_embedding_request_succeeds`,
+  `knowledge_retrieval_succeeds`, `plugin_roster_matches_plan`) failed
+  because of the embeddings defect that the update itself fixes. The r49
+  update round measured `operation_in_progress` ("create-origin transaction
+  remains nonterminal") on exactly that shape. Now:
+  - A solet whose install stages all finished, and whose only unverified
+    steps are those final checks, is eligible for `update` and `import`. The
+    dry run lists the unverified checks under
+    `enrollment.create_transaction`.
+  - The update's own final check re-runs them against the new release. If
+    they still fail, the update stops before promoting the new release, marks
+    the solet as needing attention, and rolls nothing back. Follow the
+    printed repair and run the same `--yes` command again.
+  - A solet whose install is still in progress refuses with
+    `operation_in_progress` and the repair `solet create <name>`. A solet
+    whose records disagree with its checkout refuses with
+    `managed_identity_drift`, even while in progress.
+  - `import --dry-run` and `import --yes` now apply the same rule, so a
+    preview that succeeds no longer fails at apply.
+- **The solet's action queue no longer stalls behind a long request.** A
+  direct request for the knowledge retrieval audit now runs in the
+  background and returns at once. An action abandoned by a stopped process
+  is now marked failed instead of being run again an hour later, and the
+  solet's health report names the action it is currently running.
+
+Known limits:
+
+- After an update, the older `solet status <name>` may keep showing
+  `blocked`, and `solet doctor <name>` may re-run the original install's
+  checks. Neither changes your solet. Check an updated solet with
+  `solet-manager doctor <name>`.
+- Solets that use LM Studio for embeddings or summaries cannot yet move to
+  the Apple-native stack by updating. The r49 notes planned that migration,
+  and the token-aware chunking and backfill for long session-ledger messages
+  on Core AI, for r50. Both move to r51.
+- The r50 update and fresh-install VM rounds are pending at publication.
+
 ## 2026-09-28 — r49: Core AI readiness and updates for installed solets
 
 **Solet Manager manager-v0.1.0-r49.** This is a full seed build for

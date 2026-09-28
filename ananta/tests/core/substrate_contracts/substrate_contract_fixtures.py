@@ -25,6 +25,7 @@ are recording stubs.
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -236,6 +237,27 @@ def build_completed_action() -> CompletedAction:
 # ---------------------------------------------------------------------------
 
 
+def _load_pg_result_helpers() -> Any:
+    """The postgres state plugin's ``result_helpers`` module, loaded by file path.
+
+    By path, not by package import, so the plugin's ``__init__`` (psycopg,
+    connection pools) never loads in an offline smoke.
+    """
+    path = (
+        _REPO_ROOT
+        / "plugins/postgres_state_management_plugin/src/postgres_state_management_plugin"
+        / "result_helpers.py"
+    )
+    spec = importlib.util.spec_from_file_location("_substrate_pg_result_helpers", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_PG_RESULTS = _load_pg_result_helpers()
+
+
 class RecordingStateService:
     """Records ``update_state`` calls; ``query_state`` returns no rows.
 
@@ -263,7 +285,13 @@ class RecordingStateService:
             {"namespace": namespace, "query": query, "updates": updates},
         )
         self.events.append("update")
-        return {"action_status": "completed", "data": {"rows_affected": 1}}
+        # The live postgres state plugin's own envelope (review round-2 note):
+        # the old ``{"data": {"rows_affected": 1}}`` shape has no
+        # ``data.result.updated``, so the poller's guarded status writes could
+        # only log TERMINAL_WRITE_UNCONFIRMED here and were never exercised.
+        return _PG_RESULTS.create_success_result(
+            {"namespace": namespace, "result": {"updated": 1}},
+        )
 
     def query_state(self, namespace: str, query: dict[str, Any]) -> dict[str, object]:
         self.query_calls.append((namespace, query))

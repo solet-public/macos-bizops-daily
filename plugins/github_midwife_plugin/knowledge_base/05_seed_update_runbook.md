@@ -79,9 +79,19 @@ One block of six commands. Every command is target-read-only except
 
 **A solet `solet create` installed skips `inspect` and `import`.** The
 Manager proves it against its own create record (the v1 registry row and
-the verified create transaction): the checkout must be at the exact
+the create transaction): the checkout must be at the exact
 recorded commit with its committed `PROVENANCE.json`, from the channel's
-repository, profile and `origin_id`. A current `solet create` enrolls the
+repository, profile and `origin_id`. The create transaction must show the
+install over, not verified: every install stage final and every completion
+check answered. A create whose completion checks stayed `blocked` or
+`failed` (every r46–r48 install, whose `coreai_embedding_request_succeeds`,
+`knowledge_retrieval_succeeds` and `plugin_roster_matches_plan` never
+passed) is eligible; the dry-run's `enrollment` block names those checks
+under `create_transaction`, and the update's final doctor runs its own
+checks against the new release. A create still in flight (an install stage
+not final, a completion check never run) refuses `operation_in_progress`
+with the repair `Resume with: solet create <name>`, and `import` refuses it
+the same way at `--dry-run` and at `--yes`. A current `solet create` enrolls the
 instance itself (`maintenance_enrollment` in its result). One created by an
 earlier Manager (r46–r48) has no v2 row yet, so `update <name> --dry-run`
 renders the update from the would-be row plus an `enrollment` block

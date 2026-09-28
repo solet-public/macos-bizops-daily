@@ -360,51 +360,22 @@ class KnowledgeSearchAPI(ABC):
             ),
         },
         return_value_schema=ReturnValueSchema(
-            description="Corpus audit report with aggregated retrieval findings",
+            description=(
+                "Background-submission receipt; the audit's findings are "
+                "written to a timestamped Markdown report under report_dir"
+            ),
             type=ParameterType.OBJECT,
             properties={
-                "ran_at": ParameterMetadata(
+                "audit": ParameterMetadata(
                     type=ParameterType.STRING,
-                    description="ISO 8601 timestamp the audit ran at",
+                    description="'started' if this call began a new background "
+                    "audit pass, 'already_running' if a prior pass (direct or "
+                    "cron) is still in flight (no-op)",
                 ),
-                "corpus_root": ParameterMetadata(
+                "report_dir": ParameterMetadata(
                     type=ParameterType.STRING,
-                    description="The corpus root that was walked",
-                ),
-                "total_articles_audited": ParameterMetadata(
-                    type=ParameterType.INTEGER,
-                    description="Number of articles run through the retrieval test",
-                ),
-                "passed": ParameterMetadata(
-                    type=ParameterType.INTEGER,
-                    description="Articles with no findings",
-                ),
-                "failed": ParameterMetadata(
-                    type=ParameterType.INTEGER,
-                    description="Articles with at least one finding",
-                ),
-                "drifts": ParameterMetadata(
-                    type=ParameterType.LIST,
-                    description="DRIFT findings: article_path, query, observed_rank, min_rank",
-                ),
-                "overreaches": ParameterMetadata(
-                    type=ParameterType.LIST,
-                    description=(
-                        "OVERREACH findings: article_path, query, observed_rank, "
-                        "forbidden_min_rank"
-                    ),
-                ),
-                "stale_keys": ParameterMetadata(
-                    type=ParameterType.LIST,
-                    description="STALE_PROCESS_KEY findings: article_path, process_key",
-                ),
-                "report_path": ParameterMetadata(
-                    type=ParameterType.STRING,
-                    description="Absolute path of the Markdown report written",
-                ),
-                "duration_seconds": ParameterMetadata(
-                    type=ParameterType.FLOAT,
-                    description="Wall-clock seconds the audit loop took",
+                    description="Absolute directory the pass writes its "
+                    "timestamped Markdown report into",
                 ),
             },
         ),
@@ -417,7 +388,7 @@ class KnowledgeSearchAPI(ABC):
     def audit_retrieval_corpus(
         self,
         corpus_root: str = "knowledge_bases",
-        report_dir: str = "workbench/kb_retrieval_audit_reports",
+        report_dir: str = "profile/data/kb_retrieval_audit_reports",
         active_knowledge_bases: list[str] | None = None,
         fail_fast: bool = False,
     ) -> dict[str, Any]: ...

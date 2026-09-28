@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::default_scheduling_plugin::fail_action_event",
+  "display_name": "Fail One Orphaned Action",
+  "description": "Operator recovery tool: mark one orphaned action_events row failed, by id, with a required reason recorded in its error_message. Its one real use is a row left in processing by a process that died or was replaced (for example after a SIGKILL or a blue-green swap): called from the live process, it resolves that row now instead of waiting an hour for the orphan reaper. It cannot interrupt a handler that is still running in this process: the call is itself an action on the same serial queue, so it waits behind the in-flight handler and, once it runs, finds that row finished and refuses. For the same reason it cannot overtake a queued row ahead of it in the queue. Failing a row does not stop work still running in another process, and it does not notify the row's flow or caller (no error processor, no bridge delivery); a caller polling the result sees failed and the reason. Refuses an empty reason, a row that is already completed, failed or error, a row that changed state between the read and the write, and the preserved incident-evidence rows created before 2026-07-01, which are excluded in SQL and so read as not found.",
+  "embedding_description": "Operator recovery for an orphaned action left in processing by a process that died or was replaced: mark that action_events row failed by id with a stated reason, from the live replacement process, instead of waiting out the hourly orphan reaper. Not for a handler still running in this process, which it queues behind.",
+  "result_processor_customizations": {
+    "action_label": "Action failed by request",
+    "result_type": "action_event_failed",
+    "result_description": "The failed action's id and process key, the status it had before (queued or processing), its new status (failed), and the error_message written to the row",
+    "presentation_guidance": "State which action was failed and whether it was processing or queued. Say plainly that failing the row does not stop any work still running in another process, and that the row's flow and caller were not notified.",
+    "output_action_guidance": "Resubmit the work later if it is still wanted. If solet-bridge health still shows the action path stalled, the stall is a handler running in this process: wait for it to return (kill -USR1 <pid> dumps its stack); do not kill the process."
+  },
+  "error_processor_customizations": {
+    "action_context": "Failing one queued or processing action_events row by id. fail_action_event accepts {action_id, reason}.",
+    "error_interpretation": "invalid_parameters: the reason or action_id was empty; the row was not found above the evidence floor (it does not exist, or it is a preserved evidence row); the row is already completed, failed or error; or the row changed state after it was read.",
+    "recovery_guidance": "Supply a non-empty reason and the exact action id. A refusal saying the row is completed usually means the call queued behind that very handler and ran after it returned: nothing is left to resolve. For a concurrent change, re-read the row's status and retry only if it is still processing. Preserved evidence rows are never modified by this verb."
+  }
+}
