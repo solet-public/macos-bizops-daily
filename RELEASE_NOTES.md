@@ -2,6 +2,30 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-28 — r54: llama.cpp installs on a fresh macOS 26 Mac
+
+**Solet Manager manager-v0.1.0-r54.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows only after fresh installs on macOS 27 and on macOS 26 both reach their
+end state on this build.
+
+Changes since r53 (source `f372783bf`):
+
+- **Setup on macOS 26 no longer stops at the llama.cpp install.** Homebrew's
+  llama.cpp now brings two libraries with it, libomp and ggml. Setup checks
+  every Homebrew install plan before it changes anything, and in r53 it
+  refused those two names as unreviewed. They are now reviewed for llama.cpp
+  only. Any other unexpected package in a plan is still refused before
+  anything is installed.
+
+Known limits:
+
+- Unchanged from r53: on macOS 26 embeddings use llama.cpp, since Core AI on
+  macOS 26 is not yet offered, and Intel Macs are not supported on that path.
+- Updating an existing solet is unchanged from r52.
+- The r54 fresh-install VM rounds are pending at publication.
+
 ## 2026-09-28 — r53: new solets on macOS 26 (Tahoe) with llama.cpp
 
 **Solet Manager manager-v0.1.0-r53.** This is a full seed build for

@@ -30,6 +30,8 @@ _UPGRADE_DEPENDENCY_HEADER = re.compile(
 # New dependency names require review; a package-looking action line is not proof.
 _REVIEWED_INSTALL_DEPENDENCIES: dict[tuple[str, str], frozenset[str]] = {
     ("formula", "postgresql@17"): frozenset({"krb5", "readline"}),
+    # r53 macOS 26 guest receipt (iss_6130e3f2): llama.cpp 0.4.0 bottles depend on these.
+    ("formula", "llama.cpp"): frozenset({"libomp", "ggml"}),
 }
 _KNOWN_PLAN_INFORMATION = frozenset(
     {

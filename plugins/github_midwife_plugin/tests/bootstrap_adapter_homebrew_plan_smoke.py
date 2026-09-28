@@ -61,6 +61,19 @@ readline
 xz
 """
 
+# r53 fresh macOS 26 guest, create_apply3 (iss_6130e3f2), verbatim.
+_RECEIPT_R53_LLAMA_CPP_STDOUT = """==> Would install 1 formula:
+llama.cpp
+==> Downloading https://ghcr.io/v2/homebrew/core/llama.cpp/manifests/0.4.0
+==> Would install 2 dependencies for llama.cpp:
+libomp
+ggml
+==> Would install 1 formula:
+llama.cpp
+==> Would install 2 dependencies for llama.cpp:
+libomp
+ggml
+"""
 
 def _check(condition: object, label: str) -> None:
     if not condition:
@@ -641,6 +654,31 @@ def main() -> int:
             package="postgresql@17",
         ),
         "output without a package-plan heading remains refused",
+    )
+    _check(
+        _homebrew_plan_is_exact(
+            _RECEIPT_R53_LLAMA_CPP_STDOUT + _RECEIPT_054_POSTGRES_STDERR,
+            kind="formula",
+            package="llama.cpp",
+        ),
+        "r53 llama.cpp plan with its reviewed libomp and ggml dependencies is accepted",
+    )
+    _check(
+        not _homebrew_plan_is_exact(
+            "==> Would install 1 formula:\nllama.cpp\n"
+            "==> Would install 3 dependencies for llama.cpp:\nlibomp\nggml\nopenssl@3\n",
+            kind="formula",
+            package="llama.cpp",
+        ),
+        "an unreviewed llama.cpp dependency remains refused",
+    )
+    _check(
+        not _homebrew_plan_is_exact(
+            "==> Would install 1 formula:\npostgresql@17\n==> Would install 1 dependency for postgresql@17:\nlibomp\n",
+            kind="formula",
+            package="postgresql@17",
+        ),
+        "llama.cpp's reviewed dependencies are not approved for other packages",
     )
     _check_failure_envelopes()
     _check_r44_postgres_dependency_upgrade_is_explicitly_blocked(installed=False)
