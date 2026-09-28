@@ -46,6 +46,8 @@ _READINESS_POLL_SECONDS = 0.5
 _READINESS_PROBE_TIMEOUT_SECONDS = 2
 _READINESS_INPUT_PREFIX = "startup_readiness_"
 _READINESS_BUDGET_SOURCE = "executor_contracts.start_command.timeout_seconds"
+# Seconds kept back from the request budget for the llama-server executable lookups.
+_LLAMA_SERVER_PROBE_RESERVE_SECONDS = 5
 _READINESS_BUDGET_UNIT = "seconds"
 _READINESS_SEMANTIC_SCOPE = "target_start_through_target_cli_health_status_healthy"
 _READINESS_RELEASE_SIGNAL = "target_cli_health_top_level_status_healthy"
@@ -321,7 +323,10 @@ def _llama_server_available(request: AdapterRequest, runtime: Runtime) -> JsonOb
     executable = resolve_executable(runtime, "llama-server")
     if executable is None:
         return _boolean_probe(request, "llama_cpp_server_available", False, False, "executable:llama-server unresolved", repair)
-    outcome = runtime.run((executable, "--version"), timeout_seconds=10)
+    # The first launch initializes ggml's Metal backend, which took more than 10 s
+    # on a fresh macOS 26 guest (iss_e8d7c188); spend the request's own budget.
+    budget = max(1, request.timeout_seconds - _LLAMA_SERVER_PROBE_RESERVE_SECONDS)
+    outcome = runtime.run((executable, "--version"), timeout_seconds=budget)
     return _command_probe(request, outcome, "llama_cpp_server_available", repair, source=f"executable:{executable}")
 
 

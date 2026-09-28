@@ -2,6 +2,28 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-28 — r55: setup on macOS 26 waits for llama.cpp's first start
+
+**Solet Manager manager-v0.1.0-r55.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows only after fresh installs on macOS 27 and on macOS 26 both reach their
+end state on this build.
+
+Changes since r54 (source `951bf476f`):
+
+- **Setup on macOS 26 no longer gives up on a freshly installed llama.cpp.**
+  After installing llama.cpp, setup confirms it runs by asking for its version.
+  The first run on a new Mac prepares the graphics backend and can take more
+  than 10 seconds, so r54 stopped there although llama.cpp was installed
+  correctly. The check now uses the full time setup allows it, minus a short
+  margin.
+
+Known limits:
+
+- Unchanged from r54.
+- The r55 fresh-install VM round on macOS 26 is pending at publication.
+
 ## 2026-09-28 — r54: llama.cpp installs on a fresh macOS 26 Mac
 
 **Solet Manager manager-v0.1.0-r54.** This is a full seed build for

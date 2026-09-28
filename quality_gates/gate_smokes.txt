@@ -5430,5 +5430,6 @@ ananta/tests/llm/session_ledger/embedding_token_budget_smoke.py
 solet_cli/tests/fresh_tahoe_host_gate_smoke.py
 plugins/github_midwife_plugin/tests/llama_cpp_service_plan_smoke.py
 plugins/github_midwife_plugin/tests/llama_cpp_missing_model_warning_smoke.py
+plugins/github_midwife_plugin/tests/llama_cpp_server_probe_budget_smoke.py
 plugins/github_midwife_plugin/tests/tahoe_closure_no_macos27_wheel_smoke.py
 plugins/openai_embeddings_plugin/tests/llama_cpp_token_budget_smoke.py
