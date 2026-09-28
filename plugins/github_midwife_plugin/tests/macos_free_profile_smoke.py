@@ -803,11 +803,24 @@ def _check_no_orphan_starting_actions(profile: dict[str, Any], plugins: set[str]
                 f"process_key {process_key!r} references plugin {owner!r} "
                 "not in the plugins allowlist",
             )
+        elif process_key.startswith("service_interface::"):
+            # A bound provider's plugin:: namespace is never registered, so a
+            # bound service's boot verb is a service_interface:: key
+            # (iss_49a3820a). Non-orphan means this profile binds the
+            # service to a plugin it loads.
+            service = process_key.split("::")[1]
+            bindings = profile.get("service_bindings") or {}
+            _check(
+                f"no-orphan-starting-action[{name}]",
+                bindings.get(service) in plugins,
+                f"process_key {process_key!r} references service {service!r} "
+                f"bound to {bindings.get(service)!r}, not a plugin in the allowlist",
+            )
         else:
             raise SmokeFailureError(
                 f"starting_action {name!r} has an unrecognized process_key shape "
                 f"{process_key!r} — this profile only expects plugin::<name>::... "
-                "starting actions; extend the check before adding a service_interface:: one"
+                "or service_interface::<service>::... starting actions"
             )
 
 

@@ -322,6 +322,9 @@ class MemoryService(BootstrappableServiceInterface, MemoryServiceInterface):
     def recompute_strengths_cron(self) -> dict[str, Any]:
         return self._get_backend().recompute_strengths_cron()
 
+    def ensure_schedules(self) -> dict[str, Any]:
+        return self._get_backend().ensure_schedules()
+
     def import_memories(
         self,
         file_path: str,

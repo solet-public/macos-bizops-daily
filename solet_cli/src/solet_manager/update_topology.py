@@ -16,12 +16,15 @@ path.
 
 from __future__ import annotations
 
-import re
 import unicodedata
 from dataclasses import dataclass
 
 from .existing_install_inspection import ExistingInstallFacts, ObservationAvailability, ObservedBoolean, RawRow
 from .models import JsonValue
+
+# The executable-config scan and its parser live in ``target_git``, the one hardened target Git surface.
+from .target_git import parse_git_config_entries as parse_git_config_entries
+from .target_git import unsafe_config_keys as unsafe_config_keys
 
 _TRANSITION_STATUSES = frozenset({"A", "D", "M", "T"})
 _CREATED_STATUSES = frozenset({"A", "T"})
@@ -35,19 +38,6 @@ _ROOT_GITIGNORE = ".gitignore"
 #: The seed's ``never_copy`` surface: no sealed release may carry a path under it, and the running
 #: solet owns it (section 6.1, U-config).
 PRESERVED_SURFACE_PREFIX = "profile/"
-_EXECUTABLE_CONFIG = tuple(
-    re.compile(pattern)
-    for pattern in (
-        r"^core\.(fsmonitor|fsmonitorhookversion|hookspath|sshcommand|gitproxy|askpass|editor|pager|attributesfile|excludesfile|alternaterefscommand)$",
-        r"^filter\..*",
-        r"^diff\.(external|.*\.(command|textconv))$",
-        r"^merge\..*\.driver$",
-        r"^(credential|url|alias|gpg|http|https|include|includeif|submodule|protocol|uploadpack|receive|ssh|difftool|mergetool|pager|browser|maintenance)\..*",
-        r"^sequence\.editor$",
-        r"^commit\.(gpgsign|template)$",
-        r"^remote\..*\.(proxy|proxyauthmethod|vcs|uploadpack|receivepack)$",
-    )
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,36 +215,6 @@ def analyze_update_inspection(inspection: object, *, baseline_commit: str, candi
     if not isinstance(facts, ExistingInstallFacts):
         raise ValueError("update topology requires a fresh existing-install inspection")
     return analyze_update_topology(facts, baseline_commit=baseline_commit, candidate_commit=candidate_commit)
-
-
-def parse_git_config_entries(raw: bytes) -> tuple[tuple[str, str, str], ...]:
-    """Parse ``git config --list --show-scope -z`` into (scope, key, value) rows.
-
-    The wire shape is ``scope NUL key NL value NUL``; anything else fails closed.
-    """
-    tokens = raw.split(b"\0")
-    if tokens[-1] != b"":
-        raise ValueError("git config listing is not NUL-terminated")
-    body = tokens[:-1]
-    if len(body) % 2:
-        raise ValueError("git config listing has an odd token count")
-    rows: list[tuple[str, str, str]] = []
-    for scope, entry in zip(body[::2], body[1::2], strict=True):
-        key, separator, value = entry.decode("utf-8", "strict").partition("\n")
-        if not separator or not key:
-            raise ValueError("git config entry lacks a key/value separator")
-        rows.append((scope.decode("utf-8", "strict"), key, value))
-    return tuple(rows)
-
-
-def unsafe_config_keys(entries: tuple[tuple[str, str, str], ...]) -> tuple[str, ...]:
-    """Return every repository-scoped key that would let the target run its own code."""
-    found = {
-        key
-        for scope, key, _ in entries
-        if scope in {"local", "worktree"} and any(pattern.fullmatch(key.lower()) for pattern in _EXECUTABLE_CONFIG)
-    }
-    return tuple(sorted(found))
 
 
 def config_flag(entries: tuple[tuple[str, str, str], ...], key: str) -> bool:

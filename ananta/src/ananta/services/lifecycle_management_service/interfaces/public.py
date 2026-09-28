@@ -259,7 +259,8 @@ class LifecycleManagementAPI(ABC):
                         "Each entry carries name, version, readiness status, enabled flag, "
                         "load priority, number of registered processes, whether the plugin "
                         "is LifecycleManaged, whether its services are currently running, "
-                        "and (when present) the last readiness error string."
+                        "and (when present) the last readiness error string and, for a ready "
+                        "plugin missing an optional capability, a readiness warning string."
                     ),
                     required=False,
                 ),
@@ -288,7 +289,8 @@ class LifecycleManagementAPI(ABC):
             Result dict containing ``plugins``: a list of dicts, each with
             ``name``, ``version``, ``status``, ``enabled``, ``priority``,
             ``process_count``, ``lifecycle_managed``, ``is_running``, and
-            optionally ``last_error``.
+            optionally ``last_error`` and ``warning`` (a ready plugin that is
+            degraded, such as Apple FM on an ineligible device).
         """
         ...
 

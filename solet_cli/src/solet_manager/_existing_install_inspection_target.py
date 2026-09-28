@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import PurePosixPath
@@ -55,6 +56,8 @@ def target_checks(
     root = probe(runner, InspectionProbe.REPOSITORY_ROOT, target, tracker)
     if root.returncode != 0:
         return (_not_git_worktree_check(),), {}
+    if not _root_is_pinned_target(root, target):
+        return (_redirected_root_check(_successful_line(root)),), {}
     values = _target_probe_values(target, metadata, runner, tracker, probe)
     return _target_identity_checks(values, metadata), values
 
@@ -69,6 +72,32 @@ def _not_git_worktree_check() -> InspectionCheck:
         "Pinned target is not a Git worktree.",
         None,
         "git worktree",
+        "git",
+    )
+
+
+def _root_is_pinned_target(root: InspectionProbeOutput, target: PinnedInspectionDirectory) -> bool:
+    """Review R2-1: the work tree Git reports is the pinned directory itself (same device and inode)."""
+    reported = _successful_line(root)
+    if reported is None:
+        return False
+    try:
+        observed = os.stat(reported)
+    except OSError:
+        return False
+    return (observed.st_dev, observed.st_ino) == (target.device, target.inode)
+
+
+def _redirected_root_check(reported: str | None) -> InspectionCheck:
+    return _check(
+        "repository_root",
+        "git",
+        True,
+        InspectionStatus.FAILED,
+        "repository_root_redirected",
+        "Git reports a work tree other than the pinned target.",
+        reported,
+        "pinned target directory",
         "git",
     )
 

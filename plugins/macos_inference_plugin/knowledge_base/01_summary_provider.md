@@ -23,11 +23,18 @@ is `apple-system`; no endpoint, daemon or API key is required. The SDK pin is
 
 Preparation validates configuration and registers the plugin without probing the
 model. Post-registration availability returns a typed warning with the actual
-reason and a repair instruction. A VM can remain `DEVICE_NOT_ELIGIBLE` while
-unrelated setup completes. Runtime requests fail explicitly when the model is
-unavailable; warning is not inference success. A readiness check re-probes an
-unavailable model so an asset/configuration repair can recover without a retry
-thread. The plugin creates an isolated SDK session for each request, serializes
+reason and a repair instruction. When the system model is absent, the plugin
+stays `status: ready` and degraded: `list_plugins` shows a `warning` field on its
+row, the install doctor's `plugin_roster_matches_plan` accepts it, and it reports
+the warning as `plugin_roster_warnings` evidence. The reasons that degrade the
+plugin are the SDK's `APPLE_INTELLIGENCE_NOT_ENABLED`, `DEVICE_NOT_ELIGIBLE`,
+`MODEL_NOT_READY` and `UNKNOWN`, and the provider's `SDK_UNAVAILABLE` (SDK not
+installed or not loadable). A `PROBE_FAILED` result, where the SDK raised during
+the probe, is a real error and sets `status: error`. A VM stays
+`DEVICE_NOT_ELIGIBLE` and degraded while unrelated setup completes. Runtime
+requests fail explicitly when the model is unavailable; a warning is not
+inference success. A readiness check re-probes a degraded or errored plugin, so
+a repair recovers without a retry thread and clears the warning. The plugin creates an isolated SDK session for each request, serializes
 calls, cancels asynchronous generation on timeout, and releases the request
 slot once that worker unwinds. A native call ignoring cancellation may outlive
 the synchronous deadline; the slot stays held to prevent accumulating workers.

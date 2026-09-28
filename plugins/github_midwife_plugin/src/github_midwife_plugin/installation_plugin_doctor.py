@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
@@ -16,7 +17,7 @@ from .installation_doctor import (
     blocked,
     truncated_solet_call_output,
 )
-from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, result
+from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, evidence, result
 from .setup_adapter_runtime import CommandOutcome, Runtime, read_json_object, resolve_executable
 from .setup_plugin_operations import (
     command_output_truncated,
@@ -363,25 +364,44 @@ def plugin_roster(request: AdapterRequest, runtime: Runtime) -> JsonObject:
             "plugin_roster_invalid",
             "Repair lifecycle plugin inventory until it returns a complete typed roster.",
         )
-    actual, unready = observed
-    exact = actual == desired and not unready
-    error_kind = "plugin_roster_unready" if unready else "plugin_roster_mismatch"
+    exact = observed.actual == desired and not observed.unready
+    error_kind = "plugin_roster_unready" if observed.unready else "plugin_roster_mismatch"
     return result(
         request,
         status="verified" if exact else "blocked",
         error_kind=None if exact else error_kind,
         retry_safe=True,
-        evidence_items=[
-            _evidence(
-                "plugin_roster",
-                exact,
-                "profile/config/manifest.yaml + lifecycle_management_service::list_plugins",
-                sorted(actual),
-                sorted(desired),
-            )
-        ],
-        repair=None if exact else "Apply the generated manifest and repair every unready plugin.",
+        evidence_items=_roster_evidence(observed, desired, exact),
+        repair=None if exact else _roster_repair(observed),
     )
+
+
+_ROSTER_SOURCE = "profile/config/manifest.yaml + lifecycle_management_service::list_plugins"
+
+
+def _roster_evidence(observed: _RosterObservation, desired: set[str], exact: bool) -> list[JsonObject]:
+    """Name every unready plugin with its reason, and keep degraded plugins' warnings visible."""
+    unready = sorted(observed.unready)
+    items = [
+        _evidence("plugin_roster", exact, _ROSTER_SOURCE, sorted(observed.actual), sorted(desired)),
+        _evidence("plugin_roster_unready", not unready, _ROSTER_SOURCE, unready, []),
+    ]
+    if observed.warnings:
+        items.append(evidence(
+            evidence_id="plugin_roster_warnings",
+            kind="readiness",
+            status="warning",
+            summary="ready plugins report a degraded capability",
+            observed=sorted(observed.warnings),
+            expected=[],
+            source=_ROSTER_SOURCE,
+        ))
+    return items
+
+
+def _roster_repair(observed: _RosterObservation) -> str:
+    repair = "Apply the generated manifest and repair every unready plugin."
+    return f"{repair} Unready: {'; '.join(sorted(observed.unready))}" if observed.unready else repair
 
 
 def _desired_plugins(request: AdapterRequest) -> set[str] | None:
@@ -392,38 +412,68 @@ def _desired_plugins(request: AdapterRequest) -> set[str] | None:
     return desired if desired else None
 
 
-def _observed_plugins(value: JsonValue) -> tuple[set[str], set[str]] | None:
+_EVIDENCE_LINE_LIMIT = 240
+
+
+@dataclass(frozen=True)
+class _RosterObservation:
+    """Loaded names, plus one ``name: status: reason`` line per unready or degraded plugin."""
+
+    actual: set[str]
+    unready: set[str]
+    warnings: set[str]
+
+
+@dataclass(frozen=True)
+class _PluginRow:
+    name: str
+    ready: bool
+    detail: str
+    warning: str | None
+
+
+def _observed_plugins(value: JsonValue) -> _RosterObservation | None:
     if not isinstance(value, list) or not value:
         return None
-    actual: set[str] = set()
-    unready: set[str] = set()
+    observation = _RosterObservation(set(), set(), set())
     for row in value:
         normalized = _plugin_row(row)
-        if normalized is None or normalized[0] in actual:
+        if normalized is None or normalized.name in observation.actual:
             return None
-        name, ready = normalized
-        actual.add(name)
-        if not ready:
-            unready.add(name)
-    return actual, unready
+        observation.actual.add(normalized.name)
+        if not normalized.ready:
+            observation.unready.add(f"{normalized.name}: {normalized.detail}"[:_EVIDENCE_LINE_LIMIT])
+        elif normalized.warning is not None:
+            observation.warnings.add(f"{normalized.name}: {normalized.warning}"[:_EVIDENCE_LINE_LIMIT])
+    return observation
 
 
-def _plugin_row(value: JsonValue) -> tuple[str, bool] | None:
+def _plugin_row(value: JsonValue) -> _PluginRow | None:
     if not isinstance(value, dict):
         return None
     name = value.get("name")
     status = value.get("status")
-    enabled = value.get("enabled")
-    lifecycle_managed = value.get("lifecycle_managed")
-    is_running = value.get("is_running")
-    if not _valid_plugin_identity(name, status):
-        return None
-    flags = (enabled, lifecycle_managed, is_running)
-    if not _boolean_flags(flags):
+    flags = (value.get("enabled"), value.get("lifecycle_managed"), value.get("is_running"))
+    texts = (value.get("last_error"), value.get("warning"))
+    if not (_valid_plugin_identity(name, status) and _boolean_flags(flags) and _optional_texts(texts)):
         return None
     enabled_flag, managed_flag, running_flag = cast(tuple[bool, bool, bool], flags)
+    last_error, warning = cast(tuple[str | None, str | None], texts)
     ready = enabled_flag and status == "ready" and (not managed_flag or running_flag)
-    return cast(str, name), ready
+    detail = _unready_detail(cast(str, status), enabled_flag, managed_flag, running_flag, last_error)
+    return _PluginRow(cast(str, name), ready, detail, warning)
+
+
+def _optional_texts(texts: tuple[object, object]) -> bool:
+    """``last_error`` and ``warning`` are absent or a nonempty string, never another type."""
+    return all(item is None or (isinstance(item, str) and bool(item)) for item in texts)
+
+
+def _unready_detail(status: str, enabled: bool, managed: bool, running: bool, last_error: str | None) -> str:
+    state = status if enabled else f"{status}, disabled"
+    if managed and not running:
+        state = f"{state}, not running"
+    return f"{state}: {last_error or 'no last_error reported'}"
 
 
 def _valid_plugin_identity(name: object, status: object) -> bool:

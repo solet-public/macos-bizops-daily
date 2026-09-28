@@ -9,13 +9,14 @@ them.  This module neither writes the target nor interprets receipts.
 
 from __future__ import annotations
 
-import os
 import subprocess
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .errors import UpdateBlockedError
 from .models import JsonValue
+from .target_git import run_target_git
 
 _GIT_TIMEOUT_SECONDS = 30
 _FORMAT = "seed-tree-baseline-v1"
@@ -140,19 +141,14 @@ def _git_command(target: Path, *arguments: str) -> tuple[str, ...]:
 def _subprocess_git_query(command: Sequence[str], timeout: int) -> GitQueryResult:
     """Run a fixed read-only Git vector without inheriting Git redirection."""
 
-    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    if not command or command[0] != "git":
+        raise ValueError("seed tree verification runs Git vectors only")
     try:
-        completed = subprocess.run(  # noqa: S603 - command vector is closed above
-            list(command),
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
-            timeout=timeout,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+        # iss_836499b3 B1: the shared hardened target Git surface; an unsafe config is a failed, explained query.
+        completed = run_target_git(command[1:], timeout=timeout, inherit_environment=True)
+    except (OSError, subprocess.TimeoutExpired, UpdateBlockedError) as exc:
         return GitQueryResult(1, "", str(exc))
-    return GitQueryResult(completed.returncode, completed.stdout, completed.stderr)
+    return GitQueryResult(completed.returncode, completed.stdout.decode("utf-8", "replace"), completed.stderr.decode("utf-8", "replace"))
 
 
 def _run_query(runner: GitQueryRunner, command: tuple[str, ...]) -> GitQueryResult | str:

@@ -42,8 +42,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from .errors import SourceError
+from .errors import SourceError, UpdateBlockedError
 from .models import JsonValue
+from .target_git import run_target_git
 
 ATTESTATION_FORMAT = "installation-attestation-v1"
 RELEASE_MANIFEST_NAME = "release_manifest.json"
@@ -130,6 +131,8 @@ class InstallSource:
 def run_command(argv: Sequence[str], cwd: Path | None, timeout: int) -> CommandOutcome:
     """Run a fixed read-only vector with no inherited Git redirection."""
 
+    if argv and argv[0] == "git":
+        return _run_target_git(argv, cwd, timeout)
     environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     environment.update(_GIT_ENVIRONMENT)
     try:
@@ -146,6 +149,15 @@ def run_command(argv: Sequence[str], cwd: Path | None, timeout: int) -> CommandO
     except (OSError, subprocess.TimeoutExpired) as exc:
         return CommandOutcome(1, "", str(exc))
     return CommandOutcome(completed.returncode, completed.stdout, completed.stderr)
+
+
+def _run_target_git(argv: Sequence[str], cwd: Path | None, timeout: int) -> CommandOutcome:
+    """A target Git vector through the shared hardened surface; a refusal is a failed, explained outcome."""
+    try:
+        completed = run_target_git(argv[1:], cwd=cwd, timeout=timeout, inherit_environment=True)
+    except (OSError, subprocess.TimeoutExpired, UpdateBlockedError) as exc:
+        return CommandOutcome(1, "", str(exc))
+    return CommandOutcome(completed.returncode, completed.stdout.decode("utf-8", "replace"), completed.stderr.decode("utf-8", "replace"))
 
 
 def load_release_manifest(path: Path) -> dict[str, JsonValue]:

@@ -1152,6 +1152,39 @@ class MemoryServiceAPI(ABC):
         """
         pass
 
+    # Boot-only: fired by the profiles' `ensure_actr_memory_schedules`
+    # starting action. Declared here, not as a plugin verb, because the bound
+    # memory_service provider's `plugin::actr_memory_plugin::*` namespace is
+    # skipped at registry build (`PluginProcessScanner._should_skip_plugin`),
+    # so `plugin::actr_memory_plugin::ensure_schedules` never resolved
+    # (iss_49a3820a). Same shape as
+    # `service_interface::session_ledger_service::ensure_periodic_poll_schedule`.
+    @service_interface_process(
+        name="ensure_schedules",
+        is_discoverable=False,  # boot-only; invoked by starting_actions, not the model
+        provider="memory_service",
+        processor_policy_category=ProcessorPolicyCategory.EDGE,
+        parameters={},
+        return_value_schema=ReturnValueSchema(
+            description="Scheduled memory-maintenance install result",
+            type=ParameterType.OBJECT,
+            properties={
+                "message": ParameterMetadata(
+                    type=ParameterType.STRING, description="Install summary message"
+                ),
+                "schedules": ParameterMetadata(
+                    type=ParameterType.LIST,
+                    description="Names of the crons installed on this call",
+                ),
+            },
+        ),
+        error_processor_customizations=MergeErrorProcessorCustomizations(retryable=True),
+    )
+    @abstractmethod
+    def ensure_schedules(self) -> dict[str, Any]:
+        """Idempotently install the memory-maintenance crons at boot."""
+        pass
+
     @service_interface_process(
         name="memory_stats",
         is_discoverable=True,

@@ -29,3 +29,4 @@ class ErrorCode:
     SCHEDULING_SERVICE_NOT_AVAILABLE = f"{PLUGIN_NAME}.scheduling_service_not_available"
     PARAMETER_ERROR = f"{PLUGIN_NAME}.parameter_error"
     OPERATION_FAILED = f"{PLUGIN_NAME}.operation_failed"
+    SCHEDULE_SETUP_FAILED = f"{PLUGIN_NAME}.schedule_setup_failed"

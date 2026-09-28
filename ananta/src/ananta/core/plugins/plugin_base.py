@@ -113,6 +113,7 @@ class PluginBase:
         self.action_factory: ActionFactory | None = None
         self.readiness_state: PluginReadiness = PluginReadiness.UNINITIALIZED
         self.readiness_error: str | None = None
+        self.readiness_warning: str | None = None
 
     # ------------------------------------------------------------------
     # Readiness lifecycle
@@ -122,15 +123,17 @@ class PluginBase:
         """Check if plugin is ready for action processing."""
         return self.readiness_state == PluginReadiness.READY
 
-    def set_ready(self) -> None:
-        """Mark plugin as ready for action processing."""
+    def set_ready(self, warning: str | None = None) -> None:
+        """Mark plugin ready; a warning names an absent optional capability (degraded)."""
         self.readiness_state = PluginReadiness.READY
         self.readiness_error = None
+        self.readiness_warning = warning
 
     def set_error(self, error_message: str) -> None:
         """Mark plugin as having an error."""
         self.readiness_state = PluginReadiness.ERROR
         self.readiness_error = error_message
+        self.readiness_warning = None
 
     def get_readiness_error(self) -> str | None:
         return self.readiness_error

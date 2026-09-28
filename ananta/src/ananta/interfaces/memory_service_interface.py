@@ -19,7 +19,7 @@ class MemoryServiceInterface(ABC):
     4. Implement strength-based decay model
     """
 
-    INTERFACE_VERSION: ClassVar[str] = "1.3.0"  # Added short-term memory, tags, learning, audit, maintenance
+    INTERFACE_VERSION: ClassVar[str] = "1.4.0"  # Added ensure_schedules (boot-time cron install)
 
     @abstractmethod
     def remember(
@@ -488,6 +488,25 @@ class MemoryServiceInterface(ABC):
         Returns:
             Dict with update summary (same envelope as the discoverable
             sibling).
+        """
+        ...
+
+    @abstractmethod
+    def ensure_schedules(self) -> dict[str, Any]:
+        """Idempotently install the provider's scheduled maintenance crons.
+
+        Boot-time entry point fired from a profile's ``starting_actions``
+        (after ``init_service_manager``, so ``scheduling_service`` resolves).
+        It lives on the interface because a bound ServiceProvider's
+        ``plugin::<name>::*`` verbs are never registered
+        (``PluginProcessScanner._should_skip_plugin``, iss_49a3820a).
+
+        Returns:
+            Dict with ``message`` and the list of installed ``schedules``.
+
+        Raises:
+            FrameworkError: If scheduling_service is unavailable or any cron
+                fails to install.
         """
         ...
 

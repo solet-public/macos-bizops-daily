@@ -1522,6 +1522,23 @@ class ACTRMemoryPlugin(ServicePlugin, MemoryServiceInterface):
     # SCHEDULING SETUP
     # ─────────────────────────────────────────────────────────────────────────
 
+    def _resolve_scheduling_service(self) -> Any | None:
+        """Lazily (re-)resolve ``scheduling_service`` (class defect `iss_d1a7662f`).
+
+        ``scheduling_service`` is a service-manager-tier service
+        (``EventOrchestrator._SERVICE_MANAGER_SERVICES``): it does not exist
+        until the ``init_service_manager`` startup step runs, which is AFTER
+        ``start_service_plugins`` — the step that runs `prepare_for_readiness`
+        and `start_services` on every plugin. The one-shot acquisition there
+        can only ever see it on a warm restart; a fresh boot always leaves
+        `self._scheduling_service` `None`. Re-attempt here, at actual call
+        time, mirroring `default_thinking_plugin._require_context_services`'s
+        lazy re-acquisition pattern.
+        """
+        if self._scheduling_service is None and self.orchestrator_ref is not None:
+            self._scheduling_service = self.orchestrator_ref.get_service("scheduling_service")
+        return self._scheduling_service
+
     # Text fields (display_name, description, embedding_description) are defined in
     # knowledge_base/processes/setup_schedules.json — the builder merges them at startup,
     # overwriting any values set here in the decorator.
@@ -1564,7 +1581,7 @@ class ACTRMemoryPlugin(ServicePlugin, MemoryServiceInterface):
                 {"message": "Schedules already configured"},
             )
 
-        if not self._scheduling_service:
+        if not self._resolve_scheduling_service():
             return self._build_response(
                 ActionStatus.ERROR.value,
                 {},
@@ -1576,9 +1593,23 @@ class ACTRMemoryPlugin(ServicePlugin, MemoryServiceInterface):
                 },
             )
 
-        created_schedules = []
+        created_schedules: list[str] = []
 
         try:
+            # Clear any crons the scheduler restored from a prior boot
+            # before recreating them. The real scheduler persists schedules
+            # and restores ALL of them at every boot
+            # (`default_scheduling_plugin/plugin.py:580` -> `restore_schedules`);
+            # `create_cron_schedule` never dedupes, so without this clear
+            # each boot added 3 more (review finding B1, iss_2250e07c). All
+            # three crons below carry the `PLUGIN_NAME` tag, so one
+            # clear-by-tag removes exactly this plugin's prior crons —
+            # same precedent as `SessionLedgerService.
+            # ensure_periodic_poll_schedule` (service.py:715-745) and
+            # `fleet_maintenance_plugin.ensure_dispatch_schedule` in this
+            # same unit.
+            self._scheduling_service.clear_scheduled_actions_by_tag(tag=PLUGIN_NAME)
+
             config = self.config_provider.config if self.config_provider else {}
 
             if config.get("enable_scheduled_operations", True):
@@ -1607,49 +1638,49 @@ class ACTRMemoryPlugin(ServicePlugin, MemoryServiceInterface):
 
                 # Memorization queue processing (every 6 hours).
                 memorization_result = self._scheduling_service.create_cron_schedule(
-                    params={
-                        "cron_expression": config.get(
-                            "memorization_queue_cron", MEMORIZATION_QUEUE_CRON
-                        ),
-                        "label": "ACT-R Memorization Queue Processing",
-                        "tags": [PLUGIN_NAME, "memorization"],
-                        "actions": [
-                            {
-                                "process_key": "service_interface::memory_service::process_memorization_queue_cron",
-                                "arguments": {},
-                            }
-                        ],
-                    },
+                    cron_expression=config.get(
+                        "memorization_queue_cron", MEMORIZATION_QUEUE_CRON
+                    ),
+                    label="ACT-R Memorization Queue Processing",
+                    tags=[PLUGIN_NAME, "memorization"],
+                    actions=[
+                        {
+                            "process_key": "service_interface::memory_service::process_memorization_queue_cron",
+                            "arguments": {},
+                        }
+                    ],
                     state={
                         "flow_id": _ACTR_MEMORIZATION_FLOW_ID,
                         "session_id": _ACTR_MEMORIZATION_SESSION_ID,
                     },
                 )
-                if memorization_result.get("action_status") == ActionStatus.COMPLETED.value:
-                    created_schedules.append("memorization_queue")
+                self._require_schedule_created(
+                    memorization_result, "ACT-R Memorization Queue Processing",
+                )
+                created_schedules.append("memorization_queue")
 
                 # Strength recomputation (daily).
                 strength_result = self._scheduling_service.create_cron_schedule(
-                    params={
-                        "cron_expression": config.get(
-                            "strength_recompute_cron", STRENGTH_RECOMPUTE_CRON
-                        ),
-                        "label": "ACT-R Strength Recomputation",
-                        "tags": [PLUGIN_NAME, "strength"],
-                        "actions": [
-                            {
-                                "process_key": "service_interface::memory_service::recompute_strengths_cron",
-                                "arguments": {},
-                            }
-                        ],
-                    },
+                    cron_expression=config.get(
+                        "strength_recompute_cron", STRENGTH_RECOMPUTE_CRON
+                    ),
+                    label="ACT-R Strength Recomputation",
+                    tags=[PLUGIN_NAME, "strength"],
+                    actions=[
+                        {
+                            "process_key": "service_interface::memory_service::recompute_strengths_cron",
+                            "arguments": {},
+                        }
+                    ],
                     state={
                         "flow_id": _ACTR_STRENGTH_FLOW_ID,
                         "session_id": _ACTR_STRENGTH_SESSION_ID,
                     },
                 )
-                if strength_result.get("action_status") == ActionStatus.COMPLETED.value:
-                    created_schedules.append("strength_recompute")
+                self._require_schedule_created(
+                    strength_result, "ACT-R Strength Recomputation",
+                )
+                created_schedules.append("strength_recompute")
 
                 # Consolidation (weekly). Semantic equivalence verified: the
                 # wrapper calls `self._backend.consolidate(dry_run=dry_run)`,
@@ -1658,24 +1689,24 @@ class ACTRMemoryPlugin(ServicePlugin, MemoryServiceInterface):
                 # rely on the backend's `EPISODIC_CONSOLIDATION_THRESHOLD=-1.5`
                 # + `MIN_AGE_FOR_CONSOLIDATION_DAYS=7` defaults).
                 consolidation_result = self._scheduling_service.create_cron_schedule(
-                    params={
-                        "cron_expression": config.get("consolidation_cron", CONSOLIDATION_CRON),
-                        "label": "ACT-R Memory Consolidation",
-                        "tags": [PLUGIN_NAME, "consolidation"],
-                        "actions": [
-                            {
-                                "process_key": "service_interface::memory_service::consolidate_cron",
-                                "arguments": {"dry_run": False},
-                            }
-                        ],
-                    },
+                    cron_expression=config.get("consolidation_cron", CONSOLIDATION_CRON),
+                    label="ACT-R Memory Consolidation",
+                    tags=[PLUGIN_NAME, "consolidation"],
+                    actions=[
+                        {
+                            "process_key": "service_interface::memory_service::consolidate_cron",
+                            "arguments": {"dry_run": False},
+                        }
+                    ],
                     state={
                         "flow_id": _ACTR_CONSOLIDATION_FLOW_ID,
                         "session_id": _ACTR_CONSOLIDATION_SESSION_ID,
                     },
                 )
-                if consolidation_result.get("action_status") == ActionStatus.COMPLETED.value:
-                    created_schedules.append("consolidation")
+                self._require_schedule_created(
+                    consolidation_result, "ACT-R Memory Consolidation",
+                )
+                created_schedules.append("consolidation")
 
             self._schedules_configured = True
 
@@ -1688,17 +1719,82 @@ class ACTRMemoryPlugin(ServicePlugin, MemoryServiceInterface):
             )
 
         except Exception as e:
-            self.logger.error(f"Failed to set up schedules: {e}", exc_info=True)
+            # LOUD failure: a plugin whose required schedules fail to install
+            # must not keep reporting ready. `self.set_error(...)` flips
+            # `readiness_state`/`is_ready()` from the unconditional
+            # `set_ready()` call in `prepare_for_readiness` to ERROR, the same
+            # readiness-lifecycle mechanism (`PluginBase.set_error`,
+            # `ananta/src/ananta/core/plugins/plugin_base.py`) that
+            # `postgres_state_management_plugin` and
+            # `default_inference_plugin` already use to fail readiness on a
+            # required-dependency setup failure, just triggered here from a
+            # post-readiness action instead of from `prepare_for_readiness` itself.
+            error_msg = f"Failed to set up schedules: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            self.set_error(error_msg)
             return self._build_response(
                 ActionStatus.ERROR.value,
                 {},
                 {
                     "type": "plugin_error",
-                    "code": ErrorCode.OPERATION_FAILED,
+                    "code": ErrorCode.SCHEDULE_SETUP_FAILED,
                     "message": str(e),
                     "plugin_name": PLUGIN_NAME,
                 },
             )
+
+    def _require_schedule_created(self, result: dict[str, Any], label: str) -> None:
+        """Raise if a required cron schedule was not actually created.
+
+        `create_cron_schedule` can fail WITHOUT raising — it returns an
+        `ActionResult` envelope with `action_status != "completed"`. Before
+        this fix that non-exception failure shape was silently skipped
+        (excluded from `created_schedules`, no error surfaced), so
+        `setup_schedules` still reported `ActionStatus.COMPLETED`. Route it
+        through the same LOUD failure path as an exception.
+        """
+        if result.get("action_status") != ActionStatus.COMPLETED.value:
+            raise FrameworkError(
+                f"create_cron_schedule for {label!r} did not complete: {result!r}"
+            )
+
+    # Boot-time entry point (`iss_d1a7662f`, ruling `dec_a975b80b`): wired via
+    # `starting_actions` in `initialization/profiles/local.yaml`, which fires
+    # after `init_actions` — well after `init_service_manager` — unlike
+    # `prepare_for_readiness`/`start_services`, where `scheduling_service`
+    # is always `None`. This is a MemoryServiceInterface method reached as
+    # `service_interface::memory_service::ensure_schedules`, NOT a
+    # `@platform_process`: this plugin is the bound memory_service provider,
+    # so its `plugin::actr_memory_plugin::*` namespace is never registered
+    # (`PluginProcessScanner._should_skip_plugin`, iss_49a3820a). Text fields
+    # are defined in ananta/knowledge_base/processes/memory_service/ensure_schedules.json.
+    def ensure_schedules(self) -> dict[str, Any]:
+        """Resolve scheduling_service fresh and fail LOUD if still unavailable.
+
+        Mirrors `SessionLedgerService.ensure_periodic_poll_schedule`'s
+        precedent (`ananta/src/ananta/services/session_ledger_service/
+        service.py`): a raised exception here, not a silently-returned error
+        envelope — `starting_actions` submission runs off the action queue,
+        so this does not block startup; it makes a still-missing
+        scheduling_service loud instead of leaving the install silently
+        skipped forever.
+        """
+        if self._resolve_scheduling_service() is None:
+            raise FrameworkError(
+                f"{PLUGIN_NAME}: scheduling_service still unavailable after startup "
+                "(check service_bindings.json / startup order)"
+            )
+        result = self.setup_schedules(params={}, state={})
+        if result.get("action_status") != ActionStatus.COMPLETED.value:
+            raise FrameworkError(
+                f"{PLUGIN_NAME}: scheduled memory-maintenance install failed: {result!r}"
+            )
+        data = result.get("data")
+        if not isinstance(data, dict):
+            raise FrameworkError(
+                f"{PLUGIN_NAME}: setup_schedules returned no data dict: {result!r}"
+            )
+        return cast(dict[str, Any], data)
 
     # ─────────────────────────────────────────────────────────────────────────
     # INTERFACE METHODS (MemoryServiceInterface implementation)

@@ -20,9 +20,10 @@ from solet_setup_contracts.provenance_v1 import (
     verify_seal_trailers,
 )
 
-from .errors import SourceError, SourceIdentityError
+from .errors import SourceError, SourceIdentityError, UpdateBlockedError
 from .release_lock import SeedLock
 from .state_io import ensure_private_directory
+from .target_git import GitLayout, location_env, run_target_git, target_git_argv
 from .target_parent import ParentIdentity, ensure_target_parent
 
 _GIT_TIMEOUT_SECONDS = 120
@@ -64,8 +65,22 @@ class SeedRepositoryAccessError(SourceError):
 
 
 def subprocess_runner(command: Sequence[str], cwd: Path | None, timeout: int) -> RunResult:
-    """Run one bounded, argument-vector-only command."""
+    """Run one bounded, argument-vector-only command.
 
+    Every local Git vector goes through the shared hardened target surface (iss_836499b3 B1): the
+    materialized checkout is verified in place, so its own config, hooks and replace refs never run.
+    A fetch keeps the caller's environment (proxy and credential configuration reach the network
+    transport) but carries the same ``-c`` overrides; it only ever runs in a Manager-created staging
+    repository.
+    """
+
+    if tuple(command[:1]) == ("git",) and tuple(command[:2]) != ("git", "fetch"):
+        try:
+            layout = GitLayout.UNPINNED if tuple(command[1:2]) == ("init",) else GitLayout.WORKTREE
+            hardened = run_target_git(command[1:], cwd=cwd, layout=layout, timeout=timeout, inherit_environment=True)
+        except UpdateBlockedError as exc:
+            return RunResult(1, "", str(exc))
+        return RunResult(hardened.returncode, hardened.stdout.decode("utf-8", "replace"), hardened.stderr.decode("utf-8", "replace"))
     if tuple(command[:2]) != ("git", "fetch"):
         completed = subprocess.run(  # noqa: S603 - closed argv is the contract
             list(command),
@@ -82,8 +97,10 @@ def subprocess_runner(command: Sequence[str], cwd: Path | None, timeout: int) ->
         environment = os.environ.copy()
         environment["GIT_TRACE_CURL"] = str(trace_path)
         environment["GIT_TRACE_CURL_NO_DATA"] = "1"
+        if cwd is not None:
+            environment.update(location_env(str(cwd), GitLayout.WORKTREE))
         completed = subprocess.run(  # noqa: S603 - closed argv is the contract
-            list(command),
+            list(target_git_argv(command[1:])),
             cwd=cwd,
             capture_output=True,
             check=False,

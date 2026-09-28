@@ -8,12 +8,13 @@ here: the ``verify`` source mode (zero-delta path, section 4.8), the durable
 contract copies written at apply (section 3.2) and read first on resume
 (section 4.5), and the routing of every terminal journal to ``reconcile``.
 
-Every target Git invocation uses a closed argument vector, a fixed locale,
-system/global configuration suppression, and ``GIT_TERMINAL_PROMPT=0``.  The
-two target writes (private-ref fetch, ``merge --ff-only``) additionally pin
-``core.hooksPath`` to an empty Manager-owned directory and disable fsmonitor,
-and a preview refuses any repository-scoped configuration that could execute
-target-supplied code before running a single probe.
+Every target Git invocation goes through ``target_git.run_target_git``: a closed
+argument vector with fsmonitor, hooks and signature verification disarmed, no
+system/global configuration, no replace refs, no external diff and no prompt,
+and a refusal of any repository-scoped configuration that could execute
+target-supplied code before a content vector runs (iss_836499b3 B1).  The two
+target writes (private-ref fetch, ``merge --ff-only``) pin ``core.hooksPath`` to
+an empty Manager-owned directory instead of ``/dev/null``.
 """
 
 from __future__ import annotations
@@ -76,6 +77,7 @@ from .existing_install_inspection import (
     inspect_existing_install,
 )
 from .host_software import base_python_or_none
+from .import_enrollment import import_resume_repair
 from .local_state import ObservedLocalState, observe_local_state
 from .maintenance_inventory import (
     publish_active_update,
@@ -83,6 +85,7 @@ from .maintenance_inventory import (
     publish_source_advance,
     read_maintenance_inventory_v2,
 )
+from .maintenance_journal import read_maintenance_operation
 from .models import (
     MANAGER_VERSION,
     ActiveOperation,
@@ -92,6 +95,7 @@ from .models import (
     InstanceInventoryRecordV2,
     JsonValue,
     MaintenanceOperationKind,
+    ManagementOrigin,
     ManagementState,
     ObservedProvenanceIdentity,
     ReleaseIdentity,
@@ -100,6 +104,7 @@ from .paths import ManagerPaths, update_candidate_cache
 from .release_lock import seed_lock_from_fields
 from .seed_lock_parser import SeedLockFields
 from .state_io import ensure_private_directory, instance_lock
+from .target_git import GitLayout, run_target_git
 from .transaction import utc_now
 from .update_candidate import TRANSITION_BUNDLE_DIRECTORY, UpdateCandidate, acquire_update_candidate
 from .update_journal import (
@@ -174,14 +179,6 @@ REPAIR_RECONCILE_DRY_RUN = "Run `solet-manager reconcile {name} --dry-run` to pl
 REPAIR_RECONCILE_ABANDON = "Run `solet-manager reconcile {name} --abandon --yes` to retire the terminal operation; no target byte changed."
 REPAIR_DOCTOR = "Inspect the target with `solet-manager doctor {name}`; do not reset it."
 REPAIR_RELEASE_POINTER = "Run `solet-manager reconcile {name} --release-pointer --yes`."
-_GIT_ENV = {
-    "GIT_TERMINAL_PROMPT": "0",
-    "LC_ALL": "C",
-    "GIT_CONFIG_NOSYSTEM": "1",
-    "GIT_CONFIG_GLOBAL": "/dev/null",
-    "GIT_EXTERNAL_DIFF": "",
-    "GIT_PAGER": "cat",
-}
 #: Step 7 section 6.6 (B7): the running solet's own ``knowledge_bases/`` symlink creation is admitted as a
 #: disclosed service write only once the lifecycle stage has restarted the service.
 
@@ -270,6 +267,13 @@ def apply_update(request: UpdateRequest, approved_fingerprint: str | None) -> Co
         raise ApprovalFingerprintMalformedError("approval fingerprint must be sha256:<64 hex>")
     paths = request.manager_paths
     with instance_lock(paths.lock_path(request.name), create=True):
+        # iss_836499b3: a Manager-created instance with no v2 row is enrolled inline, under this lock,
+        # only once the approved fingerprint (which binds the enrollment) is proven current.
+        from .update_enrollment import enroll_pending, plan_create_origin_enrollment  # noqa: PLC0415 - it imports this module
+
+        pending = plan_create_origin_enrollment(request)
+        if pending is not None:
+            return _apply_fresh(request, enroll_pending(request, pending, approved_fingerprint), approved_fingerprint)
         record = load_update_record(request)
         # Step 6 section 4.4: a pointer naming a promoted, abandoned, retired, or
         # verified-import journal is released on sight before anything else.
@@ -294,6 +298,12 @@ def load_update_record(request: UpdateRequest) -> InstanceInventoryRecordV2:
             repair="Re-enroll with a Manager whose import binds the exact descriptor digest.",
         )
     active = record.active_operation
+    if active is not None and active.kind is MaintenanceOperationKind.IMPORT:
+        # Review B3: a create-origin row resumes inline (update_enrollment) before reaching here.
+        raise OperationInProgressError(
+            f"the enrollment of {record.name!r} (import operation {active.operation_id}) was interrupted",
+            repair=import_resume_repair(record.name, record.target.canonical_path, record.channel.channel_id),
+        )
     if active is not None and active.kind is not MaintenanceOperationKind.UPDATE:
         raise OperationInProgressError(f"{active.kind.value} operation {active.operation_id} is active")
     return record
@@ -332,13 +342,22 @@ def select_source_mode(record: InstanceInventoryRecordV2, candidate: UpdateCandi
     return "advance"
 
 
-def probe_update(request: UpdateRequest, record: InstanceInventoryRecordV2, *, recovers: str | None = None) -> UpdateProbe:
+def probe_update(
+    request: UpdateRequest,
+    record: InstanceInventoryRecordV2,
+    *,
+    recovers: str | None = None,
+    enrollment: dict[str, JsonValue] | None = None,
+) -> UpdateProbe:
     """Acquire the exact candidate and observe the target freshly.
 
     The execution-surface scan runs before any other target probe so a hostile
     ``core.fsmonitor`` or hook cannot be triggered by the inspection itself.
+    ``enrollment`` is a pending create-origin enrollment's binding (iss_836499b3); an enrolled row
+    derives the identical binding from its durable import operation instead.
     """
     paths = request.manager_paths
+    binding = enrollment if enrollment is not None else recorded_enrollment_binding(paths, record)
     target = _target_path(record)
     entries = parse_git_config_entries(_git(target, ("config", "--list", "--show-scope", "-z"), "target configuration is unreadable"))
     unsafe = unsafe_config_keys(entries)
@@ -354,7 +373,7 @@ def probe_update(request: UpdateRequest, record: InstanceInventoryRecordV2, *, r
     _require_candidate_identity(record, descriptor, candidate)
     baseline = _inspect_baseline(request, record, candidate)
     source_mode = "verify" if recovers is not None else select_source_mode(record, candidate)
-    reduction = reduce_update(paths, record, candidate, baseline, entries, source_mode, git=_git, run_git=_run_git)
+    reduction = reduce_update(paths, record, candidate, baseline, entries, source_mode, git=_git, run_git=_run_git, cache_git=_cache_git, cache_run_git=_cache_run_git)
     operation_id = compute_update_operation_id(record.instance_id, record.source_release.commit, candidate, recovers=recovers)
     journal_path = paths.operation_path(record.instance_id, operation_id)
     planned = VERIFY_PLANNED_ACTIONS if source_mode == "verify" else PLANNED_ACTIONS
@@ -363,11 +382,35 @@ def probe_update(request: UpdateRequest, record: InstanceInventoryRecordV2, *, r
         candidate,
         UpdateTopology(reduction.reasons, actionable, None if reduction.local_state is None else reduction.local_state.state),
         baseline_commit=record.source_release.commit,
-        bound_identity=_bound_identity(record, candidate, baseline, reduction.collisions, paths, journal_path, planned, recovers, reduction.local_state),
+        bound_identity=_bound_identity(record, candidate, baseline, reduction.collisions, paths, journal_path, planned, recovers, reduction.local_state, binding),
         planned_actions=planned,
         source_mode=source_mode,
     )
     return UpdateProbe(record, descriptor, candidate, baseline, reduction.reasons, reduction.collisions, preview, operation_id, journal_path, source_mode, recovers, reduction.local_state, reduction.blocked_paths, host)
+
+
+def enrollment_binding(operation_id: str, approval_fingerprint: str) -> dict[str, JsonValue]:
+    """The create-origin enrollment an update approval binds (iss_836499b3)."""
+    return {"kind": "create_origin", "operation_id": operation_id, "approval_fingerprint": approval_fingerprint}
+
+
+def recorded_enrollment_binding(paths: ManagerPaths, record: InstanceInventoryRecordV2) -> dict[str, JsonValue] | None:
+    """The binding of the verified import that enrolled a create-origin row, until its first promotion.
+
+    It equals the pending binding the enrolling ``--dry-run`` rendered, so an inline enrollment's
+    apply, resume and reconcile all reproduce the approved fingerprint.  Import-origin rows and
+    promoted rows bind nothing, so their fingerprints are unchanged.
+    """
+    if record.management_origin is not ManagementOrigin.CREATE or record.verified_release is not None:
+        return None
+    operation_id = record.last_verified_operation_id
+    if operation_id is None:
+        return None
+    document = read_maintenance_operation(paths.operation_path(record.instance_id, operation_id))
+    approval = cast(dict[str, JsonValue], document["approval"])
+    if document["kind"] != "import" or document["status"] != "verified":
+        raise StateError("a create-origin row's last verified operation is not its verified import")
+    return enrollment_binding(operation_id, cast(str, approval["fingerprint"]))
 
 
 def _require_candidate_identity(
@@ -477,6 +520,24 @@ def _bound_identity(
     planned_actions: tuple[str, ...] = PLANNED_ACTIONS,
     recovers: str | None = None,
     local_state: ObservedLocalState | None = None,
+    enrollment: dict[str, JsonValue] | None = None,
+) -> dict[str, JsonValue]:
+    identity = _bound_identity_fields(record, candidate, baseline, collisions, paths, journal_path, planned_actions, recovers, local_state)
+    if enrollment is not None:
+        identity["enrollment"] = enrollment
+    return identity
+
+
+def _bound_identity_fields(
+    record: InstanceInventoryRecordV2,
+    candidate: UpdateCandidate,
+    baseline: ExistingInstallInspectionResult,
+    collisions: tuple[CollisionRow, ...],
+    paths: ManagerPaths,
+    journal_path: Path,
+    planned_actions: tuple[str, ...],
+    recovers: str | None,
+    local_state: ObservedLocalState | None,
 ) -> dict[str, JsonValue]:
     facts = baseline.facts
     fields = candidate.fields
@@ -1035,22 +1096,20 @@ class _Execution:
 
 
 def _run_git(cwd: Path, args: tuple[str, ...], *, hooks_dir: Path | None = None) -> subprocess.CompletedProcess[bytes]:
-    """Run one closed Git vector; ``hooks_dir`` marks the two approved target writes."""
-    env = dict(_GIT_ENV)
-    config = ["-c", "core.fsmonitor=false", "-c", "advice.diverging=false"]
-    if hooks_dir is None:
-        env["GIT_OPTIONAL_LOCKS"] = "0"
-    else:
-        config += ["-c", f"core.hooksPath={hooks_dir}"]
-    return subprocess.run(  # noqa: S603
-        ("git", *config, *args),
-        cwd=cwd,
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        check=False,
-        timeout=600,
-        env=env,
-    )
+    """Run one closed Git vector through the shared hardened surface; ``hooks_dir`` marks the two approved target writes."""
+    return run_target_git(("-c", "advice.diverging=false", *args), cwd=cwd, read_only=hooks_dir is None, hooks_dir=hooks_dir)
+
+
+def _cache_run_git(repository: Path, args: tuple[str, ...]) -> subprocess.CompletedProcess[bytes]:
+    """A read of the Manager-owned bare candidate cache, pinned as bare (R2-1)."""
+    return run_target_git(args, cwd=repository, layout=GitLayout.BARE)
+
+
+def _cache_git(repository: Path, args: tuple[str, ...], error: str) -> bytes:
+    completed = _cache_run_git(repository, args)
+    if completed.returncode:
+        raise SourceError(f"{error}: {completed.stderr.decode('utf-8', 'replace').strip()}")
+    return completed.stdout
 
 
 def _git(cwd: Path, args: tuple[str, ...], error: str, *, hooks_dir: Path | None = None) -> bytes:

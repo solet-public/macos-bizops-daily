@@ -96,11 +96,13 @@ def _target_environment(target: Path) -> dict[str, str]:
     subprocess.run((sys.executable, "-m", "venv", str(target / ".venv")), check=True)
     python = target / ".venv/bin/python3"
     _check(python.is_file(), "control invokes a real Python venv under the target")
-    environment = dict(os.environ)
-    environment["PYTHONPATH"] = os.pathsep.join(
-        (str(target_source), str(_REPOSITORY_ROOT), *sys.path)
-    )
-    return environment
+    # A .pth appends these after the target's stdlib, in this order; PYTHONPATH
+    # would put this process's sys.path ahead of the stdlib (iss_831383f5).
+    version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    site_packages = target / ".venv/lib" / version / "site-packages"
+    entries = (str(target_source), str(_REPOSITORY_ROOT), *(entry for entry in sys.path if entry))
+    (site_packages / "_parent_import_path.pth").write_text("\n".join(entries) + "\n", encoding="utf-8")
+    return dict(os.environ)
 
 
 def _bind_target_embedding_service(target: Path) -> None:

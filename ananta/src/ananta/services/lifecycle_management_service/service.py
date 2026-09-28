@@ -491,6 +491,7 @@ class LifecycleManagementService(LifecycleManagementAPI):
         is_running = lifecycle_managed and bool(plugin.is_ready())
         readiness = plugin.readiness_state.value
         last_error = plugin.readiness_error
+        warning = plugin.readiness_warning
         process_count = len(plugin.get_available_actions())
         version = self._resolve_version(plugin, config)
 
@@ -506,6 +507,8 @@ class LifecycleManagementService(LifecycleManagementAPI):
         }
         if last_error:
             row["last_error"] = last_error
+        if warning:
+            row["warning"] = warning
         return row
 
     def _resolve_version(self, plugin: PluginBase, config: dict[str, Any]) -> str:

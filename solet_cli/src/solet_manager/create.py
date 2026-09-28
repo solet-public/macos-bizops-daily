@@ -10,6 +10,7 @@ from .contract_reconciliation import (
     reconciliation_recovery_pending,
     recover_contract_reconciliation,
 )
+from .create_enrollment import enroll_created_instance
 from .create_execution import execute_create
 from .models import CommandResult, JsonValue
 from .operation_records import normalize_apply_result as _normalize_apply_result
@@ -74,9 +75,12 @@ class CreateManager:
         decision_sources: dict[str, str] | None = None,
         stop_after_stage: str | None = None,
     ) -> CommandResult:
-        """Execute the current approved preview through the resumable transaction."""
+        """Execute the current approved preview through the resumable transaction.
 
-        return execute_create(
+        A verified create is then enrolled for ``solet-manager update`` (iss_836499b3).
+        """
+
+        result = execute_create(
             paths=self.paths,
             contract_directory=self.contract_directory,
             seed_lock_path=self.seed_lock_path,
@@ -89,3 +93,6 @@ class CreateManager:
             decision_sources=decision_sources,
             stage_limit=stop_after_stage,
         )
+        if result.kind != "create" or result.status != "verified":
+            return result
+        return enroll_created_instance(self.paths, config.name, config.target, self.seed_lock_path, result)

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import stat
-import subprocess
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
@@ -21,6 +20,7 @@ from .maintenance_inventory import parse_maintenance_inventory_bytes
 from .models import CommandResult, ExitCode, JsonValue
 from .paths import ManagerPaths
 from .release_lock import SeedLock
+from .target_git import run_target_git
 
 
 class InspectionStatus(StrEnum):
@@ -637,17 +637,11 @@ def subprocess_read_only_inspection_runner(
     if args is None:
         raise ValueError("unknown inspection probe")
     before = os.fstat(target.descriptor)
-    result = subprocess.run(
-        ("git", *args),
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        check=False,
-        env={
-            "GIT_OPTIONAL_LOCKS": "0",
-            "GIT_TERMINAL_PROMPT": "0",
-            "LC_ALL": "C",
-            "GIT_EXTERNAL_DIFF": "",
-        },
+    # iss_836499b3 B1 / iss_6a8d03a3: the target's own fsmonitor, hooks, filters and config never run, and Git is
+    # pinned to the pinned directory (R2-1).  An executable or redirecting repository config is raised as
+    # ``git_execution_surface_unsafe`` with its own repair (review N6), never folded into an unproven identity.
+    result = run_target_git(
+        args,
         pass_fds=(target.descriptor,),
         preexec_fn=lambda: os.fchdir(target.descriptor),
     )

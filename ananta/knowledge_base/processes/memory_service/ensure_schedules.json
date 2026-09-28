@@ -1,0 +1,6 @@
+{
+  "process_key": "service_interface::memory_service::ensure_schedules",
+  "display_name": "Ensure Memory Maintenance Schedules",
+  "description": "Boot-only verb that idempotently installs the memory provider's three scheduled maintenance crons (memorization queue, strength recomputation, consolidation), resolving scheduling_service fresh and raising loudly if it is still unavailable. Wired via the profile's ensure_actr_memory_schedules starting action; not surfaced via process_search (`is_discoverable=False`).",
+  "embedding_description": "Boot-time starting action that ensures the ACT-R memory maintenance cron schedules exist: memorization queue every six hours, daily strength recomputation, weekly consolidation. Clears this provider's previously restored crons by tag and recreates them, so restarts never accumulate duplicates. Fails loudly when the scheduling service cannot be resolved instead of silently skipping installation."
+}

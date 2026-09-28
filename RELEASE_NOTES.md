@@ -2,6 +2,113 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-28 — r49: Core AI readiness and updates for installed solets
+
+**Solet Manager manager-v0.1.0-r49.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows only after a fresh macOS 27 install round and an existing-solet
+update round both reach their end state on this build.
+
+Requires macOS 27 on Apple-silicon hardware, as r48 does. If Apple
+Intelligence is off or its model is still downloading, the solet installs and
+runs, and summaries stay degraded until the model is available.
+
+Changes since r48 (source `07c4ded85`):
+
+- **A solet the Manager installed can now be updated with
+  `solet-manager update <name>` alone.** Before this, every solet created with
+  `solet create` was invisible to the update path: `update` refused it with
+  `instance_unmanaged` ("no v2 inventory record"), and `solet-manager import`
+  refused it as `source_identity_unproven`. The Manager proved a solet only
+  against the release it currently ships, never against the release it had
+  installed itself. This was measured in the r46, r47 and r48 update rounds.
+  Now:
+  - `solet create` enrolls the solet it creates for updates, as part of the
+    same approved install. Its result reports `maintenance_enrollment`.
+  - A solet created by an earlier Manager (r46–r48) needs no separate step.
+    `solet-manager update <name> --dry-run` proves it against the Manager's
+    own record of what it installed, shows an `enrollment` block, and binds
+    the enrollment into the approval fingerprint. `--yes` enrolls it and
+    continues the update in the same command. The dry run writes no Manager
+    state, and enrollment touches nothing in the solet's folder.
+  - An enrollment interrupted partway (a crash inside `update --yes` or
+    `solet create`) is finished by the next `update <name> --yes`. If the
+    Manager was upgraded in between, the dry run says the stale enrollment
+    will be superseded and prints a new fingerprint, and `--yes` with that
+    fingerprint enrolls afresh in the same command.
+  - The proof is strict. The checkout must still be at the exact commit the
+    Manager installed, with its committed provenance intact, from the same
+    seed repository, profile and origin as the channel the Manager serves.
+    Anything else is refused with the exact reason
+    (`create_origin_identity_unproven` or `managed_identity_drift`). A
+    symbolic link planted at the recorded path is refused, never followed.
+  - The Manager no longer runs code that a solet's own Git configuration asks
+    for. Every Git command it runs against a solet (`inspect`, `import`,
+    `update`, `doctor`) runs with fsmonitor, hooks, replace refs, external
+    diff and system/global Git config disabled, and is pinned to the solet's
+    own folder. A solet whose `.git/config` arms a filter, a diff or merge
+    driver or similar, or points its work tree elsewhere (`core.worktree`),
+    is refused with `git_execution_surface_unsafe`. It is not executed or
+    redirected.
+  - `solet-manager import` remains the one-time step for a solet set up by a
+    plain clone, without the Manager.
+- **A torn Core AI compiled-model cache no longer leaves the solet's
+  embeddings permanently broken.** An unclean stop (power loss, a kernel
+  panic, or a forced VM stop) can tear the cache Core AI reuses. Every later
+  load then returned non-normalized vectors or crashed with SIGTRAP, and
+  setup blocked at `plugin_roster_matches_plan` for good.
+  - Preparation now proves the cache in a separate process first. If that
+    child crashes or returns invalid vectors, the solet deletes only the
+    pinned model's cache entries, recompiles once and proves the cache again.
+    A second failure reports a clear error and does not retry.
+  - Solets that prepare at the same time repair the shared cache once.
+  - Only a crash counts as cache damage. A child that was killed (for
+    example by SIGKILL or SIGTERM) fails loudly and leaves the cache alone.
+    The purge never follows a symbolic link out of the cache directory.
+  - A healthy cache adds about 0.4 to 0.6 seconds to preparation.
+- **Apple Foundation Models being unavailable no longer blocks installation
+  or the plugin roster.** Summaries are non-essential.
+  - Setup's Apple model check now proceeds with a warning when Apple
+    Intelligence is off, the model is still downloading, or the reason is
+    unknown. The warning names the reason and what to do: enable Apple
+    Intelligence in System Settings, or let the model finish downloading.
+    Before, setup stopped with `apple_ai_unavailable`.
+  - Once running, the Apple FM plugin stays ready and degraded for those
+    reasons, and when the SDK is missing. `list_plugins` shows the reason as
+    a `warning`, and the doctor reports it as warning evidence. Summaries
+    recover on their own when the model becomes available.
+  - Setup still stops on an Apple-silicon Mac that is not eligible for Apple
+    Intelligence (unsupported hardware), when the availability probe itself
+    crashes, and when the model's context size is not the reviewed 8192
+    tokens.
+- The install doctor's `plugin_roster_unready` result now names each unready
+  plugin with its status and last error. Before, it showed two identical
+  plugin lists and a `blocked` verdict with no cause.
+- ACT-R memory's schedule installer is now reachable as
+  `service_interface::memory_service::ensure_schedules`. Its startup action
+  in the shipped profiles named a `plugin::` process key that a bound
+  service provider never registers, so it could not resolve. A new guard
+  checks that every shipped profile's starting actions resolve.
+- ACT-R memory and fleet-maintenance schedules are now installed after the
+  service manager is up, idempotently, and fail loudly. Before, they could
+  run before the scheduling service existed and silently install nothing.
+- The platform now carries a host disk-headroom guard, run on a schedule by
+  the scheduling service, that alerts before the host runs out of space.
+
+Known limits:
+
+- **A solet still running LM Studio (r45 or earlier) cannot yet be upgraded
+  to the Apple-native stack.** That upgrade, which swaps LM Studio embeddings
+  and inference for Core AI and Apple Foundation Models and keeps existing
+  vectors, is planned for r50.
+- On Core AI, a session-ledger message longer than the model's 2048-token
+  input limit is not embedded, so about one in ten very long messages is
+  missing from search. The message itself is kept. Token-aware chunking and
+  a backfill are planned for r50.
+- This build's fresh-install and existing-solet update results come from the
+  VM rounds that follow its publish. This entry claims neither.
+
 ## 2026-09-27 — r48: stable macos-bizops on the Apple-native stack
 
 **Solet Manager manager-v0.1.0-r48.** This is a full seed build, published

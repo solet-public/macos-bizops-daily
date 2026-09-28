@@ -61,6 +61,8 @@ def reduce_update(
     *,
     git: GitRead,
     run_git: GitRun,
+    cache_git: GitRead,
+    cache_run_git: GitRun,
 ) -> Reduction:
     """Section 6.3: topology reasons, identity/origin reasons, history proof against the candidate cache, then the local-state reduction."""
     facts = baseline.facts
@@ -79,8 +81,9 @@ def reduce_update(
     if "already_current" not in reasons or source_mode == "verify":
         cache = update_candidate_cache(paths, candidate.descriptor_digest).repository
         # A baseline the channel repository has never seen is divergent history, not an error (Step 6, n5).
-        if _object_exists(run_git, cache, release.commit) and is_ancestor(run_git, cache, release.commit, candidate.fields.commit):
-            collisions, local_state, blocked = _local_state_reduction(git, cache, record, candidate, baseline, entries)
+        # The target and the bare candidate cache are pinned differently (iss_836499b3 R2-1), hence two readers.
+        if _object_exists(cache_run_git, cache, release.commit) and is_ancestor(cache_run_git, cache, release.commit, candidate.fields.commit):
+            collisions, local_state, blocked = _local_state_reduction(git, cache_git, cache, record, candidate, baseline, entries)
         else:
             reasons.add("history_diverged")
     reasons.update(row.reason for row in collisions)
@@ -90,6 +93,7 @@ def reduce_update(
 
 def _local_state_reduction(
     git: GitRead,
+    cache_git: GitRead,
     cache: Path,
     record: InstanceInventoryRecordV2,
     candidate: UpdateCandidate,
@@ -99,7 +103,7 @@ def _local_state_reduction(
     """Section 6.3: the exact transition set, the landed collision proof, the Step 7 reasons, and the commitment."""
     target = Path(record.target.canonical_path)
     transition = parse_transition_paths(
-        git(
+        cache_git(
             cache,
             ("diff-tree", "-r", "-z", "--no-renames", "--name-status", record.source_release.commit, candidate.fields.commit),
             "candidate transition set is unreadable",

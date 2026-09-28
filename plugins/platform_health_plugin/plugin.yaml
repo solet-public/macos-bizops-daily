@@ -17,5 +17,28 @@ description: |
 
 optional: true
 
+config:
+  alert_role:
+    type: string
+    required: false
+    description: >
+      Durable peer-messaging role name that check_host_disk_headroom alerts
+      on a host free-space severity transition (ok/warning/critical). No
+      shipped default -- a role name that exists in one solet's
+      role-binding table is a guess in another's, so this is a
+      deployment-local setting, not a constant in source. When unset, the
+      check still measures and classifies correctly but cannot alert
+      anyone (alert_reason='alert_target_unconfigured', logged at ERROR),
+      and ensure_host_disk_guard_schedule refuses to install the cron
+      (logged at ERROR). Nothing installs the cron at plugin startup:
+      scheduling_service does not exist yet then. A deployment installs it
+      by adding ensure_host_disk_guard_schedule to its own runtime
+      config/starting_action_definitions.json (run after startup
+      completes), or by calling that verb; no shipped profile template
+      carries it. The installed cron always reads this key; it takes no
+      per-install override.
+      Set per-deployment under profile/config/plugins/platform_health_plugin.json
+      (an operator config override, never shipped seed content).
+
 implements:
   - interface: EdgeProcessProvider

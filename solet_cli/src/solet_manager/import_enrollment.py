@@ -8,6 +8,13 @@ from typing import cast
 
 from solet_setup_contracts import canonical_sha256
 
+from .create_origin_enrollment import (
+    CreateOriginMetadataLoader,
+    create_transaction_matches_record,
+    find_create_origin_record,
+    recorded_target_identity,
+    require_create_origin_target,
+)
 from .errors import ManagedIdentityDriftError, OperationInProgressError
 from .existing_install_inspection import (
     ChannelInspectionIdentity,
@@ -15,6 +22,7 @@ from .existing_install_inspection import (
     ExistingInstallInspectionResult,
     InspectionEffectTracker,
     InstalledInspectionMetadata,
+    InstalledInspectionMetadataLoader,
     inspect_existing_install,
     load_installed_inspection_metadata,
 )
@@ -96,6 +104,15 @@ class ImportPreview:
     idempotency_key: str
     inspection: object
     management_origin: ManagementOrigin = ManagementOrigin.IMPORT
+    #: The installed channel's release commit when the identity was proven against the Manager's own
+    #: create record (iss_836499b3): the proven release may be behind it.  ``None`` otherwise.
+    channel_release_commit: str | None = None
+    #: Review R2-2: an unfinished import of this same instance whose Manager-side facts (channel, contract,
+    #: inspection bundle) are no longer current.  Approving this preview records it abandoned and enrolls
+    #: under ``operation_id``, which names it as its predecessor.  ``None`` when there is nothing to supersede.
+    superseded_operation_id: str | None = None
+    #: Every earlier import operation of this instance in the supersede chain, oldest first.
+    predecessor_operation_ids: tuple[str, ...] = ()
 
     def to_command_result(self) -> CommandResult:
         return CommandResult(
@@ -157,8 +174,50 @@ def compute_import_key(
     )
 
 
-def compute_operation_id(import_key: str) -> str:
-    return "opr_" + canonical_sha256(["operation", import_key]).removeprefix("sha256:")[:32]
+def compute_operation_id(import_key: str, *, supersedes: str | None = None) -> str:
+    """The import operation id; a successor names the operation it supersedes, so the two never collide."""
+    identities: list[JsonValue] = ["operation", import_key]
+    if supersedes is not None:
+        identities.append(f"supersedes={supersedes}")
+    return "opr_" + canonical_sha256(identities).removeprefix("sha256:")[:32]
+
+
+_MAX_SUPERSEDED_IMPORTS = 16
+_UNFINISHED_IMPORT_STATUSES = frozenset({"prepared", "bundle_cached", "inventory_published"})
+
+
+def _import_fingerprint(bundle_digest: str, instance_id: str, operation_id: str) -> str:
+    return canonical_sha256([bundle_digest, instance_id, operation_id, list(_NON_TOUCH)])
+
+
+def _current_import_operation(
+    paths: ManagerPaths, instance_id: str, import_key: str, bundle_digest: str
+) -> tuple[str, tuple[str, ...], str | None]:
+    """The operation this preview enrolls under, its predecessors, and the stale one it must abandon.
+
+    An unfinished journal approved under different Manager-side facts is stale: the same instance proves
+    again, but its channel, contract or inspection bundle changed (a Manager upgrade between an interrupted
+    enrollment and its retry).  Its successor is derived from it; an abandoned journal is simply passed.
+    """
+    predecessors: list[str] = []
+    operation_id = compute_operation_id(import_key)
+    for _ in range(_MAX_SUPERSEDED_IMPORTS):
+        path = paths.operation_path(instance_id, operation_id)
+        if not path.exists():
+            return operation_id, tuple(predecessors), None
+        journal = read_maintenance_operation(path)
+        status = journal["status"]
+        approval = cast(dict[str, JsonValue], journal["approval"])
+        stale = status in _UNFINISHED_IMPORT_STATUSES and approval["fingerprint"] != _import_fingerprint(
+            bundle_digest, instance_id, operation_id
+        )
+        if status != "abandoned" and not stale:
+            return operation_id, tuple(predecessors), None
+        predecessors.append(operation_id)
+        operation_id = compute_operation_id(import_key, supersedes=operation_id)
+        if stale:
+            return operation_id, tuple(predecessors), predecessors[-1]
+    raise ValueError("corrupt_state")
 
 
 def compute_stage_key(operation_id: str, stage_id: str, stage_inputs: JsonValue) -> str:
@@ -201,15 +260,54 @@ def build_inspection_bundle(request: ImportRequest, inspection: object) -> dict[
     }
 
 
-def preview_import(request: ImportRequest) -> ImportPreview:
+@dataclass(frozen=True, slots=True)
+class ImportInspection:
+    """One import inspection and, for a create-origin instance, the installed channel it bound to."""
+
+    result: ExistingInstallInspectionResult
+    management_origin: ManagementOrigin
+    channel_release_commit: str | None
+
+
+def preview_import(
+    request: ImportRequest, *, installed_loader: InstalledInspectionMetadataLoader | None = None
+) -> ImportPreview:
+    inspected = inspect_for_import(request, installed_loader=installed_loader)
+    if inspected.result.classification.import_disposition != "allow":
+        raise ValueError("import_not_allowed")
+    return preview_from_inspection(request, inspected)
+
+
+def inspect_for_import(
+    request: ImportRequest, *, installed_loader: InstalledInspectionMetadataLoader | None = None
+) -> ImportInspection:
+    """Inspect ``request.target``; a Manager-created name is proven against its create record (iss_836499b3)."""
     if not request.name.islower() or not request.name.replace("-", "").isalnum():
         raise ValueError("invalid_import_name")
-    inspection = inspect_existing_install(
-        ExistingInstallInspectionRequest(request.target, request.channel, request.manager_paths),
-        metadata_loader=_paired_installed_metadata,
+    loader = _paired_installed_metadata if installed_loader is None else installed_loader
+    created = find_create_origin_record(request.manager_paths, request.name)
+    if created is None:
+        return ImportInspection(_inspect(request, loader), ManagementOrigin.IMPORT, None)
+    recorded = require_create_origin_target(created, request.target)
+    proof = CreateOriginMetadataLoader(created, recorded.path, loader)
+    result = _inspect(replace(request, target=recorded.path), proof)
+    recorded.require_inspected(result.target_identity)
+    installed = proof.installed
+    return ImportInspection(
+        result, ManagementOrigin.CREATE, None if installed is None else installed.channel_identity.commit
     )
-    if inspection.classification.import_disposition != "allow":
-        raise ValueError("import_not_allowed")
+
+
+def _inspect(request: ImportRequest, loader: InstalledInspectionMetadataLoader) -> ExistingInstallInspectionResult:
+    return inspect_existing_install(
+        ExistingInstallInspectionRequest(request.target, request.channel, request.manager_paths),
+        metadata_loader=loader,
+    )
+
+
+def preview_from_inspection(request: ImportRequest, inspected: ImportInspection) -> ImportPreview:
+    """The deterministic preview of an import the inspection already allows."""
+    inspection = inspected.result
     bundle = build_inspection_bundle(request, inspection)
     target = inspection.target_identity
     seed = inspection.channel_identity.seed_id
@@ -225,11 +323,24 @@ def preview_import(request: ImportRequest) -> ImportPreview:
         committed_head=head,
     )
     instance_id = "ins_" + key.removeprefix("sha256:")[:32]
-    operation_id = compute_operation_id(key)
-    fingerprint = canonical_sha256(
-        [canonical_sha256(bundle), instance_id, operation_id, list(_NON_TOUCH)]
+    bundle_digest = canonical_sha256(bundle)
+    operation_id, predecessors, superseded = _current_import_operation(
+        request.manager_paths, instance_id, key, bundle_digest
     )
-    return ImportPreview(request, fingerprint, bundle, instance_id, operation_id, key, inspection)
+    fingerprint = _import_fingerprint(bundle_digest, instance_id, operation_id)
+    return ImportPreview(
+        request,
+        fingerprint,
+        bundle,
+        instance_id,
+        operation_id,
+        key,
+        inspection,
+        inspected.management_origin,
+        inspected.channel_release_commit,
+        superseded,
+        predecessors,
+    )
 
 
 def _paired_installed_metadata(channel: str, tracker: InspectionEffectTracker) -> InstalledInspectionMetadata:
@@ -248,11 +359,32 @@ def enroll_import(request: ImportRequest, approved_fingerprint: str) -> ImportEn
             return _enroll_import_locked(preview)
 
 
+def import_resume_repair(name: str, target: str, channel: str) -> str:
+    """The exact command that finishes an interrupted enrollment (review B3); every import stage is idempotent."""
+    return (
+        f"Finish the interrupted enrollment with `solet-manager import {name} --target {target} --channel {channel} "
+        "--dry-run`, then rerun it with --yes --approval-fingerprint <the fingerprint it prints>."
+    )
+
+
+def enroll_import_holding_instance_lock(preview: ImportPreview) -> ImportEnrollmentResult:
+    """Enroll a preview the caller computed while already holding the instance lock.
+
+    ``update`` enrolls a create-origin instance inline under its own instance lock (iss_836499b3);
+    the lock is not re-entrant, so this takes only the registry lock.  The caller has already
+    proven the preview current by an approved fingerprint that binds it.
+    """
+    with instance_lock(preview.request.manager_paths.registry_lock_path, create=True):
+        return _enroll_import_locked(preview)
+
+
 def _enroll_import_locked(preview: ImportPreview) -> ImportEnrollmentResult:
     """Enroll only while both Manager registry identities are stable."""
     v1_match = _matching_v1_managed_import(preview)
     if v1_match is not None:
         preview = replace(preview, management_origin=ManagementOrigin.CREATE)
+    if preview.superseded_operation_id is not None:
+        _abandon_superseded_import(preview, preview.superseded_operation_id)
     _require_unclaimed_import_identity(preview)
     if _is_finalized_matching_import(preview):
         return _enrollment_result(preview, "already_managed", v1_match)
@@ -306,23 +438,18 @@ def _v1_record_matches_inspection(
         and facts.head_commit == record.seed_commit
         and facts.head_tree == record.seed_tree_hash
         and _v1_seed_id(record, inspection) == inspection.channel_identity.seed_id
-        and _matching_v1_transaction(transaction, record)
+        and create_transaction_matches_record(transaction, record)
     )
 
 
 def _v1_target_matches(record: InstanceRecord, inspection: ExistingInstallInspectionResult) -> bool:
-    """Compare the passive target identity retained by v1 with Step 2 facts."""
-    try:
-        target = Path(record.target)
-        canonical_target = str(target.resolve(strict=True))
-        filesystem = target.stat()
-    except OSError as exc:
-        raise ManagedIdentityDriftError("create-origin target is no longer observable") from exc
+    """The inspected directory is the one at the literal v1 target path, reached through no link (review B2)."""
+    recorded = recorded_target_identity(record)
     inspected = inspection.target_identity
-    return canonical_target == str(inspected.canonical_display) and (
-        filesystem.st_dev,
-        filesystem.st_ino,
-    ) == (inspected.target_device, inspected.target_inode)
+    return inspected.canonical_display == recorded.path and (recorded.device, recorded.inode) == (
+        inspected.target_device,
+        inspected.target_inode,
+    )
 
 
 def _v1_seed_id(record: InstanceRecord, inspection: ExistingInstallInspectionResult) -> str | None:
@@ -339,19 +466,6 @@ def _v1_seed_id(record: InstanceRecord, inspection: ExistingInstallInspectionRes
     return channel.seed_id
 
 
-def _matching_v1_transaction(transaction: Transaction, record: InstanceRecord) -> bool:
-    """Match every immutable seed field persisted by the v1 create registry."""
-    return (
-        transaction.name == record.name
-        and transaction.target == record.target
-        and transaction.seed.repository == record.seed_repository
-        and transaction.seed.commit == record.seed_commit
-        and transaction.seed.tree_hash == record.seed_tree_hash
-        and transaction.seed.release_tag == record.seed_tag
-        and transaction.seed.profile == record.profile
-    )
-
-
 def _require_unclaimed_import_identity(preview: ImportPreview) -> None:
     """Apply the complete combined-registry uniqueness rule before writing."""
     paths = preview.request.manager_paths
@@ -365,7 +479,7 @@ def _require_unclaimed_import_identity(preview: ImportPreview) -> None:
         None,
     )
     if incumbent is not None:
-        if not _same_import_identity(incumbent, record):
+        if not _same_import_identity(incumbent, record) and not _superseded_incumbent(preview, incumbent, record):
             raise ValueError("managed_identity_drift")
         return
     if preview.management_origin is ManagementOrigin.CREATE:
@@ -457,7 +571,15 @@ def _publish_inventory(preview: ImportPreview, bundle_digest: str) -> None:
     if incumbent is not None:
         if _same_import_identity(incumbent, record):
             return
-        raise ValueError("corrupt_state")
+        if not _superseded_incumbent(preview, incumbent, record):
+            raise ValueError("corrupt_state")
+        # Review R2-2: the row the abandoned import published is republished under the successor.
+        successor = replace(record, created_at=incumbent.created_at)
+        write_maintenance_inventory_v2(
+            preview.request.manager_paths.maintenance_inventory_path,
+            tuple(successor if item.instance_id == preview.instance_id else item for item in records),
+        )
+        return
     write_maintenance_inventory_v2(
         preview.request.manager_paths.maintenance_inventory_path,
         tuple(sorted((*records, record), key=lambda item: item.instance_id)),
@@ -512,6 +634,15 @@ def _advance_journal(
     write_maintenance_operation(path, previous, next_value)
 
 
+def pending_inventory_record(preview: ImportPreview) -> InstanceInventoryRecordV2:
+    """The finalized v2 row this preview would publish, in memory only (no active operation).
+
+    ``update --dry-run`` renders a create-origin instance's update from it before any Manager write
+    (iss_836499b3); timestamps are not part of any fingerprint.
+    """
+    return replace(_inventory_record(preview, canonical_sha256(preview.bundle), utc_now()), active_operation=None)
+
+
 def _inventory_record(
     preview: ImportPreview, bundle_digest: str, timestamp: str
 ) -> InstanceInventoryRecordV2:
@@ -522,11 +653,7 @@ def _inventory_record(
     facts = inspection.facts
     if facts.head_commit is None or facts.head_tree is None:
         raise ValueError("import_identity_unproven")
-    eligibility = (
-        UpdateEligibilityState.CURRENT
-        if facts.channel_relation.value == "current"
-        else UpdateEligibilityState.AVAILABLE
-    )
+    eligibility = _update_eligibility(preview, facts.head_commit)
     return InstanceInventoryRecordV2(
         preview.instance_id,
         preview.request.name,
@@ -572,6 +699,16 @@ def _inventory_record(
     )
 
 
+def _update_eligibility(preview: ImportPreview, head_commit: str) -> UpdateEligibilityState:
+    """Current only at the channel release; a create-origin proof inspects against its own recorded release."""
+    inspection = cast(ExistingInstallInspectionResult, preview.inspection)
+    if preview.channel_release_commit is not None:
+        current = head_commit == preview.channel_release_commit
+    else:
+        current = inspection.facts.channel_relation.value == "current"
+    return UpdateEligibilityState.CURRENT if current else UpdateEligibilityState.AVAILABLE
+
+
 def _proved_provenance(inspection: ExistingInstallInspectionResult, channel: ChannelInspectionIdentity) -> ObservedProvenanceIdentity:
     facts = inspection.facts
     anchor = inspection.matched_anchor
@@ -600,6 +737,8 @@ def _is_finalized_matching_import(preview: ImportPreview) -> bool:
     if record is None:
         return False
     expected = _inventory_record(preview, canonical_sha256(preview.bundle), record.created_at)
+    if _superseded_incumbent(preview, record, expected):
+        return False
     if not _same_import_identity(record, expected):
         raise ValueError("managed_identity_drift")
     if record.active_operation is not None:
@@ -610,6 +749,40 @@ def _is_finalized_matching_import(preview: ImportPreview) -> bool:
     if not path.exists() or read_maintenance_operation(path)["status"] != "verified":
         raise ValueError("corrupt_state")
     return True
+
+
+def _abandon_superseded_import(preview: ImportPreview, superseded: str) -> None:
+    """Record the stale import abandoned before its successor writes anything (idempotent)."""
+    path = preview.request.manager_paths.operation_path(preview.instance_id, superseded)
+    previous = read_maintenance_operation(path)
+    if previous["status"] == "abandoned":
+        return
+    if previous["status"] not in _UNFINISHED_IMPORT_STATUSES:
+        raise ValueError("corrupt_state")
+    result: dict[str, JsonValue] = {
+        "kind": "abandoned",
+        "reason_code": "superseded_by_manager_facts",
+        "repair": f"Superseded by {preview.operation_id}: the Manager's channel facts changed before this enrollment finished. Nothing to do.",
+    }
+    write_maintenance_operation(path, previous, transition_maintenance_operation(previous, status="abandoned", result=result))
+
+
+def _superseded_incumbent(
+    preview: ImportPreview, incumbent: InstanceInventoryRecordV2, expected: InstanceInventoryRecordV2
+) -> bool:
+    """The row an abandoned predecessor of this preview published: the same instance, stale Manager-side facts."""
+    active = incumbent.active_operation
+    return (
+        active is not None
+        and active.kind is MaintenanceOperationKind.IMPORT
+        and active.operation_id in preview.predecessor_operation_ids
+        and incumbent.instance_id == expected.instance_id
+        and incumbent.name == expected.name
+        and incumbent.target == expected.target
+        and incumbent.management_origin is expected.management_origin
+        and incumbent.observed_provenance == expected.observed_provenance
+        and incumbent.source_release == expected.source_release
+    )
 
 
 def _same_import_identity(

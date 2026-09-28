@@ -39,9 +39,22 @@ you'd rather do it.
 ## Before you start
 
 - You need the Solet Manager installed: `brew install
-  solet-public/tap/solet`. If your solet was set up before the Manager
-  existed, enroll it once (replace `<name>` with your solet's name and
-  `<folder>` with the folder it lives in, throughout this guide):
+  solet-public/tap/solet`. Replace `<name>` with your solet's name and
+  `<folder>` with the folder it lives in, throughout this guide.
+- **If you installed your solet with `solet create`** (the usual way),
+  there is nothing to enroll: go straight to Step 1. The first update
+  recognises the solet the Manager installed and enrolls it as part of the
+  same command; its preview says so in an `enrollment` section. If that
+  first update is interrupted, run it again: the preview shows
+  `enrollment: resume` with the same fingerprint, and `--yes` finishes it.
+  If you upgraded the Manager in between, the preview shows
+  `enrollment: supersede` and a new fingerprint instead; approve that one
+  with `--yes`.
+  The solet must still be in the folder it was created in, as a real
+  folder. A symbolic link left in its place is refused; move the folder
+  back.
+- **If your solet was set up without the Manager** (a plain clone, before
+  the Manager existed), enroll it once:
 
   ```bash
   solet-manager import <name> --target <folder> --channel stable --dry-run
@@ -54,7 +67,9 @@ you'd rather do it.
 - Then run `solet-manager doctor <name>`. **"verified" means go.** Anything
   else: read the first line of the report — it names the one thing that
   needs attention and what to do about it — and sort that out before
-  updating.
+  updating. A solet created by an earlier Manager that has not been updated
+  yet is reported as a create instance; check it with `solet doctor <name>`
+  instead.
 - You'll need a terminal window and about 10 minutes, most of which is
   waiting.
 

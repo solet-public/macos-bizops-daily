@@ -1541,8 +1541,10 @@ def _auto_install_knowledge_bases(orch: Any) -> None:
     already visible. Re-running auto-install in the probe duplicates
     that work and currently pushes boot past the 120s probe ceiling
     (2026-06-01 investigation; compositions KB alone takes ~109s when
-    ``has_valid_install`` falsely returns False — tracked separately
-    as coordinator_plan.md §5 task #18, parallel dispatch). The probe's
+    ``has_valid_install`` falsely returns False — tracked separately as a
+    parallel-dispatch follow-up, historical detail in git history under the
+    now-retired workbench coordinator-plan file, §5 task #18, removed
+    2026-09-28). The probe's
     purpose is boot-graph validation, not data hydration.
     """
     if os.environ.get(_PROBE_MODE_ENV_VAR) == "1":
@@ -1669,7 +1671,7 @@ def _start_selected_inference_work(orch: Any) -> dict[str, Any]:
     if not callable(start_inference):
         raise RuntimeError("bound inference plugin lacks post-registration hook")
     start_inference()
-    error = inference.get_readiness_error()
+    error = inference.get_readiness_error() or inference.readiness_warning
     if error is not None:
         return {
             "state": "pending",

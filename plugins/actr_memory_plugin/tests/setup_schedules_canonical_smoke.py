@@ -77,20 +77,47 @@ def _check(condition: object, label: str) -> None:
 
 
 class _RecordingSchedulingService:
-    """Captures every create_cron_schedule call so we can assert dispatch shape."""
+    """Captures every create_cron_schedule call so we can assert dispatch shape.
+
+    Mirrors the REAL `ananta.services.scheduling_service.SchedulingService
+    .create_cron_schedule` signature exactly (explicit keywords, no `params=`)
+    — a looser fixture here (accepting `params=`/`**kwargs`) is what let the
+    `params=`/`state=` caller mismatch (iss_2250e07c) go uncaught for as long
+    as it did; see setup_schedules_real_scheduling_service_smoke.py.
+    """
 
     def __init__(self) -> None:
         self.create_calls: list[dict[str, Any]] = []
+        self.cleared_tags: list[str] = []
+
+    def clear_scheduled_actions_by_tag(
+        self, tag: str, state: dict[str, Any] | None = None,  # noqa: ARG002
+    ) -> dict[str, Any]:
+        self.cleared_tags.append(tag)
+        return {"action_status": "completed", "data": {"cleared_count": 0}}
 
     def create_cron_schedule(
         self,
-        params: dict[str, Any] | None = None,
+        cron_expression: str,
+        actions: list[dict[str, Any]] | None = None,
+        action_definitions: list[dict[str, Any]] | None = None,
+        memory_tag: str | None = None,
+        label: str | None = None,
+        tags: list[str] | str | None = None,
         state: dict[str, Any] | None = None,
-        **kwargs: Any,
     ) -> dict[str, Any]:
-        captured: dict[str, Any] = dict(params or {})
+        captured: dict[str, Any] = {"cron_expression": cron_expression}
+        if actions is not None:
+            captured["actions"] = actions
+        if action_definitions is not None:
+            captured["action_definitions"] = action_definitions
+        if memory_tag is not None:
+            captured["memory_tag"] = memory_tag
+        if label is not None:
+            captured["label"] = label
+        if tags is not None:
+            captured["tags"] = tags
         captured["_state_passed"] = state
-        captured["_kwargs"] = kwargs
         self.create_calls.append(captured)
         return {"action_status": "completed", "data": {"schedule_id": "sched-fixture-001"}}
 

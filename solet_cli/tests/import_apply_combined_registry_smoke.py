@@ -57,19 +57,23 @@ def _assert_v2_target_collision(paths: ManagerPaths, target: Path) -> None:
 def _assert_v1_name_collision(paths: ManagerPaths, target: Path, legacy_target: Path) -> None:
     InstanceRegistry(paths.registry_path).add(_legacy_record("legacy", legacy_target))
     request = ImportRequest("legacy", target, "stable", paths)
-    preview = enrollment.preview_import(request)
+    operations_before = sorted(paths.operations_dir.rglob("*")) if paths.operations_dir.exists() else []
+    # iss_836499b3: a create-origin name is proven against its own create record, so a --target
+    # that is not the directory the Manager created is refused at preview, before any write.
     try:
-        enrollment.enroll_import(request, preview.fingerprint)
+        enrollment.preview_import(request)
     except ManagedIdentityDriftError:
         pass
     else:
         raise AssertionError("v1 name collision was accepted as an import rerun")
-    assert not paths.operation_path(preview.instance_id, preview.operation_id).exists()
+    assert (sorted(paths.operations_dir.rglob("*")) if paths.operations_dir.exists() else []) == operations_before
 
 
 def main() -> int:
     with TemporaryDirectory() as temporary:
-        root = Path(temporary)
+        # ``solet create`` records a resolved target (config_loading.resolve_target), and the create-origin
+        # proof refuses a recorded path with a symbolic-link component (macOS /var -> /private/var).
+        root = Path(temporary).resolve()
         target = root / "existing"
         target.mkdir()
         candidate = root / "candidate"

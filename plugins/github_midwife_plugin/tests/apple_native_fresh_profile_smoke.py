@@ -102,9 +102,15 @@ def _check_declared(profile_name: str, inference_plugin: str | None) -> tuple[li
     for action in actions:
         _require(isinstance(action, dict), f"{profile_name}: invalid starting action")
         process_key = action.get("process_key")
-        _require(isinstance(process_key, str) and process_key.startswith("plugin::"),
+        _require(isinstance(process_key, str)
+                 and process_key.startswith(("plugin::", "service_interface::")),
                  f"{profile_name}: invalid starting action process key")
-        _require(process_key.split("::")[1] in selected,
+        # A bound service's boot verb is a service_interface:: key: a bound
+        # provider's plugin:: namespace is never registered (iss_49a3820a).
+        owner = process_key.split("::")[1]
+        if process_key.startswith("service_interface::"):
+            owner = bindings.get(owner)
+        _require(owner in selected,
                  f"{profile_name}: orphan starting action {process_key}")
     return selected, bindings, actions
 

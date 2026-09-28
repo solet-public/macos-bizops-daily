@@ -7,11 +7,13 @@ from a probe or a journal; every write-capable path stays in ``update_execution`
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import cast
 
 from .errors import HostRequirementError, SourceTransitionIncompleteError, UpdateBlockedError
 from .models import ActiveOperation, CommandResult, ExitCode, InstanceInventoryRecordV2, JsonValue
 from .paths import ManagerPaths, update_candidate_cache
+from .update_enrollment import PendingEnrollment, plan_create_origin_enrollment
 from .update_execution import (
     NON_TOUCH_SURFACES,
     PREVIEW_KIND,
@@ -37,6 +39,12 @@ __all__ = ["preview_instance"]
 
 def preview_instance(request: UpdateRequest) -> CommandResult:
     """Render the closed update preview; may write only the Manager candidate cache."""
+    try:
+        pending = plan_create_origin_enrollment(request)
+    except UpdateBlockedError as exc:
+        return _blocked_preview(exc)
+    if pending is not None:
+        return _enrollment_preview(request, pending)
     record = load_update_record(request)
     if record.active_operation is not None:
         return _resume_preview(request, record)
@@ -45,6 +53,25 @@ def preview_instance(request: UpdateRequest) -> CommandResult:
     except UpdateBlockedError as exc:
         return _blocked_preview(exc)
     return _preview_result(probe, request.manager_paths)
+
+
+def _enrollment_preview(request: UpdateRequest, pending: PendingEnrollment) -> CommandResult:
+    """iss_836499b3: the update of a not-yet-enrolled Manager-created instance, enrollment disclosed and bound."""
+    try:
+        probe = probe_update(request, pending.record, enrollment=pending.binding())
+    except UpdateBlockedError as exc:
+        result = _blocked_preview(exc)
+    else:
+        result = _preview_result(probe, request.manager_paths)
+    data = {**result.data, "enrollment": pending.disclosure()}
+    if result.status in {"preview_ready", VERIFY_PREVIEW_STATUS}:
+        if pending.preview.superseded_operation_id is not None:
+            enrolls = f"supersedes the stale enrollment {pending.preview.superseded_operation_id} and enrolls"
+        else:
+            enrolls = "finishes the interrupted enrollment of" if pending.resuming else "enrolls"
+        message = f"{result.message} Approving it first {enrolls} this Manager-created Solet (no separate import)."
+        return replace(result, message=message, data=data)
+    return replace(result, data=data)
 
 
 def _preview_data(probe: UpdateProbe, paths: ManagerPaths) -> dict[str, JsonValue]:

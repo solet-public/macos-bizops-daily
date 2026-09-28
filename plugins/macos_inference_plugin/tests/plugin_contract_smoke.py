@@ -16,13 +16,14 @@ sys.path.insert(0, str(ROOT / 'plugins/macos_inference_plugin/src'))
 
 from ananta.core.config.config_provider import ConfigProvider  # noqa: E402
 from ananta.core.plugins.capabilities import validate_service_provider  # noqa: E402
+from ananta.core.plugins.plugin_base import PluginReadiness  # noqa: E402
 from ananta.interfaces import InferenceRequest, InferenceServiceUnavailableError, InferenceValidationError  # noqa: E402
 from ananta.services.context_management.compaction_types import WarmingRequest  # noqa: E402
 from ananta.services.inference_service.interfaces.provider import InferenceProvider  # noqa: E402
 from apple_fm_provider_smoke import _FakeModel, _FakeSession, _provider, _request  # noqa: E402
 from jsonschema import ValidationError  # noqa: E402
 from macos_inference_plugin.configuration import default_config, validate_config  # noqa: E402
-from macos_inference_plugin.plugin import Plugin  # noqa: E402
+from macos_inference_plugin.plugin import DEGRADED_REASONS, Plugin  # noqa: E402
 from macos_inference_plugin.providers.apple_fm_provider import AppleFMProvider  # noqa: E402
 
 
@@ -67,14 +68,59 @@ def check_plugin() -> None:
     plugin.provider = _provider(model)
     model.available = False
     plugin.start_post_registration_work()
-    assert not plugin.is_ready()
+    assert plugin.is_ready(), 'an ineligible device is degraded, never a roster error (iss_7f4ce644)'
+    assert plugin.readiness_state is PluginReadiness.READY and plugin.get_readiness_error() is None
+    assert 'DEVICE_NOT_ELIGIBLE' in (plugin.readiness_warning or '')
     warning = plugin.validate_availability()
     assert warning['error']['severity'] == 'WARNING'
     assert warning['data']['reason'] == 'DEVICE_NOT_ELIGIBLE'
     assert warning['data']['repair_instruction']
+    _assert_generation_unavailable(plugin)
     model.available = True
+    _check_recovery(plugin)
+
+
+def _check_recovery(plugin: Plugin) -> None:
     assert plugin.is_ready() and plugin.get_readiness_error() is None
+    assert plugin.readiness_warning is None
     assert plugin.generate_completion(_request('Summarize facts.'))['data']['result']['completion']
+
+
+def _assert_generation_unavailable(plugin: Plugin) -> None:
+    try:
+        plugin.generate_completion(_request('Summarize facts.'))
+    except InferenceServiceUnavailableError:
+        return
+    raise AssertionError('degraded plugin generated without the system model')
+
+
+def _availability(reason: str) -> dict[str, object]:
+    return {'action_status': 'error', 'data': {'available': False, 'reason': reason},
+            'error': {'message': f'Apple Foundation Models unavailable: {reason}'}}
+
+
+def check_unavailable_reasons() -> None:
+    """Every reason the SDK and provider report is warn-only; a probe crash stays an error."""
+    sdk_reasons = {'APPLE_INTELLIGENCE_NOT_ENABLED', 'DEVICE_NOT_ELIGIBLE', 'MODEL_NOT_READY', 'UNKNOWN'}
+    assert sdk_reasons | {'SDK_UNAVAILABLE'} == DEGRADED_REASONS
+    for reason in sorted(DEGRADED_REASONS):
+        plugin = _initialized()
+        with patch.object(AppleFMProvider, 'validate_availability', return_value=_availability(reason)):
+            plugin.validate_availability()
+        assert plugin.readiness_state is PluginReadiness.READY, reason
+        assert reason in (plugin.readiness_warning or ''), reason
+    plugin = _initialized()
+    with patch.object(AppleFMProvider, 'validate_availability', return_value=_availability('PROBE_FAILED')):
+        plugin.validate_availability()
+        assert not plugin.is_ready()
+    assert plugin.readiness_state is PluginReadiness.ERROR
+    assert 'PROBE_FAILED' in (plugin.get_readiness_error() or '') and plugin.readiness_warning is None
+    with patch('macos_inference_plugin.providers.apple_fm_provider.import_module',
+               side_effect=RuntimeError('provider crash fixture')):
+        plugin = _initialized()
+        plugin.validate_availability()
+        assert plugin.readiness_state is PluginReadiness.ERROR
+        assert 'provider crash fixture' in (plugin.get_readiness_error() or '')
 
 
 def check_unsupported_operations() -> None:
@@ -120,8 +166,9 @@ def main() -> int:
     check_config()
     check_missing_sdk()
     check_plugin()
+    check_unavailable_reasons()
     check_unsupported_operations()
-    print('plugin_contract_smoke: config, protocol, recovery, warming, routing PASS')
+    print('plugin_contract_smoke: config, protocol, degraded-not-error, recovery, warming, routing PASS')
     return 0
 
 

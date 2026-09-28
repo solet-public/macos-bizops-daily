@@ -444,6 +444,11 @@ def _assert_extended_failures(
               f"{error} fails immediately without retry or late success")
         check("private-error" not in json.dumps(response), "terminal evidence excludes raw payloads")
 
+def _evidence_observed(response: Any, evidence_id: str) -> object:
+    matches = [item for item in response["evidence"] if item["id"] == evidence_id]
+    return matches[0]["observed"] if len(matches) == 1 else None
+
+
 def run_plugin_roster_output_cap(
     target: Path,
     runtime: Any,
@@ -473,7 +478,9 @@ def run_plugin_roster_output_cap(
         "{}",
     )
 
-    def row(name: str, *, status: str = "ready", padding: str = "") -> dict[str, object]:
+    def row(
+        name: str, *, status: str = "ready", padding: str = "", **optional: object,
+    ) -> dict[str, object]:
         value: dict[str, object] = {
             "name": name,
             "status": status,
@@ -486,6 +493,7 @@ def run_plugin_roster_output_cap(
         }
         if padding:
             value["metadata"] = padding
+        value.update(optional)
         return value
 
     def roster(rows: list[dict[str, object]]) -> Any:
@@ -527,10 +535,61 @@ def run_plugin_roster_output_cap(
     dormant_rows = list(production_rows)
     dormant_rows[-1] = row(str(production_rows[-1]["name"]), status="uninitialized")
     runtime.responses[vector] = roster(dormant_rows)
+    dormant = dispatch_request(probe, runtime)
     check(
-        dispatch_request(probe, runtime)["checkpoint_status"] != "verified",
+        dormant["checkpoint_status"] != "verified",
         "unconfigured roster member is non-green",
     )
+    last_name = str(production_rows[-1]["name"])
+    check(
+        _evidence_observed(dormant, "plugin_roster_unready")
+        == [f"{last_name}: uninitialized: no last_error reported"],
+        "iss_4b22fdeb: unready evidence names the plugin and its status",
+    )
+
+    torn = "Embedding is nonfinite or not normalized"
+    erroring_rows = list(production_rows)
+    erroring_rows[-1] = row(last_name, status="error", last_error=torn)
+    runtime.responses[vector] = roster(erroring_rows)
+    erroring = dispatch_request(probe, runtime)
+    check(
+        erroring["error_kind"] == "plugin_roster_unready"
+        and _evidence_observed(erroring, "plugin_roster_unready") == [f"{last_name}: error: {torn}"],
+        "iss_4b22fdeb: unready evidence carries each plugin's last_error",
+    )
+    check(
+        f"{last_name}: error: {torn}" in str(erroring["repair"]),
+        "iss_4b22fdeb: repair text names the unready plugin",
+    )
+    check(
+        _evidence_observed(exact, "plugin_roster_unready") == [],
+        "a green roster reports an empty unready list",
+    )
+
+    unavailable = "Apple Foundation Models unavailable: DEVICE_NOT_ELIGIBLE"
+    degraded_rows = list(production_rows)
+    degraded_rows[-1] = row(last_name, warning=unavailable)
+    runtime.responses[vector] = roster(degraded_rows)
+    degraded = dispatch_request(probe, runtime)
+    warnings = [item for item in degraded["evidence"] if item["id"] == "plugin_roster_warnings"]
+    check(
+        degraded["checkpoint_status"] == "verified",
+        "iss_7f4ce644: a ready-but-degraded plugin satisfies the roster",
+    )
+    check(
+        len(warnings) == 1 and warnings[0]["status"] == "warning"
+        and warnings[0]["observed"] == [f"{last_name}: {unavailable}"],
+        "iss_7f4ce644: the degraded plugin's warning stays visible in doctor evidence",
+    )
+
+    for bad in ({"last_error": 7}, {"warning": ""}):
+        malformed_rows = list(production_rows)
+        malformed_rows[-1] = row(last_name, **bad)
+        runtime.responses[vector] = roster(malformed_rows)
+        check(
+            dispatch_request(probe, runtime)["error_kind"] == "plugin_roster_invalid",
+            f"a mistyped optional roster field is invalid, not silently dropped: {sorted(bad)}",
+        )
 
     runtime.responses[vector] = roster(
         [row("oversized_plugin", padding="x" * structured_output_limit)]

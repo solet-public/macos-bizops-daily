@@ -7,7 +7,6 @@ import hashlib
 import json
 import re
 import stat
-import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +18,7 @@ from .paths import ManagerPaths
 from .reconciliation_ceremony import run_reconciliation_ceremony
 from .registry import InstanceRegistry
 from .state_io import atomic_replace_bytes, atomic_write_json, load_json_object
+from .target_git import run_target_git
 from .transaction import Transaction, load_transaction, target_install_state_projection
 
 _RECEIPT_KEYS = frozenset(
@@ -307,13 +307,8 @@ def _replacement_json_file(path: Path, value: dict[str, JsonValue]) -> _Replacem
 
 
 def _target_revisions(target: Path) -> TargetRevision:
-    completed = subprocess.run(
-        ["git", "-C", str(target), "rev-parse", "HEAD", "main"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    values = completed.stdout.splitlines()
+    completed = run_target_git(("-C", str(target), "rev-parse", "HEAD", "main"), inherit_environment=True)
+    values = completed.stdout.decode("utf-8", "replace").splitlines()
     if (
         completed.returncode != 0
         or len(values) != 2

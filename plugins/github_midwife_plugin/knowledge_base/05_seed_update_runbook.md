@@ -77,6 +77,53 @@ One block of six commands. Every command is target-read-only except
 `import --yes` (Manager state only; no target byte) and `update --yes`
 (the journaled operations the preview listed, nothing else).
 
+**A solet `solet create` installed skips `inspect` and `import`.** The
+Manager proves it against its own create record (the v1 registry row and
+the verified create transaction): the checkout must be at the exact
+recorded commit with its committed `PROVENANCE.json`, from the channel's
+repository, profile and `origin_id`. A current `solet create` enrolls the
+instance itself (`maintenance_enrollment` in its result). One created by an
+earlier Manager (r46–r48) has no v2 row yet, so `update <name> --dry-run`
+renders the update from the would-be row plus an `enrollment` block
+(`status: planned`) and binds it into the fingerprint, and `update --yes`
+enrolls and continues in the same command. A failed proof is
+`create_origin_identity_unproven` (with the failed checks) or
+`managed_identity_drift`: a repair, never a reason to import or re-birth.
+`import` below is for a plain-clone solet the Manager did not create.
+
+The proof is of content, not of the directory: the create record keeps
+the target path but no inode, so any byte-identical checkout at that path
+proves the same. The path itself is closed. `solet create` records a
+resolved path, so the recorded target must still be a real directory at
+exactly that path; a symbolic link at or above it (to a moved checkout
+or to another copy) is `managed_identity_drift`, never followed. Put the
+checkout back at the recorded path. An operator `--target` that reaches
+the real directory through a link is fine; the recorded path is what is
+inspected. An enrollment interrupted before it finished (a crash inside
+`update --yes` or `solet create`) resumes: `update <name> --dry-run` shows
+`enrollment.status: resume` with the same fingerprint, and `--yes` finishes
+it and continues. If the Manager was upgraded in between, the same solet
+proves again under the new channel, so the dry-run shows
+`enrollment.status: supersede`, names the stale operation
+(`superseded_operation_id`) and prints a new fingerprint. The old
+fingerprint is refused. `--yes` with the new one records the stale
+operation `abandoned`, enrolls under its successor and continues, all in
+the same command. `solet create`'s `maintenance_enrollment_failed` repair
+names the exact `import` commands and `update --dry-run` then `--yes`;
+each finishes it.
+
+Every Manager Git command against the checkout (`inspect`, `import`,
+`update`, the doctor) runs with fsmonitor, hooks, replace refs, external
+diff and system/global Git config disabled. It is pinned to the checkout
+itself (`GIT_DIR`, `GIT_WORK_TREE`), so the checkout's own config cannot
+move where the Manager reads or writes. A checkout whose own
+`.git/config` configures code that Git would run (a clean/smudge filter,
+a textconv or diff/merge driver, fsmonitor, `core.hooksPath`, an include,
+and similar), or that redirects its work tree (`core.worktree`, or
+`core.bare` set to true), is refused, never executed. `inspect`, `import`
+and `update` all refuse with `git_execution_surface_unsafe` and the
+repair: remove that configuration from the checkout, then retry.
+
 ```bash
 brew install solet-public/tap/solet                       # once; brew upgrade for every later release
 solet-manager inspect --target <clone> --channel stable   # classify; exit 3 attention_required is the normal answer for a real clone

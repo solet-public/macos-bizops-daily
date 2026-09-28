@@ -316,19 +316,47 @@ def model_availability(request: AdapterRequest, runtime: Runtime) -> JsonObject:
 def _model_availability_blocker(
     request: AdapterRequest, runtime: Runtime, available: bool, reason_name: str, context: int
 ) -> JsonObject | None:
+    """Only unsupported hardware and a wrong model context block; model absence is a warning."""
     if not available and reason_name == "DEVICE_NOT_ELIGIBLE" and not _virtual_mac(runtime):
         return _blocked(request, "apple_physical_model_unavailable", "An eligible physical macOS 27 host must produce a real Apple summary; repair Apple Intelligence and retry.")
-    if not available and reason_name != "DEVICE_NOT_ELIGIBLE":
-        return _blocked(request, "apple_ai_unavailable", f"Enable Apple Intelligence and accept its terms, then retry; model reason: {reason_name}.")
     if available and context != 8192:
         return _blocked(request, "apple_model_context_invalid", "Expected the reviewed 8192-token Apple system model context.")
     return None
 
 
+# Summaries are non-essential (rul_18bd93a3, rul_73886083): every unavailable
+# reason except DEVICE_NOT_ELIGIBLE on physical hardware (rul_cc1afc13) lets
+# installation proceed, with a warning that names the reason and the user action.
+_UNAVAILABLE_WARNINGS: dict[str, tuple[str, str]] = {
+    "DEVICE_NOT_ELIGIBLE": (
+        "Apple system summarization unavailable on this VM; installation may proceed with a warning",
+        "Use an eligible physical macOS 27 Apple Silicon host for summaries.",
+    ),
+    "APPLE_INTELLIGENCE_NOT_ENABLED": (
+        "Apple Intelligence is not enabled (APPLE_INTELLIGENCE_NOT_ENABLED); installation proceeds "
+        "and summaries stay degraded until you enable Apple Intelligence in System Settings",
+        "Enable Apple Intelligence in System Settings and accept its terms; summaries recover on their own.",
+    ),
+    "MODEL_NOT_READY": (
+        "Apple system model still downloading (MODEL_NOT_READY); installation proceeds and "
+        "summaries stay degraded until the download finishes",
+        "Let the Apple Intelligence model finish downloading (System Settings shows its progress); "
+        "summaries recover on their own.",
+    ),
+}
+
+
+def _unavailable_warning(reason_name: str) -> tuple[str, str]:
+    return _UNAVAILABLE_WARNINGS.get(reason_name, (
+        f"Apple system model unavailable ({reason_name}); installation proceeds and summaries stay "
+        "degraded until it is available",
+        "Check Apple Intelligence in System Settings; summaries recover on their own once the model is available.",
+    ))
+
+
 def _model_availability_result(request: AdapterRequest, available: bool, reason_name: str) -> JsonObject:
-    summary = (
-        "Apple system summarization unavailable on this VM; installation may proceed with a warning"
-        if not available else "Apple system model is available"
+    summary, repair = (
+        ("Apple system model is available", None) if available else _unavailable_warning(reason_name)
     )
     return result(
         request,
@@ -339,10 +367,10 @@ def _model_availability_result(request: AdapterRequest, available: bool, reason_
             status="warning" if not available else "passed",
             summary=summary,
             observed=reason_name,
-            expected="AVAILABLE or DEVICE_NOT_ELIGIBLE (VM warning)",
+            expected="AVAILABLE; any other reason is a warning except DEVICE_NOT_ELIGIBLE on physical hardware",
             source="apple_fm_sdk.SystemLanguageModel.is_available",
         )],
-        repair=("Use an eligible physical macOS 27 Apple Silicon host for summaries." if not available else None),
+        repair=repair,
     )
 
 

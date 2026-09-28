@@ -60,6 +60,7 @@ from .models import (
     RuntimePlan,
 )
 from .reconciliation_request import ReconciliationOutcome, build_reconciliation_envelope
+from .target_git import GitLayout, run_target_git
 from .update_candidate import UpdateCandidate
 
 __all__ = [
@@ -131,13 +132,6 @@ STEP5_CAPABILITIES = (
 )
 ROUTER_PLUGIN = "macos_self_deployment_plugin"
 ADAPTER_MODULE_PATH = "plugins/github_midwife_plugin/src/github_midwife_plugin/setup_adapter.py"
-_GIT_ENV = {
-    "GIT_TERMINAL_PROMPT": "0",
-    "LC_ALL": "C",
-    "GIT_CONFIG_NOSYSTEM": "1",
-    "GIT_CONFIG_GLOBAL": "/dev/null",
-    "GIT_OPTIONAL_LOCKS": "0",
-}
 _PROBE_TIMEOUT_SECONDS = 300
 _ATTESTATION_KEYS = (
     "current_release_id",
@@ -253,6 +247,9 @@ class PlanContext:
     seams: RuntimeSeams
     probe_purpose: str = "preview"
     operator_selections: dict[str, JsonValue] = field(default_factory=lambda: {})
+    #: How ``cache_repository`` is pinned (iss_836499b3 R2-1): the update reads the Manager's bare candidate
+    #: cache; the standalone doctor reads the promoted target itself, whose history holds the candidate.
+    cache_layout: GitLayout = GitLayout.BARE
 
 
 def encode_facts(facts: dict[str, str | int | bool | None]) -> list[str]:
@@ -371,14 +368,14 @@ def knowledge_removed_articles(context: PlanContext) -> tuple[tuple[str, str, st
     baseline, candidate = context.baseline_commit, context.candidate.fields.commit
     if not removals or baseline == candidate:
         return ()
-    listing = _git(context.cache_repository, ("diff", "--diff-filter=D", "--name-only", "--no-renames", baseline, candidate), "candidate removal set is unreadable")
+    listing = _git(context.cache_repository, ("diff", "--diff-filter=D", "--name-only", "--no-renames", baseline, candidate), "candidate removal set is unreadable", layout=context.cache_layout)
     rows: list[tuple[str, str, str]] = []
     for path in sorted(line for line in listing.decode("utf-8", "strict").splitlines() if line.endswith(".md")):
         parts = path.split("/")
         knowledge_base = next((kb for kb in removals if kb in parts), None)
         if knowledge_base is None:
             continue
-        blob = _git(context.cache_repository, ("show", f"{baseline}:{path}"), "baseline article is unreadable")
+        blob = _git(context.cache_repository, ("show", f"{baseline}:{path}"), "baseline article is unreadable", layout=context.cache_layout)
         rows.append((knowledge_base, path, _article_title(blob, path)))
     return tuple(rows)
 
@@ -593,12 +590,12 @@ def _selected_plugins(path: Path) -> tuple[str, ...]:
 
 
 def _candidate_plugins(context: PlanContext) -> frozenset[str]:
-    listing = _git(context.cache_repository, ("ls-tree", "--name-only", f"{context.candidate.fields.commit}:plugins"), "candidate plugin tree is unreadable")
+    listing = _git(context.cache_repository, ("ls-tree", "--name-only", f"{context.candidate.fields.commit}:plugins"), "candidate plugin tree is unreadable", layout=context.cache_layout)
     return frozenset(line.strip() for line in listing.decode("utf-8", "strict").splitlines() if line.strip())
 
 
 def _candidate_tree_paths(context: PlanContext) -> frozenset[str]:
-    listing = _git(context.cache_repository, ("ls-tree", "-r", "--name-only", context.candidate.fields.commit), "candidate tree is unreadable")
+    listing = _git(context.cache_repository, ("ls-tree", "-r", "--name-only", context.candidate.fields.commit), "candidate tree is unreadable", layout=context.cache_layout)
     return frozenset(line for line in listing.decode("utf-8", "strict").splitlines() if line)
 
 
@@ -937,12 +934,12 @@ def cutover_terms(
 
 def adapter_module_identity(context: PlanContext) -> tuple[str, bool]:
     """Blob digest of the setup adapter at the candidate and whether the transition touched it."""
-    blob = _git(context.cache_repository, ("show", f"{context.candidate.fields.commit}:{ADAPTER_MODULE_PATH}"), "candidate adapter module is unreadable")
+    blob = _git(context.cache_repository, ("show", f"{context.candidate.fields.commit}:{ADAPTER_MODULE_PATH}"), "candidate adapter module is unreadable", layout=context.cache_layout)
     digest = f"sha256:{hashlib.sha256(blob).hexdigest()}"
     baseline = context.baseline_commit
     if baseline == context.candidate.fields.commit:
         return digest, False
-    completed = _run_git(context.cache_repository, ("diff-tree", "-r", "--name-only", "--no-renames", baseline, context.candidate.fields.commit))
+    completed = _run_git(context.cache_repository, ("diff-tree", "-r", "--name-only", "--no-renames", baseline, context.candidate.fields.commit), layout=context.cache_layout)
     if completed.returncode != 0:
         return digest, True
     touched = set(completed.stdout.decode("utf-8", "replace").splitlines())
@@ -960,20 +957,14 @@ def _cutover_files(context: PlanContext) -> tuple[dict[str, JsonValue], ...]:
     return tuple(rows)
 
 
-def _run_git(cwd: Path, args: tuple[str, ...]) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(  # noqa: S603
-        ("git", "-c", "core.fsmonitor=false", *args),
-        cwd=cwd,
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        check=False,
-        timeout=600,
-        env=dict(_GIT_ENV),
-    )
+def _run_git(cwd: Path, args: tuple[str, ...], *, layout: GitLayout = GitLayout.WORKTREE) -> subprocess.CompletedProcess[bytes]:
+    """One closed read-only vector through the shared hardened, pinned Git surface (iss_836499b3 B1, R2-1)."""
+    return run_target_git(args, cwd=cwd, layout=layout)
 
 
-def _git(cwd: Path, args: tuple[str, ...], error: str) -> bytes:
-    completed = _run_git(cwd, args)
+def _git(cache_repository: Path, args: tuple[str, ...], error: str, *, layout: GitLayout) -> bytes:
+    """A read of the candidate's history, pinned as ``PlanContext.cache_layout`` says."""
+    completed = _run_git(cache_repository, args, layout=layout)
     if completed.returncode:
         raise SourceError(f"{error}: {completed.stderr.decode('utf-8', 'replace').strip()}")
     return completed.stdout

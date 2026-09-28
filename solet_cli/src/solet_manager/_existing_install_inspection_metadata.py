@@ -207,6 +207,21 @@ def _metadata_documents(catalog_raw: bytes, anchors_raw: bytes) -> tuple[dict[st
     return catalog, anchors_value
 
 
+def installed_channel_ids(tracker: InspectionEffectTracker) -> tuple[str, ...]:
+    """Every channel the installed package catalog serves, in catalog order (iss_836499b3).
+
+    A create-origin instance's v1 row records the seed release it installed but no channel, so
+    ``update`` enrolling it inline reads the channel from the one catalog the Manager ships.
+    """
+    catalog_raw, anchors_raw = _released_metadata_bytes(tracker)
+    catalog, _ = _metadata_documents(catalog_raw, anchors_raw)
+    rows = cast(list[object], catalog["channels"])
+    channels = tuple(cast(dict[str, object], item).get("channel_id") for item in rows if isinstance(item, dict))
+    if len(channels) != len(rows) or not all(isinstance(value, str) for value in channels):
+        raise ValueError("installed inspection catalog channel is malformed")
+    return cast(tuple[str, ...], channels)
+
+
 def _catalog_channel(catalog: dict[str, object], channel: str) -> dict[str, str]:
     channels = cast(list[object], catalog["channels"])
     rows = [

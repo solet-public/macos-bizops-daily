@@ -126,6 +126,19 @@ starting_actions:
       Start the consolidated agent_messaging bridge — single FastAPI
       surface on a dynamic port backing every mcp__<name>__* tool
       (platform-call, peer messaging, backend-agent threads).
+  - name: ensure_actr_memory_schedules
+    process_key: service_interface::memory_service::ensure_schedules
+    description: |
+      Install ACT-R's three scheduled memory-maintenance crons
+      (memorization queue every 6h, strength recomputation daily,
+      consolidation weekly). scheduling_service is a service-manager-tier
+      service, unavailable at prepare_for_readiness/start_services (before
+      init_service_manager); this fires here, after init_actions, so the
+      resolution succeeds. Idempotent across restarts: the scheduler
+      restores every persisted cron at each boot, so this clears its own
+      tag (actr_memory_plugin) before recreating the three crons fresh,
+      rather than adding three more on top each time. iss_d1a7662f /
+      iss_2250e07c, ruling dec_a975b80b.
 
 # Service bindings written to profile/config/service_bindings.json.
 # inference_service is intentionally ABSENT — declared-VACANT boot

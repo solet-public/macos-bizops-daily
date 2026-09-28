@@ -294,7 +294,7 @@ def _inference_config(target: Path, world: FakeWorld) -> None:
 
 class _Reason(Enum):
     DEVICE_NOT_ELIGIBLE = 1
-    APPLE_INTELLIGENCE_DISABLED = 2
+    APPLE_INTELLIGENCE_NOT_ENABLED = 0
 
 
 def _availability(target: Path, world: FakeWorld) -> None:
@@ -317,8 +317,8 @@ def _availability(target: Path, world: FakeWorld) -> None:
         world.model = "Mac15,1"
         assert _status(apple.model_availability(request, world)) == "blocked"
         world.model = "VirtualMac2,1"
-        Model.reason = _Reason.APPLE_INTELLIGENCE_DISABLED
-        assert _status(apple.model_availability(request, world)) == "blocked"
+        Model.reason = _Reason.APPLE_INTELLIGENCE_NOT_ENABLED
+        assert _status(apple.model_availability(request, world)) == "verified", "iss_9b396043: a warning, not a block"
 
 
 def _process_result(value: dict[str, object]) -> CommandOutcome:

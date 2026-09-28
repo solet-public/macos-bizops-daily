@@ -35,6 +35,7 @@ from .paths import ManagerPaths
 from .registry import InstanceRegistry
 from .seed_lock_parser import parse_seed_lock_bytes
 from .state_io import instance_lock, load_json_object
+from .target_git import GitLayout
 from .transaction import utc_now
 from .update_candidate import UpdateCandidate
 from .update_execution import (
@@ -254,7 +255,10 @@ def _load_record(paths: ManagerPaths, name: str) -> InstanceInventoryRecordV2:
             raise StateError("inventory channel descriptor digest equals the transition-contract digest")
         return record
     if paths.registry_path.exists() and InstanceRegistry(paths.registry_path).get(name) is not None:
-        raise InstanceUnmanagedV2Error(f"{name!r} is a v1 create instance", repair=f"Run `solet doctor {name}`.")
+        raise InstanceUnmanagedV2Error(
+            f"{name!r} is a v1 create instance",
+            repair=f"Run `solet doctor {name}`; `solet-manager update {name} --dry-run` enrolls it for updates.",
+        )
     raise InstanceUnmanagedError(f"no v2 inventory record is named {name!r}", repair=f"Run `solet-manager import {name} --target <path> --channel <channel> --dry-run`.")
 
 
@@ -396,7 +400,7 @@ def _bindings(request: UpdateRequest, selection: DoctorSelection, context: PlanC
     files = read_transition_contract(paths, bundle_digest)
     candidate = UpdateCandidate(digest, parse_seed_lock_bytes(descriptor.descriptor_bytes), "sha256:" + "0" * 64, parse_transition_bundle(files["existing_install_flow.json"]), files, "copy")
     target = Path(record.target.canonical_path)
-    context = PlanContext(record, candidate, "opr_" + "0" * 32, "sha256:" + "0" * 64, selection.expected_source.commit, selection.expected_source.tree, registry, target, seams, "completion", dict(request.operator_selections))
+    context = PlanContext(record, candidate, "opr_" + "0" * 32, "sha256:" + "0" * 64, selection.expected_source.commit, selection.expected_source.tree, registry, target, seams, "completion", dict(request.operator_selections), GitLayout.WORKTREE)
     return candidate, descriptor.metadata, context
 
 

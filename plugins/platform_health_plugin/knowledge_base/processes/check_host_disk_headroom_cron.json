@@ -1,0 +1,6 @@
+{
+  "process_key": "plugin::platform_health_plugin::check_host_disk_headroom_cron",
+  "display_name": "Host Disk Headroom Check (Cron Target)",
+  "description": "Scheduler-fired EDGE_SINK target of the host_disk_guard cron (default every 10 minutes). Hands one host-disk headroom check to a single-slot background thread and returns immediately with dispatch=started, already_running (the previous check is still running) or inactive (this is the inactive blue-green colour). The background check measures free bytes at '/Users', classifies them against the default 100 GiB warning and 50 GiB critical floors, and alerts the role named by this plugin's 'alert_role' config key on a severity transition; a failure inside it is logged at ERROR with its traceback. Declares no result or error processor, so a fire stays terminal. Cron-only wiring (is_discoverable=False); call check_host_disk_headroom to run the check directly and see its result.",
+  "embedding_description": "Cron-only fire for the host disk headroom guard: starts one background free-space check that classifies the host disk ok, warning or critical and alerts the configured role on a severity transition. Not model-callable; the direct equivalent is check_host_disk_headroom."
+}

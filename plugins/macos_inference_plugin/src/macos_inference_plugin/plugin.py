@@ -19,6 +19,17 @@ from .providers.apple_fm_provider import AppleFMProvider
 
 logger = logging.getLogger(__name__)
 
+# Every unavailable reason the provider reports. The first four are apple_fm_sdk
+# 0.2.1's SystemLanguageModelUnavailableReason members; SDK_UNAVAILABLE is the
+# provider's own "SDK not installed or loadable". Each means the system model is
+# absent here, which rul_73886083, rul_18bd93a3 and rul_cc1afc13 make a warning:
+# the plugin stays ready and degraded, so the roster accepts it and the warning
+# stays visible. PROBE_FAILED (the SDK raised) is a real provider error.
+DEGRADED_REASONS = frozenset({
+    "APPLE_INTELLIGENCE_NOT_ENABLED", "DEVICE_NOT_ELIGIBLE", "MODEL_NOT_READY", "UNKNOWN",
+    "SDK_UNAVAILABLE",
+})
+
 
 class Plugin(PluginBase, InferenceProvider, ContextManagementContract):
     """Independent summary provider with per-request SDK sessions and no stored state."""
@@ -65,18 +76,25 @@ class Plugin(PluginBase, InferenceProvider, ContextManagementContract):
 
     def is_ready(self) -> bool:
         """Recheck an unavailable model so the service can recover after repair."""
-        if self.provider is not None and self.readiness_error is not None:
+        if self.provider is not None and (
+            self.readiness_error is not None or self.readiness_warning is not None
+        ):
             self.validate_availability()
         return super().is_ready()
 
     def validate_availability(self) -> ActionResult:
         """Probe on demand so repair/unavailability are reversible without restart."""
         result = self._provider().validate_availability()
-        if result.get("data", {}).get("available"):
+        data = result.get("data", {})
+        if data.get("available"):
             self.set_ready()
+            return result
+        error = result.get("error") or {}
+        message = str(error.get("message", "Apple model unavailable"))
+        if data.get("reason") in DEGRADED_REASONS:
+            self.set_ready(warning=message)
         else:
-            error = result.get("error") or {}
-            self.set_error(str(error.get("message", "Apple model unavailable")))
+            self.set_error(message)
         return result
 
     def generate_completion(self, request: InferenceRequest) -> ActionResult:
