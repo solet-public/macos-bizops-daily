@@ -1,0 +1,15 @@
+{
+  "name": "test_generate_embeddings_special_chars",
+  "description": "Generate embeddings for text with special characters, punctuation, and symbols",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": [
+      "Hello! How are you? #test @mention $100 50% off!",
+      "Code: function() { return x + y; }",
+      "Math: x^2 + y^2 = z^2 | E = mc^2",
+      "Symbols: <> [] {} () & | \\ / * + - ="
+    ],
+    "input_type": "text"
+  },
+  "timeout_seconds": 90
+}

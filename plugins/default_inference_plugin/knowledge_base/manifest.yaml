@@ -1,0 +1,22 @@
+name: default_inference_plugin
+description: >
+  Default Inference plugin process definitions and reference documentation.
+
+category: plugin-internal
+tags:
+  - plugin_reference
+  - default_inference
+
+content:
+  patterns:
+    include:
+      - "**/*.md"
+      - "**/*.txt"
+    exclude:
+      - "**/.git/**"
+      - "**/.archive/**"
+      - "processes/**"
+  chunking:
+    strategy: headers
+    max_chars: 3000
+    overlap_chars: 200

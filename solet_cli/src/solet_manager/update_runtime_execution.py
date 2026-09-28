@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING, cast
 
 from solet_setup_contracts import canonical_sha256
 
+from . import update_deferral as deferral
 from . import update_promotion as promotion
 from . import update_runtime_lifecycle as lifecycle_stage
 from . import update_runtime_stages as stages
@@ -459,6 +460,8 @@ class RuntimeExecution:
 
     def _drive(self, operation: RuntimeOperation, inputs: dict[str, JsonValue], *, contradiction: str, incomplete: str) -> None:
         """Section 5.2 truth table, applied to every stage's operations."""
+        if self._row(operation.operation_id)["status"] == deferral.DEFERRED:
+            return
         if self._verified_by_postcondition(operation, inputs, contradiction, incomplete):
             return
         pre = self._probe(operation, "pre_apply", inputs)
@@ -491,6 +494,8 @@ class RuntimeExecution:
 
     def _apply_and_verify(self, operation: RuntimeOperation, inputs: dict[str, JsonValue], contradiction: str) -> None:
         applied = self._apply(operation, inputs)
+        if deferral.apply_deferral(self, operation, applied):
+            return
         if applied.checkpoint_status is CheckpointStatus.FAILED and applied.retry_safe:
             self._set_status(operation.operation_id, "pending")
             raise StagePausedError(cast(str, applied.error_kind), f"{operation.operation_id} apply failed and is retry-safe; re-run --yes to reapply what is still missing", repair=applied.repair or "Re-run --yes with the recorded runtime fingerprint.")

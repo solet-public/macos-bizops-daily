@@ -1,0 +1,10 @@
+{
+  "name": "test_generate_embeddings_invalid_input_type",
+  "description": "Verify error when unsupported input_type is provided",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": ["Test text for invalid input type."],
+    "input_type": "image"
+  },
+  "timeout_seconds": 30
+}

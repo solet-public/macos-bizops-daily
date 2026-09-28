@@ -12,7 +12,7 @@ import os
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from .constants import (
     PLUGIN_NAME,
@@ -40,6 +40,9 @@ from .kb_indexing import (
     resolve_manifest,
     resolve_source,
 )
+
+if TYPE_CHECKING:
+    from ananta.interfaces.embedding_service_interface import TokenBudget
 
 logger = logging.getLogger(__name__)
 
@@ -383,6 +386,8 @@ def auto_install_knowledge_bases(
     memory_service: Any,
     address_book_service: Any,
     manifest_plugin_set: set[str] | None = None,
+    *,
+    budget: TokenBudget | None,
 ) -> None:
     """Scan knowledge_base_root for directories with manifests and install if needed.
 
@@ -448,6 +453,7 @@ def auto_install_knowledge_bases(
             install_kb(
                 name, None, kb_root,
                 state_service, memory_service, address_book_service,
+                budget=budget,
             )
         except Exception as exc:
             logger.error("%s: auto-install failed for %s: %s", PLUGIN_NAME, name, exc)
@@ -462,6 +468,8 @@ def ingest_kb(
     state_service: Any,
     memory_service: Any,
     address_book_service: Any,
+    *,
+    budget: TokenBudget | None,
 ) -> dict[str, Any]:
     """Content-hash-gated idempotent ingest of one KB, or every KB when name == "all".
 
@@ -477,8 +485,8 @@ def ingest_kb(
     structured, dispatch-friendly result instead of ``None``.
     """
     if name == _INGEST_ALL:
-        return _ingest_all_kbs(kb_root, state_service, memory_service, address_book_service)
-    return _ingest_one_kb(name, kb_root, state_service, memory_service, address_book_service)
+        return _ingest_all_kbs(kb_root, state_service, memory_service, address_book_service, budget=budget)
+    return _ingest_one_kb(name, kb_root, state_service, memory_service, address_book_service, budget=budget)
 
 
 def _ingest_one_kb(
@@ -487,12 +495,14 @@ def _ingest_one_kb(
     state_service: Any,
     memory_service: Any,
     address_book_service: Any,
+    *,
+    budget: TokenBudget | None,
 ) -> dict[str, Any]:
     """Ingest a single named KB (fail-loud); skip-if-current via has_valid_install."""
     if has_valid_install(name, state_service, memory_service, kb_root):
         return _ingest_result("single", [], [name], [], 0)
     result = install_kb(
-        name, None, kb_root, state_service, memory_service, address_book_service,
+        name, None, kb_root, state_service, memory_service, address_book_service, budget=budget,
     )
     return _ingest_result("single", [name], [], [], int(result.get("chunk_count") or 0))
 
@@ -502,6 +512,8 @@ def _ingest_all_kbs(
     state_service: Any,
     memory_service: Any,
     address_book_service: Any,
+    *,
+    budget: TokenBudget | None,
 ) -> dict[str, Any]:
     """Ingest every KB under kb_root (install pass only); collect per-KB failures."""
     ingested: list[str] = []
@@ -514,7 +526,7 @@ def _ingest_all_kbs(
                 unchanged.append(name)
                 continue
             result = install_kb(
-                name, None, kb_root, state_service, memory_service, address_book_service,
+                name, None, kb_root, state_service, memory_service, address_book_service, budget=budget,
             )
             ingested.append(name)
             total_chunks += int(result.get("chunk_count") or 0)
@@ -656,6 +668,8 @@ def install_kb(
     state_service: Any,
     memory_service: Any,
     address_book_service: Any,
+    *,
+    budget: TokenBudget | None,
 ) -> dict[str, Any]:
     """Index a knowledge base directory.
 
@@ -705,7 +719,7 @@ def install_kb(
     # new one is not inserted until below) are orphans swept by the operator-fired
     # purge_orphaned_chunks verb: the relinquished-atomicity window this slice
     # already relies on (D4). The exception propagates loud; no inline cleanup.
-    memory_ids, chunk_count = index_files(kb_dir, name, manifest, memory_service)
+    memory_ids, chunk_count = index_files(kb_dir, name, manifest, memory_service, budget=budget)
 
     resolved_path = str(kb_dir.resolve())
     clean_source = url if source_type == "git" else None
@@ -814,6 +828,8 @@ def update_kb(
     state_service: Any,
     memory_service: Any,
     address_book_service: Any,
+    *,
+    budget: TokenBudget | None,
 ) -> dict[str, Any]:
     """Pull upstream changes (git) or reindex changed files (local).
 
@@ -875,7 +891,7 @@ def update_kb(
         deleted = delete_kb_chunks_for_file(name, relative, memory_service)
         old_memory_ids = [mid for mid in old_memory_ids if mid not in deleted]
 
-    added_ids, _ = index_files(kb_dir, name, manifest, memory_service, changed_files)
+    added_ids, _ = index_files(kb_dir, name, manifest, memory_service, changed_files, budget=budget)
     new_memory_ids = old_memory_ids + added_ids
 
     now = now_iso()

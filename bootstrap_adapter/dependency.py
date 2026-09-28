@@ -344,9 +344,26 @@ def _repair_seed_packages_if_needed(
                 "--no-build-isolation",
                 "-e",
                 str(package_dir),
+                *vendor_find_links_args(package_dir),
             ],
             f"seed install for {relative}",
         )
+
+
+def vendor_find_links_args(package_dir: Path) -> list[str]:
+    """``--find-links <package>/vendor`` when the package ships prebuilt wheels there, else nothing.
+
+    The same presence-driven rule as genesis's ``profile_install._vendor_find_links_args``
+    (iss_7994d8bb), so the update path resolves a pinned dependency such as
+    ``macos_inference_plugin``'s ``apple-fm-sdk`` wheel exactly as a fresh
+    install does instead of trying a PyPI sdist the host cannot build
+    (iss_6d26db73).  This pre-venv adapter cannot import the seed plugin, so
+    a smoke proves both functions agree.
+    """
+    vendor_dir = package_dir / "vendor"
+    if vendor_dir.is_dir() and any(vendor_dir.glob("*.whl")):
+        return ["--find-links", str(vendor_dir)]
+    return []
 
 
 def apply_dependency_closure(runtime: AdapterRuntime, closure: Closure = REQUIRED_DISTRIBUTIONS) -> None:

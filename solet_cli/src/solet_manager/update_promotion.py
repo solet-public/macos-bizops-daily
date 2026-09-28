@@ -22,9 +22,10 @@ from .contract_copies import read_transition_contract
 from .doctor_journal import doctor_operation_id, latest_run, read_doctor_journal
 from .errors import StateConflictError, StateError, TransitionContractMismatchError
 from .maintenance_inventory import publish_promotion, read_maintenance_inventory_v2
-from .models import CommandResult, DoctorContractKind, ExitCode, InstanceInventoryRecordV2, JsonValue, ReleaseIdentity, UpdateEligibility, UpdateEligibilityState
+from .models import CommandResult, DoctorContractKind, ExitCode, InstanceInventoryRecordV2, JsonValue, ManagementState, ReleaseIdentity, UpdateEligibility, UpdateEligibilityState
 from .state_io import instance_lock
 from .transaction import utc_now
+from .update_deferral import deferred_rows
 from .update_pointer_repair import release_terminal_pointer
 
 if TYPE_CHECKING:
@@ -151,13 +152,21 @@ def _promote(execution: RuntimeExecution) -> None:
     current = execution.current_record()
     candidate = _candidate_release(execution)
     contract = execution.context.candidate.bundle_digest
-    if current.verified_release != candidate or current.contract_identities.verified_contract_digest != contract:
+    # A verify-mode update at the already-verified release must still clear a needs_attention row (iss_6d26db73).
+    if current.verified_release != candidate or current.contract_identities.verified_contract_digest != contract or current.management_state is not ManagementState.VERIFIED:
         digest = _recorded_evidence_digest(execution.journal)
         with instance_lock(execution.paths.registry_lock_path, create=True):
             current = publish_promotion(execution.paths.maintenance_inventory_path, current, operation_id=execution.operation_id, verified_release=candidate, verified_contract_digest=contract, eligibility=_eligibility(execution, candidate), doctor_evidence_digest=digest, now=utc_now())
         execution.executed.append("inventory:publish_promotion")
     execution.record = current
-    execution.advance_status("promoted", "promotion published and read back; the candidate is the active verified release contract", result={"kind": "promoted", "reason_code": "verified", "repair": "No operator action is required."})
+    deferred = deferred_rows(execution.journal)
+    if deferred:
+        # Before the pointer releases, so a crash cannot leave a VERIFIED row that hides a deferral (iss_6d26db73).
+        execution.publish_needs_attention(tuple(sorted({error_kind for _operation, error_kind, _repair in deferred})))
+        outcome: dict[str, JsonValue] = {"kind": "promoted", "reason_code": "migrations_deferred", "repair": " ".join(repair for _operation, _kind, repair in deferred)}
+    else:
+        outcome = {"kind": "promoted", "reason_code": "verified", "repair": "No operator action is required."}
+    execution.advance_status("promoted", "promotion published and read back; the candidate is the active verified release contract", result=outcome)
     released = release_terminal_pointer(execution.paths, execution.current_record())
     if released is not None:
         execution.record = released
@@ -188,6 +197,11 @@ def _promoted_result(execution: RuntimeExecution) -> CommandResult:
     data["management_state"] = record.management_state.value
     data["update_eligibility"] = {"state": record.update_eligibility.state.value, "reason_codes": list(record.update_eligibility.reason_codes)}
     data["active_operation"] = None if record.active_operation is None else record.active_operation.operation_id
+    deferred = deferred_rows(execution.journal)
+    data["deferred_operations"] = [{"operation_id": operation, "reason_code": kind, "repair": repair} for operation, kind, repair in deferred]
+    if deferred:
+        repair = " ".join(item for _operation, _kind, item in deferred)
+        return CommandResult(RESULT_KIND, "promoted", f"The candidate was promoted; {len(deferred)} release migration(s) deferred with the prior configuration still active: {repair}", ExitCode.OK, data=data)
     return CommandResult(RESULT_KIND, "promoted", "Final doctor verified and the candidate was promoted to the active verified release contract.", ExitCode.OK, data=data)
 
 

@@ -122,7 +122,8 @@
       "section": "plugin_roster",
       "order": 13,
       "checks": [
-        {"check_id": "roster_matches_tree", "required": {"candidate": true, "verified": true, "diagnostic": true}}
+        {"check_id": "roster_matches_tree", "required": {"candidate": true, "verified": true, "diagnostic": true}},
+        {"check_id": "plugin_transitions", "required": {"candidate": false, "verified": false, "diagnostic": false}}
       ]
     },
     {

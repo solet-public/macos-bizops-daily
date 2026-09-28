@@ -1,0 +1,7 @@
+{
+  "name": "test_get_dimension_default_model",
+  "description": "Get embedding dimension using the default configured model",
+  "process_key": "plugin::openai_embeddings_plugin::get_embedding_dimension_action",
+  "arguments": {},
+  "timeout_seconds": 60
+}

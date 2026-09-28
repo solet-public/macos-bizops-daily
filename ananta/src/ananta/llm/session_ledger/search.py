@@ -46,6 +46,10 @@ _EVENT_EMBED_CURSOR_KV_KEY = "event_embed_cursor"
 # the WHOLE corpus and embeds any such straggler, making completeness a hard
 # eventual guarantee rather than a probabilistic one.
 _EVENT_EMBED_DRAIN_COUNTER_KV_KEY = "event_embed_drain_fires"
+# The chunking policy the stored event vectors were cut to (iss_9166af93): a
+# change forces one full reconciliation sweep, the backfill for events the old
+# policy could not embed.
+_EVENT_EMBED_CHUNK_POLICY_KV_KEY = "event_embed_chunk_policy"
 
 
 def _event_at_naive(value: object) -> datetime:
@@ -291,6 +295,25 @@ class SessionLedgerSearchMixin(SessionLedgerRepositoryBase):
             value=str(nxt),
         )
         return nxt
+
+    def get_event_embed_chunk_policy(self) -> str | None:
+        """The chunking policy the last completed backfill sweep ran under; ``None`` if never recorded."""
+        result = self._state.get_key_value(
+            namespace=_EVENT_EMBED_CURSOR_KV_NAMESPACE,
+            key=_EVENT_EMBED_CHUNK_POLICY_KV_KEY,
+        )
+        if result.get("action_status") != "completed":
+            return None
+        raw = (result.get("data") or {}).get("value")
+        return raw if isinstance(raw, str) and raw else None
+
+    def set_event_embed_chunk_policy(self, policy: str) -> None:
+        """Record that a full sweep under ``policy`` completed without halting."""
+        self._state.set_key_value(
+            namespace=_EVENT_EMBED_CURSOR_KV_NAMESPACE,
+            key=_EVENT_EMBED_CHUNK_POLICY_KV_KEY,
+            value=policy,
+        )
 
     def list_events_by_ids(self, event_ids: list[str]) -> list[dict[str, object]]:
         """Read live ``__event`` rows by id (the ANN join-back read).

@@ -28,6 +28,10 @@ __all__ = ["availability", "coding_agents", "knowledge", "launchers", "migration
 
 _LSTART = "%a %b %d %H:%M:%S %Y"
 
+PLUGIN_TRANSITION_REF = "existing::migration.plugin_transition"
+#: Migrations whose pending state is advisory: the prior configuration stays active and runnable.
+_ADVISORY_OPERATION_REFS = frozenset({"existing::runtime.plugin_cache_refresh", PLUGIN_TRANSITION_REF})
+
 
 # --- 9 service / router -----------------------------------------------------------------------------------
 
@@ -394,7 +398,29 @@ def roster(probe: DoctorProbe, name: str) -> tuple[DiagnosticCheck, ...]:
     missing = sorted(set(roster) - tree)
     expected = cast(list[JsonValue], sorted(tree))
     observed = cast(list[JsonValue], list(roster))
-    return (verdict("roster_matches_tree", not missing, "Every roster plugin exists in the release tree.", "manager_static", reason="roster_plugin_absent", observed=observed, expected=expected),)
+    return (verdict("roster_matches_tree", not missing, "Every roster plugin exists in the release tree.", "manager_static", reason="roster_plugin_absent", observed=observed, expected=expected), _plugin_transitions(probe))
+
+
+def _plugin_transitions(probe: DoctorProbe) -> DiagnosticCheck:
+    """Advisory: each release-declared plugin transition as the seed observes it (iss_6d26db73).
+
+    A pending or refused transition is not a broken install -- the prior plugin
+    stays active and runnable -- so it never blocks promotion; the next update
+    retries it.  The observed rows carry the seed's own owner-facing sentences.
+    """
+    operation = operation_by_ref(probe, PLUGIN_TRANSITION_REF)
+    if operation is None:
+        return not_applicable("plugin_transitions", "plugin_transitions=none_declared", "manager_static")
+    source = f"existing_probe:{PLUGIN_TRANSITION_REF}"
+    result = probe.results.get(operation.operation_id)
+    if result is None:
+        return unknown("plugin_transitions", "The plugin transition probe did not run.", source, reason=unbound_reason(probe))
+    rows = cast(list[JsonValue], [str(item["summary"]) for item in result.evidence if str(item.get("id", "")).startswith("plugin_transition.") and not str(item.get("id", "")).endswith(".readiness")])
+    status = probe_status(result)
+    # A promoted, source-current solet has nothing for `update` to apply until the next release: its open
+    # transition (for example, a Mac that has since moved to macOS 27) switches then, not on a re-run.
+    repair = "update_at_next_release" if probe.contract is DoctorContractKind.VERIFIED else "rerun_update"
+    return check("plugin_transitions", status, "Release-declared plugin transitions: done, kept, not applicable, pending or refused.", source, reason=result.error_kind or "plugin_transition_pending", repair=repair, observed=rows)
 
 
 def knowledge(probe: DoctorProbe, name: str) -> tuple[DiagnosticCheck, ...]:
@@ -451,7 +477,7 @@ def migrations(probe: DoctorProbe, name: str) -> tuple[DiagnosticCheck, ...]:
         return (unknown("migration", "No transition bundle binds release migrations under the diagnostic contract.", "manager_static"),)
     checks: list[DiagnosticCheck] = []
     for operation in probe.candidate.bundle.runtime_operations:
-        if operation.stage not in {"migrations_pre", "runtime_reconcile"} or operation.operation_ref == "existing::runtime.plugin_cache_refresh":
+        if operation.stage not in {"migrations_pre", "runtime_reconcile"} or operation.operation_ref in _ADVISORY_OPERATION_REFS:
             continue
         check_id = f"migration:{operation.operation_id}"
         source = f"existing_probe:{operation.operation_ref}"

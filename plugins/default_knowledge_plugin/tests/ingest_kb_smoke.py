@@ -45,6 +45,8 @@ def _check(condition: object, label: str) -> None:
 
 
 _SVC: Any = object()  # opaque service stand-in; the faked leaves ignore it
+_BUDGET: Any = object()  # the provider budget ingest must thread to every install (iss_9166af93)
+_BUDGETS_SEEN: list[Any] = []
 
 
 def _install_fakes(current: set[str], fail: set[str], chunks: int = 3) -> None:
@@ -56,8 +58,10 @@ def _install_fakes(current: set[str], fail: set[str], chunks: int = 3) -> None:
 
     def fake_install(
         name: str, source: Any, kb_root: Any, state: Any, memory: Any, ab: Any,
+        *, budget: Any,
     ) -> dict[str, Any]:
         del source, kb_root, state, memory, ab
+        _BUDGETS_SEEN.append(budget)
         if name in fail:
             raise RuntimeError(f"index failure: {name}")
         return {"status": "success", "name": name, "chunk_count": chunks}
@@ -67,7 +71,7 @@ def _install_fakes(current: set[str], fail: set[str], chunks: int = 3) -> None:
 
 
 def _ingest(name: str, kb_root: Path) -> dict[str, Any]:
-    return kb.ingest_kb(name, kb_root, _SVC, _SVC, _SVC)
+    return kb.ingest_kb(name, kb_root, _SVC, _SVC, _SVC, budget=_BUDGET)
 
 
 def _make_kb_root(names: list[str]) -> tempfile.TemporaryDirectory[str]:
@@ -158,6 +162,7 @@ def main() -> int:
     test_all_mixed()
     test_all_partial_on_failure()
     test_all_empty_root()
+    _check(bool(_BUDGETS_SEEN) and all(seen is _BUDGET for seen in _BUDGETS_SEEN), "every install receives the provider budget ingest was given (iss_9166af93)")
     print(f"\nPASSED: {_passed}\nFAILED: {len(_failed)}")
     if _failed:
         for label in _failed:

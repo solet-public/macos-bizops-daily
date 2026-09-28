@@ -7,9 +7,9 @@ from typing import Any
 
 from ananta.core.domain.types import ActionResult
 from ananta.core.plugins.plugin_base import PluginBase
-from ananta.interfaces.embedding_service_interface import EmbeddingServiceInterface
+from ananta.interfaces.embedding_service_interface import EmbeddingServiceInterface, TokenBudget
 
-from .contracts import DIMENSION, MODEL_ID, EmbeddingError, ErrorCode, failure, result
+from .contracts import BUCKETS, DIMENSION, MODEL_ID, EmbeddingError, ErrorCode, failure, result
 from .runtime import EmbeddingRuntime
 from .tokenization import validate_inputs
 
@@ -108,6 +108,16 @@ class CoreAIEmbeddingsPlugin(PluginBase, EmbeddingServiceInterface):
                 self._unavailable(error)
                 return failure(error)
 
+    def input_token_budget(self) -> TokenBudget:
+        """The model's largest bucket is the hard ceiling; inputs over it are refused, never truncated."""
+        return TokenBudget(BUCKETS[-1], self._count_tokens)
+
+    def _count_tokens(self, text: str) -> int:
+        with self._lock:
+            if not self.is_ready() or self._runtime is None:
+                raise self._last_error
+            return self._runtime.count_tokens(text)
+
     def get_default_dimensions(self) -> int:
         """Static schema-init metadata does not assert runtime availability."""
         return DIMENSION
@@ -119,7 +129,7 @@ class CoreAIEmbeddingsPlugin(PluginBase, EmbeddingServiceInterface):
 
     def list_models(self) -> ActionResult:
         return result({"models": [{
-            "name": MODEL_ID, "dimension": DIMENSION, "max_input_length": 2048,
+            "name": MODEL_ID, "dimension": DIMENSION, "max_input_length": BUCKETS[-1],
             "input_types": ["text"], "description": "Pinned Nomic v1.5, normalized vectors",
             "available": self.is_ready(),
         }]})

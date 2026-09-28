@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openai_embeddings_plugin"
+version = "0.1.0"
+description = "OpenAI-compatible embedding service plugin for Ananta (works with LM Studio, Ollama, OpenAI API)"
+license = "Apache-2.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "ananta",
+    "httpx>=0.24",
+    "pydantic>=2.0",
+]
+authors = [
+    {name = "Ananta Development Team", email = "dev@ananta.ai"},
+]
+
+[project.entry-points."ananta.plugins"]
+openai_embeddings_plugin = "openai_embeddings_plugin.plugin:OpenAIEmbeddingsPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["openai_embeddings_plugin*"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "TCH"]

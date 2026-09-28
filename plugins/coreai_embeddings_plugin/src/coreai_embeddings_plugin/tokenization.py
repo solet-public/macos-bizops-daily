@@ -29,6 +29,10 @@ class NomicTokenizer:
             raise EmbeddingError(ErrorCode.ASSET_CORRUPT, "Tokenizer has no [PAD] token")
         self._pad_id = pad_id
 
+    def count(self, text: str) -> int:
+        """Tokens including special tokens: the number ``encode`` compares to the ceiling."""
+        return len(self._tokenizer.encode(text, add_special_tokens=True).ids)
+
     def encode(self, text: str) -> EncodedInput:
         """Include special tokens in the ceiling; preserve caller prefixes."""
         encoded = self._tokenizer.encode(text, add_special_tokens=True)

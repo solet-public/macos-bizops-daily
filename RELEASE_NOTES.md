@@ -2,6 +2,67 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-28 — r52: existing LM Studio solets update to the Apple-native stack
+
+**Solet Manager manager-v0.1.0-r52.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows only after an existing-solet update round on macOS 27 and one on
+macOS 26 (Tahoe) both reach their end state on this build.
+
+Changes since r51 (source `396702a4d`):
+
+- `solet-manager update` migrates a pre-r46 solet off LM Studio through the
+  new `existing::migration.plugin_transition` operation. On macOS 27,
+  embeddings move to `coreai_embeddings_plugin`, and on macos-bizops summaries
+  also move to `macos_inference_plugin` (Samantha keeps its LM Studio
+  summaries). The replacement is proven ready (the pinned Core AI asset
+  acquired, one real 768-dimension normalized embedding, Apple FM importable)
+  before any binding moves. Existing vectors are kept.
+- LM Studio and its models are left exactly as they were: no update, rollback,
+  repair or doctor path uninstalls LM Studio or deletes, moves or changes a
+  model. The solet simply stops using them for the services that moved.
+- On macOS 26 (Tahoe) the update applies and both services stay on LM Studio;
+  the doctor says why. Each switch is gated per capability by the release
+  flow's `host_profiles` (`apple_embeddings` and `apple_fm`, both macOS 27 in
+  r52), so no macOS 27-only package is installed there. A Mac that later
+  reaches macOS 27 switches with the next release's update; an update at the
+  release it already runs changes nothing.
+- The seeds ship `openai_embeddings_plugin` (and, on macos-bizops,
+  `default_inference_plugin`) as transition-retained code, so an LM Studio
+  solet keeps working embeddings and summaries at every step. They are never
+  on a fresh roster or installed on a fresh solet.
+- A replacement that is not ready, or whose readiness proof would outrun the
+  update step's time budget, defers instead of failing. The old binding
+  stays active, and the update promotes to `needs_attention` with
+  `plugin_transition_pending`. The next `solet-manager update` retries at the
+  same release. An edited predecessor config is refused
+  (`plugin_transition_conflict`), never overwritten. Extra plugins, old
+  config files and `profile/data` are preserved.
+- The final doctor gains the advisory `plugin_transitions` row.
+- Fix: a `verify`-mode update at the already-verified release now clears
+  `needs_attention` when the final doctor passes; it used to leave the row
+  stuck.
+- Fix (iss_9166af93): embedding inputs are sized to the provider's declared
+  token budget. Core AI refuses inputs over 2048 tokens, and about 10% of
+  4-8K-character ledger messages exceeded that inside the old 8192-character
+  window. Worse, the ledger drain halts at such an event, which stranded
+  every event after it. Ledger chunking and knowledge-base indexing now split
+  to the budget. The embedding service refuses, loudly and counted, any input
+  still over it. The first ledger drain under the new policy re-embeds every
+  event whose stored chunks differ from the new policy's, which covers every
+  event LM Studio embedded head-only. This applies once embeddings run on
+  Core AI; a solet still on LM Studio keeps its character windows.
+- Fix: the bootstrap closure repair installs the vendored `apple-fm-sdk`
+  wheel with genesis's `--find-links` rule.
+
+Known limits:
+
+- If an update is interrupted during the switch and the retry reports a
+  missing backup, run the `solet-manager reconcile` command it prints; your
+  solet keeps working embeddings and LM Studio is untouched meanwhile
+  (iss_a6704735).
+
 ## 2026-09-28 — r51: existing solets can update again
 
 **Solet Manager manager-v0.1.0-r51.** This is a full seed build for

@@ -1,0 +1,50 @@
+{
+  "schema": "solet.plugin_transitions.v1",
+  "transitions": [
+    {
+      "migration_id": "embedding_service.openai_to_coreai.v1",
+      "kind": "replace",
+      "service_label": "embeddings",
+      "replacement_label": "Core AI",
+      "done_note": "Existing vectors are kept.",
+      "profiles": ["macos-bizops", "macos-free-solet", "macos-samantha-solet"],
+      "service": "embedding_service",
+      "from": {
+        "plugin": "openai_embeddings_plugin",
+        "config_match": "exact",
+        "config": {
+          "base_url": "http://localhost:1234/v1",
+          "model": "text-embedding-nomic-embed-text-v1.5-embedding",
+          "timeout_seconds": 120
+        }
+      },
+      "to": {
+        "plugin": "coreai_embeddings_plugin",
+        "config_renderer": "coreai_embeddings",
+        "readiness": "coreai_embedding",
+        "requires_host": "apple_embeddings"
+      }
+    },
+    {
+      "migration_id": "inference_service.lmstudio_to_apple.v1",
+      "kind": "replace",
+      "service_label": "summaries",
+      "replacement_label": "Apple Foundation Models",
+      "profiles": ["macos-bizops"],
+      "service": "inference_service",
+      "from": {
+        "plugin": "default_inference_plugin",
+        "config_match": "fields",
+        "config": {
+          "base_url": "http://localhost:1234/v1"
+        }
+      },
+      "to": {
+        "plugin": "macos_inference_plugin",
+        "config_renderer": "apple_inference",
+        "readiness": "import",
+        "requires_host": "apple_fm"
+      }
+    }
+  ]
+}

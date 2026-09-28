@@ -27,6 +27,9 @@ _INFERENCE_SOURCE = Path(
 )
 _INFERENCE_SOURCE_SHA256 = "507745a254cb526a0a6bd19b98b47bc38049086772cee6c0dde7fbd619828d68"
 _MODEL_ID = "nomic-ai/nomic-embed-text-v1.5"
+#: Public names for the plugin transition handler, which provisions the same asset.
+COREAI_ASSET_ROOT = _ASSET_ROOT
+COREAI_ASSET_MANIFEST = _ASSET_MANIFEST
 _VERSION = re.compile(r"^(\d+)(?:\.\d+){0,2}$")
 
 
@@ -39,7 +42,7 @@ def host_eligible(request: AdapterRequest, runtime: Runtime) -> JsonObject:
         not version.ok
         or version.stdout_truncated
         or _VERSION.fullmatch(version_text) is None
-        or int(version_text.split(".", 1)[0]) != 27
+        or int(version_text.split(".", 1)[0]) < 27
         or not machine.ok
         or machine.stdout_truncated
         or machine.stdout.strip() != "arm64"
@@ -47,9 +50,9 @@ def host_eligible(request: AdapterRequest, runtime: Runtime) -> JsonObject:
         return _blocked(
             request,
             "apple_host_ineligible",
-            "Use macOS 27 on Apple Silicon, then re-preview the Apple-native choice.",
+            "Use macOS 27 or later on Apple Silicon, then re-preview the Apple-native choice.",
         )
-    return _verified(request, "apple_host", "macOS 27 Apple Silicon host observed", version_text)
+    return _verified(request, "apple_host", "macOS 27 or later Apple Silicon host observed", version_text)
 
 
 def _sha256(path: Path) -> str:
@@ -214,7 +217,7 @@ def _acquire(request: AdapterRequest, opener: UrlOpener | None) -> JsonObject:
     return result(request, status="applied", retry_safe=True)
 
 
-def _coreai_config(target: Path) -> str:
+def coreai_config_text(target: Path) -> str:
     value = {
         "asset_root": str(target / _ASSET_ROOT),
         "compute_preference": "gpu",
@@ -222,7 +225,7 @@ def _coreai_config(target: Path) -> str:
     return json.dumps(value, indent=2, sort_keys=True) + "\n"
 
 
-def _inference_config(target: Path) -> str | None:
+def apple_inference_config_text(target: Path) -> str | None:
     source = target / _INFERENCE_SOURCE
     if source.is_symlink() or not source.is_file():
         return None
@@ -275,7 +278,7 @@ def _config_result(request: AdapterRequest, runtime: Runtime, path: Path, desire
 def configure_coreai_embeddings(request: AdapterRequest, runtime: Runtime) -> JsonObject:
     if _pinned_asset_error(request.target) is not None:
         return asset_verified(request, runtime)
-    return _config_result(request, runtime, request.target / _COREAI_CONFIG, _coreai_config(request.target))
+    return _config_result(request, runtime, request.target / _COREAI_CONFIG, coreai_config_text(request.target))
 
 
 def embedding_config_valid(request: AdapterRequest, runtime: Runtime) -> JsonObject:
@@ -284,18 +287,18 @@ def embedding_config_valid(request: AdapterRequest, runtime: Runtime) -> JsonObj
     path = request.target / _COREAI_CONFIG
     if not path.is_file() or path.is_symlink():
         return _blocked(request, "coreai_config_missing", "Materialize the reviewed absolute Core AI asset_root config, then retry.")
-    return _config_result(request, runtime, path, _coreai_config(request.target))
+    return _config_result(request, runtime, path, coreai_config_text(request.target))
 
 
 def configure_apple_inference(request: AdapterRequest, runtime: Runtime) -> JsonObject:
-    desired = _inference_config(request.target)
+    desired = apple_inference_config_text(request.target)
     if desired is None:
         return _blocked(request, "apple_inference_source_missing", "Install the reviewed macos_inference_plugin source and config resource, then retry.")
     return _config_result(request, runtime, request.target / _INFERENCE_CONFIG, desired)
 
 
 def inference_config_valid(request: AdapterRequest, runtime: Runtime) -> JsonObject:
-    desired = _inference_config(request.target)
+    desired = apple_inference_config_text(request.target)
     path = request.target / _INFERENCE_CONFIG
     if desired is None or not path.is_file() or path.is_symlink():
         return _blocked(request, "apple_inference_config_missing", "Materialize the complete pinned Apple inference config, then retry.")

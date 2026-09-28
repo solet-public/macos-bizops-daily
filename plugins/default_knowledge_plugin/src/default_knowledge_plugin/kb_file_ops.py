@@ -10,7 +10,7 @@ import hashlib
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .chunking import split_title_metadata_body
 from .constants import (
@@ -30,6 +30,9 @@ from .kb_indexing import (
 )
 from .kb_lifecycle import get_install_record
 from .models import Manifest
+
+if TYPE_CHECKING:
+    from ananta.interfaces.embedding_service_interface import TokenBudget
 
 _SNAPSHOT_STAMP_FORMAT = "%Y-%m-%dT%H-%M-%S-%fZ"
 
@@ -199,6 +202,8 @@ def reindex_file(
     relative_path: str,
     state_service: Any,
     memory_service: Any,
+    *,
+    budget: TokenBudget | None,
 ) -> None:
     """Hard-delete old chunks for a file, re-chunk, remember new chunks, update record.
 
@@ -241,7 +246,7 @@ def reindex_file(
     file_path = kb_dir / relative_path
     new_ids: list[str] = []
     if file_path.exists():
-        new_ids, _ = index_files(kb_dir, name, manifest, memory_service, [file_path])
+        new_ids, _ = index_files(kb_dir, name, manifest, memory_service, [file_path], budget=budget)
 
     all_ids = remaining_ids + new_ids
     with state_service.transactional() as txn:
@@ -325,6 +330,8 @@ def edit_file_kb(
     name: str, path: str, content: str,
     state_service: Any, memory_service: Any,
     expected_content_hash: str | None = None,
+    *,
+    budget: TokenBudget | None,
 ) -> dict[str, Any]:
     """Overwrite an existing file, re-chunk, git commit if applicable.
 
@@ -372,7 +379,7 @@ def edit_file_kb(
     if record.get("source_type") == "git":
         git_commit_file(kb_dir, path, f"kb: edit {path}")
 
-    reindex_file(record, kb_dir, path, state_service, memory_service)
+    reindex_file(record, kb_dir, path, state_service, memory_service, budget=budget)
 
     return {"status": "success", "name": name, "path": path, "action": "edited"}
 
@@ -380,6 +387,8 @@ def edit_file_kb(
 def create_file_kb(
     name: str, path: str, content: str,
     state_service: Any, memory_service: Any,
+    *,
+    budget: TokenBudget | None,
 ) -> dict[str, Any]:
     """Create a new file in a knowledge base, chunk and index it."""
     record = get_install_record(name, state_service)
@@ -406,7 +415,7 @@ def create_file_kb(
     if record.get("source_type") == "git":
         git_commit_file(kb_dir, path, f"kb: create {path}")
 
-    reindex_file(record, kb_dir, path, state_service, memory_service)
+    reindex_file(record, kb_dir, path, state_service, memory_service, budget=budget)
 
     return {"status": "success", "name": name, "path": path, "action": "created"}
 
@@ -414,6 +423,8 @@ def create_file_kb(
 def delete_file_kb(
     name: str, path: str,
     state_service: Any, memory_service: Any,
+    *,
+    budget: TokenBudget | None,
 ) -> dict[str, Any]:
     """Delete a file from a knowledge base and hard-delete its chunks."""
     record = get_install_record(name, state_service)
@@ -446,7 +457,7 @@ def delete_file_kb(
     else:
         target.unlink()
 
-    reindex_file(record, kb_dir, path, state_service, memory_service)
+    reindex_file(record, kb_dir, path, state_service, memory_service, budget=budget)
 
     return {"status": "success", "name": name, "path": path, "action": "deleted"}
 
@@ -454,6 +465,8 @@ def delete_file_kb(
 def archive_file_kb(
     name: str, path: str, superseded_by: str | None,
     state_service: Any, memory_service: Any,
+    *,
+    budget: TokenBudget | None,
 ) -> dict[str, Any]:
     """Retire a workbench doc: move it under ``archive_subdir``, stamp the §4
     block, and re-key its index chunk so it stays discoverable and readable.
@@ -514,11 +527,11 @@ def archive_file_kb(
     dest.write_text(archived, encoding="utf-8")
     source.unlink()
 
-    reindex_file(record, kb_dir, path, state_service, memory_service)
+    reindex_file(record, kb_dir, path, state_service, memory_service, budget=budget)
     fresh = get_install_record(name, state_service)
     if fresh is None:
         raise RuntimeError(f"Knowledge base '{name}' install record vanished mid-archive")
-    reindex_file(fresh, kb_dir, new_relative, state_service, memory_service)
+    reindex_file(fresh, kb_dir, new_relative, state_service, memory_service, budget=budget)
 
     return {
         "status": "success",

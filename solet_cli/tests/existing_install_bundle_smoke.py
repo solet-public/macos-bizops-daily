@@ -117,12 +117,12 @@ _SEED_DENYLIST = (
     "StateManagementInterface",
     "psql",
 )
-_CHECKS = 0
+_checks = 0
 
 
 def _check(condition: object, label: str) -> None:
-    global _CHECKS
-    _CHECKS += 1
+    global _checks
+    _checks += 1
     if not condition:
         raise AssertionError(label)
 
@@ -179,6 +179,7 @@ def _check_shipped_bundle() -> None:
     )
     public_r43 = bundle.predecessor_for(_PUBLIC_R43_COMMIT, _PUBLIC_R43_TREE)
     _check(public_r43 is not None, "published public r43 predecessor is supported")
+    assert public_r43 is not None
     _check(asdict(public_r43) == _PUBLIC_R43_PREDECESSOR, "public r43 descriptor matches published artefacts")
     _check(all(not artifact.in_target for artifact in bundle.managed_artifacts), "the current release declares no in-target artifact (section 6.3)")
     _check({item.artifact_id for item in bundle.managed_artifacts} == {"instance_launchagent_plist", "shell_startup_block", "user_claude_md_section"}, "shipped artifacts")
@@ -271,11 +272,11 @@ def _check_enumerations() -> None:
     _check(set(seed_ops.operation_handlers()) | {"existing::dependencies.reconcile"} == set(SEED_SIDE_OPERATION_REFS), "every seed-side ref has a handler or the bootstrap route")
     _check(set(seed_ops.EXISTING_ALLOWED_PUBLIC_INPUTS) == set(seed_ops.operation_handlers()), "every seed handler declares its allowed public inputs")
     _check(bootstrap_dependency.EXISTING_DEPENDENCIES_REF == "existing::dependencies.reconcile", "bootstrap route name")
-    _check(len({item.operation_ref for item in EXISTING_OPERATIONS}) == len(EXISTING_OPERATIONS) == 12, "twelve unique closed members")
-    _check(set(DECLARABLE_OPERATION_REFS) == {"existing::dependencies.reconcile", "existing::migration.solet_rename", "existing::migration.export_root_containment", "existing::hydration.reconcile", "existing::autostart.reconcile", "existing::runtime.platform_migration", "existing::runtime.plugin_cache_refresh"}, "declarable subset")
+    _check(len({item.operation_ref for item in EXISTING_OPERATIONS}) == len(EXISTING_OPERATIONS) == 13, "thirteen unique closed members")
+    _check(set(DECLARABLE_OPERATION_REFS) == {"existing::dependencies.reconcile", "existing::migration.solet_rename", "existing::migration.export_root_containment", "existing::migration.plugin_transition", "existing::hydration.reconcile", "existing::autostart.reconcile", "existing::runtime.platform_migration", "existing::runtime.plugin_cache_refresh"}, "declarable subset")
     _check(REQUIRED_DISTRIBUTIONS == bootstrap_dependency.REQUIRED_DISTRIBUTIONS, "Manager REQUIRED_DISTRIBUTIONS equals the bootstrap adapter's")
-    _check(len(STEP5_NON_TOUCH_SURFACES) == 13 and len(STEP5_MANAGED_SUB_SURFACES) == 10 and len(STEP5_CAPABILITIES) == 10, "closed Step-5 surface constants")
-    _check("dependencies_and_venv" in STEP5_MANAGED_SUB_SURFACES and "dependencies_and_venv" not in STEP5_NON_TOUCH_SURFACES, "the venv moved from non-touch to managed")
+    _check(len(STEP5_NON_TOUCH_SURFACES) == 13 and len(STEP5_MANAGED_SUB_SURFACES) == 11 and len(STEP5_CAPABILITIES) == 11, "closed Step-5 surface constants")
+    _check("dependencies_and_venv" in STEP5_MANAGED_SUB_SURFACES and "dependencies_and_venv" not in set[str](STEP5_NON_TOUCH_SURFACES), "the venv moved from non-touch to managed")
     _check(len(STEP5_REASON_CODES) == len(set(STEP5_REASON_CODES)) and "in_target_destination_not_ignored" in STEP5_REASON_CODES, "closed reason codes")
 
 
@@ -320,16 +321,27 @@ def _check_static_reachability() -> None:
     _check_seed_imports()
 
 
+#: The dispatch table module and every handler module it imports (the plugin transition added two, iss_6d26db73).
+_SEED_HANDLER_MODULES = (
+    "existing_install_operations",
+    "existing_install_migrations",
+    "existing_install_plugin_transitions",
+    "plugin_transition_declaration",
+    "apple_setup_adapter",
+)
+
+
 def _check_seed_imports() -> None:
-    seed_source = (_ROOT / "plugins" / "github_midwife_plugin" / "src" / "github_midwife_plugin" / "existing_install_operations.py").read_text(encoding="utf-8")
-    imported: set[str] = set()
-    for node in ast.walk(ast.parse(seed_source)):
-        if isinstance(node, ast.ImportFrom | ast.Import):
-            imported.update(_import_names(node))
-    for forbidden in _SEED_DENYLIST:
-        hits = [name for name in imported if forbidden in name]
-        _check(not hits, f"seed handler module imports denylisted {forbidden!r}: {hits}")
-    _check("psql" not in seed_source, "seed handler module never names psql")
+    for module_name in _SEED_HANDLER_MODULES:
+        seed_source = (_ROOT / "plugins" / "github_midwife_plugin" / "src" / "github_midwife_plugin" / f"{module_name}.py").read_text(encoding="utf-8")
+        imported: set[str] = set()
+        for node in ast.walk(ast.parse(seed_source)):
+            if isinstance(node, ast.ImportFrom | ast.Import):
+                imported.update(_import_names(node))
+        for forbidden in _SEED_DENYLIST:
+            hits = [name for name in imported if forbidden in name]
+            _check(not hits, f"seed handler module {module_name} imports denylisted {forbidden!r}: {hits}")
+        _check("psql" not in seed_source, f"seed handler module {module_name} never names psql")
 
 
 def _manager_request(flow_id: str, ref: str, purpose: str | None = "preview") -> OperationRequest:
@@ -397,7 +409,7 @@ def main() -> int:
     _check_enumerations()
     _check_static_reachability()
     _check_three_validators()
-    print(f"existing_install_bundle_smoke OK: {_CHECKS} checks passed")
+    print(f"existing_install_bundle_smoke OK: {_checks} checks passed")
     return 0
 
 

@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "display_name": "Generate Embeddings",
+  "description": "Generate vector embeddings from text for semantic search and similarity matching.",
+  "embedding_description": "Generate vector embeddings from text inputs using an OpenAI-compatible API. Provide a list of strings plus optional model and input_type. Returns embeddings array and dimension for semantic search, similarity, clustering, or retrieval indexing.",
+  "result_processor_customizations": {
+    "action_label": "Embeddings generated",
+    "result_type": "embeddings_generated",
+    "result_description": "Vector embeddings with keys: embeddings (list of float arrays), dimension (int), model (string)",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Generates vector embeddings from text using OpenAI-compatible API",
+    "error_interpretation": "ConnectionError: API endpoint not reachable. ValidationError: Invalid input format or empty inputs. APIError: Backend service returned an error.",
+    "recovery_guidance": "For connection errors: verify the embedding service is running. For validation errors: check input format is a list of strings."
+  }
+}

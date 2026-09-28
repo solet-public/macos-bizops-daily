@@ -79,6 +79,21 @@
       "requires_confirmation": true
     },
     {
+      "operation_id": "migration_plugin_transition",
+      "operation_ref": "existing::migration.plugin_transition",
+      "runner": "target_adapter",
+      "stage": "migrations_pre",
+      "mutation_class": "filesystem_managed_artifact",
+      "rollback_class": "backup_required",
+      "retry_policy": "retry_safe",
+      "idempotency_key": "sha256(candidate_commit, operation_id, instance_id)",
+      "applies_when": "any",
+      "precondition_probe_refs": ["plugin_transition_state"],
+      "postcondition_probe_refs": ["plugin_transition_state"],
+      "public_inputs": [],
+      "requires_confirmation": true
+    },
+    {
       "operation_id": "hydration_reconcile",
       "operation_ref": "existing::hydration.reconcile",
       "runner": "target_adapter",
@@ -171,8 +186,15 @@
       ]
     }
   ],
+  "host_profiles": {
+    "apple_embeddings": {"macos_major_min": 27, "machine": "arm64"},
+    "apple_fm": {"macos_major_min": 27, "machine": "arm64"}
+  },
   "dependency_closure": {
-    "additions": [],
+    "additions": [
+      {"distribution": "coreai_embeddings_plugin", "relative_path": "plugins/coreai_embeddings_plugin", "requires_host": "apple_embeddings"},
+      {"distribution": "macos_inference_plugin", "relative_path": "plugins/macos_inference_plugin", "requires_host": "apple_fm"}
+    ],
     "removals": []
   },
   "knowledge_removals": [],

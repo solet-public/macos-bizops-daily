@@ -301,6 +301,41 @@ thing, sometimes wanting the whole set — narrow the request itself (ask for
 specific fields, or a bounded range) rather than forcing one shape as a
 blanket rule.
 
+## What changed in this release — your solet stops needing LM Studio (r52)
+
+If your solet was set up before r46, it still uses LM Studio for embeddings
+(and, on macos-bizops, for summaries). On a Mac running macOS 27, this
+update moves it to Apple's on-device models:
+
+- **Embeddings move to Core AI.** Your existing memories and search results
+  are kept. Only very long past messages are re-indexed, once, in the
+  background, so they can be searched in full.
+- **Summaries move to Apple Foundation Models** on macos-bizops.
+- **LM Studio and its models are left exactly as they were.** The update
+  never uninstalls LM Studio and never deletes, moves or changes a model;
+  your solet simply stops using them for what moved.
+
+**On a Mac running macOS 26 (Tahoe), nothing moves.** The update still
+brings everything else in this release, and your solet keeps using LM
+Studio for both embeddings and summaries. Keep LM Studio installed and
+running. `solet-manager doctor` says so in plain words. Once the Mac is on
+macOS 27, the switch comes with the next release's update; updating again at
+the release your solet already runs changes nothing.
+
+(On the Samantha profile, summaries keep using LM Studio on any macOS, so
+keep LM Studio installed and running there too.)
+
+The update downloads the Core AI model files and checks them before
+switching anything. If that check cannot finish (for example, the download
+fails or the update runs out of time), nothing changes. Your solet keeps
+working exactly as before, the update finishes with a "needs attention"
+note, and running `solet-manager update <name>` again later completes the
+move.
+
+If you edited your LM Studio embedding settings by hand, the update will not
+overwrite them. It leaves that part as it is and says so; ask your agent to
+walk you through the choice.
+
 ## What changed in this release — you can now run a small fleet of sessions from this solet (2026-08-10 update)
 
 If you already start extra agent sessions from this solet (or want to

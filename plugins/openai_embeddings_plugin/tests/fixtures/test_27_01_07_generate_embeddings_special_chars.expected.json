@@ -1,0 +1,15 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "action_status",
+    "completed",
+    "embeddings",
+    "dimension"
+  ],
+  "output_not_contains": [
+    "ERROR",
+    "exception",
+    "failed"
+  ],
+  "timeout_seconds": 90
+}

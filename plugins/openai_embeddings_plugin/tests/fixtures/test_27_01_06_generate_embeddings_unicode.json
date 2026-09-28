@@ -1,0 +1,16 @@
+{
+  "name": "test_generate_embeddings_unicode",
+  "description": "Generate embeddings for text with unicode characters and multiple languages",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": [
+      "Hello World",
+      "Bonjour le monde",
+      "Hola Mundo",
+      "Hallo Welt",
+      "Ciao Mondo"
+    ],
+    "input_type": "text"
+  },
+  "timeout_seconds": 90
+}

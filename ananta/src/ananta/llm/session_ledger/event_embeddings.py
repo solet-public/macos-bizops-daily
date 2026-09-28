@@ -31,14 +31,16 @@ thinking, so they stay embeddable.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ananta.llm.session_ledger.schema import EVENT_VECTOR_NAMESPACE
 from ananta.llm.session_ledger.search import project_event_window_row
 from ananta.llm.session_ledger.types import EventType, MessageRole
+from ananta.services.embedding_service.input_budget import split_to_fit
 
 if TYPE_CHECKING:
-    from ananta.interfaces.embedding_service_interface import EmbeddingServiceInterface
+    from ananta.interfaces.embedding_service_interface import EmbeddingServiceInterface, TokenBudget
     from ananta.interfaces.vector_service_interface import VectorServiceInterface
     from ananta.llm.session_ledger.repository import SessionLedgerRepository
 
@@ -126,16 +128,29 @@ def is_embeddable_event(row: dict[str, Any]) -> bool:
     return _content_json_subtype(row.get("content_json")) not in EXCLUDED_MESSAGE_SUBTYPES
 
 
-def chunk_event_content(text: str) -> list[str]:
+def chunk_event_content(text: str, budget: TokenBudget | None = None) -> list[str]:
     """Split ``content_text`` into embedding-sized chunks.
 
-    Whole text when it fits one window; otherwise fixed windows advancing by
+    With a provider ``budget`` (iss_9166af93) every chunk fits BOTH the
+    ``EVENT_CHUNK_MAX_CHARS`` window and the provider's token ceiling, cut at
+    natural boundaries with ``EVENT_CHUNK_OVERLAP_CHARS`` of overlap: Core AI
+    refuses any input over 2048 tokens, and ~10% of 4-8K-char messages exceed
+    that inside one 8192-char window.  Without a budget (a provider that
+    declares none) the fixed character windows below apply unchanged.
+
+    Whole text when it fits one window; otherwise windows advancing by
     ``window - overlap`` so consecutive chunks share
     ``EVENT_CHUNK_OVERLAP_CHARS``. The final window ends exactly at the text
     end (no pure-overlap tail chunk is emitted). The per-event chunk BOUND is
     applied by :meth:`EventEmbeddingWriter.embed_event`, which has the event
     context to log a truncation loudly; this function is pure.
     """
+    if budget is not None:
+        return split_to_fit(
+            text,
+            lambda window: len(window) <= EVENT_CHUNK_MAX_CHARS and budget.fits(window),
+            overlap_chars=EVENT_CHUNK_OVERLAP_CHARS,
+        )
     if len(text) <= EVENT_CHUNK_MAX_CHARS:
         return [text]
     chunks: list[str] = []
@@ -147,6 +162,81 @@ def chunk_event_content(text: str) -> list[str]:
             break
         start = end - EVENT_CHUNK_OVERLAP_CHARS
     return chunks
+
+
+def chunk_policy(budget: TokenBudget | None) -> str:
+    """The chunking policy identity: which window every stored chunk was cut to (iss_9166af93).
+
+    The first drain under a new policy (a provider with a different budget,
+    e.g. LM Studio -> Core AI) is a full reconciliation sweep -- the backfill
+    for every event the old policy failed to embed or embedded truncated
+    (:func:`policy_backfill_chunks`).  The policy is recorded only after a
+    sweep that did not halt, so an interrupted backfill repeats.
+    """
+    if budget is None:
+        return f"chars:{EVENT_CHUNK_MAX_CHARS}"
+    return f"tokens:{budget.max_input_tokens}+chars:{EVENT_CHUNK_MAX_CHARS}"
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyBackfill:
+    """One chunking-policy backfill sweep: the new budget and the policy the stored vectors were cut to.
+
+    ``previous`` is the recorded policy, ``None`` for a ledger embedded before
+    policies were recorded -- which only ever cut fixed character windows.
+    """
+
+    budget: TokenBudget | None
+    previous: str | None
+
+
+def policy_backfill_chunks(text: str, backfill: PolicyBackfill) -> int | None:
+    """How many old-policy chunks ``text`` must replace, or ``None`` when its stored vectors already match.
+
+    An event is re-embedded when its stored chunks differ from what the new
+    policy cuts -- compared as text, both capped at ``EVENT_MAX_CHUNKS`` --
+    not when one chunk id happens to be absent: an over-budget old chunk can
+    share its id with a fitting new one, and at the cap the counts coincide
+    (iss_50df7f10).  Core AI refused such chunks, and LM Studio silently
+    embedded only their first 2048 tokens (iss_a6fffbb6).  A previous policy
+    this code cannot reproduce counts every event as stale: the sweep then
+    re-embeds everything once rather than guess which vectors survived.
+    """
+    new = chunk_event_content(text, backfill.budget)[:EVENT_MAX_CHUNKS]
+    if backfill.previous not in (None, chunk_policy(None)):
+        return EVENT_MAX_CHUNKS
+    old = chunk_event_content(text, None)[:EVENT_MAX_CHUNKS]
+    return None if old == new else len(old)
+
+
+def _chunks_to_replace(row: dict[str, object], missing: bool, backfill: PolicyBackfill | None) -> int | None:
+    """Old chunk ids to clear when ``row`` must be (re-)embedded; ``None`` when it is embedded and current."""
+    stale = None if backfill is None else policy_backfill_chunks(str(row["content_text"]), backfill)
+    if stale is not None:
+        return stale
+    return 0 if missing else None
+
+
+def _policy_backfill_plan(repository: SessionLedgerRepository, budget: TokenBudget | None) -> tuple[str, PolicyBackfill | None]:
+    """``(policy, backfill)``; ``backfill`` is set only when the recorded policy differs (the sweep fire)."""
+    policy = chunk_policy(budget)
+    previous = repository.get_event_embed_chunk_policy()
+    return policy, None if previous == policy else PolicyBackfill(budget, previous)
+
+
+def _record_policy_backfill(repository: SessionLedgerRepository, policy: str, *, completed: bool) -> None:
+    """Record ``policy`` once its backfill sweep completed without halting; an interrupted one repeats."""
+    if completed:
+        repository.set_event_embed_chunk_policy(policy)
+
+
+def require_query_fits(query: str, budget: TokenBudget | None) -> None:
+    """Refuse, naming both counts, a search query the provider would refuse; never truncate it."""
+    if budget is not None and not budget.fits(query):
+        raise ValueError(
+            f"search_event_content query has {budget.count(query)} tokens; the embedding "
+            f"provider accepts at most {budget.max_input_tokens} -- shorten the query",
+        )
 
 
 def event_chunk_external_id(event_id: str, chunk_index: int) -> str:
@@ -242,7 +332,7 @@ class EventEmbeddingWriter:
     # Write — one event
     # ------------------------------------------------------------------
 
-    def embed_event(self, event_row: dict[str, Any]) -> dict[str, Any]:
+    def embed_event(self, event_row: dict[str, Any], *, replaces_chunks: int = 0) -> dict[str, Any]:
         """Chunk + embed + store one embeddable ``__event`` row.
 
         Idempotent under retry: events are append-only immutable, so the
@@ -250,6 +340,8 @@ class EventEmbeddingWriter:
         store clears any partial residue from a previous failed attempt
         without needing to know its extent. Chunk 0 is stored FIRST so the
         presence discriminator only exists once at least one chunk landed.
+        ``replaces_chunks`` (a chunking-policy backfill) also deletes the old
+        policy's chunk ids past the new count, so no stale tail survives.
         """
         self._require_services()
         event_id = str(event_row["id"])
@@ -260,23 +352,30 @@ class EventEmbeddingWriter:
                 f"excluded subtypes {sorted(EXCLUDED_MESSAGE_SUBTYPES)})",
             )
         content = str(event_row["content_text"])
-        chunks = chunk_event_content(content)
+        chunks = chunk_event_content(content, self._input_budget())
         truncated = len(chunks) > EVENT_MAX_CHUNKS
         if truncated:
+            # Coverage is reported in chunks and characters actually kept: under token
+            # windows a chunk's length varies, so no character constant describes it.
+            kept_chars = content.find(chunks[EVENT_MAX_CHUNKS - 1]) + len(chunks[EVENT_MAX_CHUNKS - 1])
             logger.warning(
-                "embed_event: event %s produced %d chunks; embedding first %d "
-                "(~%d chars) and dropping the tail",
+                "embed_event: event %s produced %d chunks; embedding the first %d "
+                "(%d of %d chars) and dropping the last %d",
                 event_id,
                 len(chunks),
                 EVENT_MAX_CHUNKS,
-                EVENT_MAX_CHUNKS * (EVENT_CHUNK_MAX_CHARS - EVENT_CHUNK_OVERLAP_CHARS),
+                kept_chars,
+                len(content),
+                len(chunks) - EVENT_MAX_CHUNKS,
             )
             chunks = chunks[:EVENT_MAX_CHUNKS]
         vectors = self._generate_embeddings(chunks)
         external_ids = [
             event_chunk_external_id(event_id, index) for index in range(len(chunks))
         ]
-        self._delete_existing_vectors(external_ids)
+        self._delete_existing_vectors(
+            [event_chunk_external_id(event_id, index) for index in range(max(len(chunks), replaces_chunks))],
+        )
         records = self._build_vector_records(
             event_row=event_row,
             event_id=event_id,
@@ -342,27 +441,31 @@ class EventEmbeddingWriter:
         *,
         batch_limit: int | None,
         tally: dict[str, int],
+        backfill: PolicyBackfill | None = None,
     ) -> None:
         """Embed the not-yet-embedded embeddable events of one candidate page.
 
         ``batch_limit=None`` embeds every missing event in the page with no cap
         — the drain path (:meth:`drain_missing_events`), which bounds work by
-        the durable cursor, not a per-call count.
+        the durable cursor, not a per-call count.  ``backfill`` is set on a
+        chunking-policy backfill sweep: an event whose stored chunks differ
+        from the new policy's is re-embedded too (see
+        :func:`policy_backfill_chunks`).
         """
         embeddable = [row for row in rows if is_embeddable_event(dict(row))]
         tally["events_skipped_filtered"] += len(rows) - len(embeddable)
         if not embeddable:
             return
-        missing = self._find_missing_external_ids(
-            [event_chunk_external_id(str(row["id"]), 0) for row in embeddable],
-        )
+        keys = {str(row["id"]): event_chunk_external_id(str(row["id"]), 0) for row in embeddable}
+        missing = self._find_missing_external_ids(list(keys.values()))
         for row in embeddable:
             if batch_limit is not None and tally["events_embedded"] >= batch_limit:
                 return
-            if event_chunk_external_id(str(row["id"]), 0) not in missing:
+            replaces = _chunks_to_replace(row, keys[str(row["id"])] in missing, backfill)
+            if replaces is None:
                 tally["events_skipped_existing"] += 1
                 continue
-            outcome = self.embed_event(dict(row))
+            outcome = self.embed_event(dict(row), replaces_chunks=replaces)
             tally["events_embedded"] += 1
             tally["chunks_stored"] += int(outcome["chunks_stored"])
             tally["events_truncated"] += 1 if outcome["truncated"] else 0
@@ -424,11 +527,13 @@ class EventEmbeddingWriter:
         # pre-assigned before the autocommit insert, so it is not
         # commit-visibility-monotonic) is still found and embedded. Incremental
         # fires stay O(new).
+        policy, backfill = _policy_backfill_plan(self._repository, self._input_budget())
+        policy_changed = backfill is not None
         reconcile = (
             self._repository.bump_event_embed_drain_counter()
             % _RECONCILE_EVERY_FIRES
             == 0
-        )
+        ) or policy_changed
         cursor_imported_at = (
             None if reconcile else self._repository.get_event_embed_cursor()
         )
@@ -454,7 +559,7 @@ class EventEmbeddingWriter:
                 break
             tally["candidates_scanned"] += len(rows)
             try:
-                self._embed_missing_in_page(rows, batch_limit=None, tally=tally)
+                self._embed_missing_in_page(rows, batch_limit=None, tally=tally, backfill=backfill)
             except Exception:
                 logger.exception(
                     "drain_missing_events: page embed failed at imported_at>%s "
@@ -469,7 +574,19 @@ class EventEmbeddingWriter:
             last_imported_at = str(rows[-1]["imported_at"])
             page_after = (last_imported_at, rows[-1]["id"])
             self._repository.set_event_embed_cursor(last_imported_at)
-        return {**tally, "halted_on_error": halted_on_error, "reconcile": reconcile}
+        _record_policy_backfill(self._repository, policy, completed=policy_changed and not halted_on_error)
+        return {
+            **tally,
+            "halted_on_error": halted_on_error,
+            "reconcile": reconcile,
+            "chunk_policy": policy,
+            "policy_backfill": policy_changed,
+        }
+
+    def _input_budget(self) -> TokenBudget | None:
+        if self._embedding_service is None:
+            raise EventEmbeddingServicesUnavailableError("event-content embedding requires embedding_service")
+        return self._embedding_service.input_token_budget()
 
     # ------------------------------------------------------------------
     # Read — semantic search over event content
@@ -487,6 +604,7 @@ class EventEmbeddingWriter:
         self._require_services()
         if limit < 1:
             raise ValueError("search_event_content limit must be >= 1")
+        require_query_fits(query, self._input_budget())
         query_vector = self._generate_embeddings([query])[0]
         ann_rows = self._vector_search(query_vector=query_vector, top_k=limit)
         hits = self._parse_ann_hits(ann_rows)
@@ -702,7 +820,9 @@ __all__ = [
     "EXCLUDED_MESSAGE_SUBTYPES",
     "EventEmbeddingServicesUnavailableError",
     "EventEmbeddingWriter",
+    "PolicyBackfill",
     "chunk_event_content",
     "event_chunk_external_id",
     "is_embeddable_event",
+    "policy_backfill_chunks",
 ]

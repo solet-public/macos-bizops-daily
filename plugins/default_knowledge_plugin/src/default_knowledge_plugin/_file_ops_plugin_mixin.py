@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from ananta.interfaces.embedding_service_interface import TokenBudget
+
 from .kb_file_ops import (
     archive_file_kb,
     browse_kb,
@@ -27,6 +30,8 @@ class KnowledgeFileOpsPluginMixin:
         _memory_service: Any
         _state_service: Any
 
+        def _embedding_budget(self) -> TokenBudget | None: ...
+
     def browse(self, name: str, path: str = "") -> dict[str, Any]:
         """List directory contents within a knowledge base."""
         return browse_kb(name, path, self._state_service)
@@ -44,6 +49,7 @@ class KnowledgeFileOpsPluginMixin:
             name, path, content,
             self._state_service, self._memory_service,
             expected_content_hash=expected_content_hash,
+            budget=self._embedding_budget(),
         )
 
     def create_file(self, name: str, path: str, content: str) -> dict[str, Any]:
@@ -51,6 +57,7 @@ class KnowledgeFileOpsPluginMixin:
         return create_file_kb(
             name, path, content,
             self._state_service, self._memory_service,
+            budget=self._embedding_budget(),
         )
 
     def delete_file(self, name: str, path: str) -> dict[str, Any]:
@@ -58,6 +65,7 @@ class KnowledgeFileOpsPluginMixin:
         return delete_file_kb(
             name, path,
             self._state_service, self._memory_service,
+            budget=self._embedding_budget(),
         )
 
     def archive_file(
@@ -67,4 +75,5 @@ class KnowledgeFileOpsPluginMixin:
         return archive_file_kb(
             name, path, superseded_by,
             self._state_service, self._memory_service,
+            budget=self._embedding_budget(),
         )

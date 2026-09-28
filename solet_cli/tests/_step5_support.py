@@ -22,7 +22,7 @@ import os
 import subprocess
 import sys
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -750,7 +750,7 @@ def _write_ignored(target: Path, roster: tuple[str, ...]) -> None:
     # Step 7 section 7.1: the doctor's ``instance_python``/``instance_bridge_cli`` rows read the venv marker and the exec bit.
     (target / ".venv" / "pyvenv.cfg").write_text("home = /fixture\nversion = 3.13.0\n")
     (target / ".venv" / "bin" / "solet-bridge").chmod(0o755)
-    (target / "profile" / "config").mkdir(parents=True)
+    (target / "profile" / "config").mkdir(parents=True, exist_ok=True)
     (target / "profile" / "config" / "manifest.yaml").write_text("plugins:\n" + "".join(f"- {plugin}\n" for plugin in roster), encoding="utf-8")
     assert git(target, "status", "--porcelain") == ""
 
@@ -772,7 +772,7 @@ def runtime_fingerprint(fixture: Fixture) -> str:
 
 
 @contextmanager
-def db_spy() -> Iterator[list[str]]:
+def db_spy() -> Generator[list[str]]:
     """Fail loud on any database access across the caller's whole run (design section 11)."""
     seen: list[str] = []
 

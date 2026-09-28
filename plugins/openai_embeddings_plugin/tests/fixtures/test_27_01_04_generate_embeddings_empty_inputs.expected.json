@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "action_status",
+    "error",
+    "openai_embeddings.empty_inputs",
+    "inputs cannot be empty"
+  ],
+  "output_not_contains": [
+    "completed"
+  ],
+  "timeout_seconds": 30
+}

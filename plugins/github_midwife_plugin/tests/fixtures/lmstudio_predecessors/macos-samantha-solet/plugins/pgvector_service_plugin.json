@@ -1,0 +1,5 @@
+{
+  "hnsw_ef_construction": 64,
+  "hnsw_m": 16,
+  "pool_size": 10
+}

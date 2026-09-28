@@ -74,6 +74,7 @@ from _stub_state_service import (  # noqa: E402
     StubStateService,
 )
 from ananta.core.domain.types import ActionResult  # noqa: E402
+from ananta.interfaces.embedding_service_interface import TokenBudget  # noqa: E402
 from ananta.llm.session_ledger.event_embeddings import (  # noqa: E402
     _RECONCILE_EVERY_FIRES,
     EVENT_CHUNK_MAX_CHARS,
@@ -131,6 +132,11 @@ class _StubEmbeddingService:
         # When set, any input containing this marker raises — the drain-halt pin
         # (a transient embedder failure on one page).
         self.raise_on_input: str | None = None
+        # The provider's declared budget; None = a provider that declares none (the char windows apply).
+        self.budget: TokenBudget | None = None
+
+    def input_token_budget(self) -> TokenBudget | None:
+        return self.budget
 
     def generate_embeddings(
         self,
@@ -749,6 +755,8 @@ def test_drain_periodic_reconcile_catches_below_cursor_straggler() -> None:
         vector_service=vec,  # type: ignore[arg-type]
     )
     repo.set_event_embed_cursor("2026-07-06T05:00:00")  # advanced past evt_seen
+    # Past its chunking-policy backfill, so only the counter decides reconciliation (iss_9166af93).
+    repo.set_event_embed_chunk_policy(f"chars:{EVENT_CHUNK_MAX_CHARS}")
 
     # (a) An INCREMENTAL fire (counter NOT at the reconcile boundary) never
     # re-reads the below-cursor straggler.

@@ -1,0 +1,10 @@
+{
+  "name": "test_generate_embeddings_single",
+  "description": "Generate embedding for a single text input",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": ["Hello world, this is a test sentence for embedding generation."],
+    "input_type": "text"
+  },
+  "timeout_seconds": 60
+}

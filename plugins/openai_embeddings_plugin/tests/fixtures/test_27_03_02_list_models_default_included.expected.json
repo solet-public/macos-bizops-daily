@@ -1,0 +1,16 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "action_status",
+    "completed",
+    "models",
+    "name",
+    "input_types",
+    "text"
+  ],
+  "output_not_contains": [
+    "ERROR",
+    "exception"
+  ],
+  "timeout_seconds": 60
+}

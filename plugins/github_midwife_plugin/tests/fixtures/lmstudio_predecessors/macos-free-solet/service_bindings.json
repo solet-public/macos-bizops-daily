@@ -1,0 +1,12 @@
+{
+  "state_service": "postgres_state_management_plugin",
+  "plugin_schema_service": "postgres_state_management_plugin",
+  "vault_service": "macos_vault_plugin",
+  "address_book_service": "default_address_book_plugin",
+  "memory_service": "actr_memory_plugin",
+  "vector_service": "pgvector_service_plugin",
+  "embedding_service": "openai_embeddings_plugin",
+  "blob_storage_service": "default_blob_storage_plugin",
+  "knowledge_service": "default_knowledge_plugin",
+  "thinking_service": "default_thinking_plugin"
+}

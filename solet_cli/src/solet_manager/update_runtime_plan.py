@@ -41,7 +41,8 @@ from .existing_install_adapters import (
     run_ps,
     run_security_metadata,
 )
-from .existing_install_bundle import STAGE_ORDER, ManagedArtifact, RuntimeOperation
+from .existing_install_bundle import STAGE_ORDER, DependencyPiece, ManagedArtifact, RuntimeOperation
+from .host_platform import HostPlatform, HostPlatformError, read_host_platform
 from .launch_topology import (
     SUPPORTED_TOPOLOGIES,
     derive_launch_topology,
@@ -91,6 +92,8 @@ REQUIRED_DISTRIBUTIONS: tuple[tuple[str, str], ...] = (
     ("github_midwife_plugin", "plugins/github_midwife_plugin"),
     ("agent_messaging_plugin", "plugins/agent_messaging_plugin"),
 )
+#: ``profile_config`` and ``plugin_roster_selection`` stay non-touch except for the exact files a
+#: release-declared plugin transition names in its planned actions (``declared_plugin_transitions``).
 STEP5_NON_TOUCH_SURFACES = (
     "credentials",
     "documents",
@@ -117,6 +120,7 @@ STEP5_MANAGED_SUB_SURFACES = (
     "knowledge_index_declared_removals",
     "coding_agent_plugin_cache",
     "instance_process_lifecycle",
+    "declared_plugin_transitions",
 )
 STEP5_CAPABILITIES = (
     "dependency_closure_repair",
@@ -129,6 +133,7 @@ STEP5_CAPABILITIES = (
     "post_runtime_platform_migration",
     "knowledge_reinstall",
     "plugin_cache_refresh",
+    "declared_plugin_transition",
 )
 ROUTER_PLUGIN = "macos_self_deployment_plugin"
 ADAPTER_MODULE_PATH = "plugins/github_midwife_plugin/src/github_midwife_plugin/setup_adapter.py"
@@ -189,6 +194,8 @@ class RuntimeSeams:
     #: fixture can measure "host Python absent" without deleting host binaries or environment tricks.
     resolve_base_python: BasePythonResolver = resolve_base_python
     which: WhichResolver = shutil.which
+    #: iss_6d26db73 / rul_385dac24: sw_vers + uname, measured only when a closure piece requires a host profile.
+    host_platform: Callable[[], HostPlatform] = read_host_platform
 
 
 @dataclass(frozen=True, slots=True)
@@ -544,7 +551,6 @@ def public_inputs_for(
 
 def _declared_closure(context: PlanContext, blocked: list[tuple[str, str]]) -> tuple[DeclaredClosurePiece, ...]:
     """closure = REQUIRED ∪ (roster ∩ candidate plugins) ∪ additions (design section 4.1)."""
-    bundle = context.candidate.bundle
     target = Path(context.record.target.canonical_path)
     roster = _selected_plugins(target / "profile" / "config" / "manifest.yaml")
     candidate_plugins = _candidate_plugins(context)
@@ -557,9 +563,37 @@ def _declared_closure(context: PlanContext, blocked: list[tuple[str, str]]) -> t
             blocked.append(("closure", "roster_plugin_absent_in_candidate"))
             continue
         pieces.setdefault(relative, DeclaredClosurePiece(plugin, relative, "roster_plugin"))
-    for piece in bundle.closure_additions:
+    for piece in _release_additions(context, candidate_plugins, blocked):
         pieces.setdefault(piece.relative_path, DeclaredClosurePiece(piece.distribution, piece.relative_path, "release_addition"))
     return tuple(pieces[key] for key in sorted(pieces))
+
+
+def _release_additions(context: PlanContext, candidate_plugins: frozenset[str], blocked: list[tuple[str, str]]) -> list[DependencyPiece]:
+    """The release's additions that belong on THIS candidate and THIS host.
+
+    One flow ships to every bundle, so an addition naming a plugin this candidate
+    does not ship is another bundle's (iss_3e5a14f7).  An addition that requires a
+    host profile applies only on a host measured to meet it (rul_385dac24: a
+    macOS 26 host keeps its LM Studio closure and never installs Apple-only
+    packages); a host that cannot be measured blocks the plan instead of guessing.
+    """
+    bundle = context.candidate.bundle
+    selected: list[DependencyPiece] = []
+    platform: HostPlatform | None = None
+    for piece in bundle.closure_additions:
+        if piece.relative_path.startswith("plugins/") and piece.relative_path.removeprefix("plugins/") not in candidate_plugins:
+            continue
+        if piece.requires_host is not None:
+            if platform is None:
+                try:
+                    platform = context.seams.host_platform()
+                except HostPlatformError:
+                    blocked.append(("host", "host_platform_unknown"))
+                    return selected
+            if not bundle.host_profile(piece.requires_host).admits(platform):
+                continue
+        selected.append(piece)
+    return selected
 
 
 def _selected_plugins(path: Path) -> tuple[str, ...]:

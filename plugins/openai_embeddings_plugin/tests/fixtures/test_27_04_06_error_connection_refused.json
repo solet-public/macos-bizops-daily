@@ -1,0 +1,16 @@
+{
+  "name": "test_error_connection_refused",
+  "description": "Test error handling when embedding service is unavailable (simulated via invalid endpoint)",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": ["Test text when service unavailable."],
+    "input_type": "text"
+  },
+  "timeout_seconds": 60,
+  "mock_config": {
+    "address_book_override": {
+      "base_url": "http://localhost:59999/v1",
+      "model": "test-model"
+    }
+  }
+}

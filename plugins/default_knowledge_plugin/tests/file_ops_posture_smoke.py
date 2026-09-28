@@ -174,16 +174,16 @@ def _make_kb(
 def test_read_only_rejects_all_writes() -> None:
     kb, st, mem = _make_kb("ro", "read_only")
     _expect_raises(
-        lambda: fo.create_file_kb("ro", "a.md", _COMPLIANT, st, mem),
+        lambda: fo.create_file_kb("ro", "a.md", _COMPLIANT, st, mem, budget=None),
         PermissionError, "read_only rejects create_file",
     )
     (kb / "existing.md").write_text(_COMPLIANT, encoding="utf-8")
     _expect_raises(
-        lambda: fo.edit_file_kb("ro", "existing.md", "x", st, mem),
+        lambda: fo.edit_file_kb("ro", "existing.md", "x", st, mem, budget=None),
         PermissionError, "read_only rejects edit_file",
     )
     _expect_raises(
-        lambda: fo.delete_file_kb("ro", "existing.md", st, mem),
+        lambda: fo.delete_file_kb("ro", "existing.md", st, mem, budget=None),
         PermissionError, "read_only rejects delete_file",
     )
     # read + browse still work under read_only
@@ -195,46 +195,46 @@ def test_read_only_rejects_all_writes() -> None:
 
 def test_create_only_posture() -> None:
     _kb, st, mem = _make_kb("co", "create_only", require_block=False)
-    res = fo.create_file_kb("co", "a.md", _COMPLIANT, st, mem)
+    res = fo.create_file_kb("co", "a.md", _COMPLIANT, st, mem, budget=None)
     _check(res["action"] == "created", "create_only allows create_file")
     _expect_raises(
-        lambda: fo.create_file_kb("co", "a.md", _COMPLIANT, st, mem),
+        lambda: fo.create_file_kb("co", "a.md", _COMPLIANT, st, mem, budget=None),
         FileExistsError, "create_only raises FileExistsError on collision",
     )
     _expect_raises(
-        lambda: fo.edit_file_kb("co", "a.md", "x", st, mem),
+        lambda: fo.edit_file_kb("co", "a.md", "x", st, mem, budget=None),
         PermissionError, "create_only rejects edit_file",
     )
     _expect_raises(
-        lambda: fo.delete_file_kb("co", "a.md", st, mem),
+        lambda: fo.delete_file_kb("co", "a.md", st, mem, budget=None),
         PermissionError, "create_only rejects delete_file",
     )
 
 
 def test_full_posture_unchanged() -> None:
     kb, st, mem = _make_kb("fl", "full", require_block=False)
-    fo.create_file_kb("fl", "a.md", "# A\n\nbody\n", st, mem)
-    res = fo.edit_file_kb("fl", "a.md", "# A\n\nnew body\n", st, mem)  # no hash → legacy
+    fo.create_file_kb("fl", "a.md", "# A\n\nbody\n", st, mem, budget=None)
+    res = fo.edit_file_kb("fl", "a.md", "# A\n\nnew body\n", st, mem, budget=None)  # no hash → legacy
     _check(res["action"] == "edited", "FULL edit with no hash → legacy behavior (allowed)")
     _check(not (kb / DOC_HISTORY_DIRNAME).exists(), "FULL no-hash edit writes NO snapshot (byte-compat)")
-    res2 = fo.delete_file_kb("fl", "a.md", st, mem)
+    res2 = fo.delete_file_kb("fl", "a.md", st, mem, budget=None)
     _check(res2["action"] == "deleted", "FULL allows delete_file")
 
 
 def test_metadata_validation() -> None:
     _kb, st, mem = _make_kb("mv", "create_and_cas_edit", require_block=True)
-    res = fo.create_file_kb("mv", "ok.md", _COMPLIANT, st, mem)
+    res = fo.create_file_kb("mv", "ok.md", _COMPLIANT, st, mem, budget=None)
     _check(res["action"] == "created", "compliant §4 doc accepted")
     _expect_raises(
-        lambda: fo.create_file_kb("mv", "notitle.md", "Date: x\nAuthor: y\n", st, mem),
+        lambda: fo.create_file_kb("mv", "notitle.md", "Date: x\nAuthor: y\n", st, mem, budget=None),
         ValueError, "missing title → ValueError",
     )
     _expect_raises(
-        lambda: fo.create_file_kb("mv", "partial.md", "# T\n\nDate: 2026\nAuthor: y\n", st, mem),
+        lambda: fo.create_file_kb("mv", "partial.md", "# T\n\nDate: 2026\nAuthor: y\n", st, mem, budget=None),
         ValueError, "missing required keys → ValueError",
     )
     _kb2, st2, mem2 = _make_kb("nov", "full", require_block=False)
-    res2 = fo.create_file_kb("nov", "free.md", "# Free\n\nno block needed\n", st2, mem2)
+    res2 = fo.create_file_kb("nov", "free.md", "# Free\n\nno block needed\n", st2, mem2, budget=None)
     _check(res2["action"] == "created", "validation skipped when require_metadata_block is False")
 
 
@@ -248,8 +248,8 @@ def test_git_safety_pin() -> None:
     original = fo.git_commit_file
     fo.git_commit_file = lambda *a, **k: calls.append((a, k))  # type: ignore[assignment]
     try:
-        fo.create_file_kb("git", "a.md", _COMPLIANT, st, mem)
-        fo.archive_file_kb("git", "a.md", None, st, mem)
+        fo.create_file_kb("git", "a.md", _COMPLIANT, st, mem, budget=None)
+        fo.archive_file_kb("git", "a.md", None, st, mem, budget=None)
     finally:
         fo.git_commit_file = original  # type: ignore[assignment]
     _check(calls == [], "symlink KB never invokes git_commit_file (create + archive)")
@@ -257,7 +257,7 @@ def test_git_safety_pin() -> None:
 
 def test_create_then_index_single_chunk() -> None:
     _kb, st, mem = _make_kb("idx", "create_and_cas_edit", require_block=True)
-    fo.create_file_kb("idx", "sub/deep.md", _COMPLIANT, st, mem)
+    fo.create_file_kb("idx", "sub/deep.md", _COMPLIANT, st, mem, budget=None)
     _check(len(mem.store) == 1, "create → exactly ONE new chunk")
     chunk = next(iter(mem.store.values()))
     _check("Read path: sub/deep.md" in chunk["content"], "chunk body carries the KB-relative Read path")
@@ -266,14 +266,14 @@ def test_create_then_index_single_chunk() -> None:
 
 def test_cas_edit_roundtrip() -> None:
     kb, st, mem = _make_kb("cas", "create_and_cas_edit", require_block=True)
-    fo.create_file_kb("cas", "a.md", _COMPLIANT, st, mem)
+    fo.create_file_kb("cas", "a.md", _COMPLIANT, st, mem, budget=None)
 
     read = fo.read_file_kb("cas", "a.md", st)
     _check("content_sha256" in read and len(read["content_sha256"]) == 64, "read_file returns content_sha256")
     good_hash = read["content_sha256"]
 
     updated = _COMPLIANT.replace("Summary: Testing create.", "Summary: Revised summary.")
-    res = fo.edit_file_kb("cas", "a.md", updated, st, mem, expected_content_hash=good_hash)
+    res = fo.edit_file_kb("cas", "a.md", updated, st, mem, expected_content_hash=good_hash, budget=None)
     _check(res["action"] == "edited", "CAS edit with current hash succeeds")
     snap_dir = kb / DOC_HISTORY_DIRNAME / "a.md"
     _check(snap_dir.is_dir() and len(list(snap_dir.glob("*.md"))) == 1, "prior-version snapshot written under .doc_history")
@@ -283,7 +283,7 @@ def test_cas_edit_roundtrip() -> None:
     disk_before = (kb / "a.md").read_text(encoding="utf-8")
     snaps_before = len(list(snap_dir.glob("*.md")))
     _expect_raises(
-        lambda: fo.edit_file_kb("cas", "a.md", "# clobber\n", st, mem, expected_content_hash=good_hash),
+        lambda: fo.edit_file_kb("cas", "a.md", "# clobber\n", st, mem, expected_content_hash=good_hash, budget=None),
         ValueError, "stale hash → ValueError (lost-update prevented)",
     )
     _check((kb / "a.md").read_text(encoding="utf-8") == disk_before, "stale-hash edit leaves the file untouched")
@@ -291,16 +291,16 @@ def test_cas_edit_roundtrip() -> None:
 
     # missing hash under CAS posture → PermissionError
     _expect_raises(
-        lambda: fo.edit_file_kb("cas", "a.md", "# blind\n", st, mem),
+        lambda: fo.edit_file_kb("cas", "a.md", "# blind\n", st, mem, budget=None),
         PermissionError, "missing hash under create_and_cas_edit → PermissionError",
     )
 
 
 def test_archive_roundtrip() -> None:
     kb, st, mem = _make_kb("arc", "create_and_cas_edit", require_block=True)
-    fo.create_file_kb("arc", "sub/doc.md", _COMPLIANT, st, mem)
+    fo.create_file_kb("arc", "sub/doc.md", _COMPLIANT, st, mem, budget=None)
 
-    res = fo.archive_file_kb("arc", "sub/doc.md", "archive/sub/successor.md", st, mem)
+    res = fo.archive_file_kb("arc", "sub/doc.md", "archive/sub/successor.md", st, mem, budget=None)
     _check(res["archived_path"] == "archive/sub/doc.md", "nested source preserves structure under archive/")
     _check(not (kb / "sub" / "doc.md").exists(), "source file removed after archive")
     dest = kb / "archive" / "sub" / "doc.md"
@@ -322,7 +322,7 @@ def test_archive_roundtrip() -> None:
 
     # re-archiving an already-archived path is refused
     _expect_raises(
-        lambda: fo.archive_file_kb("arc", "archive/sub/doc.md", None, st, mem),
+        lambda: fo.archive_file_kb("arc", "archive/sub/doc.md", None, st, mem, budget=None),
         PermissionError, "re-archiving a doc already under archive_subdir → PermissionError",
     )
 
@@ -330,50 +330,50 @@ def test_archive_roundtrip() -> None:
 def test_archive_refusals() -> None:
     # legacy doc without a §4 block gets a minimal block inserted
     kb, st, mem = _make_kb("leg", "full", require_block=False)
-    fo.create_file_kb("leg", "old.md", "# Old\n\njust body\n", st, mem)
-    res = fo.archive_file_kb("leg", "old.md", None, st, mem)
+    fo.create_file_kb("leg", "old.md", "# Old\n\njust body\n", st, mem, budget=None)
+    res = fo.archive_file_kb("leg", "old.md", None, st, mem, budget=None)
     archived = (kb / "archive" / "old.md").read_text(encoding="utf-8")
     _check("Archived:" in archived and "# Old" in archived, "legacy doc → minimal §4 block inserted on archive")
     _check(res["action"] == "archived", "legacy archive succeeds")
 
     # no archive_subdir configured → ValueError
     _kb2, st2, mem2 = _make_kb("noarc", "full", require_block=False, archive_subdir=None)
-    fo.create_file_kb("noarc", "a.md", "# A\n\nb\n", st2, mem2)
+    fo.create_file_kb("noarc", "a.md", "# A\n\nb\n", st2, mem2, budget=None)
     _expect_raises(
-        lambda: fo.archive_file_kb("noarc", "a.md", None, st2, mem2),
+        lambda: fo.archive_file_kb("noarc", "a.md", None, st2, mem2, budget=None),
         ValueError, "no archive_subdir configured → ValueError",
     )
 
     # destination collision → FileExistsError (never overwrite the record)
     kb3, st3, mem3 = _make_kb("col", "full", require_block=False)
-    fo.create_file_kb("col", "a.md", "# A\n\nb\n", st3, mem3)
+    fo.create_file_kb("col", "a.md", "# A\n\nb\n", st3, mem3, budget=None)
     (kb3 / "archive").mkdir(exist_ok=True)
     (kb3 / "archive" / "a.md").write_text("# preexisting archived\n", encoding="utf-8")
     _expect_raises(
-        lambda: fo.archive_file_kb("col", "a.md", None, st3, mem3),
+        lambda: fo.archive_file_kb("col", "a.md", None, st3, mem3, budget=None),
         FileExistsError, "archive destination collision → FileExistsError",
     )
 
 
 def test_archive_allowed_while_delete_rejected() -> None:
     _kb, st, mem = _make_kb("mix", "create_and_cas_edit", require_block=True)
-    fo.create_file_kb("mix", "a.md", _COMPLIANT, st, mem)
+    fo.create_file_kb("mix", "a.md", _COMPLIANT, st, mem, budget=None)
     _expect_raises(
-        lambda: fo.delete_file_kb("mix", "a.md", st, mem),
+        lambda: fo.delete_file_kb("mix", "a.md", st, mem, budget=None),
         PermissionError, "create_and_cas_edit rejects delete_file",
     )
-    res = fo.archive_file_kb("mix", "a.md", None, st, mem)
+    res = fo.archive_file_kb("mix", "a.md", None, st, mem, budget=None)
     _check(res["action"] == "archived", "create_and_cas_edit ALLOWS archive_file (sanctioned retirement)")
 
 
 def test_protected_path_guard() -> None:
     _kb, st, mem = _make_kb("prot", "full", require_block=False)
     _expect_raises(
-        lambda: fo.create_file_kb("prot", "archive/x.md", "# X\n\nb\n", st, mem),
+        lambda: fo.create_file_kb("prot", "archive/x.md", "# X\n\nb\n", st, mem, budget=None),
         PermissionError, "create into archive_subdir → PermissionError (bypasses supersession)",
     )
     _expect_raises(
-        lambda: fo.create_file_kb("prot", f"{DOC_HISTORY_DIRNAME}/x.md/1.md", "# X\n\nb\n", st, mem),
+        lambda: fo.create_file_kb("prot", f"{DOC_HISTORY_DIRNAME}/x.md/1.md", "# X\n\nb\n", st, mem, budget=None),
         PermissionError, "create into .doc_history → PermissionError",
     )
 

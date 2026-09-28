@@ -18,6 +18,7 @@ from typing import Literal
 
 from .contracts import contract_digest_from_bytes, transition_bundle_filenames
 from .errors import ContractError, OperationTypeAmbiguousError
+from .host_platform import HostPlatform
 from .models import JsonValue, OperationType
 
 __all__ = [
@@ -110,6 +111,7 @@ _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 _REPOSITORY = re.compile(r"^https://github\.com/[^/]+/[^/]+\.git$")
 _DISTRIBUTION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _RELATIVE_PATH = re.compile(r"^(plugins/[a-z][a-z0-9_]*|ananta|solet_setup_contracts)$")
+_MACHINE = re.compile(r"^(arm64|x86_64)$")
 _MODULE = re.compile(r"^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)*$")
 _TEMPLATE_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
 _MARKER_BEGIN = "SOLET {NAME} v{TEMPLATE_DIGEST8}"
@@ -138,6 +140,7 @@ EXISTING_OPERATIONS: tuple[ExistingOperation, ...] = (
     ExistingOperation("existing::dependencies.reconcile", "bootstrap", "dependencies", "seed", True),
     ExistingOperation("existing::migration.solet_rename", "target_adapter", "migrations_pre", "seed", True),
     ExistingOperation("existing::migration.export_root_containment", "target_adapter", "migrations_pre", "seed", True),
+    ExistingOperation("existing::migration.plugin_transition", "target_adapter", "migrations_pre", "seed", True),
     ExistingOperation("existing::hydration.reconcile", "target_adapter", "hydration", "seed", True),
     ExistingOperation("existing::hydration.restore", "manager", "hydration", "manager", False),
     ExistingOperation("existing::autostart.reconcile", "target_adapter", "hydration", "seed", True),
@@ -258,6 +261,20 @@ class ManagedArtifact:
 class DependencyPiece:
     distribution: str
     relative_path: str
+    #: A ``host_profiles`` name this piece needs (iss_6d26db73, rul_385dac24); ``None`` applies on every host.
+    requires_host: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class HostProfile:
+    """A measured host class the release gates pieces on: the one place its threshold is declared."""
+
+    name: str
+    macos_major_min: int
+    machine: str
+
+    def admits(self, platform: HostPlatform) -> bool:
+        return platform.macos_major >= self.macos_major_min and platform.machine == self.machine
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +297,13 @@ class TransitionBundle:
     closure_removals: tuple[DependencyPiece, ...]
     knowledge_removals: tuple[str, ...]
     lifecycle: LifecycleDeclaration
+    host_profiles: tuple[HostProfile, ...] = ()
+
+    def host_profile(self, name: str) -> HostProfile:
+        for item in self.host_profiles:
+            if item.name == name:
+                return item
+        raise ContractError(f"transition bundle declares no host profile {name!r}")
 
     def predecessor_for(self, commit: str, tree: str) -> SupportedPredecessor | None:
         return next((row for row in self.supported_predecessors if row.commit == commit and row.tree == tree), None)
@@ -321,6 +345,7 @@ def parse_transition_bundle(raw_bytes: bytes) -> TransitionBundle:
             "lifecycle",
         },
         "bundle",
+        optional={"host_profiles"},
     )
     if root["flow_id"] != FLOW_ID or root["schema_version"] != SCHEMA_VERSION or isinstance(root["schema_version"], bool):
         raise ContractError("transition bundle flow identity is invalid")
@@ -330,7 +355,8 @@ def parse_transition_bundle(raw_bytes: bytes) -> TransitionBundle:
     operations = _operations(root["runtime_operations"], predecessors)
     artifacts = tuple(_artifact(item) for item in _array(root["managed_artifacts"], "managed_artifacts"))
     _unique([item.artifact_id for item in artifacts], "managed_artifacts.artifact_id")
-    additions, removals = _closure(root["dependency_closure"])
+    profiles = _host_profiles(root.get("host_profiles", {}))
+    additions, removals = _closure(root["dependency_closure"], {item.name for item in profiles})
     knowledge = _identifiers(root["knowledge_removals"], "knowledge_removals")
     return TransitionBundle(
         FLOW_ID,
@@ -343,6 +369,7 @@ def parse_transition_bundle(raw_bytes: bytes) -> TransitionBundle:
         removals,
         knowledge,
         _lifecycle(root["lifecycle"]),
+        profiles,
     )
 
 
@@ -355,12 +382,25 @@ def _operations(value: JsonValue, predecessors: tuple[SupportedPredecessor, ...]
     return operations
 
 
-def _closure(value: JsonValue) -> tuple[tuple[DependencyPiece, ...], tuple[DependencyPiece, ...]]:
+def _closure(value: JsonValue, profiles: set[str]) -> tuple[tuple[DependencyPiece, ...], tuple[DependencyPiece, ...]]:
     closure = _object(value, {"additions", "removals"}, "dependency_closure")
-    additions = tuple(_piece(item) for item in _array(closure["additions"], "dependency_closure.additions"))
-    removals = tuple(_piece(item) for item in _array(closure["removals"], "dependency_closure.removals"))
+    additions = tuple(_piece(item, profiles) for item in _array(closure["additions"], "dependency_closure.additions"))
+    removals = tuple(_piece(item, profiles) for item in _array(closure["removals"], "dependency_closure.removals"))
     _unique([item.distribution for item in (*additions, *removals)], "dependency_closure.distribution")
     return additions, removals
+
+
+def _host_profiles(value: JsonValue) -> tuple[HostProfile, ...]:
+    if not isinstance(value, dict):
+        raise ContractError("transition bundle host_profiles must be an object")
+    profiles: list[HostProfile] = []
+    for name, item in sorted(value.items()):
+        row = _object(item, {"macos_major_min", "machine"}, "host_profile")
+        major = row["macos_major_min"]
+        if isinstance(major, bool) or not isinstance(major, int) or not 11 <= major <= 99:
+            raise ContractError("host_profile.macos_major_min must be an integer in 11..99")
+        profiles.append(HostProfile(_pattern(name, _IDENTIFIER, "host_profile name"), major, _pattern(row["machine"], _MACHINE, "host_profile.machine")))
+    return tuple(profiles)
 
 
 def _predecessor(value: JsonValue) -> SupportedPredecessor:
@@ -576,11 +616,15 @@ def _stamp(value: JsonValue, kind: str) -> str | None:
     return stamp
 
 
-def _piece(value: JsonValue) -> DependencyPiece:
-    row = _object(value, {"distribution", "relative_path"}, "dependency_piece")
+def _piece(value: JsonValue, profiles: set[str]) -> DependencyPiece:
+    row = _object(value, {"distribution", "relative_path"}, "dependency_piece", optional={"requires_host"})
+    requires = row.get("requires_host")
+    if requires is not None and requires not in profiles:
+        raise ContractError(f"dependency_piece.requires_host names no declared host profile: {requires!r}")
     return DependencyPiece(
         _pattern(row["distribution"], _DISTRIBUTION, "dependency_piece.distribution"),
         _pattern(row["relative_path"], _RELATIVE_PATH, "dependency_piece.relative_path"),
+        requires,
     )
 
 
@@ -597,8 +641,8 @@ def _lifecycle(value: JsonValue) -> LifecycleDeclaration:
     return LifecycleDeclaration(_one_of(row["strategy"], _STRATEGIES, "lifecycle.strategy"), budget, _READINESS_SIGNAL, modules)
 
 
-def _object(value: JsonValue, keys: set[str], label: str) -> dict[str, JsonValue]:
-    if not isinstance(value, dict) or set(value) != keys:
+def _object(value: JsonValue, keys: set[str], label: str, *, optional: frozenset[str] | set[str] = frozenset()) -> dict[str, JsonValue]:
+    if not isinstance(value, dict) or not keys <= set(value) <= keys | optional:
         raise ContractError(f"transition bundle {label} does not match its closed key set")
     return value
 

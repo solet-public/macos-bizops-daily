@@ -1,0 +1,10 @@
+{
+  "name": "test_error_invalid_inputs_not_list",
+  "description": "Verify error when inputs is not a list (validation before API call)",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": "this should be a list not a string",
+    "input_type": "text"
+  },
+  "timeout_seconds": 30
+}

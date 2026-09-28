@@ -8,6 +8,7 @@ Plugin Mode: Wraps local_embeddings_plugin (or configured alternative via env)
 """
 
 import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 from ananta.constants import DEFAULT_EMBEDDING_PLUGIN as DEFAULT_EMBEDDING_PLUGIN
@@ -15,7 +16,8 @@ from ananta.core.domain.types import ActionResult
 from ananta.core.plugins.plugin_manager import PluginManager
 from ananta.error_handling import FrameworkError
 from ananta.interfaces.bootstrappable_service_interface import BootstrappableServiceInterface
-from ananta.interfaces.embedding_service_interface import EmbeddingServiceInterface
+from ananta.interfaces.embedding_service_interface import EmbeddingServiceInterface, TokenBudget
+from ananta.services.embedding_service.input_budget import oversize_inputs
 from ananta.services.embedding_service.interfaces.public import EmbeddingServiceAPI
 
 if TYPE_CHECKING:
@@ -91,6 +93,8 @@ class EmbeddingService(EmbeddingServiceAPI, BootstrappableServiceInterface):
         # In bootstrap mode (plugin_manager=None), embedding_plugin_name can be None
         self._embedding_plugin_name = embedding_plugin_name
         self._embedding_plugin: EmbeddingServiceInterface | None = None
+        #: Inputs refused for exceeding the provider's declared budget since boot (iss_9166af93).
+        self.oversize_inputs_refused = 0
 
         # Initialize via BootstrappableServiceInterface pattern
         super().__init__(plugin_manager)
@@ -227,9 +231,68 @@ class EmbeddingService(EmbeddingServiceAPI, BootstrappableServiceInterface):
             FrameworkError: If plugin not available or request fails
         """
         plugin = self._ensure_ready()
+        refusal = self._refuse_oversize(plugin, inputs, input_type)
+        if refusal is not None:
+            return refusal
 
         # Call plugin with interface signature
         return plugin.generate_embeddings(inputs=inputs, model=model, input_type=input_type)
+
+    def _refuse_oversize(
+        self, plugin: EmbeddingServiceInterface, inputs: list[str], input_type: str
+    ) -> ActionResult | None:
+        """Refuse, loudly and counted, a batch holding any input over the provider's budget.
+
+        Callers split to :meth:`input_token_budget` first (iss_9166af93); an
+        input that still arrives over budget is a caller defect.  The whole
+        batch is refused before the provider runs -- never truncated -- and
+        every refusal is counted in ``oversize_inputs_refused``.
+        """
+        budget = plugin.input_token_budget()
+        if budget is None or input_type != "text":
+            return None
+        oversize = oversize_inputs(inputs, budget)
+        if not oversize:
+            return None
+        self.oversize_inputs_refused += len(oversize)
+        detail = ", ".join(f"input {index}: {tokens} tokens" for index, tokens in oversize)
+        message = (
+            f"{len(oversize)} of {len(inputs)} embedding input(s) exceed the "
+            f"{self._embedding_plugin_name} ceiling of {budget.max_input_tokens} tokens ({detail}); "
+            "split with ananta.services.embedding_service.input_budget.split_to_fit before embedding"
+        )
+        logger.warning(
+            "embedding_input_too_long: %s [oversize_inputs_refused=%d]",
+            message,
+            self.oversize_inputs_refused,
+        )
+        stamp = datetime.now(UTC).isoformat()
+        details: dict[str, object] = {
+            "oversize_inputs": [{"index": index, "tokens": tokens} for index, tokens in oversize],
+            "max_input_tokens": budget.max_input_tokens,
+            "oversize_inputs_refused": self.oversize_inputs_refused,
+        }
+        return {
+            "action_status": "error",
+            "actions": [],
+            "timestamp": stamp,
+            "error": {
+                "type": "EmbeddingInputTooLong",
+                "code": "embedding_input_too_long",
+                "message": message,
+                "details": details,
+                "severity": "warning",
+                "timestamp": stamp,
+            },
+        }
+
+    def input_token_budget(self) -> TokenBudget | None:
+        """The bound provider's declared per-input budget (see the interface).
+
+        Like :meth:`get_default_dimensions`, readable before the provider is
+        ready; the budget's ``count`` raises while the provider cannot count.
+        """
+        return self._validate_embedding_plugin().input_token_budget()
 
     def get_embedding_dimension(self, model: str | None = None) -> ActionResult:
         """Get embedding dimension for a model.

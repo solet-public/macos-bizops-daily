@@ -236,6 +236,11 @@ the healthy state, not an error.
 - Step 4a export root → `migration_export_root_containment` propagates an
   already-configured root to newly installed connectors (first-time answer:
   Part B).
+- Plugin transitions (r52, iss_6d26db73) → `migration_plugin_transition`
+  applies the release's declared plugin replacements
+  (`plugins/github_midwife_plugin/knowledge_base/plugin_transitions.json`) to a solet whose profile still
+  carries the predecessor plugin. See "Plugin transitions: LM Studio solets
+  move to the Apple-native stack" below.
 - Step 5 hydration re-run → `hydration_reconcile` for the three declared
   managed artifacts: the instance LaunchAgent plist, the `~/.zshrc` block,
   the `~/.claude/CLAUDE.md` section (the rest: Part B).
@@ -248,6 +253,70 @@ the healthy state, not an error.
   doctor <name>` afterwards. The router `no_active_color` race described in
   Part C reads as `service_offline` in the doctor's section 9 while it
   heals; re-probe.
+
+### Plugin transitions: LM Studio solets move to the Apple-native stack
+
+A release can declare that one plugin replaces another for a service; r52
+declares two, for solets born before the Apple-native stack (r46):
+
+| Transition | Profiles | From → to |
+|---|---|---|
+| `embedding_service.openai_to_coreai.v1` | macos-bizops, macos-free-solet, macos-samantha-solet | `openai_embeddings_plugin` (LM Studio) → `coreai_embeddings_plugin` |
+| `inference_service.lmstudio_to_apple.v1` | macos-bizops | `default_inference_plugin` (LM Studio) → `macos_inference_plugin` |
+
+The runtime preview's `migrations_pre` stage lists, per transition, the
+pinned Core AI asset download, the readiness proof, and the exact file
+writes (the new plugin config, the roster line in the profile's
+manifest.yaml, the binding in the profile's service_bindings.json).
+Each written file is backed up
+before the apply, like every `backup_required` migration.
+
+What the transition guarantees:
+
+- **Only where the host can run it.** Each replacement names a host profile
+  in the flow's `host_profiles` (`apple_embeddings` for Core AI, `apple_fm`
+  for Apple FM; both macOS 27 on arm64 in r52), measured with `sw_vers` and
+  `uname -m`. On a host below it (macOS 26 Tahoe), the release's closure
+  leaves that package out, the transition reports `host_unsupported`
+  (healthy, not pending), and the binding stays on LM Studio. Once the host
+  qualifies, the doctor row says the switch comes with the next release's
+  update (`update_at_next_release`).
+- **Ready before switched.** The replacement is proven first: the Core AI
+  asset is acquired and one real embedding must return 768 normalized
+  dimensions; Apple FM must import. Only then does the binding move.
+  Existing vectors are kept: nomic v1.5 on Core AI embeds the same space
+  LM Studio's nomic v1.5 did (measured, see the design record on
+  iss_6d26db73).
+- **Not ready is not a failure.** If the replacement is not ready (asset
+  download failed, readiness proof wrong or timed out, or the step's share
+  of the adapter timeout spent), nothing is written,
+  the old binding stays active, the row is journaled `deferred` with
+  `plugin_transition_pending`, and the update still promotes, but to
+  `needs_attention` rather than `verified`, with `data.deferred_operations`
+  naming the transition and its repair. Run `solet-manager update <name>`
+  again: it selects `verify` mode at the same release and retries only what
+  is still pending.
+- **Edited configuration is refused, not overwritten.** The embedding
+  transition matches the predecessor config exactly; the inference
+  transition matches on `base_url` only (setup chose the model). A solet
+  whose old config was edited reports `conflict`; the row defers with
+  `plugin_transition_conflict`, and the preview names the refusal. Restore
+  the shipped config or move the binding by hand.
+- **Everything else is preserved.** Extra plugins keep their roster place,
+  the old plugin's config file stays on disk (inert), and `profile/data` is
+  untouched. LM Studio and its models are left exactly as they were: no
+  path uninstalls LM Studio or deletes, moves or changes a model
+  (rul_ef0363a2). This solet simply stops using them for the transitioned
+  services.
+- **Interruptions resume.** Every intermediate write state boots (the new
+  plugin enters the roster before the binding moves). A resumed update
+  completes the transition, or reverts it to the predecessor bytes when the
+  replacement is no longer ready. A repeat apply is a byte-identical no-op,
+  and an already-Apple-native solet verifies with no plan.
+
+The final doctor reports the transitions as the advisory
+`plugin_transitions` row in the plugin-roster section. A pending transition
+never fails the doctor; the prior plugin stays active and runnable.
 
 ## Part B — manual steps that remain
 
@@ -819,6 +888,29 @@ LaunchAgent alone either way.
 The sections below are narrative: what each release changed and why, kept
 as history. They are not executable support — Part A's preview lists what
 an update will do to this installation, and the doctor verifies it did.
+
+## What changed in this release — LM Studio solets move to the Apple-native stack (r52)
+
+- **Plugin transitions.** `solet-manager update` now moves a pre-r46 solet
+  off LM Studio on macOS 27: embeddings to on-device Core AI, and summaries
+  to Apple Foundation Models on macos-bizops. On macOS 26 both stay on LM
+  Studio until the next release's update after the Mac reaches macOS 27. LM Studio and
+  its models are never removed or changed. See "Plugin transitions" in Part
+  A for the guarantees; a not-ready replacement defers to `needs_attention`
+  and the next `update` retries it.
+- **A verify-mode update now clears `needs_attention`.** Before r52, a
+  `verify`-mode update at the already-verified release promoted without
+  publishing, so a row once set to `needs_attention` stayed there; it now
+  lands `verified` when the final doctor passes.
+- **Embedding inputs fit the provider (iss_9166af93).** Core AI refuses any
+  input over 2048 tokens where LM Studio accepted an 8192-character window.
+  Every caller now splits to the provider's declared budget, and the
+  embedding service refuses (loudly, counted) anything that still arrives
+  over it. Once embeddings run on Core AI, the first ledger drain re-embeds
+  every event whose stored chunks differ from the new policy's, which covers
+  every event the old window embedded head-only or could not embed.
+- **Bootstrap closure repair** resolves the vendored `apple-fm-sdk` wheel
+  with the same `--find-links` rule genesis uses.
 
 ## What changed in this release — worker hooks now also fire as plugin hooks (`coordination-hooks` 0.8.0, 2026-08-24 update)
 

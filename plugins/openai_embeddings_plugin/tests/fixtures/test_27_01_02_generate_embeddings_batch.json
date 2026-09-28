@@ -1,0 +1,15 @@
+{
+  "name": "test_generate_embeddings_batch",
+  "description": "Generate embeddings for multiple text inputs in a batch",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": [
+      "The quick brown fox jumps over the lazy dog.",
+      "Machine learning enables computers to learn from data.",
+      "Natural language processing is a subfield of AI.",
+      "Vector embeddings represent text as numerical arrays."
+    ],
+    "input_type": "text"
+  },
+  "timeout_seconds": 90
+}

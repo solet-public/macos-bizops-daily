@@ -1,0 +1,9 @@
+{
+  "name": "test_get_dimension_null_model",
+  "description": "Get embedding dimension with null model parameter (should use default)",
+  "process_key": "plugin::openai_embeddings_plugin::get_embedding_dimension_action",
+  "arguments": {
+    "model": null
+  },
+  "timeout_seconds": 60
+}

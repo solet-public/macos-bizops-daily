@@ -57,7 +57,7 @@ class FakeWorld:
         if len(argv) == 4 and argv[1] == "call":
             assert argv[2] in self.process_outcomes, f"unreviewed process: {argv[2]}"
             return self.process_outcomes[argv[2]]
-        values = {
+        values: dict[tuple[str, ...], str] = {
             ("/usr/bin/sw_vers", "-productVersion"): self.version,
             ("/usr/bin/uname", "-m"): self.architecture,
             ("/usr/sbin/sysctl", "-n", "hw.model"): self.model,
@@ -237,6 +237,8 @@ def _host_checks(target: Path, world: FakeWorld) -> None:
     assert _status(apple.host_eligible(request, world)) == "verified"
     world.version = "26.6"
     assert _status(apple.host_eligible(request, world)) == "blocked"
+    world.version = "28.1"  # iss_f7937801: a later macOS is not refused
+    assert _status(apple.host_eligible(request, world)) == "verified"
     world.version = "27.0"
     world.architecture = "x86_64"
     assert _status(apple.host_eligible(request, world)) == "blocked"
@@ -332,7 +334,7 @@ def _embedding_behavior(target: Path, world: FakeWorld) -> None:
     manifest_digest = _asset_fixture(target)
     config = target / "profile/config/plugins/coreai_embeddings_plugin.json"
     config.parent.mkdir(parents=True, exist_ok=True)
-    config.write_text(apple._coreai_config(target), encoding="utf-8")
+    config.write_text(apple.coreai_config_text(target), encoding="utf-8")
     binding = target / "profile/config/service_bindings.json"
     binding.write_text(json.dumps({"embedding_service": "coreai_embeddings_plugin"}))
     failed = _apple_probe(target, world, manifest_digest, {

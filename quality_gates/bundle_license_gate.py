@@ -164,7 +164,11 @@ def _bundle_plugins(name: object, spec: object) -> list[str]:
     plugins = spec.get("plugins")
     if not isinstance(plugins, list) or not plugins:
         raise GateError(f"bundle {name!r} carries no non-empty 'plugins' list")
-    return [str(plugin) for plugin in plugins]
+    # Transition-retained plugins ship as code in the seed (rul_ffd59e37), so their licenses are checked too.
+    retained = spec.get("transition_retained", [])
+    if not isinstance(retained, list):
+        raise GateError(f"bundle {name!r} carries a non-list 'transition_retained'")
+    return [str(plugin) for plugin in (*plugins, *retained)]
 
 
 def _read_pyproject(path: Path) -> dict[str, object]:

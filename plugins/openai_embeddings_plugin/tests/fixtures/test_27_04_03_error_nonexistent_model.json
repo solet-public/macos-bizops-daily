@@ -1,0 +1,11 @@
+{
+  "name": "test_error_nonexistent_model",
+  "description": "Verify error handling when specifying a model that does not exist",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": ["Test text for nonexistent model."],
+    "model": "nonexistent-model-xyz-9999",
+    "input_type": "text"
+  },
+  "timeout_seconds": 60
+}

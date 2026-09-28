@@ -5,9 +5,32 @@ convert text, images, or other inputs into vector embeddings.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import ClassVar
 
 from ananta.core.domain.types import ActionResult
+
+
+@dataclass(frozen=True, slots=True)
+class TokenBudget:
+    """A provider's declared per-input ceiling and the provider's own token counter.
+
+    ``count`` is the provider's exact count for one input, special tokens
+    included -- the same number the provider compares against
+    ``max_input_tokens`` before it refuses.  Callers split to this budget
+    rather than guessing a character window (iss_9166af93).
+    """
+
+    max_input_tokens: int
+    count: Callable[[str], int]
+
+    def __post_init__(self) -> None:
+        if self.max_input_tokens < 1:
+            raise ValueError(f"max_input_tokens must be positive, got {self.max_input_tokens}")
+
+    def fits(self, text: str) -> bool:
+        return self.count(text) <= self.max_input_tokens
 
 
 class EmbeddingServiceInterface(ABC):
@@ -150,6 +173,19 @@ class EmbeddingServiceInterface(ABC):
         Error Cases:
             Returns action_status="error" if model listing fails.
         """
+
+    @abstractmethod
+    def input_token_budget(self) -> TokenBudget | None:
+        """The provider's declared per-input token ceiling with its own counter.
+
+        ``None`` declares that this provider publishes no ceiling it can count
+        against locally (a remote server applies its own context handling);
+        callers then keep their character windows.  A provider that refuses
+        over-long inputs MUST return its budget so callers split instead of
+        sending text the provider will refuse.  Static: callable before the
+        provider is ready; ``count`` itself may raise while it is not.
+        """
+        ...
 
     @abstractmethod
     def is_ready(self) -> bool:

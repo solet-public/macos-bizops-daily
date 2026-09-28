@@ -36,6 +36,7 @@ from .existing_install_migrations import (
     plugin_cache_refresh,
     read_text,
 )
+from .existing_install_plugin_transitions import migration_plugin_transition
 from .managed_render import (
     TEMPLATE_ROOT_REF,
     BlockMatch,
@@ -65,6 +66,7 @@ SEED_OPERATION_REFS: tuple[str, ...] = (
     "existing::dependencies.reconcile",
     "existing::migration.solet_rename",
     "existing::migration.export_root_containment",
+    "existing::migration.plugin_transition",
     "existing::hydration.reconcile",
     "existing::autostart.reconcile",
     "existing::runtime.plugin_cache_refresh",
@@ -72,6 +74,7 @@ SEED_OPERATION_REFS: tuple[str, ...] = (
 EXISTING_ALLOWED_PUBLIC_INPUTS: dict[str, frozenset[str]] = {
     "existing::migration.solet_rename": frozenset(),
     "existing::migration.export_root_containment": frozenset(),
+    "existing::migration.plugin_transition": frozenset(),
     "existing::hydration.reconcile": frozenset({"artifact_ids", "planned_destinations"}),
     "existing::autostart.reconcile": frozenset({"artifact_ids", "planned_destinations"}),
     "existing::runtime.plugin_cache_refresh": frozenset(),
@@ -93,6 +96,7 @@ def operation_handlers() -> dict[str, Handler]:
     return {
         "existing::migration.solet_rename": migration_solet_rename,
         "existing::migration.export_root_containment": migration_export_root_containment,
+        "existing::migration.plugin_transition": migration_plugin_transition,
         "existing::hydration.reconcile": hydration_reconcile,
         "existing::autostart.reconcile": autostart_reconcile,
         "existing::runtime.plugin_cache_refresh": plugin_cache_refresh,

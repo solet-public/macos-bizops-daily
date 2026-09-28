@@ -1,0 +1,18 @@
+{
+  "process_key": "plugin::openai_embeddings_plugin::list_models_action",
+  "display_name": "List Embedding Models",
+  "description": "List available embedding models and their capabilities.",
+  "embedding_description": "List available embedding models and metadata such as dimension, max input length, and supported input types. Use to choose a model for semantic search, confirm defaults, and validate service configuration.",
+  "result_processor_customizations": {
+    "action_label": "Embedding models listed",
+    "result_type": "models_listed",
+    "result_description": "Available models with keys: models (array of {name, dimension, max_input_length, input_types, description})",
+    "presentation_guidance": "",
+    "output_action_guidance": "Determine the appropriate next action based on the context and action result."
+  },
+  "error_processor_customizations": {
+    "action_context": "Lists available embedding models from the OpenAI-compatible API",
+    "error_interpretation": "ConnectionError: API endpoint not reachable. APIError: Backend service doesn't support model listing.",
+    "recovery_guidance": "For connection errors: verify the embedding service is running. If model listing is not supported, the configured default model will still be returned."
+  }
+}

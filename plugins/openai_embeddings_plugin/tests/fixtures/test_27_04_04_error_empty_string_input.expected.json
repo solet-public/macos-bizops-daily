@@ -1,0 +1,10 @@
+{
+  "exit_code": 0,
+  "output_contains": [
+    "action_status"
+  ],
+  "output_not_contains": [
+    "exception"
+  ],
+  "timeout_seconds": 60
+}

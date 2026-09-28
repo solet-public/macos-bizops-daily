@@ -29,6 +29,7 @@ from typing import Any
 from ananta.core.domain.enums import ActionStatus
 from ananta.core.domain.types import ActionResult
 from ananta.core.plugins.plugin_base import ServicePlugin
+from ananta.interfaces.embedding_service_interface import TokenBudget
 from ananta.interfaces.knowledge_service_interface import KnowledgeServiceInterface
 from ananta.services.session_ledger_service.summary_executor import BoundedSummaryExecutor
 from ananta.types.schema_types import SchemaDefinition
@@ -181,7 +182,15 @@ class DefaultKnowledgePlugin(
             self._kb_root, self._state_service,
             self._memory_service, self._address_book_service,
             manifest_plugin_set=manifest_plugin_set,
+            budget=self._embedding_budget(),
         )
+
+    def _embedding_budget(self) -> TokenBudget | None:
+        """The bound embedding provider's per-input budget; every index path splits to it (iss_9166af93)."""
+        if self._embedding_service is None:
+            raise RuntimeError(f"{PLUGIN_NAME}: embedding_service not available")
+        budget: TokenBudget | None = self._embedding_service.input_token_budget()
+        return budget
 
     async def stop_services(self) -> ActionResult:
         """Stop knowledge services."""

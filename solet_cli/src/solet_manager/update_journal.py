@@ -116,6 +116,7 @@ OPERATION_STATUSES = (
     "applied",
     "verified",
     "not_applicable",
+    "deferred",
     "blocked",
     "failed",
 )

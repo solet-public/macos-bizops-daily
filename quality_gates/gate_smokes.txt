@@ -5046,6 +5046,7 @@ plugins/macos_self_deployment_plugin/tests/dry_run_default_safety_smoke.py
 # A configured but not-yet-running LM Studio leaves the inference plugin
 # explicitly unready, retries at a bounded rate, and never crashes platform
 # boot. Offline provider fake; no network.
+plugins/default_inference_plugin/tests/boot_optional_dependency_smoke.py
 
 # Cold first-boot knowledge hydration must not delay the runtime action poller
 # or router-registration deadline. Event fixture; no wall-clock sleep.
@@ -5058,6 +5059,7 @@ ananta/tests/core/plugins/startup_failure_lifecycle_shutdown_smoke.py
 # r38 C2: embedding configuration registers without contacting LM Studio;
 # qualification begins only once the router activates the process and stays
 # visibly pending while the local server is unavailable.
+plugins/openai_embeddings_plugin/tests/startup_qualification_smoke.py
 
 # Apple wave 44 D2 (iss_3aa20e42): CoreAI embeddings native (1,768) finite
 # unit-norm contract, runtime readiness/fallback contract, and wheel resource
@@ -5156,6 +5158,9 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
 # not shipped: plugins/macos_inference_plugin/tests/legacy_plugin_coexistence_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
 # not shipped: plugins/github_midwife_plugin/tests/profile_install_vendor_find_links_smoke.py requires repository history (its RED fixture reads one pinned pre-fix commit's blob via `git show`); a born clone is a git-archive extract with no .git (repository_hygiene)
+# not shipped: plugins/github_midwife_plugin/tests/plugin_transition_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin/resources/default_config.json; absent from macos_free_minimal and macos_samantha; its fixture copies that file from the repository into every target (cross_bundle_transition)
+# not shipped: solet_cli/tests/update_plugin_transition_deferral_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin/resources/default_config.json; absent from macos_free_minimal and macos_samantha; its fixture copies that file from the repository into every target (cross_bundle_transition)
+# not shipped: solet_cli/tests/update_transition_bundle_candidates_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builds each bundle's candidate from seed_resolver, and the seed factory is in no capability bundle (fixture_build_tooling)
 
 # LM Studio provisioning, singleton login and passive diagnostics
 plugins/github_midwife_plugin/tests/lm_studio_provisioning_smoke.py
@@ -5386,6 +5391,15 @@ plugins/github_midwife_plugin/tests/apple_model_availability_warning_smoke.py
 # driver runs under inspect, import or update (raw-git controls prove each surface is live).
 # iss_836499b3 review R2-2: an enrollment interrupted before it finished, then a Manager upgrade, is
 # superseded and finished by `update --yes` (and by the printed `import` repair), never a raw error.
+# iss_6d26db73 (r52): an LM Studio solet's plugin transition to the Apple-native stack -- preview, apply,
+# preserved operator edits, interruption and repeat; the update defers a not-ready transition, promotes
+# needs_attention and retries it (crash legs at every boundary). iss_9166af93: embedding inputs split to the
+# provider's token budget, never truncated; the chunking-policy backfill re-embeds refused and head-only events.
+ananta/tests/llm/session_ledger/embedding_token_budget_smoke.py
+# rul_ffd59e37 / rul_ef0363a2 / rul_c11cf191: per bundle, against candidates pruned as assembly prunes -- LM Studio
+# and Apple-native predecessors update; macOS 26 keeps LM Studio for embeddings and summaries (rul_5cc2910c); a host
+# that later reaches macOS 27 switches at the next release; an interrupted switch
+# is put back; a fresh solet never gets the transition-retained plugins; LM Studio and its models stay byte-identical.
 # iss_fcbfabb7: a create blocked only at completion (the r46-r48 embeddings checks) updates and
 # promotes; one predicate gates update and import at preview and apply; installs in flight and identity
 # mismatches still refuse; the predicate is proven over every checkpoint assignment.

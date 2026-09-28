@@ -17,6 +17,10 @@ if TYPE_CHECKING:
     from .assets import InstalledAsset
 
 T = TypeVar("T")
+#: The oldest macOS this runtime serves on. 27 for now (rul_5cc2910c): Core AI Nomic has only been run on 27, so a
+#: macOS 26 update keeps LM Studio; lowering it after the macOS 26 measurement (iss_c6abab0d) is a data change here
+#: and in the release flow's host_profiles.apple_embeddings.macos_major_min, pinned equal by embedding_token_budget_smoke.
+MIN_MACOS_MAJOR = 27
 
 
 class EmbeddingRuntime:
@@ -66,8 +70,8 @@ class EmbeddingRuntime:
     def _verified_asset(self) -> "InstalledAsset":
         from .assets import AssetCorruptError, AssetMissingError, verify_installed_asset
 
-        if platform.system() != "Darwin" or platform.mac_ver()[0].split(".")[0] != "27":
-            raise EmbeddingError(ErrorCode.UNAVAILABLE, "Core AI embeddings require macOS 27")
+        if platform.system() != "Darwin" or int(platform.mac_ver()[0].split(".")[0] or "0") < MIN_MACOS_MAJOR:
+            raise EmbeddingError(ErrorCode.UNAVAILABLE, f"Core AI embeddings require macOS {MIN_MACOS_MAJOR} or later")
         try:
             return verify_installed_asset(self.asset_root)
         except AssetMissingError as exc:
@@ -81,6 +85,15 @@ class EmbeddingRuntime:
         self._native = NativeModel()
         self._runner.run(self._native.load(asset.model_path, self.preference))
         self._runner.run(self._native.embed(self._tokenizer.encode("readiness probe")))
+
+    def count_tokens(self, text: str) -> int:
+        """The prepared tokenizer's count for one input, on the owner thread."""
+        return self._call(lambda: self._count(text))
+
+    def _count(self, text: str) -> int:
+        if self._tokenizer is None:
+            raise EmbeddingError(ErrorCode.UNAVAILABLE, "Runtime has not been prepared")
+        return self._tokenizer.count(text)
 
     def generate(self, texts: list[str]) -> list[list[float]]:
         """Validate all token lengths before producing any batch output."""

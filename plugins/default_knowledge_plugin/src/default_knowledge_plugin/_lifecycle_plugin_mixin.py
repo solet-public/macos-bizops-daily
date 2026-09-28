@@ -10,6 +10,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from ananta.interfaces.embedding_service_interface import TokenBudget
+
 from .constants import PLUGIN_NAME
 from .kb_lifecycle import (
     activate_kb,
@@ -34,6 +37,8 @@ class KnowledgeLifecyclePluginMixin:
         _memory_service: Any
         _state_service: Any
 
+        def _embedding_budget(self) -> TokenBudget | None: ...
+
     def install(self, name: str, source: str | None = None) -> dict[str, Any]:
         """Index a knowledge base directory."""
         if self._kb_root is None:
@@ -41,6 +46,7 @@ class KnowledgeLifecyclePluginMixin:
         return install_kb(
             name, source, self._kb_root,
             self._state_service, self._memory_service, self._address_book_service,
+            budget=self._embedding_budget(),
         )
 
     def ingest(self, name: str) -> dict[str, Any]:
@@ -50,6 +56,7 @@ class KnowledgeLifecyclePluginMixin:
         return ingest_kb(
             name, self._kb_root,
             self._state_service, self._memory_service, self._address_book_service,
+            budget=self._embedding_budget(),
         )
 
     def uninstall(self, name: str, remove_files: bool = False) -> dict[str, Any]:
@@ -62,6 +69,7 @@ class KnowledgeLifecyclePluginMixin:
         """Pull upstream changes (git) or reindex changed files (local)."""
         return update_kb(
             name, self._state_service, self._memory_service, self._address_book_service,
+            budget=self._embedding_budget(),
         )
 
     def list_installed(self, active_only: bool = False) -> dict[str, Any]:

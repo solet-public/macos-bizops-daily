@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from ananta.interfaces.embedding_service_interface import TokenBudget
+from ananta.services.embedding_service.input_budget import split_to_fit
 from ananta.services.memory_service.actr.constants import (
     EMBEDDING_MAX_CHARS,
 )
@@ -382,8 +384,16 @@ def index_files(
     manifest: Manifest,
     memory_service: Any,
     files: list[Path] | None = None,
+    *,
+    budget: TokenBudget | None,
 ) -> tuple[list[str], int]:
-    """Index files into memory. Returns (memory_ids, chunk_count)."""
+    """Index files into memory. Returns (memory_ids, chunk_count).
+
+    ``budget`` is the embedding provider's declared per-input ceiling
+    (iss_9166af93): a chunk whose enriched text (preamble included) the
+    provider would refuse is split further to fit, never truncated.  ``None``
+    (a provider that declares no ceiling) keeps the character bound alone.
+    """
     if files is None:
         files = collect_files(kb_dir, manifest)
 
@@ -417,7 +427,7 @@ def index_files(
         )
         chunks = chunk_file(content, adjusted, relative)
 
-        for chunk_content in chunks:
+        for chunk_content in _fit_to_budget(chunks, preamble, budget):
             enriched = f"{preamble}\n{chunk_content}"
             if len(enriched) > EMBEDDING_MAX_CHARS:
                 raise ValueError(
@@ -434,6 +444,22 @@ def index_files(
             chunk_count += 1
 
     return memory_ids, chunk_count
+
+
+def _fit_to_budget(chunks: list[str], preamble: str, budget: TokenBudget | None) -> list[str]:
+    """Each chunk as-is when its enriched text fits the provider budget; otherwise split to fit."""
+    if budget is None:
+        return chunks
+    fitted: list[str] = []
+    for chunk in chunks:
+        pieces = split_to_fit(chunk, lambda piece: budget.fits(f"{preamble}\n{piece}"))
+        if len(pieces) > 1:
+            logger.info(
+                "%s: chunk over the %d-token embedding ceiling split into %d pieces",
+                PLUGIN_NAME, budget.max_input_tokens, len(pieces),
+            )
+        fitted.extend(pieces)
+    return fitted
 
 
 def delete_kb_chunks(memory_ids: list[str], memory_service: Any) -> None:

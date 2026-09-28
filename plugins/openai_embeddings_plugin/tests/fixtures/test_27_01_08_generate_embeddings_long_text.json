@@ -1,0 +1,12 @@
+{
+  "name": "test_generate_embeddings_long_text",
+  "description": "Generate embeddings for longer text passages",
+  "process_key": "plugin::openai_embeddings_plugin::generate_embeddings_action",
+  "arguments": {
+    "inputs": [
+      "Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any system that perceives its environment and takes actions that maximize its chance of achieving its goals. The term artificial intelligence had previously been used to describe machines that mimic and display human cognitive skills that are associated with the human mind, such as learning and problem-solving."
+    ],
+    "input_type": "text"
+  },
+  "timeout_seconds": 120
+}
