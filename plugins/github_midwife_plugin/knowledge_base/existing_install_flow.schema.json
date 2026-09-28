@@ -71,6 +71,7 @@
     "supported_predecessor": {
       "type": "object",
       "additionalProperties": false,
+      "description": "A predecessor identity the existing-install flow recognises. A row with a non-null legacy_anchor_id may be an inert reserved anchor rather than a currently-known real seed: iss_3272e5f6 verified (2026-09-28) that the 'stable-pre-manager-seed-v1' row's commit/tree/provenance_sha256/seed_id/origin_id/manifest_sha256 are byte-for-byte the deterministic output of solet_cli/tests/existing_install_inspection_contract_smoke.py::_create_released_anchor_target's synthetic PROVENANCE.json fixture (reproduced independently against the same git author/committer dates and message), not a real commit ever pushed to https://github.com/solet-public/macos-bizops.git (absent from every branch, tag and ref there as of that date). It is kept exactly as the paired smoke expects, because it can never match a real clone (no real macos-bizops history reaches that commit) and no replacement value is known; retire it once a real pre-Manager predecessor is identified, or when PRE_MANAGER_SEED coverage is redesigned to not depend on a fixed commit.",
       "required": [
         "repository",
         "commit",

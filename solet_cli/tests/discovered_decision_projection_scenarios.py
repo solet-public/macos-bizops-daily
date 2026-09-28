@@ -267,8 +267,11 @@ def _check_genesis_profile_projection(
             "clone_directory": str((root / "projection-macos-bizops").resolve()),
             "setup_profile": "macos-bizops",
             "autostart": "enabled",
+            # Genesis resolves its roster from the implementation decisions (iss_3a2a74ea).
+            "embeddings_implementation": "lm_studio",
+            "inference_implementation": "lm_studio",
         },
-        "genesis carries its resolved profile and independent autostart decisions",
+        "genesis carries its resolved profile, autostart and implementation decisions",
     )
 
 

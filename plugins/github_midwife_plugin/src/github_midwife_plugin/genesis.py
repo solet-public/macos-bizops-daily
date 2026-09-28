@@ -40,9 +40,10 @@ import json
 import os
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 from macos_vault_plugin.keychain import MASTER_KEY_ACCOUNT, PerCredentialKeychain, SystemKeychain
@@ -57,9 +58,10 @@ from .command_launcher import (
 from .credential_seed import CredentialSeedError, seed_db_password
 from .git_init import GitInitError, git_init_worktree
 from .manifest_marker import build_marker_payload, write_marker
+from .profile_implementations import IMPLEMENTATION_DECISIONS
 from .profile_install import ProfileInstallError, install_profile_allowlist, load_plugin_allowlist
 from .router_install import RouterInstallError, RouterInstallResult, install_router_at_birth
-from .setup_operations import CoreAIRosterError, coreai_autostart_deferral
+from .setup_operations import CoreAIRosterError, autostart_deferral, coreai_autostart_deferral
 from .steps import GenesisContext, run_steps
 from .vault_passphrase_seed import (
     clear_vault_passphrase_stale_check_pending,
@@ -76,11 +78,16 @@ _AUTOSTART_INSTALL_OPERATION_REF = "genesis::autostart.install"
 _STALE_VAULT_PRECHECK_ARGUMENT = "--check-vault-stale-state"
 _PROVENANCE_FILENAME = "PROVENANCE.json"
 _COREAI_ASSET_PENDING_STATUS = "deferred_coreai_asset_pending"
+_LLAMA_CPP_CONFIG_PENDING_STATUS = "deferred_llama_cpp_config_pending"
 _PROFILE_TEMPLATE_BY_BUNDLE = {
     "macos_free_minimal": "macos-free-solet",
     "macos-bizops": "macos-bizops",
     "macos_samantha": "macos-samantha-solet",
 }
+
+
+#: No implementation decisions: genesis installs the template's roster as written.
+_NO_IMPLEMENTATIONS: Mapping[str, str] = MappingProxyType({})
 
 
 class GenesisError(RuntimeError):
@@ -168,6 +175,7 @@ def run_genesis(
     clone_root: Path,
     profile_name: str = _DEFAULT_PROFILE_NAME,
     autostart: bool = True,
+    implementations: Mapping[str, str] = _NO_IMPLEMENTATIONS,
     keychain: PerCredentialKeychain | None = None,
     alter_role_password: Callable[[str], None] | None = None,
     role_authenticates: Callable[[str], bool] | None = None,
@@ -215,16 +223,19 @@ def run_genesis(
     profile_name = resolve_profile_name(clone_root, profile_name)
     kb_root = _resolve_kb_root(clone_root)
     venv_dir = clone_root / ".venv"
+    selected = dict(implementations)
 
     try:
         allowlist = load_plugin_allowlist(
-            kb_root / "profile_templates" / f"{profile_name}.yaml"
+            kb_root / "profile_templates" / f"{profile_name}.yaml", selected
         )
         install_profile_allowlist(venv_dir=venv_dir, target=clone_root, plugin_allowlist=allowlist)
     except ProfileInstallError as exc:
         raise GenesisError(f"profile-driven allowlist install failed: {exc}") from exc
 
-    ctx = GenesisContext(name=name, profile_name=profile_name, target=clone_root, kb_root=kb_root)
+    ctx = GenesisContext(
+        name=name, profile_name=profile_name, target=clone_root, kb_root=kb_root, implementations=selected,
+    )
     steps = run_steps(ctx)
     last_step = steps[-1] if steps else {}
     if last_step.get("status") == "failed":
@@ -299,6 +310,7 @@ def run_genesis(
         launchctl_run=launchctl_run,
         phases=phases,
         finalize_marker=_finalize_marker,
+        embeddings_implementation=selected.get("embeddings_implementation"),
     )
 
     # SEED-06: install the blue-green router right after the main autostart
@@ -396,6 +408,21 @@ def _coreai_deferral(clone_root: Path) -> str | None:
         raise GenesisError(f"autostart gate could not read the plugin roster: {exc}") from exc
 
 
+def _autostart_hold(clone_root: Path, embeddings_implementation: str | None) -> tuple[str, str, str] | None:
+    """Return (reason, detail, status) when the first boot must wait, else None.
+
+    Core AI keeps its asset gate. On the llama.cpp path the solet waits for
+    the embeddings address-book entry the models stage writes (iss_aec1ef16).
+    """
+    deferral = _coreai_deferral(clone_root)
+    if deferral is not None:
+        return "coreai_asset_pending", deferral, _COREAI_ASSET_PENDING_STATUS
+    pending = autostart_deferral(clone_root, embeddings_implementation)
+    if pending is not None:
+        return "llama_cpp_config_pending", pending, _LLAMA_CPP_CONFIG_PENDING_STATUS
+    return None
+
+
 def _install_autostart(
     name: str,
     clone_root: Path,
@@ -426,6 +453,7 @@ def _run_autostart_phase(
     launchctl_run: Runner | None,
     phases: list[dict[str, Any]],
     finalize_marker: Callable[[str], None],
+    embeddings_implementation: str | None = None,
 ) -> tuple[str, str | None]:
     if not enabled:
         phases.append({
@@ -435,15 +463,16 @@ def _run_autostart_phase(
         })
         return "not_requested", None
     try:
-        deferral = _coreai_deferral(clone_root)
-        if deferral is not None:
+        hold = _autostart_hold(clone_root, embeddings_implementation)
+        if hold is not None:
+            reason, detail, status = hold
             phases.append({
                 "step_name": "install_autostart",
                 "status": "deferred",
-                "reason": "coreai_asset_pending",
-                "detail": deferral,
+                "reason": reason,
+                "detail": detail,
             })
-            return _COREAI_ASSET_PENDING_STATUS, None
+            return status, None
         installed = _install_autostart(name, clone_root, plist_dir, home_dir, launchctl_run)
     except GenesisError as exc:
         phases.append({"step_name": "install_autostart", "status": "failed", "error": str(exc)})
@@ -728,6 +757,7 @@ def main() -> int:
             clone_root=clone_root,
             profile_name=profile_name,
             autostart=_autostart_from_environment(),
+            implementations=_implementations_from_environment(),
         )
         _write_genesis_marker(
             name=name, clone_root=clone_root, profile_name=profile_name, result=result
@@ -757,6 +787,20 @@ def _autostart_from_environment() -> bool:
     raise GenesisError(
         f"{_AUTOSTART_ENV_VAR} must be exactly 'enabled' or 'disabled', got {value!r}"
     )
+
+
+def _implementations_from_environment() -> dict[str, str]:
+    """The setup's implementation decisions (SOLET_EMBEDDINGS_IMPLEMENTATION, SOLET_INFERENCE_IMPLEMENTATION); unset ones are absent."""
+    selected: dict[str, str] = {}
+    for decision in IMPLEMENTATION_DECISIONS:
+        variable = f"SOLET_{decision.upper()}"
+        value = os.environ.get(variable)
+        if value is None:
+            continue
+        if not value.strip():
+            raise GenesisError(f"{variable} is set but empty")
+        selected[decision] = value.strip()
+    return selected
 
 
 def _operation_ref_from_environment() -> str:

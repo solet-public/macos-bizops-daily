@@ -116,6 +116,10 @@ def probe_handlers() -> dict[str, ProbeHandler]:
         session_retrieval,
         session_roots,
     )
+    from .llama_cpp_setup import embedding_config_valid as llama_cpp_embedding_config_valid
+    from .llama_cpp_setup import inference_config_valid as llama_cpp_inference_config_valid
+    from .llama_cpp_setup import models_present as llama_cpp_models_present
+    from .llama_cpp_setup import services_current as llama_cpp_services_current
     from .lm_studio_provisioning import probe_handlers as lm_studio_handlers
 
     handlers: dict[str, ProbeHandler] = {
@@ -126,6 +130,11 @@ def probe_handlers() -> dict[str, ProbeHandler]:
         "setup::apple.inference_config_valid": inference_config_valid,
         "setup::apple.model_availability": model_availability,
         **lm_studio_handlers(),
+        "setup::llama_cpp.server_available": _llama_server_available,
+        "setup::llama_cpp.models_present": llama_cpp_models_present,
+        "setup::llama_cpp.services_current": llama_cpp_services_current,
+        "setup::llama_cpp.embedding_config_valid": llama_cpp_embedding_config_valid,
+        "setup::llama_cpp.inference_config_valid": llama_cpp_inference_config_valid,
         "setup::tmux.probe": _tmux,
         "hydration::shell.probe_path": shell_path,
         "hydration::shell.probe_python": shell_python,
@@ -305,6 +314,15 @@ def _node_available(request: AdapterRequest, runtime: Runtime) -> JsonObject:
         "Install Node through the Codex-selected provisioning operation.",
         source=f"executable:{executable}",
     )
+
+
+def _llama_server_available(request: AdapterRequest, runtime: Runtime) -> JsonObject:
+    repair = "Install llama.cpp through setup's system step."
+    executable = resolve_executable(runtime, "llama-server")
+    if executable is None:
+        return _boolean_probe(request, "llama_cpp_server_available", False, False, "executable:llama-server unresolved", repair)
+    outcome = runtime.run((executable, "--version"), timeout_seconds=10)
+    return _command_probe(request, outcome, "llama_cpp_server_available", repair, source=f"executable:{executable}")
 
 
 def _generic_process(request: AdapterRequest, runtime: Runtime) -> JsonObject:

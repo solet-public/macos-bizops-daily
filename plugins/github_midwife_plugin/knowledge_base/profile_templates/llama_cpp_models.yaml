@@ -1,0 +1,66 @@
+# Reviewed llama.cpp model artifacts for Macs below macOS 27 (iss_3a2a74ea).
+#
+# Setup selects llama.cpp for summaries and embeddings on a Mac below the
+# Apple-native host profiles (macOS 27 on arm64). Each role runs its own
+# host-shared, loopback-only `llama-server` login service. Before serving, the
+# service fetches its model from the pinned Hugging Face revision and accepts
+# it only at the declared size and SHA-256 (resumable; a slow or failed download
+# finishes in the background and is a warning, never a blocked setup stage,
+# rul_18bd93a3). Models live in the host-shared directory
+# ~/Library/Application Support/Solet/llama.cpp/models/<repository>/<revision>/
+# and, like the services, are never removed by a solet.
+#
+# Roles name a catalog entry by `model:`, so switching a role to another
+# reviewed model is a one-line edit (for example summaries: qwen3-4b-q4_k_m).
+# Sizes and SHA-256 values were read from the Hugging Face API at the pinned
+# revision and re-verified against a download on 2026-09-28.
+schema_version: 1
+formula: llama.cpp
+executable: llama-server
+host: 127.0.0.1
+
+roles:
+  summaries:
+    decision: inference_implementation
+    consumed_by: default_inference_plugin
+    model: qwen3-8b-q4_k_m
+    port: 18180
+    # One 8192-token slot, matching the LM Studio load; thinking off so a summary is plain content.
+    server_args: ["--ctx-size", "8192", "--parallel", "1", "--reasoning", "off"]
+    # Written into default_inference_plugin's config beside base_url and model.
+    plugin_config:
+      context.model_context_tokens: 8192
+  embeddings:
+    decision: embeddings_implementation
+    consumed_by: openai_embeddings_plugin
+    model: nomic-embed-text-v1.5-f16
+    port: 18181
+    # llama.cpp clamps an embedding model to its 2048-token training context; the
+    # physical batch must hold a whole input (measured 2026-09-28).
+    server_args: ["--embeddings", "--parallel", "1", "--ctx-size", "2048", "--batch-size", "2048", "--ubatch-size", "2048"]
+    # Declared to openai_embeddings_plugin, which counts inputs with the server's /tokenize.
+    max_input_tokens: 2048
+
+models:
+  qwen3-8b-q4_k_m:
+    alias: qwen3-8b
+    repository: lmstudio-community/Qwen3-8B-GGUF
+    revision: 07ebe812301319d9947477e3a94ab8aa587bb3af
+    filename: Qwen3-8B-Q4_K_M.gguf
+    size_bytes: 5027783968
+    sha256: a7676d257b10f3ce23aedba45e64ba61a5aa295f0009d87c5627f6c026a8f35f
+  qwen3-4b-q4_k_m:
+    alias: qwen3-4b
+    repository: lmstudio-community/Qwen3-4B-GGUF
+    revision: aaffcf9c16d545f8a889846b98676ddf359aa9e9
+    filename: Qwen3-4B-Q4_K_M.gguf
+    size_bytes: 2497280704
+    sha256: d0c2ac093a77c402f2ddc23a64f68b7c70cfef151899b33e3a6066247104ced3
+  nomic-embed-text-v1.5-f16:
+    # The same artifact LM Studio serves, so vectors stay in the LM Studio and Core AI Nomic space.
+    alias: nomic-embed-text-v1.5
+    repository: gaianet/Nomic-embed-text-v1.5-Embedding-GGUF
+    revision: 01b698953cf90266dcce3eedcaddb34feaec026e
+    filename: nomic-embed-text-v1.5.f16.gguf
+    size_bytes: 274290560
+    sha256: f7af6f66802f4df86eda10fe9bbcfc75c39562bed48ef6ace719a251cf1c2fdb

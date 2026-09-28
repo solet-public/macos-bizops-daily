@@ -9,6 +9,7 @@ from .condition_evaluator import condition_matches
 from .contracts import ContractBundle, active_decision_ids
 from .decision_state import is_declined_answer
 from .errors import ContractError
+from .host_option_binding import host_bound
 from .models import JsonValue
 
 
@@ -131,13 +132,14 @@ def static_decision_prompts(
     bundle: ContractBundle,
     plan: DecisionPromptPlan,
 ) -> list[JsonValue]:
-    """Render unresolved static choices without inventing defaults."""
+    """Render unresolved static choices without inventing defaults; only options this Mac can take are offered."""
 
+    choosing = host_bound(bundle, _answer_decisions(plan.answers), {})
     prompts: list[JsonValue] = []
     for decision_id in plan.unresolved_decisions:
         prompt = _static_decision_prompt(
             decision_id,
-            bundle.decisions[decision_id],
+            choosing.decisions[decision_id],
             _answer_decisions(plan.answers),
         )
         if prompt is not None:

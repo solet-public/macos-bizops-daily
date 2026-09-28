@@ -5213,6 +5213,15 @@ solet_cli/tests/update_runtime_execution_smoke.py
 solet_cli/tests/existing_install_router_cutover_smoke.py
 plugins/github_midwife_plugin/tests/existing_install_operations_smoke.py
 
+# Every shipped contract/flow JSON or YAML under plugins/*/knowledge_base/ and
+# solet_cli/src/solet_manager/released_metadata/ scanned for a placeholder
+# leaf value (repeated-hex-char run, the 123e4567 example UUID family, an
+# all-zero/all-f hex run, a bare TODO/FIXME/XXX/CHANGEME/PLACEHOLDER/EXAMPLE
+# token), with a narrow evidence-cited allowlist for the one verified,
+# deliberately-synthetic exception (iss_3272e5f6). A self-test proves the
+# scanner actually detects an injected, unallowlisted violation.
+solet_cli/tests/shipped_predecessor_identity_smoke.py
+
 # WS5 Step 6 (existing-install doctor/resume/promotion, iss_4851c5c8 / chg_54bfee65):
 # closed v4 update journal (abandoned/doctor/promoting/promoted statuses, recovers,
 # source_mode, retirement, per-row operation_type, v3 upgrade) (offline); the
@@ -5411,3 +5420,15 @@ ananta/tests/llm/session_ledger/embedding_token_budget_smoke.py
 # without a contract entry, a contract entry without a manifest exclude, and a contract entry without
 # a marker; reproduces the exact three-file state that broke r50's publish (master 87796aab4); GREEN
 # on the real repo's own contract; and the gate CLI itself exits 0 clean over the real repo.
+
+# 2026-09-28 fresh macOS 26 (Tahoe) create on llama.cpp (iss_3a2a74ea, rul_c11cf191): the Manager
+# binds fresh embeddings/summaries choices to r52's host profiles (26.x, 27.x, unmeasurable, recorded
+# answers never re-judged); the llama.cpp service plan, plugin binding and loopback config; a missing
+# model is a warning (rul_18bd93a3); the macOS 26 install closure reaches no macOS 27-only wheel; and
+# openai_embeddings_plugin declares the llama.cpp budget through TokenBudget counted by /tokenize.
+# All offline: fixture host readings, an in-memory launchd, an in-process HTTP transport.
+solet_cli/tests/fresh_tahoe_host_gate_smoke.py
+plugins/github_midwife_plugin/tests/llama_cpp_service_plan_smoke.py
+plugins/github_midwife_plugin/tests/llama_cpp_missing_model_warning_smoke.py
+plugins/github_midwife_plugin/tests/tahoe_closure_no_macos27_wheel_smoke.py
+plugins/openai_embeddings_plugin/tests/llama_cpp_token_budget_smoke.py

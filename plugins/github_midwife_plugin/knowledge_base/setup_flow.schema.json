@@ -54,6 +54,9 @@
     "target": {
       "$ref": "#/definitions/target"
     },
+    "host_profiles": {
+      "$ref": "#/definitions/host_profile_registry"
+    },
     "distribution": {
       "$ref": "#/definitions/distribution"
     },
@@ -251,6 +254,33 @@
           "minItems": 1
         }
       ]
+    },
+    "host_profile_registry": {
+      "description": "Named host thresholds measured by the Manager (sw_vers -productVersion and uname -m); the same thresholds the release's existing-install flow declares.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_]{0,63}$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["macos_major_min", "machine"],
+          "properties": {
+            "macos_major_min": {"type": "integer", "minimum": 11, "maximum": 99},
+            "machine": {"type": "string", "pattern": "^[a-z0-9_]{1,32}$"}
+          }
+        }
+      }
+    },
+    "host_condition": {
+      "description": "Host condition for offering a static option: 'meets' requires the measured host to satisfy the named host profile, 'below' requires it not to.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host_profile", "operator"],
+      "properties": {
+        "host_profile": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+        "operator": {"enum": ["meets", "below"]}
+      }
     },
     "target": {
       "type": "object",
@@ -858,6 +888,9 @@
         "available_when": {
           "$ref": "#/definitions/decision_condition",
           "description": "Decision-only condition for selecting this option; every referenced decision must be resolved before evaluation."
+        },
+        "host_available_when": {
+          "$ref": "#/definitions/host_condition"
         },
         "unavailable_reason": {
           "$ref": "#/definitions/non_empty_string"

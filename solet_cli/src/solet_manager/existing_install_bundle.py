@@ -175,6 +175,15 @@ SEED_SIDE_OPERATION_REFS = tuple(item.operation_ref for item in EXISTING_OPERATI
 
 @dataclass(frozen=True, slots=True)
 class SupportedPredecessor:
+    """One predecessor identity the existing-install flow recognises.
+
+    A ``legacy_anchor_id`` row can be a reserved, currently-inert anchor
+    rather than a known real seed: see the ``supported_predecessor``
+    schema description (iss_3272e5f6) for the verified ``stable-pre-manager-
+    seed-v1`` case, whose identity fields never match a real
+    ``solet-public/macos-bizops`` clone.
+    """
+
     repository: str
     commit: str
     tree: str

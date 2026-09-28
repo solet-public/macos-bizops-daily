@@ -22,12 +22,14 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from .constants import PROFILE_BASELINE_SUBDIR, PROFILE_TEMPLATES_SUBDIR
+from .profile_implementations import ProfileImplementationError, resolve_implementations
 
 # The plugin whose boot-time seed loader reads the entries file this module
 # materializes (finding F9). Its `prepare_for_readiness` calls
@@ -124,7 +126,9 @@ def _substitute_profile_override_placeholders(
     )
 
 
-def load_profile(kb_root: Path, profile_name: str) -> dict[str, Any]:
+def load_profile(
+    kb_root: Path, profile_name: str, implementations: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
     """Load `<kb_root>/profile_templates/<profile_name>.yaml` as a raw dict.
 
     Deliberately NOT `macos_midwife_plugin.profile_template_loader`'s
@@ -142,7 +146,10 @@ def load_profile(kb_root: Path, profile_name: str) -> dict[str, Any]:
         raise ConfigMaterializeError(
             f"profile template did not parse to a mapping: {path}"
         )
-    return raw
+    try:
+        return resolve_implementations(raw, implementations or {})
+    except ProfileImplementationError as exc:
+        raise ConfigMaterializeError(f"profile template {path}: {exc}") from exc
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -463,6 +470,7 @@ def write_address_book_entries(
 
 def materialize_profile(
     *, target: Path, kb_root: Path, profile_name: str, name: str,
+    implementations: Mapping[str, str] | None = None,
 ) -> dict[str, list[Path]]:
     """Run every writer in the canonical order; return a paths-written map.
 
@@ -471,7 +479,7 @@ def materialize_profile(
     substitution -- the explicit newborn name, never the ambient env var
     (verb-mode runs in the parent's process).
     """
-    profile = load_profile(kb_root, profile_name)
+    profile = load_profile(kb_root, profile_name, implementations)
     written: dict[str, list[Path]] = {}
     # Scaffold FIRST: the runtime-required empty dirs a seed clone arrives
     # without (git tracks no empty dirs) -- cold-run D9.

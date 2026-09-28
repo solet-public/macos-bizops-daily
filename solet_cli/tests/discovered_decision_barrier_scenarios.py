@@ -89,6 +89,9 @@ _GOLDEN_APPLY_TRACE: tuple[tuple[str, str, JsonObject], ...] = (
         {
             "autostart": "enabled",
             "clone_directory": "$TARGET",
+            # Genesis resolves its roster from the implementation decisions (iss_3a2a74ea).
+            "embeddings_implementation": "lm_studio",
+            "inference_implementation": "lm_studio",
             "setup_profile": "macos-" + "biz" + "ops",
             "solet_name": "barrier-terminal",
         },

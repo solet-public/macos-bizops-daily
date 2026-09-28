@@ -64,6 +64,7 @@ _ROUTES: dict[str, tuple[str, str]] = {
     "install_codex_cli": ("setup::coding_agents.install_codex", "operation"),
     "install_claude_cli": ("setup::coding_agents.install_claude", "operation"),
     "install_node": ("setup::coding_agents.install_node", "operation"),
+    "install_llama_cpp": ("setup::llama_cpp.install", "operation"),
     "install_lm_studio": ("setup::lm_studio.install", "operation"),
     "start_lm_studio_server": ("setup::lm_studio.start_server", "operation"),
     "pull_lm_studio_embedding_model": ("setup::lm_studio.pull_embedding", "operation"),
@@ -143,6 +144,9 @@ _CODING_TOOL_ACQUISITIONS: dict[str, tuple[str, str, str]] = {
     "install_codex_cli": ("codex", "cask", "codex"),
     "install_claude_cli": ("claude", "cask", "claude-code"),
     "install_node": ("node", "formula", "node"),
+    # Summaries and embeddings for Macs below macOS 27 (iss_3a2a74ea); new dependencies
+    # Homebrew reports as reachable from llama.cpp (ggml, libomp) pass the dry-run guard.
+    "install_llama_cpp": ("llama-server", "formula", "llama.cpp"),
 }
 
 

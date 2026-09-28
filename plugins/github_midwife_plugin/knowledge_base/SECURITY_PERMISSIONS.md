@@ -72,6 +72,15 @@ An item with no declared System Settings pane or denial behavior says so explici
 - SYSTEM SETTINGS PANE: Not applicable (no System Settings path declared).
 - GRANT ACTOR: user
 
+### llama.cpp background items (`llama_cpp_background_items_permission`)
+
+- WHAT: llama.cpp background items
+- WHY: Allow the host-shared llama.cpp summaries and embeddings services to start after login.
+- WHEN: When (`embeddings_implementation` equals `llama_cpp`) or (`inference_implementation` equals `llama_cpp`).
+- WHAT DENIAL DOES: disable_capability
+- SYSTEM SETTINGS PANE: General > Login Items & Extensions
+- GRANT ACTOR: user
+
 ### LM Studio background item (`lm_studio_background_items_permission`)
 
 - WHAT: LM Studio background item

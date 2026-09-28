@@ -60,7 +60,14 @@ Three things to know before the first `solet create`:
   recommended, Apple-native options (Core AI Nomic embeddings, Apple
   Foundation Models inference — macOS 27 on Apple-silicon hardware, with
   Apple Intelligence available) download and verify a SHA-256-pinned model
-  archive with a single operator approval. LM Studio remains an available
+  archive with a single operator approval. On macos-bizops, a Mac running
+  macOS 26 (Tahoe) is offered llama.cpp in place of both Apple choices:
+  setup installs Homebrew llama.cpp and runs two loopback services, one for
+  summaries (Qwen3 8B) and one for embeddings (the same Nomic v1.5 model LM
+  Studio serves). Each model is pinned by SHA-256 and downloads in the
+  background; a model still downloading is a warning, not a stop. Core AI has
+  never run on macOS 26, so embeddings use llama.cpp there in this release.
+  LM Studio remains an available
   alternative; if selected instead, the manager installs it, pulls the
   required models, and loads them automatically. Stage-by-stage detail and
   recovery for both paths are in the Homebrew install troubleshooting

@@ -27,3 +27,5 @@ class EntryField(StrEnum):
     MODEL = "model"
     API_KEY = "api_key"
     TIMEOUT_SECONDS = "timeout_seconds"
+    # Optional: the server's per-input token ceiling, counted with its /tokenize (llama.cpp).
+    MAX_INPUT_TOKENS = "max_input_tokens"

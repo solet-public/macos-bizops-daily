@@ -8,7 +8,7 @@ Article Role: operations_runbook
 
 Article Tags: planning-stage:solet-lifecycle, evidence-category:operations-runbook, domain:local-solet, domain:client-deployment, consumer_profile:both
 
-Embedding Description: Agent-facing runbook for installing a solet on a Mac through the Homebrew path (brew install solet-public/tap/solet, then solet create), explaining the preview-then-approve loop and its exit codes, the nine setup stages in order, how to read the manager's JSON when a stage stops (message, repair, error_kind, decision_errors, unresolved_actions, probe statuses), the automated LM Studio provisioning operations in system_dependencies (pinned installer, JIT disabled, exact artifacts, explicit CPU loading and shared login job), and recovery for older releases with manual provisioning, what it means when an LM Studio model download sits stuck at 0% forever with no error while the server and daemon both report healthy (an unpinned installer build that cannot transfer bytes, not a network problem, fixed by pinning the installer version), where the instance, transaction journal, install-state projection, logs and LaunchAgent live, stage-by-stage recovery for PostgreSQL, pgvector, cask installs, stale Keychain names and crash-looping services, the 24 GB memory minimum, and the rule never to mix the manager path with the bootstrap.py path mid-run.
+Embedding Description: Agent-facing runbook for installing a solet on a Mac through the Homebrew path (brew install solet-public/tap/solet, then solet create), explaining the preview-then-approve loop and its exit codes, the nine setup stages in order, how to read the manager's JSON when a stage stops (message, repair, error_kind, decision_errors, unresolved_actions, probe statuses), the automated LM Studio provisioning operations in system_dependencies (pinned installer, JIT disabled, exact artifacts, explicit CPU loading and shared login job), how a fresh macos-bizops create on macOS 26 (Tahoe) runs Homebrew llama.cpp instead of the Apple-native stack (host-profile gate, two loopback llama-server login services, pinned GGUF models with SHA-256 readback, a missing model as a warning, the 2048-token embedding budget, measured speed and memory, swapping the summaries model), and recovery for older releases with manual provisioning, what it means when an LM Studio model download sits stuck at 0% forever with no error while the server and daemon both report healthy (an unpinned installer build that cannot transfer bytes, not a network problem, fixed by pinning the installer version), where the instance, transaction journal, install-state projection, logs and LaunchAgent live, stage-by-stage recovery for PostgreSQL, pgvector, cask installs, stale Keychain names and crash-looping services, the 24 GB memory minimum, and the rule never to mix the manager path with the bootstrap.py path mid-run.
 
 ## When to use this runbook
 
@@ -174,6 +174,94 @@ state is unknown, and does not change completion verification.
 `solet inspect <name> --json` reads named LM Studio conditions without starting
 the daemon or loading a model.
 
+## macOS 26 (Tahoe): llama.cpp for a fresh macos-bizops create
+
+The Apple-native choices need macOS 27 on Apple silicon: Core AI embeddings
+and Apple Foundation Models summaries. Setup measures the Mac with `sw_vers`
+and `uname -m` against the same host profiles the update flow uses. On a Mac
+below them it withholds both Apple choices and offers llama.cpp. On macOS 26
+the embeddings choice defaults to llama.cpp, and summaries offer llama.cpp in
+place of Apple Foundation Models. An explicit Apple selection is refused with
+the Mac's version in the message. If the Mac cannot be measured, setup stops
+the choice instead of guessing. A choice already recorded is never re-judged,
+so a solet keeps what it was created with after the Mac is upgraded.
+
+Why embeddings use llama.cpp on macOS 26 in this release: Core AI has never
+run on macOS 26, so the Core AI embeddings floor is macOS 27 (rul_5cc2910c,
+iss_c6abab0d). The llama.cpp embeddings serve the same Nomic v1.5 model that
+LM Studio serves, so vectors stay in the same space.
+
+What setup does when llama.cpp is selected (macos-bizops only):
+
+- `system_dependencies` installs the Homebrew `llama.cpp` formula only if
+  `llama-server` is absent.
+- `models` writes and loads one host-shared login service per selected role,
+  both listening only on `127.0.0.1`:
+  - `local.solet.llama-server.summaries` on port 18180, serving Qwen3 8B
+    Q4_K_M from `lmstudio-community/Qwen3-8B-GGUF` as `qwen3-8b`, with one
+    8192-token slot and reasoning off;
+  - `local.solet.llama-server.embeddings` on port 18181, serving
+    `nomic-embed-text-v1.5.f16.gguf` as `nomic-embed-text-v1.5`, with a
+    2048-token context.
+- Setup points `default_inference_plugin` and `openai_embeddings_plugin` at
+  those servers. The embeddings entry declares a 2048-token input budget, and
+  the plugin counts every input with the server's own `/tokenize`, so long
+  text is split to fit and never truncated.
+- Genesis installs those two plugins in place of the Apple ones, so no
+  macOS 27-only package is installed.
+- The solet does not start at genesis. Its autostart is deferred
+  (`deferred_llama_cpp_config_pending`) until `models` writes the
+  `openai_embeddings` address-book entry. `install_launchagent` then starts
+  it, the same way a Core AI solet waits for its pinned asset.
+
+Models: `plugins/github_midwife_plugin/knowledge_base/profile_templates/llama_cpp_models.yaml`
+pins each model by Hugging Face revision, size and SHA-256.
+
+- Before serving, each service fetches its model from that revision into
+  `~/Library/Application Support/Solet/llama.cpp/models/<repository>/<revision>/`.
+  It accepts the file only at the pinned size and SHA-256, and then writes a
+  `.verified` stamp.
+- A download resumes from its `.partial` file after any failure; launchd
+  retries the service every 60 seconds.
+- A model that is still downloading, or missing, is a **warning**, never a
+  blocked stage (rul_18bd93a3). `llama_cpp_models_present` reports the bytes
+  present so far.
+- Setup waits up to ten minutes for the embeddings server, which the solet
+  needs first. The 5 GB summaries model finishes in the background.
+- To seed a Mac without downloading, copy the exact file into that directory
+  before setup. The service verifies it the same way.
+
+Swapping the summaries model is a one-line change to `model:` under
+`roles.summaries` in the registry, for example `qwen3-4b-q4_k_m`, which is
+already pinned there.
+
+Measured on an M3 Ultra (256 GB) with Homebrew llama.cpp 0.5.0 (build 11146),
+through the rendered services on macOS 27:
+
+| Service | Ready | Speed | Memory |
+|---|---|---|---|
+| Summaries | 13.6 s on first start, including the SHA-256 of 5.0 GB | prompt 1,037 tokens/s (1,580 tokens), generation 88.8 tokens/s | RSS 6.0 GiB, footprint 1.5 GB |
+| Embeddings | 1.0 s on first start, including verification; 0.6 s after | a 2,048-token input in 0.20 s; a 40,500-character input split into 5 windows, all embedded | RSS 619 MiB, footprint 578 MB |
+
+Expect lower speeds on smaller Apple silicon. A macOS 26 guest has not yet
+run this path end to end.
+
+Where things live and how to look:
+
+- `launchctl print gui/$(id -u)/local.solet.llama-server.embeddings` (or
+  `.summaries`) shows whether a service is loaded and its last exit.
+- Logs are in `~/Library/Application Support/Solet/llama.cpp/logs/<role>.stderr.log`.
+- `curl -s http://127.0.0.1:18181/health` answers `{"status":"ok"}` once the
+  embeddings model is serving; port 18180 is summaries.
+
+Like the LM Studio job, these services are shared by every solet on the Mac.
+No solet removes them or their models. A definition that differs from the
+reviewed one is rewritten and reloaded by the next setup. If
+`llama_cpp_service_gui_session_required` stops the stage, log into the Mac's
+desktop as the setup account and preview again. Homebrew publishes
+`llama.cpp` bottles for Apple silicon; an Intel Mac would build it from
+source and is not covered by this path.
+
 ## Older releases: manual LM Studio recovery
 
 On a fresh Mac using a release without the seven operations, the preview stops at `models` with `error_kind:
@@ -308,9 +396,11 @@ services first, with the operator's approval, or picking a new name. A
 service that starts and exits shows a growing run count and a non-zero last
 exit in `launchctl print`; read the newest log under `profile/data/logs/`.
 
-**`models`.** The section above. `model_discovery_failed` means nothing
+**`models`.** The LM Studio section above. `model_discovery_failed` means nothing
 answered on `http://localhost:1234`; zero candidates with a running server
-means the models are absent or not the expected builds.
+means the models are absent or not the expected builds. On llama.cpp, see
+the macOS 26 section: a model warning clears on its own once the download
+verifies, and a service stop names its `launchctl` step in `repair`.
 
 **`coding_agents`, `session_sources`, `completion`.** These run the solet's
 own hydration steps and end-to-end checks. They have had less clean-machine

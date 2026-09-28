@@ -56,6 +56,16 @@
     ],
     "installation_scope": "per_user"
   },
+  "host_profiles": {
+    "apple_embeddings": {
+      "macos_major_min": 27,
+      "machine": "arm64"
+    },
+    "apple_fm": {
+      "macos_major_min": 27,
+      "machine": "arm64"
+    }
+  },
   "distribution": {
     "source_kind": "git_repository",
     "release_channel": "tag",
@@ -316,7 +326,8 @@
       "required": true,
       "resolution_stage_ref": "decision_review",
       "recommended_option_refs": [
-        "coreai"
+        "coreai",
+        "llama_cpp"
       ],
       "option_source": {
         "mode": "static",
@@ -324,6 +335,7 @@
           "coreai": {
             "label": "Core AI Nomic embeddings",
             "description": "Pinned local Nomic v1.5 model using Core AI on macOS 27 Apple Silicon.",
+            "host_available_when": {"host_profile": "apple_embeddings", "operator": "meets"},
             "availability": "supported",
             "implications": {
               "cost": "No per-call fee; the reviewed model asset is required.",
@@ -343,6 +355,32 @@
               "coreai_embedding_config_valid",
               "coreai_embedding_request_succeeds"
             ]
+          },
+          "llama_cpp": {
+            "label": "llama.cpp Nomic embeddings",
+            "description": "The pinned Nomic v1.5 GGUF served by a local llama.cpp server, for Macs below macOS 27.",
+            "available_when": {
+              "decision_ref": "setup_profile",
+              "operator": "equals",
+              "value": "macos-bizops"
+            },
+            "host_available_when": {"host_profile": "apple_embeddings", "operator": "below"},
+            "availability": "supported",
+            "implications": {
+              "cost": "No per-call fee; consumes local compute.",
+              "privacy": "Embedding text remains local.",
+              "security": "A loopback-only llama.cpp server from Homebrew serves one pinned model file verified against its SHA-256.",
+              "operator_effort": "None beyond the install: setup installs llama.cpp with Homebrew, downloads the pinned 274 MB model, and starts a login service.",
+              "performance": "Metal GPU with CPU fallback; the Nomic server uses about 0.6 GB of memory."
+            },
+            "activates": {
+              "component_refs": ["llama_cpp"],
+              "plugin_refs": ["openai_embeddings_plugin"],
+              "operation_refs": ["install_llama_cpp", "install_llama_cpp_services", "configure_llama_cpp_embeddings"],
+              "probe_refs": ["llama_cpp_server_available", "llama_cpp_models_present"],
+              "permission_refs": ["llama_cpp_background_items_permission"]
+            },
+            "verification_probe_refs": ["llama_cpp_services_current", "llama_cpp_embedding_config_valid"]
           },
           "lm_studio": {
             "label": "LM Studio",
@@ -458,6 +496,7 @@
       "recommended_option_refs": [
         "none",
         "apple_foundation_models",
+        "llama_cpp",
         "lm_studio"
       ],
       "option_source": {
@@ -489,6 +528,7 @@
               "operator": "equals",
               "value": "macos-bizops"
             },
+            "host_available_when": {"host_profile": "apple_fm", "operator": "meets"},
             "availability": "supported",
             "implications": {
               "cost": "No per-call fee or separate model archive.",
@@ -504,6 +544,32 @@
               "consent_refs": ["apple_ai_attestation"]
             },
             "verification_probe_refs": ["apple_inference_config_valid", "apple_model_availability"]
+          },
+          "llama_cpp": {
+            "label": "llama.cpp with Qwen3 8B",
+            "description": "Local summaries from the pinned Qwen3 8B GGUF served by a local llama.cpp server, for Macs below macOS 27.",
+            "available_when": {
+              "decision_ref": "setup_profile",
+              "operator": "equals",
+              "value": "macos-bizops"
+            },
+            "host_available_when": {"host_profile": "apple_fm", "operator": "below"},
+            "availability": "supported",
+            "implications": {
+              "cost": "No per-call fee; consumes local compute and about 6 GB of memory while serving.",
+              "privacy": "Summary prompts remain on the Mac.",
+              "security": "A loopback-only llama.cpp server from Homebrew serves one pinned model file verified against its SHA-256.",
+              "operator_effort": "None beyond the install: setup downloads the pinned 5 GB model and starts a login service.",
+              "performance": "Metal GPU; summaries arrive in seconds on Apple Silicon."
+            },
+            "activates": {
+              "component_refs": ["llama_cpp"],
+              "plugin_refs": ["default_inference_plugin"],
+              "operation_refs": ["install_llama_cpp", "install_llama_cpp_services", "configure_llama_cpp_inference"],
+              "probe_refs": ["llama_cpp_server_available", "llama_cpp_models_present"],
+              "permission_refs": ["llama_cpp_background_items_permission"]
+            },
+            "verification_probe_refs": ["llama_cpp_services_current", "llama_cpp_inference_config_valid"]
           },
           "lm_studio": {
             "label": "LM Studio",
@@ -1279,6 +1345,16 @@
         "load_lm_studio_inference_model",
         "install_lm_studio_login_agent"
       ]
+    },
+    "llama_cpp": {
+      "name": "llama.cpp",
+      "kind": "model_host",
+      "description": "Setup installs the Homebrew llama.cpp formula, and registers host-shared loopback llama-server login services for summaries and embeddings; each service fetches its reviewed GGUF, pinned by revision and SHA-256, into a host-shared directory before serving it. A missing model is a warning, never a blocked stage.",
+      "source": "package_manager",
+      "lifecycle": "managed_by_setup",
+      "configure_operation_refs": ["configure_llama_cpp_embeddings", "configure_llama_cpp_inference"],
+      "probe_refs": ["llama_cpp_server_available", "llama_cpp_models_present", "llama_cpp_services_current", "llama_cpp_embedding_config_valid", "llama_cpp_inference_config_valid"],
+      "install_operation_refs": ["install_llama_cpp", "install_llama_cpp_services"]
     },
     "ollama": {
       "name": "Ollama",
@@ -2433,6 +2509,23 @@
       "grant_operation_ref": "open_background_items_settings",
       "probe_ref": "lm_studio_login_agent_valid",
       "denial_behavior": "disable_capability"
+    },
+    "llama_cpp_background_items_permission": {
+      "name": "llama.cpp background items",
+      "platform": "macos",
+      "kind": "background_items",
+      "purpose": "Allow the host-shared llama.cpp summaries and embeddings services to start after login.",
+      "required_when": {
+        "any": [
+          {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "llama_cpp"},
+          {"decision_ref": "inference_implementation", "operator": "equals", "value": "llama_cpp"}
+        ]
+      },
+      "grant_actor": "user",
+      "system_settings_path": "General > Login Items & Extensions",
+      "grant_operation_ref": "open_background_items_settings",
+      "probe_ref": "llama_cpp_services_current",
+      "denial_behavior": "disable_capability"
     }
   },
   "plugins": {
@@ -2575,9 +2668,10 @@
       "documentation_status": "complete",
       "cardinality": "zero_or_one",
       "enabled_when": {
-        "decision_ref": "embeddings_implementation",
-        "operator": "equals",
-        "value": "lm_studio"
+        "any": [
+          {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "lm_studio"},
+          {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "llama_cpp"}
+        ]
       },
       "input_refs": [
         "lm_studio_base_url"
@@ -2662,9 +2756,10 @@
       "documentation_status": "partial",
       "cardinality": "zero_or_one",
       "enabled_when": {
-        "decision_ref": "inference_implementation",
-        "operator": "equals",
-        "value": "lm_studio"
+        "any": [
+          {"decision_ref": "inference_implementation", "operator": "equals", "value": "lm_studio"},
+          {"decision_ref": "inference_implementation", "operator": "equals", "value": "llama_cpp"}
+        ]
       },
       "input_refs": [
         "lm_studio_base_url"
@@ -3317,6 +3412,12 @@
         },
         "autostart": {
           "decision_ref": "autostart"
+        },
+        "embeddings_implementation": {
+          "decision_ref": "embeddings_implementation"
+        },
+        "inference_implementation": {
+          "decision_ref": "inference_implementation"
         }
       },
       "idempotency": {
@@ -3473,6 +3574,94 @@
         "mode": "probe_then_apply",
         "precondition_probe_refs": ["apple_host_eligible"],
         "postcondition_probe_refs": ["apple_inference_config_valid"]
+      }
+    },
+    "install_llama_cpp": {
+      "name": "Install llama.cpp",
+      "description": "Install the Homebrew llama.cpp formula only when its llama-server executable is absent.",
+      "operation_ref": "setup::llama_cpp.install",
+      "runner": "bootstrap",
+      "implementation_status": "implemented",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "required_when": {
+        "any": [
+          {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "llama_cpp"},
+          {"decision_ref": "inference_implementation", "operator": "equals", "value": "llama_cpp"}
+        ]
+      },
+      "consent_refs": ["system_change_consent"],
+      "acquisition": {"kind": "formula", "name": "llama.cpp", "approved_closure": []},
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": ["llama_cpp_server_available"],
+        "postcondition_probe_refs": ["llama_cpp_server_available"]
+      },
+      "apply_timeout_seconds": 900
+    },
+    "install_llama_cpp_services": {
+      "name": "Install llama.cpp login services",
+      "description": "Write and load the host-shared loopback llama-server login services for the selected roles. Each service fetches its reviewed GGUF (pinned revision, size, and SHA-256) before serving it, so a slow or failed download finishes in the background; apply waits, bounded, for the embeddings server only.",
+      "operation_ref": "setup::llama_cpp.install_services",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "medium",
+      "requires_confirmation": true,
+      "required_when": {
+        "any": [
+          {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "llama_cpp"},
+          {"decision_ref": "inference_implementation", "operator": "equals", "value": "llama_cpp"}
+        ]
+      },
+      "consent_refs": ["system_change_consent"],
+      "permission_refs": ["llama_cpp_background_items_permission"],
+      "parameters": {
+        "embeddings_implementation": {"decision_ref": "embeddings_implementation"},
+        "inference_implementation": {"decision_ref": "inference_implementation"}
+      },
+      "idempotency": {
+        "mode": "probe_then_apply",
+        "precondition_probe_refs": ["llama_cpp_services_current"],
+        "postcondition_probe_refs": ["llama_cpp_services_current"]
+      },
+      "apply_timeout_seconds": 900
+    },
+    "configure_llama_cpp_embeddings": {
+      "name": "Configure llama.cpp embeddings",
+      "description": "Point openai_embeddings_plugin at the loopback llama.cpp embeddings server and declare the model's 2048-token input budget.",
+      "operation_ref": "setup::llama_cpp.configure_embeddings",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "low",
+      "requires_confirmation": false,
+      "required_when": {
+        "decision_ref": "embeddings_implementation",
+        "operator": "equals",
+        "value": "llama_cpp"
+      },
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": ["llama_cpp_embedding_config_valid"],
+        "postcondition_probe_refs": ["llama_cpp_embedding_config_valid"]
+      }
+    },
+    "configure_llama_cpp_inference": {
+      "name": "Configure llama.cpp summaries",
+      "description": "Point default_inference_plugin at the loopback llama.cpp summaries server.",
+      "operation_ref": "setup::llama_cpp.configure_inference",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "risk": "low",
+      "requires_confirmation": false,
+      "required_when": {
+        "decision_ref": "inference_implementation",
+        "operator": "equals",
+        "value": "llama_cpp"
+      },
+      "idempotency": {
+        "mode": "upsert",
+        "precondition_probe_refs": ["llama_cpp_inference_config_valid"],
+        "postcondition_probe_refs": ["llama_cpp_inference_config_valid"]
       }
     },
     "configure_lm_studio_embeddings": {
@@ -4517,6 +4706,75 @@
       "required_when": {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "coreai"},
       "expectation": {"operator": "truthy"}
     },
+    "llama_cpp_server_available": {
+      "name": "llama.cpp server is installed",
+      "description": "Confirms the Homebrew llama-server executable is present and reports its version.",
+      "probe_ref": "setup::llama_cpp.server_available",
+      "runner": "system",
+      "implementation_status": "adapter_required",
+      "level": "precondition",
+      "required_when": {
+        "any": [
+          {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "llama_cpp"},
+          {"decision_ref": "inference_implementation", "operator": "equals", "value": "llama_cpp"}
+        ]
+      },
+      "expectation": {"operator": "truthy"},
+      "remediation_operation_refs": ["install_llama_cpp"]
+    },
+    "llama_cpp_models_present": {
+      "name": "llama.cpp models present",
+      "description": "Reports each selected role's reviewed GGUF as verified against its pinned size and SHA-256, or as still downloading. A missing model is a warning and never blocks (rul_18bd93a3).",
+      "probe_ref": "setup::llama_cpp.models_present",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "required_when": {
+        "any": [
+          {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "llama_cpp"},
+          {"decision_ref": "inference_implementation", "operator": "equals", "value": "llama_cpp"}
+        ]
+      },
+      "expectation": {"operator": "truthy"}
+    },
+    "llama_cpp_services_current": {
+      "name": "llama.cpp login services current",
+      "description": "Confirms each selected role's host-shared llama-server login service matches its reviewed definition and is loaded; a server still waiting on its model download is reported as a warning.",
+      "probe_ref": "setup::llama_cpp.services_current",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "required_when": {
+        "any": [
+          {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "llama_cpp"},
+          {"decision_ref": "inference_implementation", "operator": "equals", "value": "llama_cpp"}
+        ]
+      },
+      "expectation": {"operator": "truthy"},
+      "remediation_operation_refs": ["install_llama_cpp_services"]
+    },
+    "llama_cpp_embedding_config_valid": {
+      "name": "llama.cpp embeddings config is current",
+      "description": "Requires openai_embeddings_plugin to point at the loopback llama.cpp embeddings server with the reviewed model alias and input budget.",
+      "probe_ref": "setup::llama_cpp.embedding_config_valid",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "required_when": {"decision_ref": "embeddings_implementation", "operator": "equals", "value": "llama_cpp"},
+      "expectation": {"operator": "truthy"},
+      "remediation_operation_refs": ["configure_llama_cpp_embeddings"]
+    },
+    "llama_cpp_inference_config_valid": {
+      "name": "llama.cpp summaries config is current",
+      "description": "Requires default_inference_plugin to point at the loopback llama.cpp summaries server with the reviewed model alias.",
+      "probe_ref": "setup::llama_cpp.inference_config_valid",
+      "runner": "hydration",
+      "implementation_status": "adapter_required",
+      "level": "readiness",
+      "required_when": {"decision_ref": "inference_implementation", "operator": "equals", "value": "llama_cpp"},
+      "expectation": {"operator": "truthy"},
+      "remediation_operation_refs": ["configure_llama_cpp_inference"]
+    },
     "selected_inference_models_discoverable": {
       "name": "Selected implementation exposes inference candidates",
       "description": "Dispatches discovery through the selected inference option and normalizes candidates for the wizard.",
@@ -5291,6 +5549,7 @@
         "install_postgresql",
         "configure_postgresql",
         "configure_terminal_return_keys",
+        "install_llama_cpp",
         "install_tmux",
         "install_lm_studio",
         "start_lm_studio_server",
@@ -5351,6 +5610,9 @@
         "acquire_coreai_asset",
         "configure_coreai_embeddings",
         "configure_apple_inference",
+        "install_llama_cpp_services",
+        "configure_llama_cpp_embeddings",
+        "configure_llama_cpp_inference",
         "configure_lm_studio_embeddings",
         "configure_lm_studio_inference",
         "install_launchagent"
@@ -5360,6 +5622,11 @@
         "coreai_embedding_config_valid",
         "apple_inference_config_valid",
         "apple_model_availability",
+        "llama_cpp_server_available",
+        "llama_cpp_models_present",
+        "llama_cpp_services_current",
+        "llama_cpp_embedding_config_valid",
+        "llama_cpp_inference_config_valid",
         "embedding_request_succeeds",
         "launchagent_running",
         "router_ready",

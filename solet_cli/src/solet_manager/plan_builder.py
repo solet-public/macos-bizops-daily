@@ -17,6 +17,7 @@ from .decision_resolution import (
     unresolved_required_decisions,
 )
 from .errors import ContractError
+from .host_option_binding import host_bound, require_host_available
 from .models import JsonValue
 from .probe_input_retention import retain_probe_inputs
 from .release_lock import SeedLock
@@ -83,8 +84,10 @@ def build_setup_plan(
     decisions = _initial_decisions(config, seed)
     recorded_ids = _merge_recorded_decisions(bundle, recorded_answers, decisions)
     selection_evidence = _recorded_selection_evidence(recorded_answers, recorded_ids)
+    # New choices only are made against this Mac's host profiles; recorded answers are never re-judged.
+    choosing = host_bound(bundle, decisions, decision_selections or {})
     _apply_explicit_selections(
-        bundle,
+        choosing,
         decisions,
         decision_selections or {},
         selection_evidence,
@@ -92,8 +95,9 @@ def build_setup_plan(
         decision_sources or {},
         resolution_stage_ids,
     )
+    require_host_available(choosing, decision_selections or {})
     default_evidence = apply_reviewed_static_defaults(
-        bundle,
+        choosing,
         decisions,
         resolution_stage_ids=resolution_stage_ids,
     )

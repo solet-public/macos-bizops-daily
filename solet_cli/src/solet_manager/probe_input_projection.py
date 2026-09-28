@@ -49,7 +49,13 @@ def probe_public_inputs(
         return {"candidate_id": _inference_model_selection(transaction)}
     if probe_ref in _LM_STUDIO_PROBES:
         return _lm_studio_inputs(transaction)
+    if probe_ref in _LLAMA_CPP_PROBES:
+        return _implementation_inputs(transaction)
     return {}
+
+
+#: llama.cpp probes serve only the roles whose decision selected llama_cpp (iss_3a2a74ea).
+_LLAMA_CPP_PROBES = frozenset({"setup::llama_cpp.models_present", "setup::llama_cpp.services_current"})
 
 
 _LM_STUDIO_PROBES = frozenset(
@@ -84,6 +90,18 @@ def _lm_studio_inputs(transaction: Transaction) -> dict[str, JsonValue]:
     projected["lm_studio_base_url"] = inputs.get("lm_studio_base_url")
     if any(not isinstance(value, str) or not value for value in projected.values()):
         raise StateConflictError("LM Studio implementation or loopback URL is unresolved")
+    return projected
+
+
+def _implementation_inputs(transaction: Transaction) -> dict[str, JsonValue]:
+    """Both implementation decisions; one absent from the answers is inactive and projects ``none``."""
+    decisions = _decisions(transaction)
+    projected: dict[str, JsonValue] = {}
+    for carrier in ("embeddings_implementation", "inference_implementation"):
+        value = decisions.get(carrier, "none")
+        if not isinstance(value, str) or not value:
+            raise StateConflictError(f"transaction {carrier} decision is invalid")
+        projected[carrier] = value
     return projected
 
 

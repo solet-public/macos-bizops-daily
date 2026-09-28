@@ -75,6 +75,8 @@ class GenesisContext:
     target: Path
     kb_root: Path
     steps: list[dict[str, Any]] = field(default_factory=list)
+    #: The setup's implementation decisions; the roster and bindings follow them (iss_3a2a74ea).
+    implementations: dict[str, str] = field(default_factory=dict)
     manifest_path: Path | None = None
 
 
@@ -116,6 +118,7 @@ def _run_materialize_configs(ctx: GenesisContext) -> dict[str, Any]:
         written = materialize_profile(
             target=ctx.target, kb_root=ctx.kb_root,
             profile_name=ctx.profile_name, name=ctx.name,
+            implementations=ctx.implementations,
         )
     except ConfigMaterializeError as exc:
         return {"step_name": "materialize_configs", "status": "failed", "error": str(exc)}

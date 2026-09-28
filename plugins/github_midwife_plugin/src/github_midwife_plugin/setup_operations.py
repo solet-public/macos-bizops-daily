@@ -14,6 +14,8 @@ from solet_setup_contracts.hook_interpreter_pin import CLAUDE_HOOK_MANIFEST, COD
 
 from .apple_setup_adapter import pinned_asset_error
 from .launchagent_status import launchagent_health
+from .llama_cpp_setup import embeddings_entry_error
+from .profile_implementations import IMPLEMENTATION_DECISIONS
 from .setup_adapter_contract import (
     AdapterRequest,
     JsonObject,
@@ -109,6 +111,9 @@ def operation_handlers() -> dict[str, OperationHandler]:
         configure_apple_inference,
         configure_coreai_embeddings,
     )
+    from .llama_cpp_setup import configure_embeddings as configure_llama_cpp_embeddings
+    from .llama_cpp_setup import configure_inference as configure_llama_cpp_inference
+    from .llama_cpp_setup import install_services as install_llama_cpp_services
     from .lm_studio_provisioning import operation_handlers as lm_studio_handlers
     from .setup_plugin_operations import plugin_install
     from .setup_session_operations import session_source
@@ -119,6 +124,9 @@ def operation_handlers() -> dict[str, OperationHandler]:
         "setup::apple.configure_coreai_embeddings": configure_coreai_embeddings,
         "setup::apple.configure_inference": configure_apple_inference,
         **lm_studio_handlers(),
+        "setup::llama_cpp.install_services": install_llama_cpp_services,
+        "setup::llama_cpp.configure_embeddings": configure_llama_cpp_embeddings,
+        "setup::llama_cpp.configure_inference": configure_llama_cpp_inference,
         "setup::tmux.install": _tmux,
         "setup::terminal.configure_return_keys": _terminal_return_keys,
         "setup::coding_agents.install_codex": _coding_agent_cli,
@@ -413,6 +421,19 @@ def coreai_autostart_deferral(target: Path) -> str | None:
     return pinned_asset_error(target)
 
 
+def autostart_deferral(target: Path, embeddings_implementation: str | None) -> str | None:
+    """Return why the first boot must wait, or None.
+
+    The Core AI gate is unchanged. On the llama.cpp path the solet also waits
+    for the ``openai_embeddings`` address-book entry, which the models stage
+    writes after Genesis (iss_aec1ef16).
+    """
+    deferral = coreai_autostart_deferral(target)
+    if deferral is not None or embeddings_implementation != "llama_cpp":
+        return deferral
+    return embeddings_entry_error(target)
+
+
 def materialized_plugin_roster(target: Path) -> tuple[str, ...]:
     """Read the plugin roster Genesis materialized for the target runtime.
 
@@ -491,6 +512,13 @@ def _genesis_apply(request: AdapterRequest, runtime: Runtime, autostart: bool) -
             "operation_input_missing",
             "Resolve the selected setup profile before running genesis.",
         )
+    # The roster follows the implementation decisions the Manager projects (iss_3a2a74ea); an
+    # absent decision keeps the profile template's own roster for that service.
+    implementations = {
+        decision: value
+        for decision in IMPLEMENTATION_DECISIONS
+        if request.operation_ref == "genesis::solet.run" and (value := public_string(request, decision)) is not None
+    }
     outcome = runtime.run(
         (str(python), "-m", "github_midwife_plugin.genesis"),
         timeout_seconds=request.timeout_seconds,
@@ -501,6 +529,7 @@ def _genesis_apply(request: AdapterRequest, runtime: Runtime, autostart: bool) -
             "SOLET_PROFILE": setup_profile,
             "SOLET_AUTOSTART": "enabled" if autostart else "disabled",
             "SOLET_OPERATION_REF": request.operation_ref,
+            **{f"SOLET_{decision.upper()}": str(value) for decision, value in implementations.items()},
         },
     )
     return _apply_outcome(request, outcome, "genesis_failed")
@@ -509,7 +538,7 @@ def _genesis_apply(request: AdapterRequest, runtime: Runtime, autostart: bool) -
 def _launchagent_deferral(
     request: AdapterRequest, *, autostart: bool, artifacts_valid: bool
 ) -> str | None:
-    """Name the pending Core AI asset that holds the LaunchAgent, if any.
+    """Name the pending Core AI asset or llama.cpp entry that holds the LaunchAgent, if any.
 
     The scoped LaunchAgent install always reads the materialized roster. A
     full Genesis request reads it only once Genesis artifacts are valid; before
@@ -519,7 +548,7 @@ def _launchagent_deferral(
         return None
     if request.operation_ref != "genesis::autostart.install" and not artifacts_valid:
         return None
-    return coreai_autostart_deferral(request.target)
+    return autostart_deferral(request.target, public_string(request, "embeddings_implementation"))
 
 
 def _coreai_asset_pending(request: AdapterRequest, deferral: str) -> JsonObject:

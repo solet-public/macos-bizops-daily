@@ -241,6 +241,27 @@ service_bindings:
   self_deployment_service: macos_self_deployment_plugin
   local_self_deployment_service: macos_self_deployment_plugin
 
+# The roster follows the setup's implementation decisions (iss_3a2a74ea).
+# `plugins:` and `service_bindings:` above name the macOS 27 Apple-native
+# choice; genesis swaps each listed service's plugin in place for the selected
+# option's plugin (github_midwife_plugin/profile_implementations.py). On a Mac
+# below macOS 27 setup selects llama_cpp, so neither Apple-only plugin (and so
+# no macosx_27 wheel) is installed. Each table equals the setup flow's
+# `plugins.*.enabled_when` for that decision; a smoke pins it.
+implementation_plugins:
+  embeddings_implementation:
+    service: embedding_service
+    options:
+      coreai: coreai_embeddings_plugin
+      llama_cpp: openai_embeddings_plugin
+      lm_studio: openai_embeddings_plugin
+  inference_implementation:
+    service: inference_service
+    options:
+      apple_foundation_models: macos_inference_plugin
+      llama_cpp: default_inference_plugin
+      lm_studio: default_inference_plugin
+
 notes:
   excluded:
     mock_inference_plugin: RETIRED platform-wide (INF-03/INF-03b).

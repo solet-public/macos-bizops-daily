@@ -143,6 +143,36 @@
       "denial_behavior": "disable_capability",
       "entry_type": "permission",
       "grant_actor": "user",
+      "id": "llama_cpp_background_items_permission",
+      "source": {
+        "grant_operation_ref": "open_background_items_settings",
+        "kind": "background_items",
+        "platform": "macos",
+        "probe_ref": "llama_cpp_services_current",
+        "required_when": {
+          "any": [
+            {
+              "decision_ref": "embeddings_implementation",
+              "operator": "equals",
+              "value": "llama_cpp"
+            },
+            {
+              "decision_ref": "inference_implementation",
+              "operator": "equals",
+              "value": "llama_cpp"
+            }
+          ]
+        }
+      },
+      "system_settings_pane": "General > Login Items & Extensions",
+      "what": "llama.cpp background items",
+      "when": "When (`embeddings_implementation` equals `llama_cpp`) or (`inference_implementation` equals `llama_cpp`).",
+      "why": "Allow the host-shared llama.cpp summaries and embeddings services to start after login."
+    },
+    {
+      "denial_behavior": "disable_capability",
+      "entry_type": "permission",
+      "grant_actor": "user",
       "id": "lm_studio_background_items_permission",
       "source": {
         "grant_operation_ref": "open_background_items_settings",

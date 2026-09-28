@@ -94,6 +94,12 @@ class ReopenUnsafeAppliedStateError(StateConflictError):
     error_kind = "reopen_unsafe_applied_state"
 
 
+class HostPlatformUnknownError(StateConflictError):
+    """A host-conditioned setup choice cannot be made because this Mac could not be measured."""
+
+    error_kind = "host_platform_unknown"
+
+
 class VenvIncompatibleError(StateConflictError):
     """The target venv cannot import authenticated locked-seed code."""
 

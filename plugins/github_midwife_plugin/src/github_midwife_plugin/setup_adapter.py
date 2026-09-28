@@ -17,6 +17,7 @@ from .lm_studio_provisioning import operation_handlers as lm_studio_operations
 from .lm_studio_provisioning import probe as probe_lm_studio
 from .lm_studio_provisioning import probe_handlers as lm_studio_probes
 from .lm_studio_provisioning import provision as provision_lm_studio
+from .profile_implementations import IMPLEMENTATION_DECISIONS
 from .setup_adapter_contract import (
     AdapterInputError,
     AdapterRequest,
@@ -60,7 +61,16 @@ _ALLOWED_PUBLIC_INPUTS: dict[str, frozenset[str]] = {
         READINESS_PUBLIC_INPUT_KEYS
     ),
     "genesis::solet.run": frozenset(
-        {"solet_name", "clone_directory", "setup_profile", "autostart"}
+        {"solet_name", "clone_directory", "setup_profile", "autostart", *IMPLEMENTATION_DECISIONS}
+    ),
+    # The llama.cpp service and model callables serve only the roles those decisions selected.
+    **dict.fromkeys(
+        (
+            "setup::llama_cpp.install_services",
+            "setup::llama_cpp.models_present",
+            "setup::llama_cpp.services_current",
+        ),
+        frozenset(IMPLEMENTATION_DECISIONS),
     ),
     "genesis::autostart.install": frozenset({"setup_profile", "autostart"}),
     "genesis::solet.verify": frozenset({"autostart"}),
@@ -241,16 +251,28 @@ def _validate_operation_inputs(request: AdapterRequest) -> JsonObject | None:
         "solet_name": request.name,
         "clone_directory": str(request.target),
     }
-    if request.operation_ref == "genesis::solet.run":
-        expected["setup_profile"] = request.public_inputs.get("setup_profile")
-        expected["autostart"] = request.public_inputs.get("autostart")
-        if not isinstance(expected["setup_profile"], str) or not expected["setup_profile"]:
-            return _protocol_failure(request)
-        if expected["autostart"] not in {"enabled", "disabled"}:
-            return _protocol_failure(request)
+    if request.operation_ref == "genesis::solet.run" and not _genesis_run_inputs_valid(request, expected):
+        return _protocol_failure(request)
     if request.public_inputs != expected:
         return _protocol_failure(request)
     return None
+
+
+def _genesis_run_inputs_valid(request: AdapterRequest, expected: JsonObject) -> bool:
+    """Extend ``expected`` with genesis's profile, autostart and any implementation decisions."""
+    expected["setup_profile"] = request.public_inputs.get("setup_profile")
+    expected["autostart"] = request.public_inputs.get("autostart")
+    if not isinstance(expected["setup_profile"], str) or not expected["setup_profile"]:
+        return False
+    if expected["autostart"] not in {"enabled", "disabled"}:
+        return False
+    for decision in IMPLEMENTATION_DECISIONS:
+        value = request.public_inputs.get(decision)
+        if decision in request.public_inputs and (not isinstance(value, str) or not value):
+            return False
+        if decision in request.public_inputs:
+            expected[decision] = value
+    return True
 
 
 def _validate_autostart_install_inputs(request: AdapterRequest) -> JsonObject | None:

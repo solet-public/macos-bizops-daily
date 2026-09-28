@@ -322,6 +322,10 @@ running. `solet-manager doctor` says so in plain words. Once the Mac is on
 macOS 27, the switch comes with the next release's update; updating again at
 the release your solet already runs changes nothing.
 
+A new macos-bizops solet created on macOS 26 does not use LM Studio. Setup
+runs Homebrew llama.cpp for its summaries and embeddings instead; the
+Homebrew install troubleshooting runbook's macOS 26 section describes it.
+
 (On the Samantha profile, summaries keep using LM Studio on any macOS, so
 keep LM Studio installed and running there too.)
 

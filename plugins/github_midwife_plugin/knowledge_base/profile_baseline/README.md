@@ -46,6 +46,26 @@ server address or API key. Autonomous planning remains session-primary and no
 local-provider completion fallback is enabled here. Runnable proof still
 requires the separately owned plugin source to be composed with this profile.
 
+## llama.cpp on macOS 26 — the same two baselines, pointed at loopback
+
+A fresh macos-bizops create on a Mac below macOS 27 selects llama.cpp for
+embeddings and summaries (iss_3a2a74ea). Genesis resolves the template's
+`implementation_plugins` table, so `openai_embeddings_plugin` and
+`default_inference_plugin` replace the two Apple plugins in the roster and
+their baselines here materialize. Setup's `models` stage then points them at
+the solet's loopback llama.cpp servers:
+
+- `default_inference_plugin.json` receives the llama.cpp `base_url`, the
+  `qwen3-8b` model alias and an 8,192-token `context.model_context_tokens`;
+  every other key keeps this baseline's value.
+- `openai_embeddings_plugin` reads its endpoint from the `openai_embeddings`
+  address-book entry, not from this file. Setup adds that entry, with the
+  2,048-token `max_input_tokens` budget, to the address-book seed.
+
+The values come from
+`plugins/github_midwife_plugin/knowledge_base/profile_templates/llama_cpp_models.yaml`,
+never from this directory.
+
 ## `coreai_embeddings_plugin` asset configuration
 
 Every supported fresh macOS 27 profile selects the Core AI embedding plugin.

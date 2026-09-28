@@ -929,7 +929,10 @@ a pinned Nomic v1.5 model served on-host through Apple's Core AI on macOS 27 App
 Silicon). `openai_embeddings_plugin` — OpenAI-*compatible*, not OpenAI; typically an
 LM Studio + nomic model on this machine, taking no API key — remains an
 optional/legacy provider, still what the `local` profile template and a manual
-`bootstrap.py` genesis provision. On either local default, ingested content never
+`bootstrap.py` genesis provision. A macos-bizops solet created on macOS 26 binds
+`openai_embeddings_plugin` to its own loopback llama.cpp server, which serves the
+same pinned Nomic v1.5 model (the Homebrew install troubleshooting runbook's
+macOS 26 section). On any of these local defaults, ingested content never
 leaves the machine. Re-binding to a cloud embedding provider (for example
 `titanv2_embeddings_plugin`) sends ingested content — including anything a business
 connector has already read into a session, and peer message bodies regardless of

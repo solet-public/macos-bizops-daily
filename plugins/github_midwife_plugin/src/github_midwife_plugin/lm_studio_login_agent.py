@@ -151,14 +151,22 @@ def login_definition_current(home: Path, models: dict[str, ModelArtifact]) -> bo
 
 
 def _login_load_state(runtime: Runtime) -> str:
-    """Distinguish an absent GUI session from an absent job or failed probe."""
+    return launchd_job_state(runtime, LABEL)
+
+
+def launchd_job_state(runtime: Runtime, label: str) -> str:
+    """Distinguish an absent GUI session from an absent job or failed probe.
+
+    One of ``loaded``, ``absent``, ``gui_session_absent`` or ``unknown`` for the
+    job ``label`` in this user's GUI domain; shared by every host-shared login job.
+    """
 
     uid = os.getuid()
-    outcome = runtime.run(("/bin/launchctl", "print", f"gui/{uid}/{LABEL}"), timeout_seconds=5)
+    outcome = runtime.run(("/bin/launchctl", "print", f"gui/{uid}/{label}"), timeout_seconds=5)
     if outcome.timed_out or outcome.stdout_truncated or outcome.stderr_truncated:
         return "unknown"
     if outcome.ok:
-        return "loaded" if "state =" in outcome.stdout and LABEL in outcome.stdout else "unknown"
+        return "loaded" if "state =" in outcome.stdout and label in outcome.stdout else "unknown"
     return _failed_login_print_state(outcome.stderr, outcome.returncode, uid)
 
 

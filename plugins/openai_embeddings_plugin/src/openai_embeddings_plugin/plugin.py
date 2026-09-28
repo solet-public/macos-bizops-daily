@@ -26,6 +26,7 @@ from ananta.interfaces.embedding_service_interface import EmbeddingServiceInterf
 
 from .constants import ADDRESS_BOOK_ENTRY_NAME, PLUGIN_NAME, EntryField, ErrorCode
 from .response_builders import error_result, success_result
+from .server_tokenizer import parse_max_input_tokens, server_token_budget
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,8 @@ class OpenAIEmbeddingsPlugin(PluginBase, EmbeddingServiceInterface, EdgeProcessP
     - model: Default model name (e.g., nomic-embed-text-v1.5)
     - api_key: Optional API key (use vault::key_name for secrets)
     - timeout_seconds: Request timeout (optional, defaults to 30)
+    - max_input_tokens: Optional per-input ceiling of a server exposing llama.cpp's
+      /tokenize; when present the plugin declares a TokenBudget counted there
     """
 
     # Default dimension for the canonical local model (nomic-embed-text-v1.5).
@@ -61,6 +64,7 @@ class OpenAIEmbeddingsPlugin(PluginBase, EmbeddingServiceInterface, EdgeProcessP
         self._default_model: str = ""
         self._api_key: str | None = None
         self._timeout_seconds: int = 30
+        self._max_input_tokens: int | None = None
         self._default_dimensions: int = self._DEFAULT_LOCAL_DIMENSIONS
 
         # Service references
@@ -218,6 +222,8 @@ class OpenAIEmbeddingsPlugin(PluginBase, EmbeddingServiceInterface, EdgeProcessP
                 self._api_key = str(value) if value else None
             elif field_type == EntryField.TIMEOUT_SECONDS:
                 self._timeout_seconds = int(value) if value else 30
+            elif field_type == EntryField.MAX_INPUT_TOKENS:
+                self._max_input_tokens = parse_max_input_tokens(self.name, value)
 
     def _validate_required_config(self) -> None:
         """Validate required configuration fields are present."""
@@ -229,6 +235,7 @@ class OpenAIEmbeddingsPlugin(PluginBase, EmbeddingServiceInterface, EdgeProcessP
             raise RuntimeError(
                 f"{self.name}: Missing 'model' in address book entry '{ADDRESS_BOOK_ENTRY_NAME}'"
             )
+        self.input_token_budget()
 
     def _get_headers(self) -> dict[str, str]:
         """Build HTTP headers for API requests."""
@@ -246,13 +253,17 @@ class OpenAIEmbeddingsPlugin(PluginBase, EmbeddingServiceInterface, EdgeProcessP
     # ─────────────────────────────────────────────────────────────────────────
 
     def input_token_budget(self) -> TokenBudget | None:
-        """No locally countable ceiling.
+        """A llama.cpp entry's declared ceiling counted by its /tokenize (iss_3a2a74ea), else none.
 
-        The OpenAI-compatible server (LM Studio) applies its own context handling
-        and exposes no tokenizer this plugin can count with, so it declares no
-        ceiling; callers keep their character windows (iss_9166af93).
+        LM Studio exposes no tokenizer, so its entry declares no ceiling and
+        callers keep their character windows (iss_9166af93).
         """
-        return None
+        if self._max_input_tokens is None:
+            return None
+        return server_token_budget(
+            self.name, self._base_url, self._max_input_tokens,
+            timeout_seconds=self._timeout_seconds, headers=self._get_headers(),
+        )
 
     def generate_embeddings(
         self,
@@ -606,6 +617,17 @@ class OpenAIEmbeddingsPlugin(PluginBase, EmbeddingServiceInterface, EdgeProcessP
                     "maximum": 300,
                     "x-group": "advanced",
                     "x-order": 1,
+                },
+                "max_input_tokens": {
+                    "type": "integer",
+                    "title": "Input Token Budget",
+                    "description": (
+                        "Per-input token ceiling of a llama.cpp server; inputs are "
+                        "counted with the server's /tokenize and split to fit"
+                    ),
+                    "minimum": 1,
+                    "x-group": "advanced",
+                    "x-order": 2,
                 },
             },
             "x-test-endpoint": "/v1/embeddings",

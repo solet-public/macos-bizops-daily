@@ -2,6 +2,48 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-28 — r53: new solets on macOS 26 (Tahoe) with llama.cpp
+
+**Solet Manager manager-v0.1.0-r53.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows only after fresh installs on macOS 27 and on macOS 26 both reach their
+end state on this build.
+
+Changes since r52 (source `1e01df260`):
+
+- **A new solet now installs and sets up on macOS 26.** On a Mac below
+  macOS 27, setup offers llama.cpp instead of the Apple stack.
+  - llama.cpp is installed with Homebrew and runs as two local services on
+    127.0.0.1: one serves Qwen3-8B (Q4_K_M, about 5 GB) for summaries, and one
+    serves the same Nomic v1.5 embedding model LM Studio uses.
+  - Both models are pinned by revision, size and checksum. A missing model is
+    only a warning: setup finishes and the solet starts without it, the
+    download resumes on its own, and work that needs embeddings begins once
+    the embeddings model is served.
+  - On first boot the solet waits until its embeddings service is configured,
+    so it does not restart in a loop.
+- **Apple's Core AI and Foundation Models are offered only on macOS 27 or
+  later.** Setup reads the Mac's version, never guesses, and stops if it cannot
+  read it.
+- **Setup installs only the plugins for the choices you make.** Before, every
+  macos-bizops install added the macOS 27-only Apple packages, whatever was
+  chosen.
+- **Embedding requests stay within the model's input limit** (2048 tokens for
+  Nomic under llama.cpp).
+- **Publishing no longer depends on a leftover build cache.** The release check
+  installs the prebuilt Apple package that ships with the seed, as setup does.
+
+Known limits:
+
+- On macOS 26 this release uses llama.cpp for embeddings; Core AI on macOS 26
+  is not yet offered.
+- Intel Macs are not supported on the macOS 26 path.
+- Updating an existing solet is unchanged from r52: on macOS 27 it moves to the
+  Apple stack, and on macOS 26 it keeps LM Studio for embeddings and summaries.
+  Updating never uninstalls LM Studio or deletes a model.
+- The r53 fresh-install VM rounds are pending at publication.
+
 ## 2026-09-28 — r52: existing LM Studio solets update to the Apple-native stack
 
 **Solet Manager manager-v0.1.0-r52.** This is a full seed build for

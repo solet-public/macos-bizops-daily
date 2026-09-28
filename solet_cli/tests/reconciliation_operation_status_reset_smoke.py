@@ -30,7 +30,7 @@ _HISTORICAL_FIXTURES = (
 )
 _MIGRATION_ID = "macos-repository-setup-pgvector-package-postcondition-v1"
 _SOURCE_DIGEST = "sha256:c2a0386e86e0378e694f1793732fac223ec70ff3358e856b54ccf588e51024a4"
-_DESTINATION_DIGEST = "sha256:e42e751583ad12e446f67bf73b131a0dfdbdc3c0a08e3737c92756acad022656"
+_DESTINATION_DIGEST = "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
 _ACTIVE_DESTINATION_MIGRATION_IDS = frozenset(
     {
         "macos-repository-setup-pgvector-package-postcondition-v1",

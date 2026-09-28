@@ -7,6 +7,7 @@ from typing import Protocol
 
 from .contract_decision_validation import validate_decision_contract
 from .errors import ContractError
+from .host_option_binding import validate_host_conditions
 from .models import CheckpointStatus, JsonValue
 
 _EXPECTED_STATUSES = tuple(status.value for status in CheckpointStatus)
@@ -74,6 +75,7 @@ def validate_contract_bundle(bundle: ContractView) -> None:
     )
     _check_references(bundle.flow)
     validate_decision_contract(bundle)
+    validate_host_conditions(bundle.flow)
 
 
 def _validate_flow_shape(

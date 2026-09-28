@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
@@ -23,6 +23,7 @@ from urllib.parse import unquote, urlparse
 import yaml
 
 from .constants import BUILD_BACKEND_PACKAGES, PIP_INSTALL_TIMEOUT_S
+from .profile_implementations import ProfileImplementationError, resolve_implementations
 
 _SEED_PACKAGE_NAME = "github_midwife_plugin"
 _VENDOR_DIRNAME = "vendor"
@@ -32,12 +33,14 @@ class ProfileInstallError(RuntimeError):
     """Raised when the seed or any allowlisted plugin fails to install."""
 
 
-def load_plugin_allowlist(profile_path: Path) -> list[str]:
+def load_plugin_allowlist(profile_path: Path, implementations: Mapping[str, str] | None = None) -> list[str]:
     """Extract the `plugins:` allowlist from a profile template YAML.
 
     Deliberately minimal — only reads the one field this module needs,
     independent of Slice D's richer `config_materialize.py` (which
     reads baseline configs, service_bindings, and starting_actions too).
+    ``implementations`` (the setup's implementation decisions) resolves the
+    roster exactly as ``config_materialize.load_profile`` does (iss_3a2a74ea).
     """
     if not profile_path.is_file():
         raise ProfileInstallError(f"profile template not found: {profile_path}")
@@ -49,6 +52,10 @@ def load_plugin_allowlist(profile_path: Path) -> list[str]:
         raise ProfileInstallError(
             f"profile template did not parse to a mapping: {profile_path}"
         )
+    try:
+        raw = resolve_implementations(raw, implementations or {})
+    except ProfileImplementationError as exc:
+        raise ProfileInstallError(f"profile template {profile_path}: {exc}") from exc
     plugins = raw.get("plugins") or []
     if not isinstance(plugins, list) or not all(isinstance(p, str) for p in plugins):
         raise ProfileInstallError(

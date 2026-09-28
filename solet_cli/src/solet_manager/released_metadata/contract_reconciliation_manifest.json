@@ -338,7 +338,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:e42e751583ad12e446f67bf73b131a0dfdbdc3c0a08e3737c92756acad022656"
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
@@ -362,7 +362,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:e42e751583ad12e446f67bf73b131a0dfdbdc3c0a08e3737c92756acad022656"
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
@@ -389,7 +389,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:e42e751583ad12e446f67bf73b131a0dfdbdc3c0a08e3737c92756acad022656"
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
@@ -413,7 +413,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:e42e751583ad12e446f67bf73b131a0dfdbdc3c0a08e3737c92756acad022656"
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
@@ -437,7 +437,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:e42e751583ad12e446f67bf73b131a0dfdbdc3c0a08e3737c92756acad022656"
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],

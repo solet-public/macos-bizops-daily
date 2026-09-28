@@ -194,8 +194,8 @@ def _check_probe_expectation_advisory_contract(flow: dict[str, Any]) -> None:
         str(declared),
     )
     _check(
-        "all 71 probe expectations, including Qwen index readback, are advisory documentation",
-        len(declared) == 71
+        "all 76 probe expectations, including Qwen index readback, are advisory documentation",
+        len(declared) == 76
         and any(
             gap["id"] == "probe_expectations_advisory_only"
             for gap in flow["known_gaps"]
