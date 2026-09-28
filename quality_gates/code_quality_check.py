@@ -87,6 +87,8 @@ _BUNDLE_LICENSE_CHECK = _QUALITY_GATES_DIR / "bundle_license_gate.py"
 _BUNDLE_LICENSE_ALLOWLIST = _QUALITY_GATES_DIR / "bundle_license_allowlist.txt"
 _SCHEMA_INIT_CHECK = _QUALITY_GATES_DIR / "schema_init_gate.py"
 _SCHEMA_INIT_ALLOWLIST = _QUALITY_GATES_DIR / "schema_init_allowlist.txt"
+_SMOKE_CONTRACT_LINT_CHECK = _QUALITY_GATES_DIR / "smoke_contract_lint_gate.py"
+_SMOKE_CONTRACT_LINT_ALLOWLIST = _QUALITY_GATES_DIR / "smoke_contract_lint_gate_allowlist.txt"
 
 # Exit codes returned by the three wrapper scripts (see each script's
 # docstring): 0 = clean (or every finding allowlisted), 2 = one or more
@@ -647,6 +649,22 @@ _SCHEMA_INIT_GATE = _GateSpec(
     allowlist=_SCHEMA_INIT_ALLOWLIST,
 )
 
+# Repo-level shipped-smoke checkout-only contract lint gate (iss_59385149).
+# Tree-walking (no scope-path argv splicing) — checks that every checkout-only
+# smoke declaration agrees across all three surfaces (gate_smokes.txt marker,
+# shipped_smoke_contract.yaml entry, seed_manifest.yaml exclude_paths), the
+# same V1 predicate ``assemble()`` runs, but reachable before a bundle exists.
+# ``unt_85473403`` landed a smoke with only the marker; the full pre-landing
+# battery and two reviews passed it, and the gap surfaced one publish lap
+# later at assembly (``rrun_78ae868f``). Exit codes follow the canonical
+# _WRAPPER_OK (0) / _WRAPPER_BLOCKING (2) pattern.
+_SMOKE_CONTRACT_LINT_GATE = _GateSpec(
+    name="smoke_contract_lint",
+    description="shipped-smoke checkout-only contract consistency",
+    script=_SMOKE_CONTRACT_LINT_CHECK,
+    allowlist=_SMOKE_CONTRACT_LINT_ALLOWLIST,
+)
+
 
 def _scope_roots(project_root: Path) -> list[Path]:
     """Resolve the declared quality-surface roots that exist in this checkout."""
@@ -1126,6 +1144,38 @@ def _check_schema_init_gate(project_root: Path, venv_python: Path,
     )
 
 
+def _check_smoke_contract_lint_gate(project_root: Path, venv_python: Path,
+                                    results: _CheckResults) -> bool:
+    """Run the shipped-smoke checkout-only contract lint gate (iss_59385149).
+
+    Tree-walking gate: no scope-path argv splicing — it reads this repo's own
+    ``shipped_smoke_contract.yaml`` (which locates ``gate_smokes.txt`` and
+    ``seed_manifest.yaml`` beside/above it) rather than being handed a file
+    set. Exit codes follow the canonical _WRAPPER_OK / _WRAPPER_BLOCKING
+    pattern.
+    """
+    artifacts = _resolve_gate_artifacts(project_root, _SMOKE_CONTRACT_LINT_GATE)
+    if artifacts is None:
+        return True
+    script, allowlist = artifacts
+
+    print(f"\n📊 {_SMOKE_CONTRACT_LINT_GATE.description.title()} Gate ({_SMOKE_CONTRACT_LINT_GATE.name})...")
+    argv = [str(venv_python), str(script), "--repo-root", str(project_root),
+            "--allowlist", str(allowlist)]
+    try:
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        print(f"❌ BLOCKING: {_SMOKE_CONTRACT_LINT_GATE.name} gate timed out after 60s")
+        return True
+    except FileNotFoundError as exc:
+        print(f"❌ BLOCKING: {_SMOKE_CONTRACT_LINT_GATE.name} gate cannot invoke: {exc}")
+        return True
+
+    return _interpret_tree_gate_result(
+        _SMOKE_CONTRACT_LINT_GATE, result, venv_python, script, allowlist, results,
+    )
+
+
 def _check_embedding_bound_gate(project_root: Path, venv_python: Path,
                                 results: _CheckResults) -> bool:
     """Run the embedding_description bound gate. True iff non-allowlisted findings.
@@ -1375,6 +1425,8 @@ def _run_blocking_gates(
         results.failed_blocking_gates.append(_BUNDLE_LICENSE_GATE.name)
     if _check_schema_init_gate(project_root, venv_python, results):
         results.failed_blocking_gates.append(_SCHEMA_INIT_GATE.name)
+    if _check_smoke_contract_lint_gate(project_root, venv_python, results):
+        results.failed_blocking_gates.append(_SMOKE_CONTRACT_LINT_GATE.name)
     # W-INT Cycle 2 driver-import gate runs in WARN mode per master plan
     # §1.7 — emits findings but never blocks. Mode flip at W-WINT2-FINAL.
     _check_wint2_driver_import_gate(project_root, venv_python)

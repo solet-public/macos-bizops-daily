@@ -39,8 +39,10 @@ WRONG-TREE DEFENCE. A lane worktree's ``.venv`` is a symlink to the shared
 checkout's, whose editable ``.pth`` pointers name the SHARED checkout, so a
 naive ``import ananta`` from a worktree tests master, not the candidate
 (``iss_ec0db9c7`` / ``iss_77fe09ad`` class). The child is started with
-``PYTHONPATH`` set to the tree's own ``ananta/src`` and every
-``plugins/*/src``, which sort ahead of site-packages, and it REFUSES (exit 64)
+``PYTHONPATH`` set to the tree's own ``ananta/src``, every ``plugins/*/src``
+and (when the tree carries it) ``solet_setup_contracts/src`` -- the one required
+editable distribution outside those two, which a plugin imports at boot
+(``iss_f1d8cfc2``) -- which sort ahead of site-packages, and it REFUSES (exit 64)
 unless ``ananta.__file__`` actually resolves inside the tree it was told to
 boot. The gate script itself also refuses to run from a different tree than
 ``--repo-root`` (``assert_running_from_source_root``).
@@ -139,6 +141,9 @@ def _import_roots(root: Path) -> list[Path]:
                 if (child / "src").is_dir() and not child.name.startswith(_BUNDLED_VENV_PREFIX)
             ),
         )
+    contracts = root / "solet_setup_contracts" / "src"
+    if contracts.is_dir():
+        roots.append(contracts)
     missing = [str(path) for path in roots if not path.is_dir()]
     if missing:
         raise _GateUsageError(f"import roots missing from the tree under test: {missing}")

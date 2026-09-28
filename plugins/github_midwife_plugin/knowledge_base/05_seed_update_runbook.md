@@ -157,20 +157,33 @@ wait".
 group of the source preview lists three things a real clone always carries:
 *preserved local modifications* (the genesis rewrite of
 `root_manifest.yaml`, the hydration blocks in `AGENTS.md`/`CLAUDE.md`,
-`NOTICE` — unstaged, content-only edits to tracked files the candidate does
-not touch), *committed local state* (the untracked `.gitignore`, `.solet/`,
+`NOTICE`, and the installer's interpreter pin in the two coordination-hook
+manifests `plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/hooks.json`
+and `plugins/github_midwife_plugin/codex_plugin/coordination-hooks/hooks/hooks.json`
+— unstaged, content-only edits to tracked files the candidate does not
+touch), *committed local state* (the untracked `.gitignore`, `.solet/`,
 `knowledge_bases/*` symlinks, `client/` — paths the update commits to leave
 byte-identical, verified after every operation), and the *preserved
 surface* (`profile/**`, disclosed with kind, mode and size, never digested,
-never committed). None of these is a refusal. The preview refuses only:
+never committed). None of these is a refusal.
+
+The two hook manifests sit under a roster plugin, an executed-code root, so
+the Manager admits them only as the installer wrote them: every bare
+`python3` hook command bound to `<target>/.venv/bin/python3` and nothing
+else, re-derived byte-for-byte from the committed file (`local_state.installer_pins`
+lists them). Never restore these files to the shipped `python3`: the
+coordination hooks need the pin, and the fast-forward carries the pinned
+bytes onto the new release. Any further edit to either file, or a pin to a
+different interpreter path, is refused as `executed_code_modified`, the same
+as a hand edit elsewhere under a roster plugin. The preview refuses only:
 
 | Reason (`data.topology.reasons`, exit 3) | Meaning | Repair |
 |---|---|---|
 | `history_diverged` | the clone's HEAD is not an ancestor of the candidate | re-birth, or Part C if the operator wants to hand-merge |
-| `tracked_overlap_present` | the candidate changes a file this installation modified locally | keep your lines by hand: `git diff <baseline>..<candidate> -- <path>`, then preview again; the Manager never overwrites, stashes or resets a local change |
+| `tracked_overlap_present` | the candidate changes a file this installation modified locally | keep your lines by hand: `git diff <baseline>..<candidate> -- <path>`, then preview again; the Manager never overwrites, stashes or resets a local change. If the named file is a pinned coordination-hook manifest (listed in `local_state.installer_pins`), do not edit or restore it: upgrade the Manager (`brew upgrade solet`) and preview again — carrying the pin across a changed manifest is a Manager capability (`iss_c1a7df20`) |
 | `staged_changes_present` | something is in the index | `git restore --staged <paths>` is the operator's call; the Manager never runs it |
 | `tracked_shape_changed` | a tracked path was deleted, retyped, mode-changed or symlinked | restore it to a content-only edit of the shipped regular file |
-| `executed_code_modified` | an edit under `bootstrap.py`, `bootstrap_adapter/`, an editable-installed distribution or a roster plugin | restore it; the Manager will not execute a modified target |
+| `executed_code_modified` | an edit under `bootstrap.py`, `bootstrap_adapter/`, an editable-installed distribution or a roster plugin, other than the installer's own interpreter pin | `git diff -- <path>` in the clone shows the local edit: undo only that edit (keep the installer's interpreter pin in a hook manifest) or move the change out of the tree, then preview again; the Manager will not execute a modified target |
 | `git_metadata_present` | `.gitattributes`/`.gitmodules` anywhere, or an edited tracked root `.gitignore` | remove it; it changes how the fast-forward writes files |
 | `preserved_surface_in_transition` | the candidate ships something under `profile/` | seed-side regression; file feedback, do not repair the clone |
 | `source_identity_unproven` | `origin` names a URL the descriptor does not declare as an allowed migration | Part C, Step 2a (manual re-point) |

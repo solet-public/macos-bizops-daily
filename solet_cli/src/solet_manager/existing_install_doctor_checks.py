@@ -16,6 +16,7 @@ from .existing_install_doctor_probe import (
     artifact_facts,
     check,
     executed_code_overlap_paths,
+    executed_code_unknown_reason,
     executed_code_verifiable,
     not_applicable,
     operation_by_ref,
@@ -128,7 +129,7 @@ def _local_state_admissible(probe: DoctorProbe) -> DiagnosticCheck:
         return unknown("local_state_admissible", "The tracked, staged or raw-diff probe did not answer.", source, reason="local_state_unobserved")
     overlap = executed_code_overlap_paths(probe)
     if overlap is None:
-        return unknown("local_state_admissible", "The executed-code roots cannot be derived from an unreadable roster.", source, reason="roster_unreadable")
+        return unknown("local_state_admissible", "The executed-code set cannot be derived (an unreadable roster or pinned hook manifest blob).", source, reason=executed_code_unknown_reason(probe))
     observed = observe_local_state(probe.target, facts)
     detail = _local_state_detail(facts, observed, overlap)
     reason = _shape_reason(detail)

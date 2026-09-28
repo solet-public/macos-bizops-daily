@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import json
-import shlex
 from pathlib import Path
 from typing import cast
+
+from solet_setup_contracts.hook_interpreter_pin import (
+    HookManifestError,
+    hook_commands,
+    instance_interpreter,
+    pin_hook_interpreter,
+)
 
 from .coordination_hook_installation import (
     ReceiptSurface,
@@ -345,11 +351,11 @@ def plugin_row_visible(cli: str, row: JsonObject, selector: str) -> bool:
 
 
 def _manifest_has_absolute_python(path: Path, target: Path) -> bool:
-    manifest = read_json_object(path)
-    if manifest is None:
+    try:
+        commands = hook_commands(path.read_bytes())
+    except (OSError, HookManifestError):
         return False
-    expected = str(target / ".venv/bin/python3")
-    commands = _hook_commands(manifest)
+    expected = instance_interpreter(target)
     python_commands = [
         command for command in commands if command.endswith("python3") or "python3 " in command
     ]
@@ -359,48 +365,13 @@ def _manifest_has_absolute_python(path: Path, target: Path) -> bool:
 
 
 def _patch_hook_manifest(path: Path, target: Path, runtime: Runtime) -> str | None:
-    manifest = read_json_object(path)
-    if manifest is None:
+    """Apply the shared interpreter pin (``solet_setup_contracts.hook_interpreter_pin``) in place."""
+    try:
+        pinned = pin_hook_interpreter(path.read_bytes(), instance_interpreter(target))
+    except OSError:
         return f"hook manifest is absent or invalid: {path}"
-    expected = str(target / ".venv/bin/python3")
-    if not isinstance(manifest.get("hooks"), dict):
-        return "hook manifest lacks the hooks object"
-    changed = False
-    for hook in _hook_records(manifest):
-        command = cast(str, hook["command"])
-        replacement = _absolute_python_command(command, expected)
-        if replacement is not None:
-            hook["command"] = replacement
-            changed = True
-    if changed:
-        runtime.atomic_write(path, json.dumps(manifest, indent=2) + "\n", mode=0o644)
-    return None
-
-
-def _hook_commands(manifest: JsonObject) -> list[str]:
-    return [cast(str, hook["command"]) for hook in _hook_records(manifest)]
-
-
-def _hook_records(manifest: JsonObject) -> list[JsonObject]:
-    hooks = manifest.get("hooks")
-    records: list[JsonObject] = []
-    if not isinstance(hooks, dict):
-        return records
-    for event_entries in hooks.values():
-        if not isinstance(event_entries, list):
-            continue
-        for entry in event_entries:
-            if not isinstance(entry, dict) or not isinstance(entry.get("hooks"), list):
-                continue
-            for hook in cast(list[JsonValue], entry["hooks"]):
-                if isinstance(hook, dict) and isinstance(hook.get("command"), str):
-                    records.append(hook)
-    return records
-
-
-def _absolute_python_command(command: str, expected: str) -> str | None:
-    if command == "python3":
-        return expected
-    if command.startswith("python3 "):
-        return shlex.quote(expected) + command[len("python3") :]
+    except HookManifestError as exc:
+        return f"hook manifest is absent or invalid: {path}: {exc}"
+    if pinned is not None:
+        runtime.atomic_write(path, pinned.decode("utf-8"), mode=0o644)
     return None

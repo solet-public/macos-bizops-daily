@@ -120,6 +120,8 @@ def _preview_data(probe: UpdateProbe, paths: ManagerPaths) -> dict[str, JsonValu
             "committed": local_state.state.committed_rows(),
             "local_state_commitment": local_state.state.local_state_commitment,
             "preserved_surface": [{"path": path, "kind": kind, "mode": mode, "size": size} for path, kind, mode, size in local_state.state.preserved_surface],
+            # iss_f1d8cfc2: preserved tracked paths proved byte-exact installer interpreter pins (disclosed, bound by digest above).
+            "installer_pins": list(probe.installer_pins),
         },
         "planned_actions": list(probe.planned_actions),
         "source_mode": probe.source_mode,
@@ -162,10 +164,22 @@ _OVERLAP_REPAIR = (
     "(`git diff <baseline>..<candidate> -- <path>`), keep your local lines, and re-run `solet-manager update {name} --dry-run`. "
     "If the only local difference is the genesis rewrite of `solet_name:`, see the seed follow-up (design D8)."
 )
+#: iss_f1d8cfc2 / iss_c1a7df20: a candidate that changes a manifest carrying the installer's own interpreter pin.
+_PIN_OVERLAP_REPAIR = (
+    "The candidate release changes {paths}, which this installation's own installer bound to its Python interpreter "
+    "(the coordination-hook interpreter pin); this Manager cannot yet carry that pin onto a changed manifest. "
+    "Do not restore or edit the file -- the pin is required. Upgrade the Manager (`brew upgrade solet`), then re-run "
+    "`solet-manager update {name} --dry-run`."
+)
 _REPAIRS = {
     "staged_changes_present": "Staged changes are refused (A7.1): `git restore --staged {paths}` is the operator's call; the Manager never runs it.",
     "tracked_shape_changed": "A deleted, retyped, mode-changed or symlinked tracked path is refused; restore {paths} to a content-only edit of the shipped regular file, then preview again.",
-    "executed_code_modified": "{paths} is under an executed-code root (bootstrap, an editable-installed distribution, or a roster plugin); the Manager will not execute a modified target. Restore it, then preview again.",
+    "executed_code_modified": (
+        "{paths} is under an executed-code root (bootstrap, an editable-installed distribution, or a roster plugin) and differs from "
+        "the release's committed bytes by more than an installer write the Manager recognizes; the Manager will not execute a modified "
+        "target. `git diff -- <path>` in the solet shows the local edit: undo only that edit (keep any installer write, such as the "
+        "coordination-hook interpreter pin) or move your change out of the tree, then preview again."
+    ),
     "git_metadata_present": "{paths} changes how the fast-forward writes candidate files (attributes: eol/text/filters; modules: gitlinks) and is never preserved through an update. Remove it, then preview again.",
     "preserved_surface_in_transition": "The candidate carries {paths} under profile/, which no sealed release may ship; this is a seed-side regression, not an installation you can repair.",
 }
@@ -176,10 +190,20 @@ def _blocked_repair(probe: UpdateProbe) -> dict[str, JsonValue]:
     for reason, paths in sorted(probe.blocked_paths.items()):
         joined = ", ".join(paths)
         if reason == "tracked_overlap_present":
-            repairs[reason] = _OVERLAP_REPAIR.format(paths=joined, name=probe.record.name)
+            repairs[reason] = _overlap_repair(paths, probe.installer_pins, probe.record.name)
         elif reason in _REPAIRS:
             repairs[reason] = _REPAIRS[reason].format(paths=joined)
     return repairs
+
+
+def _overlap_repair(paths: list[str], pins: tuple[str, ...], name: str) -> str:
+    """The operator's own overlaps are resolved by hand; an overlapped installer pin needs a newer Manager, never a hand edit."""
+    own = [path for path in paths if path not in pins]
+    pinned = [path for path in paths if path in pins]
+    parts = [_OVERLAP_REPAIR.format(paths=", ".join(own), name=name)] if own else []
+    if pinned:
+        parts.append(_PIN_OVERLAP_REPAIR.format(paths=", ".join(pinned), name=name))
+    return " ".join(parts)
 
 
 def _blocked_preview(exc: UpdateBlockedError) -> CommandResult:

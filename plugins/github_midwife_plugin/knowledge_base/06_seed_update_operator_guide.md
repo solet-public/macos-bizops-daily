@@ -100,8 +100,10 @@ the upgrade comes first. The second command is a preview: it changes
 nothing, and prints exactly what the update would do — which release it
 will move your solet to, which of the files on your machine it will
 preserve untouched (your generated `AGENTS.md`/`CLAUDE.md`, the
-`knowledge_bases` links, your `profile` folder — these are listed as
-preserved, not as problems), and any component it will install.
+`knowledge_bases` links, your `profile` folder, and the two Claude/Codex
+coordination-hook `hooks.json` files that setup pointed at your solet's own
+Python — these are listed as preserved, not as problems), and any component
+it will install.
 
 **If it says `preview_ready`:** continue to Step 2. It also prints an
 approval fingerprint — you'll pass that back in the next command, which is
@@ -114,7 +116,11 @@ force anything. The most common reasons: a file the release changes that
 you also changed locally (the report tells you how to keep your version by
 hand), or something staged in git that you or an agent left behind. Fix the
 named thing, or ask for help with the report in hand, then run the preview
-again.
+again. One exception: never "restore" a coordination-hook `hooks.json` file
+to fix a refusal. Setup deliberately points those hooks at your solet's own
+Python, and undoing that breaks them. If the report names one of them, it
+says what to do instead: usually `git diff -- <file>` to find an extra edit,
+or upgrading the Manager with `brew upgrade solet`.
 
 ## Step 2 — apply the update
 

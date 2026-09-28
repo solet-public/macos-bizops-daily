@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+from solet_setup_contracts.hook_interpreter_pin import CLAUDE_HOOK_MANIFEST, CODEX_HOOK_MANIFEST
 
 from .apple_setup_adapter import pinned_asset_error
 from .launchagent_status import launchagent_health
@@ -34,8 +35,8 @@ from .steps import GENESIS_STEP_RUNNERS
 type OperationHandler = Callable[[AdapterRequest, Runtime], JsonObject]
 
 _TEMPLATES = Path(__file__).resolve().parents[2] / "knowledge_base" / "hydration_templates"
-_CLAUDE_HOOKS = Path("plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/hooks.json")
-_CODEX_HOOKS = Path("plugins/github_midwife_plugin/codex_plugin/coordination-hooks/hooks/hooks.json")
+_CLAUDE_HOOKS = Path(CLAUDE_HOOK_MANIFEST)
+_CODEX_HOOKS = Path(CODEX_HOOK_MANIFEST)
 _MODEL_CONFIGS = {
     "setup::models.configure_lm_studio_embeddings": Path("profile/config/plugins/openai_embeddings_plugin.json"),
     "setup::models.configure_lm_studio_inference": Path("profile/config/plugins/default_inference_plugin.json"),

@@ -24,6 +24,11 @@ dependencies = [
     # reference-code map entries (birther.py/venv_setup.py/autostart_manager.py
     # patterns) that genesis does not install or depend on at runtime.
     "macos_vault_plugin",
+    # The coordination-hook interpreter pin (iss_f1d8cfc2) is the one transform
+    # the installer writes and the Manager recognizes; it lives in the shared
+    # stdlib-only contracts package, installed before this plugin at genesis
+    # (venv_provision) and in the Manager's required-distribution order.
+    "solet-setup-contracts",
 ]
 
 [project.entry-points."ananta.plugins"]

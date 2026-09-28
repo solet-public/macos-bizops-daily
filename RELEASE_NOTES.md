@@ -2,6 +2,47 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-28 — r51: existing solets can update again
+
+**Solet Manager manager-v0.1.0-r51.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows only after a fresh macOS 27 install round and an existing-solet
+update round both reach their end state on this build.
+
+Requires macOS 27 on Apple-silicon hardware for a fresh install, as r50 does.
+
+Changes since r50 (source `ae8180ee7`):
+
+- **`solet-manager update` no longer refuses every existing solet.** During
+  install, the setup step pins both coordination-hook manifests (the
+  hooks.json files of the Claude and Codex coordination-hooks plugins) to the
+  solet's own Python. The update preview treated that pin as a local
+  code edit and stopped with `executed_code_modified`. Its repair message,
+  "restore it", would have undone the pin. The r50 update round measured
+  this refusal on a clean r46 install. Now:
+  - The Manager accepts a hook manifest only when its bytes are exactly
+    the installer's pin of the committed file for this solet. Any other
+    edit is still refused. The message now says to check it with
+    `git diff`, not to restore it.
+  - The pin is carried through the update unchanged, so the hooks never
+    point at a bare `python3`.
+  - `solet-manager doctor` no longer reports a pinned solet's code as
+    unverifiable.
+  - If a future release changes a pinned hook manifest, the update refuses
+    and asks you to upgrade the Manager first (`brew upgrade solet`).
+- **A new landing check keeps the shipped-test lists consistent.** The r50
+  publish first failed because a new test was listed as not shipped in one
+  place but not in the other two. That check used to run only when a
+  release was built; it now runs before every change lands.
+
+Known limits:
+
+- Solets that use LM Studio cannot yet move to the Apple-native stack by
+  updating. That migration, including macOS 26 (Tahoe) hosts, is planned for
+  r52. Updating never uninstalls LM Studio or deletes any downloaded model.
+- The r51 update and fresh-install VM rounds are pending at publication.
+
 ## 2026-09-28 — r50: updates for solets whose install never fully verified
 
 **Solet Manager manager-v0.1.0-r50.** This is a full seed build for

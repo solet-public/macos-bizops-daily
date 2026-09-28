@@ -1,0 +1,28 @@
+# smoke_contract_lint_gate — tracked-debt allowlist
+#
+# The gate (quality_gates/smoke_contract_lint_gate.py) checks that every
+# checkout-only shipped-smoke declaration agrees across all three surfaces:
+# the `# not shipped:` marker in quality_gates/gate_smokes.txt, the
+# checkout_only entry in shipped_smoke_contract.yaml, and the
+# seed_manifest.yaml exclude_paths line. A finding here is a three-surface
+# disagreement — exactly the class that broke r50's publish (iss_59385149).
+#
+# Format: <key>  # owner: <id> reason: <free text> expires: <YYYY-MM-DD>
+#   key — the gate's own violation message, matched verbatim.
+#
+# Allowlisted findings are STILL PRINTED; they do not contribute to the
+# exit-2 verdict. Removing an entry is the unit of remediation progress.
+# This register is NOT a skip path.
+#
+# NOT MEANINGFULLY ALLOWLISTABLE BY DESIGN: a three-surface disagreement IS
+# the defect this gate exists to catch before assembly, not a style
+# preference with a legitimate exception (mirrors the schema-init gate's
+# standing ruling, 2026-09-20, under rul_367d8bd6, that a live boot-crash is
+# never allowlisted). This file is expected to stay empty; it exists only
+# for uniformity with the other gates code_quality_check.py wires the same
+# way. Entries here require operator ratification (KB: "Gate Allowlist
+# Conventions").
+#
+# ---------------------------------------------------------------------------
+# Registered 2026-09-28 (lane-smoke-contract-lint-20260928, iss_59385149)
+# with ZERO entries.

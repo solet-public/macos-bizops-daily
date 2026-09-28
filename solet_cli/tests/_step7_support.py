@@ -164,6 +164,8 @@ class Knobs:
     journal_version: Literal[5, 4] = 5
     router: bool = False
     genesis_untracked: bool = True
+    #: Extra ``(path, content)`` files the candidate ships (iss_f1d8cfc2: a changed coordination-hook manifest).
+    candidate_files: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -313,7 +315,7 @@ def assembled_seed() -> tuple[Path, str]:
 
 
 def _seed_key(knobs: Knobs) -> tuple[object, ...]:
-    return (knobs.git_metadata == "gitattributes_tracked_edit", knobs.router, knobs.knowledge_removal, knobs.overlap, knobs.untracked_collision, knobs.kb_addition is not None)
+    return (knobs.git_metadata == "gitattributes_tracked_edit", knobs.router, knobs.knowledge_removal, knobs.overlap, knobs.untracked_collision, knobs.kb_addition is not None, knobs.candidate_files)
 
 
 def _release_json(release: Release) -> dict[str, str]:
@@ -373,6 +375,7 @@ def _seed_repository(source: Path, knobs: Knobs) -> tuple[Release, Release, dict
         extra["root_manifest.yaml"] = (source / "root_manifest.yaml").read_text(encoding="utf-8") + "\n# candidate touch\n"
     if knobs.untracked_collision:
         extra[".gitignore"] = "profile/data/\n"
+    extra.update(dict(knobs.candidate_files))
     if knobs.kb_addition is not None:
         extra[f"plugins/{NEW_PLUGIN}/knowledge_base/manifest.yaml"] = f"name: {NEW_PLUGIN}\nversion: 1\ndescription: fixture knowledge base\n"
         extra[f"plugins/{NEW_PLUGIN}/knowledge_base/01_article.md"] = "# New plugin article\n\nFixture content.\n"

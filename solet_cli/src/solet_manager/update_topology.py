@@ -158,15 +158,22 @@ def local_state_reasons(
     executed_code_roots: tuple[str, ...],
     *,
     case_insensitive: bool,
+    installer_pins: tuple[str, ...],
 ) -> tuple[tuple[str, tuple[str, ...]], ...]:
-    """Section 6.2's candidate-dependent reasons, each with the exact paths it names."""
+    """Section 6.2's candidate-dependent reasons, each with the exact paths it names.
+
+    ``installer_pins`` are the tracked modifications ``installer_pins`` proved
+    byte-exact installer writes (iss_f1d8cfc2): they are Class T, never
+    ``executed_code_modified``, but still overlap a candidate that changes them.
+    """
     rows: list[tuple[str, tuple[str, ...]]] = []
     overlap = tracked_overlap(facts.tracked_paths.values, transition, case_insensitive=case_insensitive)
     for reason in ("tracked_overlap_present", "casefold_collision"):
         paths = tuple(sorted({row.path for row in overlap if row.reason == reason}))
         if paths:
             rows.append((reason, paths))
-    executed = executed_code_overlap((*facts.tracked_paths.values, *facts.untracked_paths.values), executed_code_roots)
+    local = tuple(path for path in (*facts.tracked_paths.values, *facts.untracked_paths.values) if path not in installer_pins)
+    executed = executed_code_overlap(local, executed_code_roots)
     if executed:
         rows.append(("executed_code_modified", executed))
     surface = preserved_surface_transition(transition)

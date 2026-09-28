@@ -242,6 +242,8 @@ class UpdateProbe:
     local_state: ObservedLocalState | None = None
     blocked_paths: dict[str, list[str]] = field(default_factory=lambda: {})
     host: dict[str, JsonValue] = field(default_factory=lambda: {})
+    #: iss_f1d8cfc2: the tracked hook manifests proved to carry exactly the installer's interpreter pin.
+    installer_pins: tuple[str, ...] = ()
 
     @property
     def fingerprint(self) -> str | None:
@@ -386,7 +388,7 @@ def probe_update(
         planned_actions=planned,
         source_mode=source_mode,
     )
-    return UpdateProbe(record, descriptor, candidate, baseline, reduction.reasons, reduction.collisions, preview, operation_id, journal_path, source_mode, recovers, reduction.local_state, reduction.blocked_paths, host)
+    return UpdateProbe(record, descriptor, candidate, baseline, reduction.reasons, reduction.collisions, preview, operation_id, journal_path, source_mode, recovers, reduction.local_state, reduction.blocked_paths, host, reduction.installer_pins)
 
 
 def enrollment_binding(operation_id: str, approval_fingerprint: str) -> dict[str, JsonValue]:

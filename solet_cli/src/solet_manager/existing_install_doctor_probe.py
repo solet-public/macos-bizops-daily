@@ -20,19 +20,20 @@ from pathlib import Path
 from typing import cast
 
 from .adapter_protocol import OperationResult
-from .errors import AdapterError, AdapterProtocolError, ManagerError, StateConflictError
+from .errors import AdapterError, AdapterProtocolError, ManagerError, SourceError, StateConflictError
 from .executed_code import RosterUnreadableError, executed_code_roots
 from .existing_install_adapters import ExistingInstallAdapterRegistry
 from .existing_install_bundle import RuntimeOperation
 from .existing_install_inspection import ExistingInstallInspectionResult
 from .existing_solet_diagnostics import DiagnosticCheck, DiagnosticStatus
+from .installer_pins import installer_pinned_paths, read_target_blob
 from .models import CheckpointStatus, DoctorContractKind, InstanceInventoryRecordV2, JsonValue, ReleaseIdentity
 from .paths import ManagerPaths
 from .update_candidate import UpdateCandidate
 from .update_runtime_plan import PlanContext, RuntimeSeams, declared_closure_for, decode_facts, operation_request, public_inputs_for
 from .update_topology import executed_code_overlap
 
-__all__ = ["STALE_ARTIFACT_STATES", "VERIFIED_ARTIFACT_STATES", "DoctorProbe", "Section", "artifact_check", "artifact_facts", "check", "executed_code_overlap_paths", "executed_code_verifiable", "not_applicable", "operation_by_ref", "probe_status", "run_probes", "unbound_reason", "unknown", "unknown_section", "verdict"]
+__all__ = ["STALE_ARTIFACT_STATES", "VERIFIED_ARTIFACT_STATES", "DoctorProbe", "Section", "artifact_check", "artifact_facts", "check", "executed_code_overlap_paths", "executed_code_unknown_reason", "executed_code_verifiable", "not_applicable", "operation_by_ref", "probe_status", "run_probes", "unbound_reason", "unknown", "unknown_section", "verdict"]
 
 VERIFIED_ARTIFACT_STATES = frozenset({"stamped_current"})
 STALE_ARTIFACT_STATES = frozenset({"stamped_previous", "legacy_matched"})
@@ -74,6 +75,8 @@ class DoctorProbe:
     #: Step 7: the Manager paths, so contract 2 can read the last verified update's journal for the B7 disclosure.
     paths: ManagerPaths | None = None
     executed_code_roots_reason: str | None = None
+    #: iss_f1d8cfc2: tracked hook manifests proved to carry exactly the installer's interpreter pin (Class T, not executed-code).
+    installer_pins: tuple[str, ...] = ()
 
     @property
     def probes_bound(self) -> bool:
@@ -123,16 +126,26 @@ def unknown_section(probe: DoctorProbe, name: str) -> tuple[DiagnosticCheck, ...
 
 
 def executed_code_overlap_paths(probe: DoctorProbe) -> tuple[str, ...] | None:
-    """Every tracked-or-untracked local path under a derived executed-code root (section 6.5); ``None`` when the roster is unreadable."""
+    """Every tracked-or-untracked local path under a derived executed-code root (section 6.5), less the byte-exact
+    installer interpreter pins (iss_f1d8cfc2); ``None`` when the roster or a pinned manifest's committed blob is unreadable."""
     if probe.executed_code_roots is None and probe.executed_code_roots_reason is None:
         try:
             probe.executed_code_roots = executed_code_roots(probe.target, probe.candidate)
+            probe.installer_pins = installer_pinned_paths(probe.target, probe.inspection.facts, read_target_blob(probe.target))
         except RosterUnreadableError as exc:
-            probe.executed_code_roots_reason = f"roster_unreadable: {exc}"
+            probe.executed_code_roots, probe.executed_code_roots_reason = None, f"roster_unreadable: {exc}"
+        except SourceError as exc:
+            probe.executed_code_roots, probe.executed_code_roots_reason = None, f"installer_pin_unreadable: {exc}"
     if probe.executed_code_roots is None:
         return None
     facts = probe.inspection.facts
-    return executed_code_overlap((*facts.tracked_paths.values, *facts.untracked_paths.values), probe.executed_code_roots)
+    local = tuple(path for path in (*facts.tracked_paths.values, *facts.untracked_paths.values) if path not in probe.installer_pins)
+    return executed_code_overlap(local, probe.executed_code_roots)
+
+
+def executed_code_unknown_reason(probe: DoctorProbe) -> str:
+    """The stable reason code for an underivable executed-code set: ``roster_unreadable`` or ``installer_pin_unreadable``."""
+    return (probe.executed_code_roots_reason or "roster_unreadable").split(":", 1)[0]
 
 
 def executed_code_verifiable(probe: DoctorProbe) -> bool:
@@ -187,7 +200,7 @@ def unbound_reason(probe: DoctorProbe) -> str:
     if not probe.probes_bound:
         return "no_authoritative_probe"
     if probe.executed_code_roots is None and probe.executed_code_roots_reason is not None:
-        return "roster_unreadable"
+        return executed_code_unknown_reason(probe)
     return "target_code_unverifiable"
 
 
