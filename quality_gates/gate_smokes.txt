@@ -4548,6 +4548,8 @@ quality_gates/tests/ananta_no_solet_manager_import_smoke.py
 plugins/github_midwife_plugin/tests/bootstrap_adapter_contract_smoke.py
 plugins/github_midwife_plugin/tests/bootstrap_adapter_homebrew_guard_contract_smoke.py
 plugins/github_midwife_plugin/tests/bootstrap_adapter_homebrew_plan_smoke.py
+plugins/github_midwife_plugin/tests/bootstrap_adapter_python_on_request_smoke.py
+plugins/github_midwife_plugin/tests/python_on_request_upgrade_docs_smoke.py
 plugins/github_midwife_plugin/tests/setup_executor_contract_smoke.py
 quality_gates/tests/flow_probe_registry_gate_smoke.py
 
@@ -4808,6 +4810,7 @@ solet_cli/tests/doctor_postgres_pin_census_smoke.py
 # the Cellar version the interpreter link resolves to now. It does NOT read an ACL
 # or hash a signature. Offline: constructed directory trees only, nothing executed.
 solet_cli/tests/doctor_python_interpreter_census_smoke.py
+solet_cli/tests/doctor_python_on_request_census_smoke.py
 
 # Router identity read-back (D-7.4 iss_c30be917, 2026-09-05): _verify_router_up
 # returns on ANY status reply containing router_started_at -- no pid, port or
@@ -5163,6 +5166,7 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/create_origin_blocked_create_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/hook_interpreter_pin_update_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_legacy_direct_runtime_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_resume_pinned_predecessor_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports update_legacy_direct_runtime_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: quality_gates/tests/smoke_contract_lint_gate_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it calls checkout_only_consistency_violations directly to prove the repo-level contract-lint gate, which is in no capability bundle (fixture_build_tooling)
 # not shipped: ananta/tests/core/orchestration/selected_inference_startup_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin; absent from macos_free_minimal and macos_samantha, which ship default_inference_plugin instead (iss_76ae2d4d, cross_bundle_transition)
 # not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
@@ -5438,6 +5442,12 @@ ananta/tests/llm/session_ledger/embedding_token_budget_smoke.py
 # router_preferred strategy, a legacy_direct plist, an attest that raises) previews single_color_restart and promotes; a new st_dev
 # for the same inode keeps update and doctor working while another directory still refuses; a solet stopped at source_advanced on a
 # renumbered device finishes with the fixed Manager's preview and apply.
+# iss_f81e71d3 (r60): a Manager upgraded while an update sat at source_advanced finishes the update pinned by the older
+# Manager when its own paired release lists that seed as a supported predecessor (real created shape, legacy_direct, a renumbered
+# st_dev), doctor names the finishing commands, and the next update offers the new seed; an unlisted pinned seed refuses
+# pinned_candidate_unsupported on every resume path (and one differing only in repository, channel or tree refuses too), the runtime
+# preview discloses the admission, and a keg whose own records disagree still refuses release_identity_inconsistent; iss_285d061f:
+# an offline doctor's receipt-less candidate cache repository is discarded and fetched again once back online.
 # iss_59385149: the repo-level shipped-smoke checkout-only contract lint gate goes RED on a marker
 # without a contract entry, a contract entry without a manifest exclude, and a contract entry without
 # a marker; reproduces the exact three-file state that broke r50's publish (master 87796aab4); GREEN

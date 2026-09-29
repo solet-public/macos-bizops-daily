@@ -430,13 +430,24 @@ def _installed_release(request: UpdateRequest, record: InstanceInventoryRecordV2
 # --- result ------------------------------------------------------------------------------------------------
 
 
+def _unresolved(selection: DoctorSelection) -> tuple[str, str]:
+    """An update stopped at its source half is unresolved because its runtime half has not run: name that step (iss_f81e71d3)."""
+    if selection.journal is not None and selection.journal["status"] == "source_advanced":
+        name = selection.record.name
+        return "update_in_progress", (
+            f"The update stopped after its source half; finish it: run `solet-manager update {name} --dry-run`, then "
+            f"`solet-manager update {name} --yes --approval-fingerprint <runtime_approval_fingerprint>` with the fingerprint it prints."
+        )
+    return "required_check_unresolved", "Resolve the missing or unknown required checks, then run the doctor again."
+
+
 def doctor_result(selection: DoctorSelection, run: DoctorRun) -> CommandResult:
     record = selection.record
     error_kind, repair = (None, None) if selection.pending is None else selection.pending
     if run.status == "failed" and error_kind is None:
         error_kind, repair = "required_check_failed", "Repair the failed required checks, then run the doctor again."
     elif run.status == "incomplete" and error_kind is None:
-        error_kind, repair = "required_check_unresolved", "Resolve the missing or unknown required checks, then run the doctor again."
+        error_kind, repair = _unresolved(selection)
     data: dict[str, JsonValue] = {
         "instance": {"instance_id": record.instance_id, "name": record.name, "canonical_target": record.target.canonical_path, "management_state": record.management_state.value},
         "contract": {"kind": selection.contract.value, "bundle_digest": selection.bundle_digest, "update_operation_id": selection.update_operation_id, "expected_source": _release_dict(selection.expected_source), "expected_runtime": None if selection.expected_runtime is None else _release_dict(selection.expected_runtime)},

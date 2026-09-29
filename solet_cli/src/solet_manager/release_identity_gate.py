@@ -156,7 +156,7 @@ def require_manager_seed_pairing(
             "the installed manager and the candidate seed were cut from different source "
             f"revisions ({verdict['manager_source_commit']} vs {verdict['seed_source_commit']}) "
             "and no release manifest records an allow_manager_seed_skew reason",
-            repair="Upgrade the manager and seed together (brew upgrade solet), or stage a release "
+            repair="Upgrade the manager and seed together (brew tab --installed-on-request python@3.13 && brew upgrade solet), or stage a release "
             "that records --allow-manager-seed-skew <reason> in its manifest.",
         )
     raise ReleaseIdentityError(

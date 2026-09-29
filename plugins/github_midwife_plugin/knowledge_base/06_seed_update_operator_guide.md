@@ -8,7 +8,7 @@ Article Role: operations_runbook
 
 Article Tags: planning-stage:solet-lifecycle, evidence-category:operations-runbook, domain:local-solet, domain:client-deployment, consumer_profile:both
 
-Embedding Description: Plain-language, no-jargon walkthrough for the solet's OWNER to bring an already-running solet up to date with a newer published seed release using the Solet Manager at a terminal — `brew upgrade` to get the update, `solet-manager doctor <name>` as the go/no-go before and after, `solet-manager update <name> --dry-run` to read what will change (it lists the component it will install, the files on your machine it will preserve, and refuses with the exact file names when it will not proceed — never force anything), then `--yes` with the fingerprint from the preview, which restarts and waits itself and tells you when it is verified; what the three exit codes mean and `solet-manager reconcile <name> --dry-run` when an update stops part way; the few things still done by hand (your own project's `AGENTS.md`/`CLAUDE.md`, shell integration and Claude Code hooks re-rendered by a coding agent, the first-time business-connector export/workspace root answer, quitting Claude Code before a rename migration, and the read/override/refusal checks for Marketo and Zuora that are only verifiable on your machine); and a closing note on shaping newly-authored joseki cards now that connector reads never return record values inline. Companion to `05_seed_update_runbook.md`, which is written to the coding agent performing the same update and carries the full technical detail and the legacy manual procedure this guide deliberately leaves out.
+Embedding Description: Plain-language, no-jargon walkthrough for the solet's OWNER to bring an already-running solet up to date with a newer published seed release using the Solet Manager at a terminal — `brew tab --installed-on-request python@3.13 && brew upgrade solet` to get the update, `solet-manager doctor <name>` as the go/no-go before and after, `solet-manager update <name> --dry-run` to read what will change (it lists the component it will install, the files on your machine it will preserve, and refuses with the exact file names when it will not proceed — never force anything), then `--yes` with the fingerprint from the preview, which restarts and waits itself and tells you when it is verified; what the three exit codes mean and `solet-manager reconcile <name> --dry-run` when an update stops part way; the few things still done by hand (your own project's `AGENTS.md`/`CLAUDE.md`, shell integration and Claude Code hooks re-rendered by a coding agent, the first-time business-connector export/workspace root answer, quitting Claude Code before a rename migration, and the read/override/refusal checks for Marketo and Zuora that are only verifiable on your machine); and a closing note on shaping newly-authored joseki cards now that connector reads never return record values inline. Companion to `05_seed_update_runbook.md`, which is written to the coding agent performing the same update and carries the full technical detail and the legacy manual procedure this guide deliberately leaves out.
 
 > **Status (2026-09-19, existing-solet import/update Step 7):** this guide
 > is the Manager path. If your solet was never imported into the Manager,
@@ -94,9 +94,13 @@ Every command here is `solet-manager`, not `solet`: `solet --help` does not list
 update, and `solet update` only points you back to `solet-manager update`.
 
 ```bash
-brew upgrade solet-public/tap/solet
+brew tab --installed-on-request python@3.13 && brew upgrade solet
 solet-manager update <name> --dry-run
 ```
+
+The first command, `brew tab --installed-on-request python@3.13`, only flags the shared
+`python@3.13` as one you asked for, so Homebrew never removes it as unused later. It
+installs and upgrades nothing, and running it again is harmless.
 
 The Manager learns about new releases from its own Homebrew package, so
 the upgrade comes first. The second command is a preview: it changes
@@ -123,7 +127,7 @@ again. One exception: never "restore" a coordination-hook `hooks.json` file
 to fix a refusal. Setup deliberately points those hooks at your solet's own
 Python, and undoing that breaks them. If the report names one of them, it
 says what to do instead: usually `git diff -- <file>` to find an extra edit,
-or upgrading the Manager with `brew upgrade solet`.
+or upgrading the Manager with `brew tab --installed-on-request python@3.13 && brew upgrade solet`.
 
 ## Step 2 — apply the update
 

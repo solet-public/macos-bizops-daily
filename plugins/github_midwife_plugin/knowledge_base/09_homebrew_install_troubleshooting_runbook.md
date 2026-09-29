@@ -70,6 +70,30 @@ import`, `solet doctor <name>` reports `doctor::python_interpreter_drift_v1`
 for a venv created under one `python@3.13` version that now resolves to
 another; it does not see a same-version revision bump.
 
+### Upgrading the Manager later: mark `python@3.13` on request first
+
+This release still depends on `python@3.13`; a later one (planned as r61) will
+not, and on a real install Homebrew keeps that Python only as the Manager's
+dependency (`installed_on_request` is false in its receipt). Once the
+dependency is gone, `brew autoremove`, which `brew upgrade` runs in its
+periodic cleanup, would delete the interpreter every solet `.venv` links.
+Every upgrade therefore starts with the receipt flag:
+
+```console
+brew tab --installed-on-request python@3.13 && brew upgrade solet
+```
+
+`brew tab` changes only that flag: it installs and upgrades nothing, and
+running it again is harmless. It fails only if `python@3.13` is not installed,
+and that stops the `&&` before the upgrade. An installed Manager depends on
+`python@3.13`, so a failure here means the Python was removed from the machine:
+run `brew install python@3.13` (which also marks it installed on request), then
+run the pair again. `solet-manager create` and `update` run the same
+flag command as a planned, previewed step, and `solet-manager doctor <name>`
+reports `doctor::python_installed_on_request_v1` with reason
+`python_not_installed_on_request` and this exact command until the flag is
+set.
+
 ## The loop: preview, approve, repeat
 
 `solet create` is not a single run. Each pass is one of two things:

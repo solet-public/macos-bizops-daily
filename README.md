@@ -51,6 +51,13 @@ run first and how to make Homebrew refuse instead. To recover, in a logged-in
 GUI session read each of that solet's Keychain items once and answer Always
 Allow.
 
+When you later upgrade the manager, follow the upgrade command in
+`plugins/github_midwife_plugin/knowledge_base/05_seed_update_runbook.md`
+rather than a bare upgrade: it first marks the shared `python@3.13` as
+installed on request, which installs and upgrades nothing but keeps Homebrew
+from ever removing that Python as unused once a later manager release stops
+depending on it.
+
 If Homebrew is not installed, start at [brew.sh](https://brew.sh). That is
 Homebrew's installer and canonical source. This seed does not provide a Solet
 installer script or a `curl | bash` alternative.

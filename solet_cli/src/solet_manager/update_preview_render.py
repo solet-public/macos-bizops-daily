@@ -168,7 +168,7 @@ _OVERLAP_REPAIR = (
 _PIN_OVERLAP_REPAIR = (
     "The candidate release changes {paths}, which this installation's own installer bound to its Python interpreter "
     "(the coordination-hook interpreter pin); this Manager cannot yet carry that pin onto a changed manifest. "
-    "Do not restore or edit the file -- the pin is required. Upgrade the Manager (`brew upgrade solet`), then re-run "
+    "Do not restore or edit the file -- the pin is required. Upgrade the Manager (`brew tab --installed-on-request python@3.13 && brew upgrade solet`), then re-run "
     "`solet-manager update {name} --dry-run`."
 )
 _REPAIRS = {
@@ -273,6 +273,8 @@ def _runtime_preview(request: UpdateRequest, record: InstanceInventoryRecordV2, 
     except UpdateBlockedError as exc:
         return _blocked_runtime_preview(exc, journal)
     data = plan_preview_data(plan, context, status)
+    # Disclosed, never fingerprinted: a pinned candidate admitted as a supported predecessor shows it (iss_f81e71d3).
+    data["release_identity"] = dict(execution.candidate.release_identity)
     approval = journal["runtime_approval"]
     if approval is not None:
         data["recorded_runtime_approval_fingerprint"] = cast(dict[str, JsonValue], approval)["fingerprint"]

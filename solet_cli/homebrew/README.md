@@ -39,6 +39,17 @@ on every credential read (`-25293`) at its next restart.
   `python@3.13` under `Would upgrade N dependencies for solet:` when it will move.
 - **Refuse instead of upgrading:** `brew pin python@3.13` makes the install stop
   with `You must brew unpin python@3.13`; `brew unpin` when the move is intended.
+- **Keep it from being autoremoved:** on a real install `python@3.13` is
+  recorded `installed_on_request=false`, kept only by this Formula's dependency.
+  A later release that drops the dependency would let `brew autoremove` (run by
+  `brew upgrade`'s periodic cleanup) delete the interpreter every solet venv
+  links. Every upgrade therefore runs
+  `brew tab --installed-on-request python@3.13 && brew upgrade solet`; the tab
+  changes only the receipt flag and installs and upgrades nothing. This
+  release still declares the dependency, so a bare upgrade loses nothing today.
+  `solet-manager create` and `update` plan the same step, and `solet doctor
+  <name>` reports `doctor::python_installed_on_request_v1` with the exact
+  command until it is set.
 - **Recovery:** in a logged-in GUI session (not SSH), read each Keychain item
   the affected solet owns once under its current interpreter and answer
   **Always Allow**; plain Allow is asked again on every spawn. After

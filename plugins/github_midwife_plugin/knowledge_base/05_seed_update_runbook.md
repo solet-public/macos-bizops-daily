@@ -28,12 +28,24 @@ newer seed release has been published. Do not use it for first-time setup
 
 ## How you learn a new release exists
 
-The Manager learns about releases through its own formula: `brew upgrade
-solet-public/tap/solet` installs the seed lock naming the new release, and
+The Manager learns about releases through its own formula: `brew tab --installed-on-request python@3.13 && brew upgrade solet` installs the seed lock naming the new release, and
 `solet-manager update <name> --dry-run` then reports the candidate as
 `available` (the doctor's section 16, `installed_descriptor_release`, says
 the same thing from the read-only side). The GitHub subscription remains
-the human notification channel that tells you to run that upgrade at all:
+the human notification channel that tells you to run that upgrade at all.
+
+Run the two commands together, in that order. The first, `brew tab
+--installed-on-request python@3.13`, changes only Homebrew's receipt flag for the
+shared `python@3.13`: it installs and upgrades nothing. It is needed because
+Homebrew currently keeps that Python only as this formula's dependency, and a later
+Manager release (planned as r61) stops depending on it; once that happens `brew autoremove`
+(which `brew upgrade` runs in its periodic cleanup) would delete the interpreter
+every solet `.venv` links. Marking it installed-on-request first makes that
+impossible. Running the flag command twice is harmless. This release still
+depends on `python@3.13`, so a bare `brew upgrade solet` loses nothing today;
+`solet-manager create` and `update` mark the flag themselves the next time they
+run, and `solet-manager doctor` warns with `python_not_installed_on_request`
+until then.
 
 **Subscribe to the seed repository's releases on GitHub**: **Watch → Custom
 → Releases** at the repository this clone was born from, not the default
@@ -139,7 +151,7 @@ or this `inspect`, and `solet update` / `solet import` refuse with a pointer to
 the `solet-manager` command. `solet inspect` is a different, active probe.
 
 ```bash
-brew install solet-public/tap/solet                       # once; brew upgrade for every later release
+brew install solet-public/tap/solet                       # once; for every later release run: brew tab --installed-on-request python@3.13 && brew upgrade solet
 solet-manager inspect --target <clone> --channel stable   # classify; exit 3 attention_required is the normal answer for a real clone
 solet-manager import <name> --target <clone> --channel stable --dry-run
 solet-manager import <name> --target <clone> --channel stable --yes --approval-fingerprint <fingerprint from the dry-run>
@@ -184,7 +196,7 @@ as a hand edit elsewhere under a roster plugin. The preview refuses only:
 | Reason (`data.topology.reasons`, exit 3) | Meaning | Repair |
 |---|---|---|
 | `history_diverged` | the clone's HEAD is not an ancestor of the candidate | re-birth, or Part C if the operator wants to hand-merge |
-| `tracked_overlap_present` | the candidate changes a file this installation modified locally | keep your lines by hand: `git diff <baseline>..<candidate> -- <path>`, then preview again; the Manager never overwrites, stashes or resets a local change. If the named file is a pinned coordination-hook manifest (listed in `local_state.installer_pins`), do not edit or restore it: upgrade the Manager (`brew upgrade solet`) and preview again — carrying the pin across a changed manifest is a Manager capability (`iss_c1a7df20`) |
+| `tracked_overlap_present` | the candidate changes a file this installation modified locally | keep your lines by hand: `git diff <baseline>..<candidate> -- <path>`, then preview again; the Manager never overwrites, stashes or resets a local change. If the named file is a pinned coordination-hook manifest (listed in `local_state.installer_pins`), do not edit or restore it: upgrade the Manager (`brew tab --installed-on-request python@3.13 && brew upgrade solet`) and preview again — carrying the pin across a changed manifest is a Manager capability (`iss_c1a7df20`) |
 | `staged_changes_present` | something is in the index | `git restore --staged <paths>` is the operator's call; the Manager never runs it |
 | `tracked_shape_changed` | a tracked path was deleted, retyped, mode-changed or symlinked | restore it to a content-only edit of the shipped regular file |
 | `executed_code_modified` | an edit under `bootstrap.py`, `bootstrap_adapter/`, an editable-installed distribution or a roster plugin, other than the installer's own interpreter pin | `git diff -- <path>` in the clone shows the local edit: undo only that edit (keep the installer's interpreter pin in a hook manifest) or move the change out of the tree, then preview again; the Manager will not execute a modified target |
@@ -210,10 +222,17 @@ not. (`import` still binds the device number into the instance id it derives;
 that is tracked as `iss_d2fa8dbe`.) An update that stopped with `lifecycle_strategy_unproven` (the Manager
 before r59 stopped every created solet there, at `source_advanced`, with no
 verb to go on or back) needs no reconcile and no manual Part C: run
-`brew upgrade solet`, then `update <name> --dry-run` (the runtime plan is now
+`brew tab --installed-on-request python@3.13 && brew upgrade solet`, then `update <name> --dry-run` (the runtime plan is now
 `single_color_restart`) and `--yes --approval-fingerprint` with the runtime
 fingerprint it prints, and it finishes through the final doctor to
-`promoted`. A terminal update (`blocked`, `failed`) has one named answer:
+`promoted`. The same answer holds when the Manager was upgraded while the
+update sat at `source_advanced`: from r60 the newer Manager finishes the
+seed the older one pinned when its own release lists that seed as a supported
+predecessor, `doctor` names this state `update_in_progress` with those two
+commands, and the next `update --dry-run` then offers the new release. A
+pinned seed the installed release does not list refuses
+`pinned_candidate_unsupported` on every verb; leave the clone and the journal
+alone and upgrade the Manager again (`iss_f81e71d3`). A terminal update (`blocked`, `failed`) has one named answer:
 `solet-manager reconcile <name> --dry-run` plans the successor, `--yes
 --approval-fingerprint` mints it, `--abandon --yes` abandons or retires
 before the fast-forward, `--release-pointer --yes` releases a stale pointer.

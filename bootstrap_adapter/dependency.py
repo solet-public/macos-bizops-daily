@@ -6,13 +6,13 @@ import enum
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from .homebrew import homebrew_guard_environment
 from .models import (
     FORMULA_KEG_MARKER,
     INSTALL_TIMEOUT_SECONDS,
@@ -21,7 +21,7 @@ from .models import (
     AdapterRuntime,
     Runner,
 )
-from .protocol import EMPTY_ACTION_PURPOSES, Request, evidence, planned_action, result
+from .protocol import EMPTY_ACTION_PURPOSES, Request, evidence, planned_action, result, run_public
 
 REQUIRED_DISTRIBUTIONS: tuple[tuple[str, str], ...] = (
     ("solet-setup-contracts", "solet_setup_contracts"),
@@ -32,6 +32,10 @@ REQUIRED_DISTRIBUTIONS: tuple[tuple[str, str], ...] = (
 )
 Closure = tuple[tuple[str, str], ...]
 EXISTING_DEPENDENCIES_REF = "existing::dependencies.reconcile"
+PYTHON_FORMULA = "python@3.13"
+PYTHON_ON_REQUEST_ACTION_ID = "homebrew.python_installed_on_request"
+_PYTHON_ON_REQUEST_TARGET = f"homebrew:{PYTHON_FORMULA}"
+_PYTHON_TAB_ARGS = ("tab", "--installed-on-request", PYTHON_FORMULA)
 _DECLARED_RELATIVE = re.compile(r"^(plugins/[a-z][a-z0-9_]*|ananta|solet_setup_contracts)$")
 _DECLARED_DISTRIBUTION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
@@ -43,6 +47,23 @@ class ClosureState(enum.Enum):
     INCOMPLETE = "incomplete"
     INTERPRETER_DANGLING = "interpreter_dangling"
     PRESENT_CLOSED = "present_closed"
+
+
+class PythonRequestState(enum.Enum):
+    """Whether Homebrew keeps ``python@3.13`` on its own account or only as a dependency (iss_d62aeab7)."""
+
+    NOT_HOMEBREW = "not_homebrew_python_313"
+    RECEIPT_UNREADABLE = "install_receipt_unreadable"
+    ON_REQUEST = "installed_on_request"
+    DEPENDENCY_ONLY = "installed_as_dependency"
+
+
+class PythonRequestMarkError(AdapterError):
+    """Marking python@3.13 installed-on-request could not complete; carries its named error kind."""
+
+    def __init__(self, error_kind: str, message: str) -> None:
+        super().__init__(message)
+        self.error_kind = error_kind
 
 
 def declared_closure(request: Request) -> Closure:
@@ -270,7 +291,7 @@ def _python_candidate_works(runtime: AdapterRuntime, candidate: str) -> bool:
 
 
 def _resolve_long_lived_python(runtime: AdapterRuntime) -> str:
-    discovered = shutil.which("python3.13")
+    discovered = runtime.which("python3.13")
     candidates = [
         runtime.base_python,
         discovered,
@@ -301,10 +322,146 @@ def _run_required(runtime: AdapterRuntime, command: list[str], label: str) -> No
         )
 
 
+def venv_rebuild_needed(state: ClosureState, facts: dict[str, bool]) -> bool:
+    """The one predicate for "apply rebuilds the venv": absent, a dangling interpreter, or not Python 3.13.
+
+    ``_repair_venv_if_needed`` (apply), ``_declared_actions`` (the existing-install plan) and the python
+    on-request probe all read it, so what the plan judges and what apply builds cannot drift apart.
+    """
+
+    return state in {ClosureState.ABSENT, ClosureState.INTERPRETER_DANGLING} or not facts["python_313"]
+
+
+def _instance_interpreter(runtime: AdapterRuntime, *, rebuild: bool) -> Path | None:
+    """The interpreter python@3.13's receipt is judged on: the one apply will actually use.
+
+    When apply rebuilds the venv (``venv_rebuild_needed``) that is ``_resolve_long_lived_python``, whatever the
+    old launcher points at; otherwise it is the venv's own launcher.
+
+    The remaining preview-to-apply window is discovery changing between the two calls. The Manager guards
+    it by re-probing at pre_apply: ``operation_executor._planned_action_drift`` treats a create whose
+    re-probed planned actions differ from the approved ones as probe drift and stops for a fresh approval, and
+    an update raises ``ProbeDriftError`` when its lock-time runtime-plan fingerprint differs from the
+    approved one (``update_runtime_execution``).
+    """
+
+    launcher = runtime.target / ".venv/bin/python3"
+    if not rebuild and launcher.exists():
+        return launcher
+    try:
+        return Path(_resolve_long_lived_python(runtime))
+    except AdapterError:
+        return None
+
+
+def _python_keg(resolved: Path) -> Path | None:
+    """The ``Cellar/python@3.13/<version>`` keg holding a resolved interpreter, if it is one."""
+
+    for parent in resolved.parents:
+        if parent.parent.name == PYTHON_FORMULA and parent.parent.parent.name == "Cellar":
+            return parent
+    return None
+
+
+def _python_request_probe(runtime: AdapterRuntime, *, rebuild: bool) -> tuple[PythonRequestState, Path | None]:
+    """Read the keg's install receipt; only an explicit ``false`` is a dependency-only python@3.13."""
+
+    interpreter = _instance_interpreter(runtime, rebuild=rebuild)
+    keg = None if interpreter is None else _python_keg(Path(os.path.realpath(interpreter)))
+    if keg is None:
+        return PythonRequestState.NOT_HOMEBREW, None
+    try:
+        receipt: object = json.loads((keg / "INSTALL_RECEIPT.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return PythonRequestState.RECEIPT_UNREADABLE, keg
+    flag = receipt.get("installed_on_request") if isinstance(receipt, dict) else None
+    if flag is True:
+        return PythonRequestState.ON_REQUEST, keg
+    if flag is False:
+        return PythonRequestState.DEPENDENCY_ONLY, keg
+    return PythonRequestState.RECEIPT_UNREADABLE, keg
+
+
+def probe_python_request_state(runtime: AdapterRuntime, *, rebuild: bool) -> PythonRequestState:
+    return _python_request_probe(runtime, rebuild=rebuild)[0]
+
+
+def _python_request_evidence(runtime: AdapterRuntime, state: PythonRequestState) -> dict[str, Any]:
+    return evidence(
+        runtime,
+        evidence_id="environment.python_installed_on_request",
+        kind="dependency_closure",
+        status="pending" if state is PythonRequestState.DEPENDENCY_ONLY else "verified",
+        summary=(
+            f"Whether Homebrew keeps {PYTHON_FORMULA} on request, so `brew autoremove` cannot remove the "
+            "interpreter this instance's venv links, was read from the keg's install receipt."
+        ),
+        observed=state.value,
+        expected=f"{PythonRequestState.ON_REQUEST.value} or {PythonRequestState.NOT_HOMEBREW.value}",
+        source=f"Cellar/{PYTHON_FORMULA}/<version>/INSTALL_RECEIPT.json",
+    )
+
+
+def _python_request_action() -> dict[str, Any]:
+    return planned_action(
+        PYTHON_ON_REQUEST_ACTION_ID,
+        f"Mark {PYTHON_FORMULA} installed on request so `brew autoremove` cannot remove it (no install, no upgrade)",
+        "package_install",
+        _PYTHON_ON_REQUEST_TARGET,
+        PythonRequestState.DEPENDENCY_ONLY.value,
+    )
+
+
+def mark_python_installed_on_request(runtime: AdapterRuntime, closure: Closure = REQUIRED_DISTRIBUTIONS) -> None:
+    """Run ``<prefix>/bin/brew tab --installed-on-request python@3.13`` when the receipt says dependency-only.
+
+    The brew is the one that owns the keg (the Cellar's parent), never whichever brew PATH finds first:
+    on a host with two prefixes the wrong brew can report success while the venv's keg stays unmarked.
+    Nothing is ever installed or upgraded.
+    """
+
+    closure_state, facts = probe_dependency_closure(runtime.target, runtime.run, closure)
+    state, keg = _python_request_probe(runtime, rebuild=venv_rebuild_needed(closure_state, facts))
+    if state is not PythonRequestState.DEPENDENCY_ONLY or keg is None:
+        return
+    brew = keg.parent.parent.parent / "bin" / "brew"
+    if not _brew_works(runtime, brew):
+        raise PythonRequestMarkError(
+            "python_on_request_brew_missing",
+            f"{brew}, the Homebrew that owns this python@3.13, is not available, so it could not be marked installed on request. "
+            f"Run `{brew} {' '.join(_PYTHON_TAB_ARGS)}` once it is available",
+        )
+    try:
+        environment = homebrew_guard_environment()
+    except AdapterError as exc:
+        raise PythonRequestMarkError("python_on_request_mark_failed", f"the Homebrew guard environment could not be built ({exc})") from exc
+    try:
+        completed = runtime.run(
+            [str(brew), *_PYTHON_TAB_ARGS],
+            capture_output=True,
+            text=True,
+            timeout=INSTALL_TIMEOUT_SECONDS,
+            env=environment,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise PythonRequestMarkError("python_on_request_mark_failed", "brew tab could not execute") from exc
+    if completed.returncode != 0:
+        stderr_tail = completed.stderr[-1024:].strip()
+        raise PythonRequestMarkError(
+            "python_on_request_mark_failed",
+            f"brew tab failed (exit {completed.returncode}; stderr tail: {stderr_tail!r})",
+        )
+
+
+def _brew_works(runtime: AdapterRuntime, brew: Path) -> bool:
+    completed = run_public(runtime, [str(brew), "--version"])
+    return completed is not None and completed.returncode == 0
+
+
 def _repair_venv_if_needed(
     runtime: AdapterRuntime, state: ClosureState, facts: dict[str, bool], venv_dir: Path, closure: Closure = REQUIRED_DISTRIBUTIONS
 ) -> tuple[ClosureState, dict[str, bool]]:
-    if state not in {ClosureState.ABSENT, ClosureState.INTERPRETER_DANGLING} and facts["python_313"]:
+    if not venv_rebuild_needed(state, facts):
         return state, facts
     interpreter = _resolve_long_lived_python(runtime)
     venv_command = [interpreter, "-m", "venv"]
@@ -398,7 +555,7 @@ def _closure_evidence(
 
 def _declared_actions(runtime: AdapterRuntime, state: ClosureState, facts: dict[str, bool], closure: Closure, venv_python: Path) -> list[dict[str, Any]]:
     """Existing-install planned actions: exactly the missing declared pieces, or one venv rebuild (section 4.2)."""
-    if state in {ClosureState.ABSENT, ClosureState.INTERPRETER_DANGLING} or not facts["python_313"]:
+    if venv_rebuild_needed(state, facts):
         return [planned_action("rebuild_venv", "Rebuild the instance virtual environment with the long-lived Python 3.13", "environment_rebuild", "$TARGET/.venv", state.value)]
     actions: list[dict[str, Any]] = []
     if not all(facts[name] for name in ("pip", "build_backend", "wheel")):
@@ -412,7 +569,7 @@ def _declared_actions(runtime: AdapterRuntime, state: ClosureState, facts: dict[
     return actions
 
 
-def _existing_probe_result(request: Request, runtime: AdapterRuntime, state: ClosureState, facts: dict[str, bool], closure: Closure, evidence_items: list[dict[str, Any]]) -> dict[str, Any]:
+def _existing_probe_result(request: Request, runtime: AdapterRuntime, state: ClosureState, facts: dict[str, bool], closure: Closure, evidence_items: list[dict[str, Any]], request_state: PythonRequestState) -> dict[str, Any]:
     """Existing-install probe: a not-yet-verified closure is ``pending``, never ``blocked`` (section 4.3).
 
     Only a formula-keg venv is a real refusal; a missing piece or a dangling
@@ -423,13 +580,107 @@ def _existing_probe_result(request: Request, runtime: AdapterRuntime, state: Clo
         return result(request, status="blocked", error_kind="instance_formula_keg_detected", retry_safe=False, evidence_items=evidence_items, repair="Rebuild the instance environment outside the manager formula keg.")
     if request["probe_purpose"] in EMPTY_ACTION_PURPOSES:
         return result(request, status="pending", evidence_items=evidence_items, repair="Reapply the declared dependency closure.")
+    actions = _declared_actions(runtime, state, facts, closure, runtime.target / ".venv/bin/python3")
+    if request_state is PythonRequestState.DEPENDENCY_ONLY:
+        actions.append(_python_request_action())
     return result(
         request,
         status="pending",
-        planned_actions=_declared_actions(runtime, state, facts, closure, runtime.target / ".venv/bin/python3"),
+        planned_actions=actions,
         evidence_items=evidence_items,
         repair="Approve exactly the missing declared pieces.",
     )
+
+
+def _apply_route_result(request: Request, runtime: AdapterRuntime, closure: Closure) -> dict[str, Any]:
+    """Apply the closure repair, then mark python@3.13 installed-on-request; each failure keeps its own name."""
+    try:
+        apply_dependency_closure(runtime, closure)
+    except AdapterError as exc:
+        return result(
+            request,
+            status="failed",
+            error_kind="dependency_closure_apply_failed",
+            retry_safe=True,
+            repair=(
+                f"{exc}. Repair the target package or interpreter condition and resume."
+            ),
+        )
+    try:
+        mark_python_installed_on_request(runtime, closure)
+    except PythonRequestMarkError as exc:
+        return result(
+            request,
+            status="failed",
+            error_kind=exc.error_kind,
+            retry_safe=True,
+            repair=f"{exc}. Nothing was installed or upgraded; resolve it and resume.",
+        )
+    return result(request, status="applied")
+
+
+def _create_probe_actions(state: ClosureState, error_kind: str, request_state: PythonRequestState) -> list[dict[str, Any]]:
+    """Create-flow planned actions: the whole closure set unless it is closed, plus the on-request mark when needed."""
+    actions: list[dict[str, Any]] = []
+    if state is not ClosureState.PRESENT_CLOSED:
+        actions = [
+            planned_action(
+                "environment.create_or_repair_venv",
+                "Create or deterministically repair the instance dependency closure",
+                "environment_rebuild",
+                "$TARGET/.venv",
+                error_kind,
+            ),
+            planned_action(
+                "environment.install_build_backend",
+                "Install pip, setuptools, and wheel in the instance environment",
+                "package_install",
+                "$TARGET/.venv",
+                "build_backend_incomplete",
+            ),
+            planned_action(
+                "environment.install_seed_package_closure",
+                "Install the locked editable seed closure and private solet CLI",
+                "package_install",
+                "$TARGET",
+                "seed_package_closure_incomplete",
+            ),
+        ]
+    if request_state is PythonRequestState.DEPENDENCY_ONLY:
+        actions.append(_python_request_action())
+    return actions
+
+
+def _flag_only_gap_result(request: Request, request_state: PythonRequestState, evidence_items: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """A closed closure whose only gap is the on-request flag (dec_b08cf4c7: advisory, never a red required check).
+
+    Only a plan (``preview``/``pre_apply``) reports it, as the pending mark step. ``post_apply`` names the
+    contradiction of an apply that claimed success while the flag stayed false. Every other purpose,
+    including the doctor's ``completion`` probe, stays verified; the advisory census check reports the flag.
+    """
+    if request_state is not PythonRequestState.DEPENDENCY_ONLY:
+        return result(request, status="verified", evidence_items=evidence_items)
+    purpose = request["probe_purpose"]
+    if purpose not in EMPTY_ACTION_PURPOSES:
+        return None
+    if purpose != "post_apply":
+        return result(request, status="verified", evidence_items=evidence_items)
+    return result(
+        request,
+        status="blocked",
+        error_kind=_closure_error_kind(ClosureState.PRESENT_CLOSED),
+        evidence_items=evidence_items,
+        repair=f"The mark step reported success but the receipt still says {PYTHON_FORMULA} was not installed on request. "
+        f"Run `{' '.join(('brew', *_PYTHON_TAB_ARGS))}` with the Homebrew that owns the keg, then resume.",
+    )
+
+
+def _closure_error_kind(state: ClosureState) -> str:
+    if state is ClosureState.PRESENT_CLOSED:
+        return "python_not_installed_on_request"
+    if state is ClosureState.INTERPRETER_DANGLING:
+        return "instance_interpreter_dangling"
+    return "dependency_closure_incomplete"
 
 
 def dependency_closure_route(request: Request, runtime: AdapterRuntime) -> dict[str, Any]:
@@ -437,28 +688,18 @@ def dependency_closure_route(request: Request, runtime: AdapterRuntime) -> dict[
         closure = declared_closure(request)
     except AdapterError as exc:
         return result(request, status="blocked", error_kind="adapter_protocol_error", retry_safe=False, repair=f"{exc}. Send the exact declared closure the Manager computed.")
-    existing = request["operation_ref"] == EXISTING_DEPENDENCIES_REF
     if request["phase"] == "apply":
-        try:
-            apply_dependency_closure(runtime, closure)
-        except AdapterError as exc:
-            return result(
-                request,
-                status="failed",
-                error_kind="dependency_closure_apply_failed",
-                retry_safe=True,
-                repair=(
-                    f"{exc}. Repair the target package or interpreter condition and resume."
-                ),
-            )
-        return result(request, status="applied")
+        return _apply_route_result(request, runtime, closure)
     state, facts = probe_dependency_closure(runtime.target, runtime.run, closure)
-    evidence_items = _closure_evidence(runtime, facts)
+    request_state = probe_python_request_state(runtime, rebuild=venv_rebuild_needed(state, facts))
+    evidence_items = [*_closure_evidence(runtime, facts), _python_request_evidence(runtime, request_state)]
     if state is ClosureState.PRESENT_CLOSED:
-        return result(request, status="verified", evidence_items=evidence_items)
-    if existing:
-        return _existing_probe_result(request, runtime, state, facts, closure, evidence_items)
-    error_kind = "instance_interpreter_dangling" if state is ClosureState.INTERPRETER_DANGLING else "dependency_closure_incomplete"
+        flag_only = _flag_only_gap_result(request, request_state, evidence_items)
+        if flag_only is not None:
+            return flag_only
+    if request["operation_ref"] == EXISTING_DEPENDENCIES_REF:
+        return _existing_probe_result(request, runtime, state, facts, closure, evidence_items, request_state)
+    error_kind = _closure_error_kind(state)
     if request["probe_purpose"] in EMPTY_ACTION_PURPOSES:
         return result(
             request,
@@ -467,33 +708,10 @@ def dependency_closure_route(request: Request, runtime: AdapterRuntime) -> dict[
             evidence_items=evidence_items,
             repair="Re-run the approved dependency-closure repair operation.",
         )
-    actions = [
-        planned_action(
-            "environment.create_or_repair_venv",
-            "Create or deterministically repair the instance dependency closure",
-            "environment_rebuild",
-            "$TARGET/.venv",
-            error_kind,
-        ),
-        planned_action(
-            "environment.install_build_backend",
-            "Install pip, setuptools, and wheel in the instance environment",
-            "package_install",
-            "$TARGET/.venv",
-            "build_backend_incomplete",
-        ),
-        planned_action(
-            "environment.install_seed_package_closure",
-            "Install the locked editable seed closure and private solet CLI",
-            "package_install",
-            "$TARGET",
-            "seed_package_closure_incomplete",
-        ),
-    ]
     return result(
         request,
         status="pending",
-        planned_actions=actions,
+        planned_actions=_create_probe_actions(state, error_kind, request_state),
         evidence_items=evidence_items,
         repair="Approve the complete dependency-closure action set.",
     )

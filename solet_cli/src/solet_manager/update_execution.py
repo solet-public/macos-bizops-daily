@@ -106,7 +106,7 @@ from .seed_lock_parser import SeedLockFields
 from .state_io import ensure_private_directory, instance_lock
 from .target_git import GitLayout, run_target_git
 from .transaction import utc_now
-from .update_candidate import TRANSITION_BUNDLE_DIRECTORY, UpdateCandidate, acquire_update_candidate
+from .update_candidate import TRANSITION_BUNDLE_DIRECTORY, UpdateCandidate, acquire_pinned_candidate, acquire_update_candidate
 from .update_journal import (
     DOCTOR_STATUSES,
     FRONTIER_STATUSES,
@@ -624,7 +624,14 @@ def _candidate_execution(request: UpdateRequest, record: InstanceInventoryRecord
                 "neither a durable descriptor copy nor the installed descriptor reproduces the journaled candidate",
                 repair=f"Reinstall the Manager release that shipped {candidate_row['tag']} or run `solet-manager reconcile {record.name} --dry-run`.",
             )
-    candidate = acquire_update_candidate(paths, descriptor.descriptor_bytes, transport_url=request.transport_url)
+    # iss_f81e71d3: the journal may pin a candidate an earlier Manager release selected; see acquire_pinned_candidate.
+    candidate = acquire_pinned_candidate(
+        paths,
+        descriptor.descriptor_bytes,
+        lambda: request.descriptor_loader(record.channel.channel_id, _LoaderTracker()).descriptor_bytes,
+        name=record.name,
+        transport_url=request.transport_url,
+    )
     if candidate.fields.commit != candidate_row["commit"] or candidate.descriptor_digest != descriptor_digest or candidate.bundle_digest != candidate_row["contract_digest"]:
         raise CandidateCopyMissingError("the reproduced candidate does not match the journaled identity", repair=f"Run `solet-manager reconcile {record.name} --dry-run`.")
     persist_contract_copies(paths, descriptor, candidate)

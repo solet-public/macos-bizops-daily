@@ -2,6 +2,83 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-29 — r60: a newer Manager finishes an update an older one started
+
+**Solet Manager manager-v0.1.0-r60.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows once an update from stable r57 reaches `promoted` on a macOS 27 guest.
+
+This release is step one of two. r61 will stop making the Manager formula
+depend on `python@3.13`, so an installed Python 3.13 that works is no longer
+upgraded just because the Manager was. That is unsafe on its own: on a real
+install Homebrew records `python@3.13` as installed only because the Manager
+depends on it (`installed_on_request` is false in its receipt). Once the
+dependency is gone, `brew autoremove`, which `brew upgrade` runs in its
+periodic cleanup, would delete the interpreter every solet's environment links.
+r60 closes that hole first.
+
+- **An update that was stopped at `source_advanced` when you upgraded the
+  Manager now finishes.** This applies when `solet-manager update <name>
+  --dry-run` or `solet-manager doctor <name>` refused with
+  `release_identity_inconsistent` (`manifest_seed_identity_mismatch`) and told
+  you to reinstall the manager, `solet-manager reconcile <name> --dry-run`
+  answered `update_not_terminal` naming `source_advanced`, and the Manager
+  formula was upgraded after the update started. Reinstalling never helped.
+  Run `brew tab --installed-on-request python@3.13 && brew upgrade solet` to
+  reach r60 or later, then run `solet-manager update <name> --dry-run`. Expect `runtime_preview_ready`. Apply it with `solet-manager
+  update <name> --yes --approval-fingerprint <runtime_approval_fingerprint>`
+  and expect `promoted`. The solet is now at the release the older Manager
+  started. Run `solet-manager update <name> --dry-run` again. Expect
+  `preview_ready` for the release the new Manager ships, and apply it the
+  usual way. Nothing has to be undone first. `solet-manager doctor <name>`
+  now names this state `update_in_progress` and gives these commands.
+- **The Manager still refuses a seed it cannot vouch for.** It finishes the
+  pinned seed only when its own release lists that seed as a supported
+  predecessor. Its own manager and seed must also still pair. If it answers
+  `pinned_candidate_unsupported`, leave the clone and the update journal as
+  they are, and upgrade the Manager again when a newer release ships. If it
+  answers `release_identity_inconsistent`, the installed keg itself is
+  damaged: reinstall the formula.
+- **A Manager command run without network no longer blocks every later
+  one.** This applies when `update`, `doctor` or `reconcile` refused with
+  `candidate cache repository lacks its immutable receipt`. An interrupted
+  download left a partial copy of the release in the Manager's cache, and
+  every later command refused it, even online. With r60, run the same command
+  again while online. The Manager discards the partial copy, downloads the
+  release again, and continues. A copy it downloaded completely is never
+  discarded.
+- **A solet installed from stable r59 can run `solet-manager update` to this
+  release.** The update recognises stable r59 as a release it can move forward
+  from, the same as r58 and earlier.
+- **`solet-manager create` and `update` now mark `python@3.13` installed on
+  request.** The preview lists one extra planned action,
+  `homebrew.python_installed_on_request`, on target `homebrew:python@3.13`,
+  whenever a solet's interpreter is Homebrew's `python@3.13` and its receipt
+  says it was not installed on request. Applying it runs
+  `brew tab --installed-on-request python@3.13`, which changes only the
+  receipt flag. It never installs or upgrades anything. When the flag is
+  already set, or the interpreter is not Homebrew's, nothing is planned and
+  nothing runs. If Homebrew is missing when the step applies, it stops with
+  `python_on_request_brew_missing` and the exact command to run later.
+- **`solet-manager doctor` warns when the flag is not set.**
+  `doctor::python_installed_on_request_v1` reports
+  `python_not_installed_on_request` for a solet whose environment links a
+  Homebrew `python@3.13` that is kept only as a dependency, with the exact fix
+  command. It is a warning, never a refusal, and it clears once `create`,
+  `update` or the command itself has run.
+- **Upgrade the Manager with the flag first.** Every upgrade instruction in
+  the seed-update runbook, the update guide, the Homebrew troubleshooting
+  runbook, the tap README and the Manager's own repair messages is now
+  `brew tab --installed-on-request python@3.13 && brew upgrade solet`.
+  The install command is unchanged. Running the flag command twice is
+  harmless.
+- **The r57 warning still holds for this release.** r60 still depends on
+  `python@3.13`, so installing or upgrading the Manager can still upgrade the
+  shared Python and cut another solet off from its Keychain credentials
+  (`-25293`). The check-first and `brew pin python@3.13` guidance stands. r61
+  is the release that stops forcing that upgrade.
+
 ## 2026-09-29 — r59: `solet-manager update` finishes on a solet the Manager created
 
 **Solet Manager manager-v0.1.0-r59.** This is a full seed build for
@@ -19,7 +96,7 @@ follows once an update from stable r57 reaches `promoted` on a macOS 27 guest.
   runs behind a router as a materialized release still switches over through
   the router, as before.
 - **If an update stopped with `lifecycle_strategy_unproven`, upgrade the
-  Manager and run the update again.** Run `brew upgrade solet`, then
+  Manager and run the update again.** Run `brew tab --installed-on-request python@3.13 && brew upgrade solet`, then
   `solet-manager update <name> --dry-run`. The preview now shows the runtime
   plan as `single_color_restart`. Apply it with `solet-manager update <name>
   --yes --approval-fingerprint <the runtime fingerprint it prints>`. Nothing
@@ -35,6 +112,9 @@ follows once an update from stable r57 reaches `promoted` on a macOS 27 guest.
   different directory at the same path is still refused. The same change stops
   the Manager counting one solet twice, and refusing to register another solet,
   after such a reboot.
+- **A solet installed from stable r58 can run `solet-manager update` to this
+  release.** The update recognises stable r58 as a release it can move forward
+  from, the same as r57 and earlier.
 
 ## 2026-09-29 — r58: the update refreshes an existing solet's fleet launcher
 

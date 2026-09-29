@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
@@ -14,12 +17,20 @@ from .errors import ContractError, SourceError, TransitionContractMismatchError
 from .existing_install_bundle import TransitionBundle, parse_transition_bundle, transition_bundle_digest
 from .models import JsonValue
 from .paths import ManagerPaths, update_candidate_cache
-from .release_identity_gate import require_manager_seed_pairing
+from .release_identity_gate import (
+    VERDICT_INCONSISTENT,
+    VERDICT_SKEW,
+    ReleaseIdentityError,
+    pair_manager_and_seed,
+    require_manager_seed_pairing,
+)
 from .seed_lock_parser import SeedLockFields, parse_seed_lock_bytes
-from .state_io import atomic_write_json, ensure_private_directory
+from .state_io import atomic_write_json, ensure_private_directory, instance_lock
 
 CANDIDATE_REF_PREFIX = "refs/solet/candidates/"
 TRANSITION_BUNDLE_DIRECTORY = "plugins/github_midwife_plugin/knowledge_base"
+REASON_PINNED_CANDIDATE_UNSUPPORTED = "pinned_candidate_unsupported"
+ACQUIRE_LOCK_NAME = "acquire.lock"
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,8 +48,10 @@ class UpdateCandidate:
     bundle: TransitionBundle
     bundle_files: dict[str, bytes]
     cache_status: str = "reused"
-    #: The §7.3 manager<->seed pairing verdict measured at selection, disclosed
-    #: on the preview; a refusing verdict never reaches here (it raises).
+    #: The §7.3 manager<->seed pairing verdict measured at acquisition, disclosed on the
+    #: fresh and the runtime preview.  A refusing verdict reaches here only on a resume, with
+    #: the ``resume_admission`` that admitted the pinned seed as a supported predecessor of
+    #: the running release (``acquire_pinned_candidate``); otherwise it raises.
     release_identity: dict[str, JsonValue] = field(default_factory=dict[str, JsonValue])
 
     @property
@@ -60,25 +73,93 @@ def acquire_update_candidate(
     ``transport_url`` is a test seam for offline fixtures; the CLI never sets
     it, and the receipt always records the descriptor's canonical repository.
     """
-    fields = parse_seed_lock_bytes(descriptor_bytes)
-    if fields.channel_id is None or fields.release_tag is None or fields.existing_install_contract is None:
-        raise SourceError("update candidate requires an exact seed-lock v3 descriptor")
+    fields = _v3_fields(descriptor_bytes)
     # Design §7.3: the candidate's seed half must pair with the installed
     # manager half BEFORE any cache or network work -- a skewed pair is
     # refused here, a recorded skew reason or an unpairable (non-keg) manager
     # is carried on the candidate and disclosed by the preview.
     pairing = require_manager_seed_pairing(fields)
+    return _acquire(paths, descriptor_bytes, fields, pairing, transport_url)
+
+
+def acquire_pinned_candidate(
+    paths: ManagerPaths,
+    descriptor_bytes: bytes,
+    running_descriptor: Callable[[], bytes],
+    *,
+    name: str,
+    transport_url: str | None = None,
+) -> UpdateCandidate:
+    """Re-acquire the candidate a non-terminal journal pinned, which an earlier Manager release may have selected.
+
+    The §7.3 gate ran when the journal was written: ``probe_update`` acquires the candidate before any journal
+    exists.  After the manager formula is upgraded the running keg pairs with its OWN seed, so the pinned seed of the
+    earlier release no longer pairs with it and every resume, doctor and reconcile refused (iss_f81e71d3).
+    A pinned seed that still pairs takes the ordinary path.  One that does not is admitted only when the
+    running keg's own seed pairs (the unchanged gate, via ``acquire_update_candidate``) and that paired
+    release's proven transition bundle lists the pinned commit and tree as a supported predecessor: the
+    update then finishes at a release the running Manager accepts as an update baseline.  Anything else is
+    refused as ``pinned_candidate_unsupported``.  ``running_descriptor`` is read only on that path.
+    """
+    fields = _v3_fields(descriptor_bytes)
+    verdict = pair_manager_and_seed(fields)
+    if verdict["verdict"] in (VERDICT_SKEW, VERDICT_INCONSISTENT):
+        running = acquire_update_candidate(paths, running_descriptor(), transport_url=transport_url)
+        verdict = _admit_supported_predecessor(fields, verdict, running, name)
+    return _acquire(paths, descriptor_bytes, fields, verdict, transport_url)
+
+
+def _admit_supported_predecessor(fields: SeedLockFields, verdict: dict[str, JsonValue], running: UpdateCandidate, name: str) -> dict[str, JsonValue]:
+    listed = running.bundle.predecessor_for(fields.commit, fields.tree_hash)
+    if listed is None or listed.repository != fields.repository or fields.channel_id != running.fields.channel_id:
+        raise ReleaseIdentityError(
+            REASON_PINNED_CANDIDATE_UNSUPPORTED,
+            f"the in-progress update is pinned to seed {fields.commit} ({fields.repository}), which does not pair with "
+            f"the installed manager ({verdict['reason']}) and which the installed release {running.fields.commit} does not "
+            "list as a supported predecessor",
+            repair="Leave the target and the update journal as they are. Upgrade the manager "
+            "(`brew tab --installed-on-request python@3.13 && brew upgrade solet`) to a "
+            f"release that lists {fields.commit} as a supported predecessor, then run `solet-manager update {name} --dry-run`.",
+        )
+    return {
+        **verdict,
+        "resume_admission": {
+            "kind": "supported_predecessor",
+            "running_seed_commit": running.fields.commit,
+            "running_release_identity": running.release_identity,
+        },
+    }
+
+
+def _v3_fields(descriptor_bytes: bytes) -> SeedLockFields:
+    fields = parse_seed_lock_bytes(descriptor_bytes)
+    if fields.channel_id is None or fields.release_tag is None or fields.existing_install_contract is None:
+        raise SourceError("update candidate requires an exact seed-lock v3 descriptor")
+    return fields
+
+
+def _acquire(
+    paths: ManagerPaths, descriptor_bytes: bytes, fields: SeedLockFields, pairing: dict[str, JsonValue], transport_url: str | None
+) -> UpdateCandidate:
     digest = "sha256:" + hashlib.sha256(descriptor_bytes).hexdigest()
     cache = update_candidate_cache(paths, digest)
-    receipt_path, repository = cache.receipt, cache.repository
+    ensure_private_directory(cache.repository.parent)
+    # The entry is shared by every solet on the host and a dry-run holds no instance lock: the
+    # receipt check, the discard of a receipt-less repository and the fetch run under one
+    # exclusive lock per entry, so no acquisition can delete another's work (iss_285d061f).
+    with instance_lock(cache.repository.parent / ACQUIRE_LOCK_NAME, create=True):
+        return _acquire_holding_entry_lock(cache.repository, cache.receipt, digest, fields, pairing, transport_url)
+
+
+def _acquire_holding_entry_lock(
+    repository: Path, receipt_path: Path, digest: str, fields: SeedLockFields, pairing: dict[str, JsonValue], transport_url: str | None
+) -> UpdateCandidate:
     if receipt_path.exists():
         receipt_digest = _read_receipt(receipt_path, digest, fields)
         _verify_cached_objects(repository, digest, fields)
         bundle, files = read_transition_bundle(repository, fields)
         return UpdateCandidate(digest, fields, receipt_digest, bundle, files, "reused", pairing)
-    ensure_private_directory(repository.parent)
-    if repository.exists():
-        raise SourceError("candidate cache repository lacks its immutable receipt")
+    _discard_unreceipted(repository)
     _git(("git", "init", "--bare", str(repository)), None)
     private_ref = CANDIDATE_REF_PREFIX + digest[7:]
     tag_ref = f"refs/tags/{fields.release_tag}:{private_ref}"
@@ -96,6 +177,24 @@ def acquire_update_candidate(
     receipt_digest = "sha256:" + hashlib.sha256(json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     atomic_write_json(receipt_path, {**receipt, "receipt_digest": receipt_digest})
     return UpdateCandidate(digest, fields, receipt_digest, bundle, files, "acquired", pairing)
+
+
+def _discard_unreceipted(repository: Path) -> None:
+    """A repository without its receipt is an interrupted acquisition (an offline fetch), never proof.
+
+    Called only under the entry lock with no receipt present: it is discarded and fetched again rather
+    than wedge every later verb (iss_285d061f).  ``rmtree`` refuses a symlink or a regular file rather than
+    follow it; that refusal, like any other, is a typed ``SourceError``.
+    """
+    if not os.path.lexists(repository):
+        return
+    try:
+        shutil.rmtree(repository)
+    except OSError as exc:
+        raise SourceError(
+            f"cannot discard the interrupted candidate cache repository {repository}: {exc}",
+            repair=f"Remove {repository} (a Manager cache directory, not part of the solet), then run the command again.",
+        ) from exc
 
 
 def read_transition_bundle(repository: Path, fields: SeedLockFields) -> tuple[TransitionBundle, dict[str, bytes]]:
