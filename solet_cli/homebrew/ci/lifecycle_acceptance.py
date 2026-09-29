@@ -134,6 +134,7 @@ def build_plan(inputs: Inputs) -> tuple[Phase, ...]:
             (
                 ("brew", "style", inputs.formula),
                 ("brew", "audit", "--strict", "--new", "--online", inputs.formula),
+                ("env", "HOMEBREW_NO_INSTALL_UPGRADE=1", "brew", "install", inputs.python_formula),
                 ("brew", "install", "--build-from-source", inputs.formula),
                 ("brew", "test", inputs.formula),
                 ("brew", "uninstall", inputs.formula),
@@ -419,6 +420,9 @@ def _environment(fixture: Fixture) -> dict[str, str]:
 def _run_clean_source(inputs: Inputs, fixture: Fixture, runner: Runner) -> None:
     runner.run(["brew", "style", inputs.formula])
     runner.run(["brew", "audit", "--strict", "--new", "--online", inputs.formula])
+    # The Formula declares no Python dependency (r61), so the runner supplies the
+    # interpreter the documented way: installed if missing, never upgraded.
+    runner.run(["env", "HOMEBREW_NO_INSTALL_UPGRADE=1", "brew", "install", inputs.python_formula])
     runner.run(["brew", "install", "--build-from-source", inputs.formula])
     runner.run(["brew", "test", inputs.formula])
     _assert_version(runner, inputs.current_version)

@@ -276,6 +276,21 @@ def _assert_skipped_phase_is_not_a_divergence() -> None:
         )
 
 
+def _assert_deferred_autostart_is_not_a_divergence() -> None:
+    """``deferred`` is the writer's own benign outcome (``genesis._run_autostart_phase``), not an unrecognised status (r61)."""
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _write_genesis(root, steps=_spine_steps())
+        deferred = {"step_name": "install_autostart", "status": "deferred", "reason": "coreai_asset_pending", "detail": "the pinned Core AI asset is unverified"}
+        _write_attempt(root, steps=[*_spine_steps(), deferred])
+        advisory = _pair(root)
+        _check(
+            advisory["status"] == "verified",
+            f"a deferred autostart was misread as unrecognised: {advisory['reason_code']}",
+        )
+
+
 def _assert_unrecognised_status_is_not_green() -> None:
     """An ungraded status must never be folded into the passing bucket."""
 
@@ -446,6 +461,7 @@ def main() -> int:
     _assert_identity_disagreement_is_named()
     _assert_unsuccessful_attempt_is_named()
     _assert_skipped_phase_is_not_a_divergence()
+    _assert_deferred_autostart_is_not_a_divergence()
     _assert_unrecognised_status_is_not_green()
     _assert_absent_pair_is_not_a_divergence()
     _assert_unreadable_marker_is_unknown_not_green()

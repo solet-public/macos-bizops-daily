@@ -30,8 +30,14 @@ A published daily release renders this line for the tap selected by that
 release, so use the command shown in the README of your release.
 
 ```console
-brew install dwestgate/tap-validate/solet
+HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 dwestgate/tap-validate/solet
 ```
+
+This installs the manager and, only when this Mac has none, Homebrew's
+`python@3.13`. The manager builds on the Python 3.13 already here and never
+upgrades it. When `python@3.13` is already installed, Homebrew prints an
+`Error:` or `Warning:` line saying it is already installed, then exits 0 and
+installs the manager anyway. That line is expected.
 
 Then begin the separate, reviewed creation transaction:
 
@@ -39,24 +45,22 @@ Then begin the separate, reviewed creation transaction:
 solet create bizops
 ```
 
-These commands are deliberately separate. Homebrew installs only the manager;
+These commands are deliberately separate. Homebrew installs only the manager
+(and `python@3.13` when it is missing);
 `solet create` previews its own machine and instance changes and asks before it
 writes them. Do not join the commands with `&&`.
 
-If another solet already runs on this Mac from its own clone, know that
-installing the manager can upgrade the shared `python@3.13`, and that any solet
-whose `.venv` links it has its Keychain credentials refused (`-25293`) at its
-next restart. The manager formula's caveats and the tap README give the check to
-run first and how to make Homebrew refuse instead. To recover, in a logged-in
-GUI session read each of that solet's Keychain items once and answer Always
-Allow.
+The manager does not depend on `python@3.13`, so installing or upgrading it
+leaves any other solet on this Mac, and the Python its `.venv` links, as they
+were. If the install stops with `No Python 3.13 found`, run the command above
+exactly as written: it installs `python@3.13` first.
 
 When you later upgrade the manager, follow the upgrade command in
 `plugins/github_midwife_plugin/knowledge_base/05_seed_update_runbook.md`
 rather than a bare upgrade: it first marks the shared `python@3.13` as
 installed on request, which installs and upgrades nothing but keeps Homebrew
-from ever removing that Python as unused once a later manager release stops
-depending on it.
+from ever removing that Python as unused now that the manager no longer
+depends on it.
 
 If Homebrew is not installed, start at [brew.sh](https://brew.sh). That is
 Homebrew's installer and canonical source. This seed does not provide a Solet

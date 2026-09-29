@@ -88,6 +88,7 @@ def _check_plan(root: Path) -> None:
     _check_required_commands(commands)
     _check_name_based_commands(inputs, commands)
     _check_formula_trust_order(phases)
+    _check_clean_source_supplies_python(phases)
     _check_upgrade_sequence(inputs, phases)
     _check_python_replacement(commands, phases)
     _check_brewfile_sequence(phases)
@@ -142,6 +143,19 @@ def _check_formula_trust_order(phases: tuple[Phase, ...]) -> None:
         == ("brew", "trust", "--formula", "solet-public/tap/solet")
         and prepare.commands[-1] == ("brew", "trust", "--json=v1"),
         "Formula-scoped trust is recorded and inspected before style/audit",
+    )
+
+
+def _check_clean_source_supplies_python(phases: tuple[Phase, ...]) -> None:
+    clean = next(phase for phase in phases if phase.name == "clean-source-install")
+    python = ("env", "HOMEBREW_NO_INSTALL_UPGRADE=1", "brew", "install", "python@3.13")
+    install = ("brew", "install", "--build-from-source", "solet-public/tap/solet")
+    _check(
+        python in clean.commands
+        and install in clean.commands
+        and clean.commands.index(python) < clean.commands.index(install),
+        "the Formula declares no Python (r61): the clean runner installs python@3.13 "
+        "with the documented no-upgrade guard before the first Manager install",
     )
 
 

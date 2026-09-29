@@ -2,7 +2,8 @@
 
 Every fact here is QUERIED, never inferred: the OS build from ``sw_vers``,
 Homebrew's own version and the installed versions of the manager Formula's
-declared dependency closure from ``brew``, the model identifiers actually
+declared dependency closure from ``brew``, the interpreter the manager's own
+venv actually runs on from the running process, the model identifiers actually
 served from the local inference server's live listing, and the running
 solet's code identity from its own ``attest_runtime_code`` verb over the
 target's bridge CLI.  A probe that cannot run records WHY (``error``) and a
@@ -13,6 +14,8 @@ it did not measure.
 from __future__ import annotations
 
 import json
+import platform
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -23,7 +26,9 @@ from .release_identity import CommandRunner, run_command
 
 # The manager Formula's ``depends_on`` closure (solet.rb.template). The NAMES
 # are the Formula's declaration; only their installed VERSIONS are queried.
-FORMULA_DEPENDENCY_CLOSURE = ("git", "python@3.13")
+# python@3.13 left it in r61: the Formula builds on any existing Python 3.13, so
+# which one it used is a fact of the running venv (``manager_python``), not of brew.
+FORMULA_DEPENDENCY_CLOSURE = ("git",)
 _BREW_CANDIDATES = (Path("/opt/homebrew/bin/brew"), Path("/usr/local/bin/brew"))
 _MODELS_ENDPOINT = "http://127.0.0.1:1234/api/v0/models"
 _PROBE_TIMEOUT_S = 20
@@ -38,7 +43,21 @@ def environment_facts(runner: CommandRunner = run_command, models_endpoint: str 
     return {
         "os": _os_build(runner),
         "homebrew": _homebrew_versions(runner),
+        "manager_python": _manager_python(),
         "models_served": _models_served(models_endpoint),
+    }
+
+
+def _manager_python() -> dict[str, JsonValue]:
+    """The interpreter this manager process runs on: its venv launcher and what that resolves to."""
+
+    executable = Path(sys.executable)
+    return {
+        "source": "sys.executable realpath",
+        "executable": str(executable),
+        "resolved": str(executable.resolve()),
+        "version": platform.python_version(),
+        "error": None,
     }
 
 

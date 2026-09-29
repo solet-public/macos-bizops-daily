@@ -5,6 +5,11 @@ This is intentionally the baseline half of the future managed-tree verifier.
 sealed tree and names tracked deviations; ``managed-tree-v1`` will later be
 able to accept those deviations only when authenticated overlay receipts cover
 them.  This module neither writes the target nor interprets receipts.
+
+One narrower acceptance sits beside it (iss_9cd4359a): ``create_applied_edits``
+moves a content-only worktree modification into ``accepted_manager_edits`` when
+the file's bytes still equal the digest a create's own apply operation recorded.
+The baseline measurement here is unchanged; only that caller partitions it.
 """
 
 from __future__ import annotations
@@ -59,6 +64,7 @@ class SeedTreeVerification:
     observed_head_tree_hash: str | None
     deviations: tuple[SeedTreeDeviation, ...]
     query_error: str | None = None
+    accepted_manager_edits: tuple[SeedTreeDeviation, ...] = ()
 
     @property
     def baseline_matches(self) -> bool:
@@ -92,6 +98,7 @@ class SeedTreeVerification:
             "observed_head_tree_hash": self.observed_head_tree_hash,
             "baseline_matches": self.baseline_matches,
             "deviations": deviations,
+            "accepted_manager_edits": [item.to_dict() for item in self.accepted_manager_edits],
             "query_error": self.query_error,
         }
 
@@ -132,6 +139,12 @@ def verify_seed_tree(
         observed_head_tree_hash=head_tree.stdout.strip(),
         deviations=deviations,
     )
+
+
+def query_target_git(target: Path, *arguments: str, runner: GitQueryRunner | None = None) -> GitQueryResult | str:
+    """One bounded, read-only Git query against ``target``; a failure is returned as its explained string."""
+
+    return _run_query(_subprocess_git_query if runner is None else runner, _git_command(target, *arguments))
 
 
 def _git_command(target: Path, *arguments: str) -> tuple[str, ...]:

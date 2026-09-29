@@ -71,15 +71,19 @@ def collect_release_identity_advisories(
     install_source_path: Path | None = None,
     package_root: Path | None = None,
     runner: CommandRunner = run_command,
+    accepted_edits: frozenset[str] = frozenset(),
 ) -> list[JsonValue]:
-    """Return the one report-only release-identity check for ``record``."""
+    """Return the one report-only release-identity check for ``record``.
+
+    ``accepted_edits`` are the create's own recorded tracked edits (iss_9cd4359a), not dirt.
+    """
 
     seed_lock_path = Path(sys.prefix) / "share" / "solet" / _SEED_LOCK_NAME if manager_seed_lock_path is None else manager_seed_lock_path
     manifest_file = default_release_manifest_path() if manifest_path is None else manifest_path
     receipt_path = default_install_source_path() if install_source_path is None else install_source_path
     root = Path(__file__).resolve().parent if package_root is None else package_root
     consistency = collect_seed_integrity_advisories(record, transaction, manager_seed_lock_path=seed_lock_path)[0]
-    return [_release_identity_advisory(record, seed_lock_path, manifest_file, receipt_path, root, runner, consistency)]
+    return [_release_identity_advisory(record, seed_lock_path, manifest_file, receipt_path, root, runner, consistency, accepted_edits)]
 
 
 def _release_identity_advisory(
@@ -90,6 +94,7 @@ def _release_identity_advisory(
     package_root: Path,
     runner: CommandRunner,
     consistency: JsonValue,
+    accepted_edits: frozenset[str],
 ) -> dict[str, JsonValue]:
     source = str(manifest_path)
     consistency_row = cast(dict[str, JsonValue], consistency)
@@ -101,7 +106,7 @@ def _release_identity_advisory(
     manifest, unreadable = _manifest(manifest_path)
     install_source = _install_source(receipt_path)
     manager = compare_manager(installed_file_digests(package_root), install_source, manifest)
-    checkout = compare_seed_checkout(Path(record.target), manifest, runner)
+    checkout = compare_seed_checkout(Path(record.target), manifest, runner, accepted_edits)
     observed["manager"] = _manager_summary(manager)
     observed["seed_checkout"] = _checkout_summary(checkout)
     pairing = _pairing(seed_lock_path, receipt_path, manifest)
@@ -205,6 +210,7 @@ def _checkout_summary(checkout: dict[str, JsonValue]) -> dict[str, JsonValue]:
         "head_commit": checkout["head_commit"],
         "head_tree": checkout["head_tree"],
         "dirty_paths": checkout["dirty_paths"],
+        "accepted_manager_edits": checkout["accepted_manager_edits"],
         "drifted_components": checkout["drifted_components"],
     }
 

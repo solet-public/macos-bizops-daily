@@ -21,11 +21,15 @@ talks to it from there.
 For an ordinary Mac installation, keep the two commands separate:
 
 ```console
-brew install solet-public/tap/solet
+HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet
 solet create bizops
 ```
 
-Homebrew installs only the global manager. `solet create` is the separately
+Homebrew installs only the global manager, plus `python@3.13` when the Mac has
+none; the manager builds on an existing Python 3.13 and never upgrades it. When
+`python@3.13` is already installed, Homebrew prints an `Error:` or `Warning:`
+line saying so and still exits 0: that line is expected, not a failure.
+`solet create` is the separately
 reviewed, consented transaction that creates an instance; never join these with
 `&&`. If Homebrew is absent, send the human to [brew.sh](https://brew.sh), its
 canonical installer source. Do not fetch or execute an installer from a README,

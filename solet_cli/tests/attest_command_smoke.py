@@ -31,6 +31,7 @@ _ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(_ROOT / "solet_cli" / "src"), str(_ROOT / "solet_setup_contracts" / "src"), str(Path(__file__).resolve().parent)]
 
 import json  # noqa: E402
+import platform  # noqa: E402
 import tempfile  # noqa: E402
 from collections.abc import Sequence  # noqa: E402
 from typing import Any  # noqa: E402
@@ -71,6 +72,7 @@ class _Fixture:
         self.receipt = write_receipt(share / "install-source.json")
         self.manifest_path = write_json(share / "release_manifest.json", manifest(seed=self.seed, file_digests=self.digests, surface_sha256=_SURFACE))
         self.gh_calls: list[Sequence[str]] = []
+        self.brew_calls: list[tuple[str, ...]] = []
         self._register()
 
     def _register(self) -> None:
@@ -92,7 +94,8 @@ class _Fixture:
         if head == "sw_vers":
             return CommandOutcome(0, "ProductName:\t\tmacOS\nProductVersion:\t\t26.0\nBuildVersion:\t\t25A354\n", "")
         if head == "brew":
-            return CommandOutcome(0, "Homebrew 5.0.0\n" if argv[1] == "--version" else "git 2.51.0\npython@3.13 3.13.7\n", "")
+            self.brew_calls.append(tuple(argv))
+            return CommandOutcome(0, "Homebrew 5.0.0\n" if argv[1] == "--version" else "git 2.51.0\n", "")
         if head == "gh":
             self.gh_calls.append(tuple(argv))
             destination = Path(argv[argv.index("--dir") + 1]) / "release_manifest.json"
@@ -133,8 +136,25 @@ def _assert_verified_instance_and_environment(fixture: _Fixture, document: dict[
     journal = instance["journal"]
     _check(journal["transaction"]["seed_commit"] == fixture.seed["commit"] and journal["registry"]["seed_tree_hash"] == fixture.seed["tree_hash"] and journal["applied_updates"] == [], "the journal identity and (empty) update history are recorded")
     environment = document["environment"]
-    _check(environment["os"]["build_version"] == "25A354" and environment["homebrew"]["formulae"] == {"git": "2.51.0", "python@3.13": "3.13.7"}, f"environment facts come from the live queries: {environment}")
+    _check(environment["os"]["build_version"] == "25A354" and environment["homebrew"]["formulae"] == {"git": "2.51.0"}, f"environment facts come from the live queries: {environment}")
+    _assert_closure_and_manager_python(fixture, environment)
     _check(environment["models_served"]["models"] is None and "unreachable" in environment["models_served"]["error"], "an unreachable inference server is an error, not an empty list")
+
+
+def _assert_closure_and_manager_python(fixture: _Fixture, environment: dict[str, Any]) -> None:
+    listed = [call for call in fixture.brew_calls if call[1:3] == ("list", "--versions")]
+    _check(
+        environment["homebrew"]["closure"] == ["git"] and listed != [] and all(call[3:] == ("git",) for call in listed),
+        f"the queried closure is the Formula's own, which no longer names python@3.13 (r61): {environment['homebrew']} {listed}",
+    )
+    manager_python = environment["manager_python"]
+    _check(
+        manager_python["resolved"] == str(Path(sys.executable).resolve())
+        and manager_python["executable"] == sys.executable
+        and manager_python["version"] == platform.python_version()
+        and manager_python["error"] is None,
+        f"the attestation records the interpreter the manager venv actually runs on: {manager_python}",
+    )
 
 
 def _assert_drift_is_named(fixture: _Fixture) -> None:

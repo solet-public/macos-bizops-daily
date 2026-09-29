@@ -17,39 +17,58 @@ remains the separate, reviewed `solet create <name>` transaction. Installation
 and setup are deliberately two commands:
 
 ```console
-brew install solet-public/tap/solet
+HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet
 solet create bizops
 ```
 
 Homebrew prints `Next: run solet create` as a conventional caveat; it does not
 launch the wizard or mutate instance/user state during `brew install`.
 
-### Shared `python@3.13`: risk to other solets on the machine
+### The Manager uses the `python@3.13` already on the Mac
 
-The Formula declares `depends_on "python@3.13"`. Homebrew treats a dependency as
-satisfied only when its latest version is installed, so `brew install` upgrades
-an older `python@3.13` as an ordinary dependency, and no `depends_on` option
-avoids that. The upgrade replaces the ad-hoc-signed interpreter that every
-Python venv linking Homebrew's framework resolves to. A Keychain ACL on an
-ad-hoc-signed binary pins its exact code-directory hash, so any solet whose
-`.venv` links that Python, including one the Manager did not create, is refused
-on every credential read (`-25293`) at its next restart.
+The Formula does not declare `depends_on "python@3.13"` (from r61). A source
+formula's dependency is satisfied only by the latest version, so the old
+declaration upgraded a working `python@3.13` on every install and upgrade. That
+replaced the ad-hoc-signed interpreter every venv linking Homebrew's framework
+resolves to, and a Keychain ACL pins that binary's exact code-directory hash:
+any solet whose `.venv` linked it was refused on every credential read
+(`-25293`) at its next restart. Instead, `install` builds the Manager venv on
+the first of these that reports Python 3.13, in this order, and never installs
+or upgrades Python itself:
 
-- **Check first:** `brew install --dry-run solet-public/tap/solet` lists
-  `python@3.13` under `Would upgrade N dependencies for solet:` when it will move.
-- **Refuse instead of upgrading:** `brew pin python@3.13` makes the install stop
-  with `You must brew unpin python@3.13`; `brew unpin` when the move is intended.
-- **Keep it from being autoremoved:** on a real install `python@3.13` is
-  recorded `installed_on_request=false`, kept only by this Formula's dependency.
-  A later release that drops the dependency would let `brew autoremove` (run by
-  `brew upgrade`'s periodic cleanup) delete the interpreter every solet venv
+1. `/opt/homebrew/opt/python@3.13/bin/python3.13`
+2. `/usr/local/bin/python3.13`
+3. `/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13`
+
+- **Install command:** `HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13
+  solet-public/tap/solet`. Naming `python@3.13` installs it when it is missing
+  and marks it installed on request; with the variable set, an existing
+  `python@3.13` is left at its version. When one is already installed Homebrew
+  prints `Error: python@3.13 <version> is already installed` or a `Warning:`
+  that it is already installed and up to date, and still exits 0 and installs
+  the Manager. That line is expected.
+- **An older Python 3.13 is fine:** Homebrew's `Virtualenv#pip_install` runs
+  the base interpreter's pip with `--uploaded-prior-to`, which pip older than
+  26.1 rejects. The Formula pins a `pip` wheel resource, installs it into the
+  venv by running pip from its own wheel under the venv's interpreter, and then
+  rebinds the installer (`virtualenv_create(libexec, venv_python)`) so every
+  later install uses that pip. `ci/pip_bootstrap_proof.py --old-pip-wheel
+  <pip-25.3 wheel>` proves both sides on a host, without Homebrew.
+- **If the install stops with `No Python 3.13 found`:** none of the three paths
+  answered. Run the install command above, which installs `python@3.13` first.
+- **Keep it from being autoremoved:** an install made before r61 recorded
+  `python@3.13` as `installed_on_request=false`, kept only by the old
+  dependency. Without that dependency, `brew autoremove` (run by `brew
+  upgrade`'s periodic cleanup) would delete the interpreter every solet venv
   links. Every upgrade therefore runs
   `brew tab --installed-on-request python@3.13 && brew upgrade solet`; the tab
-  changes only the receipt flag and installs and upgrades nothing. This
-  release still declares the dependency, so a bare upgrade loses nothing today.
+  changes only the receipt flag and installs and upgrades nothing.
   `solet-manager create` and `update` plan the same step, and `solet doctor
   <name>` reports `doctor::python_installed_on_request_v1` with the exact
   command until it is set.
+- **Your own upgrades still move it:** a `brew upgrade` you run yourself can
+  still upgrade `python@3.13`. `brew pin python@3.13` prevents that, and no
+  longer blocks installing or upgrading the Manager.
 - **Recovery:** in a logged-in GUI session (not SSH), read each Keychain item
   the affected solet owns once under its current interpreter and answer
   **Always Allow**; plain Allow is asked again on every spawn. After
@@ -68,8 +87,8 @@ the actual published upstream tap; the local fixture is not publication proof.
 
 The focused `solet_cli/homebrew/tests/release_payload_smoke.py` check is
 host-dependent by design:
-it fails rather than skips unless `brew` is available and the Formula-declared
-`python@3.13` dependency is installed locally. Its no-index regression mirrors
+it fails rather than skips unless `brew` is available and `python@3.13`, the
+first interpreter the Formula looks for, is installed locally. Its no-index regression mirrors
 Homebrew `virtualenv_create` exactly with `python -m venv
 --system-site-packages --without-pip`, then proves the system-site build backend
 can install the manager with `PIP_NO_INDEX=1`.
@@ -107,7 +126,9 @@ CI=true GITHUB_ACTIONS=true SOLET_ACCEPT_LIFECYCLE_MUTATION=1 \
   --fixture-root "$RUNNER_TEMP/solet-lifecycle"
 ```
 
-The harness executes Homebrew style/audit, clean source and bottle installs,
+The harness executes Homebrew style/audit, a clean source install preceded by
+`HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13` (the Formula declares
+no Python dependency, so a fresh runner must supply one), a bottle install,
 Formula `test do`, an explicit previous-to-current Formula/manager/seed-lock
 upgrade in that tap, a deterministic simulated Python 3.13 dependency
 replacement, uninstall/reinstall preservation, registry and manual-target
@@ -128,7 +149,7 @@ its GitHub Actions-local HOME; the harness never issues whole-tap trust and the
 pre-test style/audit/install path remains Formula-scoped.
 
 Every lifecycle no-keg scan resolves both the fully qualified Solet Formula
-Cellar and the declared `python@3.13` Cellar. It scans path names, file bytes,
+Cellar and the `python@3.13` Cellar. It scans path names, file bytes,
 and symlink targets under only the preserved instance target, manager/registry,
 user launcher, and LaunchAgent roots. Unrelated Homebrew caches and logs under
 the isolated HOME remain outside preservation evidence. The Brewfile phase

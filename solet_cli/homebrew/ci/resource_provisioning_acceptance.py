@@ -55,9 +55,9 @@ def main() -> int:
         root = Path(raw)
         formula = _render_formula(root)
         resources = _parse_pinned_resources(formula)
-        if not {"setuptools", "wheel"} <= resources.keys():
+        if not {"setuptools", "wheel"} <= resources.keys() or next(iter(resources), None) != "pip":
             raise RuntimeError(
-                "Formula does not declare both pinned setuptools and wheel "
+                "Formula does not declare pinned pip (first), setuptools and wheel "
                 "resources — nothing to verify"
             )
         venv_python = _create_venv(python, root)
@@ -65,7 +65,7 @@ def main() -> int:
         _assert_absent(venv_python, no_user_site)
         for name, (url, sha256) in resources.items():
             wheel_path = _fetch_and_verify(root, name, url, sha256)
-            _pip_install_no_index(venv_python, wheel_path, no_user_site)
+            _pip_install_no_index(venv_python, wheel_path, no_user_site, bootstrap=name == "pip")
         _assert_present(venv_python, no_user_site)
         _install_manager_no_ambient_state(venv_python)
     print("resource_provisioning_acceptance PASSED")
@@ -169,10 +169,13 @@ def _fetch_and_verify(root: Path, name: str, url: str, sha256: str) -> Path:
 
 
 def _pip_install_no_index(
-    venv_python: Path, wheel_path: Path, no_user_site: dict[str, str]
+    venv_python: Path, wheel_path: Path, no_user_site: dict[str, str], *, bootstrap: bool
 ) -> None:
+    # As the Formula does: pip itself runs from its own wheel under the venv's
+    # interpreter, so no install ever uses the base interpreter's pip (r61, unt_f3bf05be F1).
+    runner = [str(wheel_path / "pip")] if bootstrap else ["-m", "pip"]
     subprocess.run(
-        [str(venv_python), "-m", "pip", "install", "--no-index", "--no-deps", str(wheel_path)],
+        [str(venv_python), *runner, "install", "--no-index", "--no-deps", "--ignore-installed", str(wheel_path)],
         check=True,
         env=no_user_site,
     )

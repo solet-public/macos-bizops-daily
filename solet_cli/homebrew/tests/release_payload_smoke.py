@@ -1,7 +1,8 @@
 """Focused no-network smoke for release rendering and Formula package closure.
 
 The installability checks are host-dependent by design (see the README):
-they require `brew` and the Formula-declared `python@3.13`, but touch no
+they require `brew` and Homebrew's `python@3.13` (the Formula's first
+interpreter candidate), but touch no
 network — no PyPI index, no live fetch of the Formula's own pinned
 `setuptools`/`wheel`/`packaging` resources (those are vendored locally
 under `fixtures/pinned_wheels/`, hash-verified against the Formula's own
@@ -133,6 +134,24 @@ def _check_formula_boundary(
     )
 
 
+def _check_formula_caveats(formula: str) -> None:
+    caveats = formula.split("def caveats", 1)[1].split("\n  end", 1)[0]
+    _check(
+        all(
+            token in caveats
+            for token in (
+                "never installs or upgrades it",
+                "brew tab --installed-on-request python@3.13 && brew upgrade solet",
+                "brew pin python@3.13",
+                "-25293",
+                "Always Allow",
+            )
+        )
+        and "can upgrade the shared python@3.13" not in caveats,
+        "formula caveats say it never moves python@3.13 and name the guarded upgrade, the optional pin, and the recovery",
+    )
+
+
 def _check_formula_install_shape(formula: str, lock: dict[str, object]) -> None:
     _check(
         "{{" not in formula and "post_install" not in formula,
@@ -142,22 +161,16 @@ def _check_formula_install_shape(formula: str, lock: dict[str, object]) -> None:
         "def caveats" in formula and "Next: run solet create" in formula,
         "formula prints the standard separate setup instruction",
     )
-    caveats = formula.split("def caveats", 1)[1].split("\n  end", 1)[0]
-    _check(
-        all(
-            token in caveats
-            for token in ("python@3.13", "-25293", "--dry-run", "brew pin python@3.13", "Always Allow")
-        ),
-        "formula caveats name the shared-python Keychain risk, the check, the pin, and the recovery",
-    )
+    _check_formula_caveats(formula)
     _check(
         "include Language::Python::Virtualenv" in formula,
         "formula imports Homebrew's Python virtualenv helpers",
     )
     _check(
-        'depends_on "python@3.13"' in formula and 'depends_on "git"' in formula,
-        "formula declares runtime dependencies",
+        'depends_on "git"' in formula and re.search(r'^\s*depends_on\s+"python', formula, re.MULTILINE) is None,
+        "formula declares git and no Python dependency (a source formula's python dependency forces its upgrade)",
     )
+    _check_python_candidate_selection(formula)
     _check(
         "virtualenv_create(libexec" in formula
         and "build_isolation: false" in formula
@@ -169,7 +182,7 @@ def _check_formula_install_shape(formula: str, lock: dict[str, object]) -> None:
         "formula test is behavioral",
     )
     _check(
-        "brew install" not in formula and "services" not in formula,
+        "brew install" not in _without_odie_message(formula) and "services" not in formula,
         "formula does not create machine or instance state",
     )
     _check_seeds_symlink_shape(formula, lock)
@@ -357,6 +370,92 @@ def _check_independent_manager_identities(
         _check(manager_url in formula, f"{label} is carried into the Formula")
 
 
+_PYTHON_CANDIDATES = (
+    "/opt/homebrew/opt/python@3.13/bin/python3.13",
+    "/usr/local/bin/python3.13",
+    "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13",
+)
+# One `odie` statement: its first line plus every line a trailing backslash continues.
+_ODIE_MESSAGE = re.compile(r"odie (?:[^\n]*\\\n)*[^\n]*")
+
+
+# review unt_f3bf05be F1: Homebrew's Virtualenv#pip_install runs `<base> -m pip --python=<venv>`
+# with std_pip_args, whose --uploaded-prior-to pip < 26.1 rejects. The Formula bootstraps its
+# pinned pip into the venv from pip's own wheel and installs everything with the venv's pip.
+_PIP_BOOTSTRAP = 'system venv_python, wheel/"pip", "install", *std_pip_args(prefix: false), wheel'
+_PIP_REBIND = "venv = virtualenv_create(libexec, venv_python)"
+
+
+def _check_pip_bootstrap(formula: str, code: str) -> None:
+    resources = _parse_pinned_resources(formula)
+    pip_url = resources.get("pip", ("", ""))[0]
+    pinned = re.search(r"/pip-(?P<major>\d+)\.(?P<minor>\d+)(?:\.\d+)?-py3-none-any\.whl$", pip_url)
+    _check(
+        pinned is not None and (int(pinned["major"]), int(pinned["minor"])) >= (26, 1),
+        f"formula pins a pip wheel resource with sha256 at 26.1 or later (carries --uploaded-prior-to): {pip_url!r}",
+    )
+    create = code.find("virtualenv_create(libexec, python)")
+    stage = code.find('resource("pip").stage do')
+    bootstrap = code.find(_PIP_BOOTSTRAP)
+    rebind = code.find(_PIP_REBIND)
+    first_install = code.find(".pip_install")
+    _check(
+        -1 < create < stage < bootstrap < rebind < first_install
+        and "venv_python = libexec/\"bin/python\"" in code
+        and "= virtualenv_create(libexec, python)" not in code,
+        "pip is bootstrapped into the venv by the venv's own interpreter before the installer is rebound and before any resource installs",
+    )
+    _check(
+        'venv.pip_install resources.reject { |r| r.name == "pip" }' in code
+        and code.count(".pip_install") == code.count("venv.pip_install")
+        and '"-m", "pip"' not in code,
+        "every install goes through the rebound venv (its own pip), none through the base interpreter's pip",
+    )
+
+
+def _without_odie_message(formula: str) -> str:
+    return _ODIE_MESSAGE.sub("", formula)
+
+
+def _check_python_candidate_selection(formula: str) -> None:
+    listed = re.search(r"PYTHON_CANDIDATES = %w\[(?P<body>[^\]]*)\]\.freeze", formula)
+    _check(
+        listed is not None and tuple(listed.group("body").split()) == _PYTHON_CANDIDATES,
+        "formula lists exactly the three Python 3.13 candidates, opt path first",
+    )
+    install = formula.split("  def install", 1)[1].split("\n  end\n", 1)[0]
+    code = "\n".join(line for line in _without_odie_message(install).splitlines() if not line.lstrip().startswith("#"))
+    probe = install.find('PYTHON_CANDIDATES.map { |candidate| Pathname(candidate) }.find do |candidate|')
+    odie = install.find("odie ")
+    venv = install.find("virtualenv_create(libexec, python)")
+    _check(
+        -1 < probe < odie < venv
+        and 'quiet_system(candidate, "-c", "import sys; sys.exit(sys.version_info[:2] != (3, 13))")' in install
+        and "popen_read" not in code
+        and "unless python" in install[probe:odie],
+        "install takes the first candidate reporting 3.13, odies when none does, then builds the venv on it",
+    )
+    odie_messages = _ODIE_MESSAGE.findall(install)
+    _check(
+        len(odie_messages) == 1
+        and "No Python 3.13 found" in odie_messages[0]
+        and "HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 #{full_name}" in odie_messages[0],
+        "the odie names the exact guarded install command for this formula's own tap",
+    )
+    _check_install_shell_outs(code)
+    _check_pip_bootstrap(formula, code)
+
+
+def _check_install_shell_outs(code: str) -> None:
+    without_bootstrap = code.replace(_PIP_BOOTSTRAP, "", 1)
+    _check(
+        re.search(r"\b(?:safe_system|system|exec)\b|%x|\bbrew\b", without_bootstrap) is None
+        and code.count("quiet_system(") == 1
+        and code.count(_PIP_BOOTSTRAP) == 1,
+        "install never shells out to brew, so it cannot install or upgrade Python itself; its one system call is the pip bootstrap",
+    )
+
+
 def _homebrew_python() -> Path:
     brew = shutil.which("brew")
     if brew is None:
@@ -365,8 +464,8 @@ def _homebrew_python() -> Path:
         # formula-install leg at all, and that is an environment fact about
         # the runner, not a defect in the payload under test.
         print(
-            "SKIP  formula-install checks: no `brew` on PATH to provide the "
-            "declared python@3.13 dependency"
+            "SKIP  formula-install checks: no `brew` on PATH to provide "
+            "python@3.13, the Formula's first interpreter candidate"
         )
         raise SystemExit(77)
     result = subprocess.run(
@@ -377,13 +476,13 @@ def _homebrew_python() -> Path:
     )
     _check(
         result.returncode == 0,
-        "host prerequisite missing: install the Formula-declared Homebrew "
-        f"dependency with `brew install python@3.13`: {result.stderr.strip()}",
+        "host prerequisite missing: install Homebrew's python@3.13, the "
+        f"Formula's first interpreter candidate: {result.stderr.strip()}",
     )
     python = Path(result.stdout.strip()) / "bin" / "python3.13"
     _check(
         python.is_file(),
-        "host prerequisite missing: the Formula-declared Homebrew python@3.13 "
+        "host prerequisite missing: the Homebrew python@3.13 "
         f"executable is absent: {python}",
     )
     return python
@@ -478,6 +577,7 @@ _PINNED_WHEELS_DIR = Path(__file__).resolve().parent / "fixtures" / "pinned_whee
 # time, so a stale vendored file (Formula pin bumped, fixture not updated)
 # fails loudly here rather than silently installing the wrong bytes.
 _PINNED_WHEEL_FILENAMES: dict[str, str] = {
+    "pip": "pip-26.2.1-py3-none-any.whl",
     "setuptools": "setuptools-84.0.0-py3-none-any.whl",
     "wheel": "wheel-0.48.0-py3-none-any.whl",
     "packaging": "packaging-26.2-py3-none-any.whl",
@@ -511,6 +611,17 @@ def _install_pinned_build_resources(
             f"resource {name!r} (expected {pinned_sha256}, got {actual_sha256} — "
             "the Formula's pin moved without the vendored fixture being updated)",
         )
+    # The Formula's bootstrap: the venv's interpreter runs pip from the pinned wheel itself.
+    pip_wheel = _PINNED_WHEELS_DIR / _PINNED_WHEEL_FILENAMES["pip"]
+    booted = _run_with_contention_retry(
+        [str(venv_python), str(pip_wheel / "pip"), "install", "--no-index", "--no-deps", "--ignore-installed", str(pip_wheel)],
+    )
+    _check(booted.returncode == 0, f"pinned pip bootstraps into the venv from its own wheel: {booted.stderr}")
+    own_pip = subprocess.run(
+        [str(venv_python), "-c", "import pip, sys; print(pip.__file__.startswith(sys.prefix))"],
+        check=False, capture_output=True, text=True, env=_no_user_site_env(),
+    )
+    _check(own_pip.stdout.strip() == "True", f"the venv's -m pip is its own bootstrapped pip, not the base's: {own_pip.stdout}{own_pip.stderr}")
     installed_resources = _run_with_contention_retry(
         [
             str(venv_python),
@@ -521,7 +632,7 @@ def _install_pinned_build_resources(
             "--find-links",
             str(_PINNED_WHEELS_DIR),
             "--no-deps",
-            *_PINNED_WHEEL_FILENAMES,
+            *(name for name in _PINNED_WHEEL_FILENAMES if name != "pip"),
         ],
     )
     _check(
@@ -568,8 +679,8 @@ def _check_no_index_formula_install(root: Path, formula: str) -> None:
 
     resources = _parse_pinned_resources(formula)
     _check(
-        {"setuptools", "wheel", "packaging"} <= resources.keys(),
-        "Formula declares pinned setuptools, wheel, and packaging resources",
+        {"pip", "setuptools", "wheel", "packaging"} <= resources.keys(),
+        "Formula declares pinned pip, setuptools, wheel, and packaging resources",
     )
     _assert_resources_declared_before_manager_install(formula)
 

@@ -8,7 +8,27 @@ class Solet < Formula
   license "Apache-2.0"
 {{REVISION_LINE}}
   depends_on "git"
-  depends_on "python@3.13"
+
+  # No `depends_on "python@3.13"`: a source formula's dependency is satisfied only
+  # by the LATEST python@3.13, so declaring one upgraded every user's working
+  # Python on each install and upgrade (iss_d62aeab7, dec_b08cf4c7). The venv is
+  # built on the first existing Python 3.13 below instead, opt path first so a
+  # later `brew upgrade python@3.13` keeps it working. This formula never
+  # installs or upgrades Python itself.
+  PYTHON_CANDIDATES = %w[
+    /opt/homebrew/opt/python@3.13/bin/python3.13
+    /usr/local/bin/python3.13
+    /Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13
+  ].freeze
+
+  # pip itself, pinned. Homebrew's Virtualenv#pip_install runs the BASE interpreter's pip
+  # (`<base> -m pip --python=<venv>`), and std_pip_args always passes --uploaded-prior-to,
+  # which pip older than 26.1 rejects. The base is now whatever Python 3.13 the Mac already
+  # has, so install() bootstraps this pip into the venv and does every install with it.
+  resource "pip" do
+    url "https://files.pythonhosted.org/packages/f3/6e/1736e5b4ae2b778ef2f81c47d797de9f891d4d8acb047a24ca37a60294dd/pip-26.2.1-py3-none-any.whl"
+    sha256 "71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e"
+  end
 
   resource "setuptools" do
     url "https://files.pythonhosted.org/packages/95/9c/c510029fc6ef33a6275cd2c5d3cecd6613dfd6aa401d57c54f1c18852ccf/setuptools-84.0.0-py3-none-any.whl"
@@ -32,14 +52,35 @@ class Solet < Formula
   end
 
   def install
-    venv = virtualenv_create(libexec, "python3.13")
+    # quiet_system, not Utils.popen_read: brew style's SafePopenCommands cop refuses
+    # popen_read in a formula body, and safe_popen_read would abort on a broken
+    # candidate instead of trying the next one.
+    python = PYTHON_CANDIDATES.map { |candidate| Pathname(candidate) }.find do |candidate|
+      candidate.executable? &&
+        quiet_system(candidate, "-c", "import sys; sys.exit(sys.version_info[:2] != (3, 13))")
+    end
+    unless python
+      odie "No Python 3.13 found (looked in: #{PYTHON_CANDIDATES.join(", ")}). " \
+           "Install one and this formula together with: " \
+           "HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 #{full_name}"
+    end
+    virtualenv_create(libexec, python)
+    venv_python = libexec/"bin/python"
+    # pip runs from its own wheel under the venv's interpreter: no base pip is involved.
+    resource("pip").stage do
+      wheel = Pathname.pwd.glob("pip-*.whl").fetch(0)
+      system venv_python, wheel/"pip", "install", *std_pip_args(prefix: false), wheel
+    end
+    # The venv already exists, so this only rebinds the installer: every pip_install below
+    # runs `<venv python> -m pip`, the pip just bootstrapped.
+    venv = virtualenv_create(libexec, venv_python)
     # Homebrew's python@3.13 provisions pip and wheel via ensurepip but never
     # setuptools (measured: its post-install log installs only pip, wheel).
     # solet_cli's build backend is setuptools.build_meta, so build_isolation
     # below needs setuptools present without hitting the network — vendor it
     # as a pinned, checksummed resource instead of assuming the machine has
     # one lying around.
-    venv.pip_install resources
+    venv.pip_install resources.reject { |r| r.name == "pip" }
     venv.pip_install buildpath/"solet_setup_contracts", build_isolation: false
     venv.pip_install buildpath/"solet_cli", build_isolation: false
 
@@ -129,14 +170,16 @@ class Solet < Formula
     <<~EOS
       Next: run solet create
 
-      Installing this formula can upgrade the shared python@3.13. Any solet whose
-      .venv links that Python, including one the Manager did not create, can then
-      lose its Keychain credentials (error -25293) on its next restart.
-      Before an install or upgrade, add --dry-run: it lists python@3.13 under Would upgrade.
-      To make brew refuse instead of upgrading: brew pin python@3.13
-      Recovery: in a logged-in GUI session, read each Keychain item that solet
-      owns once and answer Always Allow. After solet-manager import, solet doctor
-      names a venv that needs this.
+      This formula does not depend on python@3.13 and never installs or upgrades it.
+      It builds on the Python 3.13 already on this Mac, so installing or upgrading it
+      leaves that Python, and every solet .venv that links it, untouched.
+      Upgrade later with: brew tab --installed-on-request python@3.13 && brew upgrade solet
+      The brew tab step installs nothing; it keeps Homebrew from autoremoving that Python.
+      Optional: brew pin python@3.13 keeps your own brew upgrade from moving it too.
+      If that Python does move, a solet can lose its Keychain credentials (error -25293)
+      on its next restart. Recovery: in a logged-in GUI session, read each Keychain item
+      that solet owns once and answer Always Allow. After solet-manager import,
+      solet doctor names a venv that needs this.
     EOS
   end
 

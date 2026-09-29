@@ -2,8 +2,9 @@
 
 Detection coverage for ``iss_d62aeab7`` (macos-bizops issue 73, Part 55.6).
 
-``brew install solet-public/tap/solet`` upgrades the shared ``python@3.13`` as an
-ordinary formula dependency.  A co-located solet whose ``.venv`` links that
+Before r61, ``brew install solet-public/tap/solet`` upgraded the shared ``python@3.13``
+as an ordinary formula dependency; from r61 the Manager formula no longer depends on it,
+but a user's own ``brew upgrade`` or any other dependent formula still can.  A co-located solet whose ``.venv`` links that
 framework then resolves to a different ad-hoc-signed binary.  The Keychain ACL of
 every credential that solet owns pins the OLD binary's code-directory hash, so the
 next restart fails with ``-25293`` until each item is re-authorized by hand.

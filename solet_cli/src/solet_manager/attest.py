@@ -17,7 +17,9 @@ by :mod:`release_identity`:
                 dirty list, per-plugin subtree hashes), the running process
                 (``attest_runtime_code`` over the target's bridge), and the
                 transaction-journal identity with the applied-update history.
-- ``environment`` OS build, Homebrew closure versions, models served.
+- ``environment`` OS build, Homebrew closure versions (``git`` alone from r61), the
+                interpreter the manager venv runs on (``manager_python``),
+                models served.
 
 The manifest comes from ``--against`` (a file, or a release tag resolved
 through ambient ``gh`` into the manager cache) or from the keg's default

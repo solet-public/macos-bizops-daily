@@ -16,7 +16,7 @@ Run this ladder after genesis completes and the newborn solet boots, when the us
 
 Hydration is deliberately NOT genesis code. The files this ladder writes belong to the user's side of the genesis boundary, just like optional client registration does: the agent performs them with its own tools, in conversation, under the user's approval.
 
-Updating an existing install is not a hydration concern and not a manual `git pull`: install the Manager (`brew install solet-public/tap/solet`), then `solet-manager import <name> --target <clone> --channel stable` once, and `solet-manager update <name> --dry-run` / `--yes` for every release after that — the Manager preserves the files this runbook writes and discloses them in its preview. The procedure, the refusal vocabulary, and the steps that remain manual are in `05_seed_update_runbook.md`.
+Updating an existing install is not a hydration concern and not a manual `git pull`: install the Manager (`HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet`; an "already installed" line for `python@3.13` is expected), then `solet-manager import <name> --target <clone> --channel stable` once, and `solet-manager update <name> --dry-run` / `--yes` for every release after that — the Manager preserves the files this runbook writes and discloses them in its preview. The procedure, the refusal vocabulary, and the steps that remain manual are in `05_seed_update_runbook.md`.
 
 ## Three fixed rules
 

@@ -5167,6 +5167,7 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/hook_interpreter_pin_update_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_legacy_direct_runtime_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_resume_pinned_predecessor_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports update_legacy_direct_runtime_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/doctor_promoted_seed_identity_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: quality_gates/tests/smoke_contract_lint_gate_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it calls checkout_only_consistency_violations directly to prove the repo-level contract-lint gate, which is in no capability bundle (fixture_build_tooling)
 # not shipped: ananta/tests/core/orchestration/selected_inference_startup_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin; absent from macos_free_minimal and macos_samantha, which ship default_inference_plugin instead (iss_76ae2d4d, cross_bundle_transition)
 # not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
@@ -5476,3 +5477,16 @@ solet_cli/tests/probe_timeout_override_smoke.py
 # PR". RED against the r56 text (7 findings in 5 files), GREEN after. Offline, reads shipped
 # files only; `--root <tree>` runs it against another checkout.
 plugins/github_midwife_plugin/tests/feedback_path_drift_guard_smoke.py
+# iss_a81b79e3 (r61): after a real create-origin update reaches promoted, the real InstallationDoctor.run
+# compares the checkout against the promoted seed tree (the v2 row's source_release) and hands the vintage
+# census the promoted identity, while the v1 create record stays at the create's release -- the same state
+# r58-r60 left in the field, so no migration is needed; control: a never-updated solet reads its create
+# record; mid-update it reads the checked-out candidate; a same-name v2 row that is not the create's alias is refused
+# StateConflictError; a checkout moved by hand still warns seed_tree_hash_mismatch.
+# iss_9cd4359a (r61): the real operation_executor._apply_operation records the digest of every tracked file an
+# approved apply wrote (run_genesis: AGENTS.md, CLAUDE.md, root_manifest.yaml; install_claude_plugin: the two
+# coordination-hook manifests through the installer's own pin transform), and the real doctor accepts exactly
+# those bytes (and HEAD's mode) in seed_tree_verification and doctor::release_identity_v1; a later edit to a recorded
+# file, a chmod before or after the apply, a staged edit behind the Manager's bytes, an edit to any other tracked file,
+# a pre-apply edit, a failed apply's writes and another create's ledger all still warn; a re-create drops the old rows.
+solet_cli/tests/create_applied_edits_doctor_smoke.py

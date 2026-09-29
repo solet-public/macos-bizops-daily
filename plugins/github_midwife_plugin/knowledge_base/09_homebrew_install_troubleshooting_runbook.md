@@ -8,12 +8,12 @@ Article Role: operations_runbook
 
 Article Tags: planning-stage:solet-lifecycle, evidence-category:operations-runbook, domain:local-solet, domain:client-deployment, consumer_profile:both
 
-Embedding Description: Agent-facing runbook for installing a solet on a Mac through the Homebrew path (brew install solet-public/tap/solet, then solet create), explaining the preview-then-approve loop and its exit codes, the nine setup stages in order, how to read the manager's JSON when a stage stops (message, repair, error_kind, decision_errors, unresolved_actions, probe statuses), the automated LM Studio provisioning operations in system_dependencies (pinned installer, JIT disabled, exact artifacts, explicit CPU loading and shared login job), how a fresh macos-bizops create on macOS 26 (Tahoe) runs Homebrew llama.cpp instead of the Apple-native stack (host-profile gate, two loopback llama-server login services, pinned GGUF models with SHA-256 readback, a missing model as a warning, the 2048-token embedding budget, measured speed and memory, swapping the summaries model), and recovery for older releases with manual provisioning, what it means when an LM Studio model download sits stuck at 0% forever with no error while the server and daemon both report healthy (an unpinned installer build that cannot transfer bytes, not a network problem, fixed by pinning the installer version), where the instance, transaction journal, install-state projection, logs and LaunchAgent live, stage-by-stage recovery for PostgreSQL, pgvector, cask installs, stale Keychain names and crash-looping services, the 24 GB memory minimum, and the rule never to mix the manager path with the bootstrap.py path mid-run.
+Embedding Description: Agent-facing runbook for installing a solet on a Mac through the Homebrew path (HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet, then solet create), explaining the preview-then-approve loop and its exit codes, the nine setup stages in order, how to read the manager's JSON when a stage stops (message, repair, error_kind, decision_errors, unresolved_actions, probe statuses), the automated LM Studio provisioning operations in system_dependencies (pinned installer, JIT disabled, exact artifacts, explicit CPU loading and shared login job), how a fresh macos-bizops create on macOS 26 (Tahoe) runs Homebrew llama.cpp instead of the Apple-native stack (host-profile gate, two loopback llama-server login services, pinned GGUF models with SHA-256 readback, a missing model as a warning, the 2048-token embedding budget, measured speed and memory, swapping the summaries model), and recovery for older releases with manual provisioning, what it means when an LM Studio model download sits stuck at 0% forever with no error while the server and daemon both report healthy (an unpinned installer build that cannot transfer bytes, not a network problem, fixed by pinning the installer version), where the instance, transaction journal, install-state projection, logs and LaunchAgent live, stage-by-stage recovery for PostgreSQL, pgvector, cask installs, stale Keychain names and crash-looping services, the 24 GB memory minimum, and the rule never to mix the manager path with the bootstrap.py path mid-run.
 
 ## When to use this runbook
 
 Use this when a solet is being created on a Mac through the Homebrew path
-(`brew install solet-public/tap/solet` followed by `solet create <name>`) and
+(`HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet` followed by `solet create <name>`) and
 a `solet create` pass has stopped, refused, or asked for something. It is
 written to the coding agent driving the install, the same audience as the
 genesis section of the seed README, and applies equally to Claude Code and
@@ -37,7 +37,7 @@ runbook).
 ## Before `solet create`: the Homebrew trust check
 
 Homebrew 6 refuses to load a formula from a third-party tap until it is
-trusted: `brew install solet-public/tap/solet` or `brew info` stops with
+trusted: the install command or `brew info` stops with
 `Refusing to load formula solet-public/tap/solet from untrusted tap
 solet-public/tap. Run brew trust ...`. That is Homebrew policy, not a
 formula defect. Trust the one formula, never the whole tap, and retry:
@@ -45,7 +45,7 @@ formula defect. Trust the one formula, never the whole tap, and retry:
 ```console
 brew tap solet-public/tap
 brew trust --formula solet-public/tap/solet
-brew install solet-public/tap/solet
+HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet
 ```
 
 `brew trust --help` documents the current flags if they differ. Older
@@ -53,31 +53,58 @@ Homebrew versions have no trust store and install directly. Record which
 case the machine was in; it decides whether an upgrade later needs the same
 step.
 
-## Before `brew install`: another solet on the same Mac
+## Before `brew install`: the Python the Manager builds on
 
-Installing the Manager can upgrade the shared `python@3.13`, because Homebrew
-treats a dependency as satisfied only at its latest version. Any solet whose
-`.venv` links that Python, including one the Manager did not create, then has
-its Keychain credentials refused (`-25293`, "make sure executable is signed
-with codesign util") at its next restart: the Keychain ACL of an ad-hoc-signed
-binary pins its exact code-directory hash. Run `brew install --dry-run
-solet-public/tap/solet` first and look for `python@3.13` under `Would upgrade`;
-`brew pin python@3.13` makes the install stop instead (`brew unpin` when the
-move is intended). To recover a solet already affected, in a logged-in GUI
-session (not SSH) read each of its Keychain items once under its current
-interpreter and answer **Always Allow**, not Allow. After `solet-manager
-import`, `solet doctor <name>` reports `doctor::python_interpreter_drift_v1`
-for a venv created under one `python@3.13` version that now resolves to
-another; it does not see a same-version revision bump.
+From r61 the Manager formula does not depend on `python@3.13` and never
+installs or upgrades it. It builds its venv on the first of these that
+reports Python 3.13, in this order:
+
+1. `/opt/homebrew/opt/python@3.13/bin/python3.13`
+2. `/usr/local/bin/python3.13`
+3. `/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13`
+
+Install with exactly this command:
+
+```console
+HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet
+```
+
+Naming `python@3.13` installs it when the Mac has none and marks it installed
+on request. `HOMEBREW_NO_INSTALL_UPGRADE=1` leaves an existing `python@3.13` at
+its version. When one is installed, Homebrew prints `Error: python@3.13
+<version> is already installed` (or a `Warning:` that it is already installed
+and up to date), exits 0, and installs the Manager anyway. That line is
+expected: do not treat it as a failure and do not run `brew upgrade
+python@3.13` because of it.
+
+If the install stops with `No Python 3.13 found (looked in: ...)`, none of the
+three paths answered. The same message names the command to run; it is the
+install command above, which installs `python@3.13` first. Confirm with
+`brew list --versions python@3.13` (one line) and the Manager with
+`solet --version`.
+
+Other solets on the same Mac are unaffected: a solet whose `.venv` links
+`python@3.13` keeps its exact interpreter, so its Keychain credentials keep
+working. Before r61, installing the Manager upgraded that Python, and any such
+solet was refused on every credential read (`-25293`, "make sure executable
+is signed with codesign util") at its next restart, because the Keychain ACL
+of an ad-hoc-signed binary pins its exact code-directory hash. A `brew upgrade`
+you run yourself can still move `python@3.13`; `brew pin python@3.13` prevents
+that and no longer blocks the Manager. To recover a solet already affected, in
+a logged-in GUI session (not SSH) read each of its Keychain items once under
+its current interpreter and answer **Always Allow**, not Allow. After
+`solet-manager import`, `solet doctor <name>` reports
+`doctor::python_interpreter_drift_v1` for a venv created under one
+`python@3.13` version that now resolves to another; it does not see a
+same-version revision bump.
 
 ### Upgrading the Manager later: mark `python@3.13` on request first
 
-This release still depends on `python@3.13`; a later one (planned as r61) will
-not, and on a real install Homebrew keeps that Python only as the Manager's
-dependency (`installed_on_request` is false in its receipt). Once the
-dependency is gone, `brew autoremove`, which `brew upgrade` runs in its
-periodic cleanup, would delete the interpreter every solet `.venv` links.
-Every upgrade therefore starts with the receipt flag:
+A Manager installed before r61 left `python@3.13` recorded only as its
+dependency (`installed_on_request` is false in its receipt). From r61 the
+formula no longer depends on it, so `brew autoremove`, which `brew upgrade`
+runs in its periodic cleanup, would delete the interpreter every solet
+`.venv` links. Every upgrade therefore starts with the receipt flag:
 
 ```console
 brew tab --installed-on-request python@3.13 && brew upgrade solet
@@ -85,14 +112,13 @@ brew tab --installed-on-request python@3.13 && brew upgrade solet
 
 `brew tab` changes only that flag: it installs and upgrades nothing, and
 running it again is harmless. It fails only if `python@3.13` is not installed,
-and that stops the `&&` before the upgrade. An installed Manager depends on
-`python@3.13`, so a failure here means the Python was removed from the machine:
-run `brew install python@3.13` (which also marks it installed on request), then
-run the pair again. `solet-manager create` and `update` run the same
-flag command as a planned, previewed step, and `solet-manager doctor <name>`
-reports `doctor::python_installed_on_request_v1` with reason
-`python_not_installed_on_request` and this exact command until the flag is
-set.
+and that stops the `&&` before the upgrade. A failure here means the Python
+was removed from the machine: run `brew install python@3.13` (which also marks
+it installed on request), then run the pair again. `solet-manager create` and
+`update` run the same flag command as a planned, previewed step, and
+`solet-manager doctor <name>` reports `doctor::python_installed_on_request_v1`
+with reason `python_not_installed_on_request` and this exact command until the
+flag is set.
 
 ## The loop: preview, approve, repeat
 

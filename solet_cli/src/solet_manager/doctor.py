@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from .adapters import AdapterRegistry, resolve_long_lived_python
 from .completion_verifier import run_completion_probes
 from .contract_reconciliation import recover_contract_reconciliation
 from .contracts import ContractBundle, target_contract_directory
+from .create_applied_edits import accept_applied_edits, accepted_edit_paths
 from .doctor_blue_green_census import collect_blue_green_advisories
 from .doctor_credential_copy_census import collect_credential_copy_advisories
 from .doctor_genesis_marker_census import collect_genesis_marker_advisories
@@ -29,9 +31,10 @@ from .doctor_terminal_return_keys import collect_terminal_return_key_advisories
 from .doctor_vintage_census import collect_doctor_advisories
 from .errors import StateConflictError
 from .journal_rollup import _FINAL_STAGE_STATUSES
+from .maintenance_inventory import read_maintenance_inventory_v2
 from .models import CommandResult, ExitCode, InstanceRecord, JsonValue
 from .paths import ManagerPaths
-from .registry import InstanceRegistry
+from .registry import InstanceRegistry, is_create_origin_alias
 from .seed_tree_verifier import SeedTreeVerification, verify_seed_tree
 from .state_io import instance_lock
 from .transaction import Transaction, load_transaction, write_transaction
@@ -62,7 +65,9 @@ class InstallationDoctor:
                 record,
                 target,
             )
-            seed_tree_verification = verify_seed_tree(target, record.seed_tree_hash)
+            seed_record = current_seed_record(self.paths, record)
+            accepted = accepted_edit_paths(self.paths, name=name, target=target, create_operation_id=transaction.operation_id)
+            seed_tree_verification = accept_applied_edits(verify_seed_tree(target, seed_record.seed_tree_hash), accepted)
             transaction, checks = run_completion_probes(
                 bundle,
                 transaction,
@@ -73,11 +78,11 @@ class InstallationDoctor:
                 "doctor_verified" if transaction.status.value == "verified" else "doctor_incomplete"
             )
             write_transaction(self.paths.transaction_path(name), transaction)
-        advisories = collect_doctor_advisories(record, transaction)
+        advisories = collect_doctor_advisories(seed_record, transaction)
         advisories.extend(collect_residue_advisories(record))
         advisories.extend(collect_blue_green_advisories(record))
         advisories.extend(collect_seed_integrity_advisories(record, transaction))
-        advisories.extend(collect_release_identity_advisories(record, transaction))
+        advisories.extend(collect_release_identity_advisories(record, transaction, accepted_edits=accepted))
         advisories.extend(collect_secret_exposure_advisories(record))
         advisories.extend(collect_genesis_marker_advisories(record))
         advisories.extend(collect_postgres_pin_advisories(record))
@@ -97,6 +102,40 @@ class InstallationDoctor:
         )
         advisories.extend(collect_inference_probe_advisories(transaction))
         return _doctor_result(name, transaction, checks, seed_tree_verification, advisories)
+
+
+def current_seed_record(paths: ManagerPaths, record: InstanceRecord) -> InstanceRecord:
+    """The create record with its seed identity at the release the Manager last checked out (iss_a81b79e3).
+
+    The v1 row is the immutable create record: ``create_transaction_matches_record`` binds it to
+    the create transaction and ``is_create_origin_alias`` joins it to v2 on identity only.  Once
+    ``update`` enrolls the instance, the v2 row's ``source_release`` is the Manager's record of the
+    tree it checked out: the same promotion that publishes ``verified_release`` requires it at the
+    candidate.  So a promoted update is read from there, never by rewriting the create record, and a
+    solet promoted before this fix reads correctly on its first doctor with no migration.  No v2 row
+    means never updated, so the create record is the seed identity.  A same-name v2 row that does not
+    join the create record is refused rather than silently read past: which release this checkout
+    should be at is then unknown.
+    """
+
+    row = next((item for item in read_maintenance_inventory_v2(paths.maintenance_inventory_path) if item.name == record.name), None)
+    if row is None:
+        return record
+    if not is_create_origin_alias(record, row):
+        target = row.target
+        raise StateConflictError(
+            f"managed instance {record.name!r}: the v2 inventory row (origin {row.management_origin.value}, target "
+            f"{target.canonical_path}, inode {target.filesystem_identity.inode}) is not the create record's alias "
+            f"(target {record.target}); the doctor cannot tell which seed release this checkout should be at"
+        )
+    release = row.source_release
+    return replace(
+        record,
+        seed_repository=release.repository,
+        seed_tag=release.tag,
+        seed_commit=release.commit,
+        seed_tree_hash=release.tree,
+    )
 
 
 def _provisional_doctor_result(

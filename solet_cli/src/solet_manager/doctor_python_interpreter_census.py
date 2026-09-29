@@ -8,9 +8,10 @@ verified.
 
 Row detected
 ------------
-A Homebrew ``python@3.13`` upgrade (which ``brew install`` of this Manager, or of
-any other formula that depends on it, performs as an ordinary dependency upgrade)
-replaces the ad-hoc-signed interpreter that a solet's ``.venv`` links.  An ad-hoc
+A Homebrew ``python@3.13`` upgrade (which ``brew install`` of a Manager before r61,
+or of any other formula that depends on it, performs as an ordinary dependency
+upgrade; from r61 the Manager formula no longer depends on it, but a user's own
+``brew upgrade`` still can) replaces the ad-hoc-signed interpreter that a solet's ``.venv`` links.  An ad-hoc
 signature has no stable signing authority, so the Keychain ACL of every credential
 the solet owns pins the OLD binary's code-directory hash.  The next restart fails
 each read with ``-25293`` until a human re-authorizes each item.

@@ -77,9 +77,13 @@ _PAIR_CHECK_ID = "doctor::genesis_marker_pair_agreement_v1"
 _VINTAGE_CHECK_ID = "doctor::genesis_marker_step_vintage_v1"
 
 # ``skipped`` is a real, benign outcome (``install_autostart`` records it when
-# autostart was not requested).  Only ``failed`` is a divergence; anything else
-# is reported as unrecognised rather than silently folded into either bucket.
-_BENIGN_STEP_STATUSES = frozenset({"completed", "skipped"})
+# autostart was not requested), and so is ``deferred`` (``install_autostart``
+# holds the first boot until the Core AI asset or the llama.cpp address-book
+# entry exists; the later ``install_launchagent`` operation installs it, and its
+# own probe grades that -- r60 VM report, fixed r61).  Only ``failed`` is a
+# divergence; anything else is reported as unrecognised rather than silently
+# folded into either bucket.
+_BENIGN_STEP_STATUSES = frozenset({"completed", "skipped", "deferred"})
 _FAILED_STEP_STATUS = "failed"
 
 _MARKER_SUCCESS_STATUS = "success"

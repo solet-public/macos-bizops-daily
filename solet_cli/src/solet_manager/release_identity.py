@@ -319,12 +319,16 @@ def compare_seed_checkout(
     target: Path,
     manifest: dict[str, JsonValue] | None,
     runner: CommandRunner = run_command,
+    accepted_edits: frozenset[str] = frozenset(),
 ) -> dict[str, JsonValue]:
     """Measure the checkout with git and localise drift per declared component.
 
     A checkout without ``.git`` cannot be measured -- the manager acquires
     seeds by ``git fetch`` and verifies tree hashes, so a missing ``.git`` is
     a real finding (``no_git_metadata``), reported rather than guessed around.
+    ``accepted_edits`` names the paths whose bytes still equal a create's own
+    recorded apply-time digest (iss_9cd4359a); only a worktree-only content
+    modification of one of them moves to ``accepted_manager_edits``.
     """
 
     section: dict[str, JsonValue] = {
@@ -334,6 +338,7 @@ def compare_seed_checkout(
         "head_commit": None,
         "head_tree": None,
         "dirty_paths": [],
+        "accepted_manager_edits": [],
         "declared": None,
         "components": [],
         "drifted_components": [],
@@ -345,9 +350,11 @@ def compare_seed_checkout(
     if measured is None:
         section["reason"] = "git_query_failed"
         return section
-    head, tree, dirty = measured
+    head, tree, entries = measured
+    dirty, accepted = _partition_dirty(entries, accepted_edits)
     section["head_commit"], section["head_tree"] = head, tree
     section["dirty_paths"] = cast(list[JsonValue], dirty)
+    section["accepted_manager_edits"] = cast(list[JsonValue], accepted)
     seed = manifest.get("seed") if manifest is not None else None
     if not isinstance(seed, dict):
         section["reason"] = "release_manifest_absent" if manifest is None else "manifest_seed_section_absent"
@@ -360,7 +367,7 @@ def compare_seed_checkout(
     return section
 
 
-def _measure_checkout(runner: CommandRunner, target: Path) -> tuple[str, str, list[str]] | None:
+def _measure_checkout(runner: CommandRunner, target: Path) -> tuple[str, str, list[tuple[str, str]]] | None:
     head = _git(runner, target, "rev-parse", "HEAD")
     tree = _git(runner, target, "rev-parse", "HEAD^{tree}")
     # Raw stdout: the porcelain's leading status column may be a space.
@@ -370,17 +377,24 @@ def _measure_checkout(runner: CommandRunner, target: Path) -> tuple[str, str, li
     return head, tree, _dirty_paths(status.stdout)
 
 
-def _dirty_paths(porcelain: str) -> list[str]:
-    """Tracked paths with index or worktree changes, from ``status --porcelain -z``.
+def _partition_dirty(entries: list[tuple[str, str]], accepted_edits: frozenset[str]) -> tuple[list[str], list[str]]:
+    """Split ``(XY, path)`` rows into dirt and the create's accepted worktree-only content edits."""
+
+    accepted = [path for status, path in entries if status == " M" and path in accepted_edits]
+    return [path for _status, path in entries if path not in accepted], accepted
+
+
+def _dirty_paths(porcelain: str) -> list[tuple[str, str]]:
+    """Tracked ``(XY, path)`` entries with index or worktree changes, from ``status --porcelain -z``.
 
     Each entry is ``XY <path>``; a rename or copy carries the original path
     as one extra NUL-terminated field, which is consumed, not listed.
     """
 
     fields = iter(field for field in porcelain.split("\0") if field)
-    dirty: list[str] = []
+    dirty: list[tuple[str, str]] = []
     for entry in fields:
-        dirty.append(entry[3:])
+        dirty.append((entry[:2], entry[3:]))
         if entry[0] in "RC":
             next(fields, None)
     return dirty

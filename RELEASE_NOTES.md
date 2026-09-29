@@ -2,6 +2,107 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-29 — r61: the Manager no longer forces a `python@3.13` upgrade
+
+**Solet Manager manager-v0.1.0-r61.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate.
+
+This release is step two of two (`iss_d62aeab7`, `dec_b08cf4c7`). The Manager
+formula no longer declares `depends_on "python@3.13"`, so a working Python 3.13
+is no longer upgraded just because the Manager was installed or upgraded. r60
+was step one: it marks `python@3.13` installed on request, so Homebrew does not
+remove that Python once the dependency is gone.
+
+- **Install with this command.** `HOMEBREW_NO_INSTALL_UPGRADE=1 brew install
+  python@3.13 solet-public/tap/solet`, or the same command with the tap your
+  release README names. It installs `python@3.13` only when the Mac has none,
+  and then marks it installed on request. When one is already installed,
+  Homebrew prints `Error: python@3.13 <version> is already installed`, or a
+  `Warning:` that it is already installed and up to date. It still exits 0 and
+  installs the Manager. That line is expected. Check the result with
+  `brew list --versions python@3.13` (one line) and `solet --version`.
+- **The Manager formula never installs or upgrades `python@3.13`.** It builds
+  its environment on the first path that reports Python 3.13, in this order:
+  `/opt/homebrew/opt/python@3.13/bin/python3.13`, `/usr/local/bin/python3.13`,
+  `/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13`. A solet
+  whose `.venv` links `python@3.13` keeps its exact interpreter across Manager
+  installs and upgrades, so its Keychain credentials keep working. The r57
+  warning (`-25293` after a Manager install) no longer applies to the Manager.
+  A `brew upgrade` you run yourself can still move `python@3.13`.
+  `brew pin python@3.13` prevents that, and it no longer blocks installing or
+  upgrading the Manager.
+- **An older Python 3.13 works as it is.** Homebrew builds a formula's Python
+  packages with the base interpreter's pip and passes `--uploaded-prior-to`,
+  which pip older than 26.1 rejects. The formula therefore installs its own
+  pinned pip 26.2.1 into the Manager's environment first and does every
+  install with that pip, so a Python 3.13 whose bundled pip is older still
+  installs the Manager. That Python itself is not changed.
+- **If the install stops with `No Python 3.13 found (looked in: ...)`,** none
+  of those paths answered. Run the install command above exactly as written:
+  it installs `python@3.13` first. The message itself names the same command
+  with this formula's own tap.
+- **Upgrade with the same guarded command as r60.** It is still
+  `brew tab --installed-on-request python@3.13 && brew upgrade solet`. The
+  `brew tab` step installs and upgrades nothing, and it matters most on this
+  release: a Manager installed before r61 left `python@3.13` recorded only as
+  its dependency. Do not use a bare `brew upgrade solet` to reach r61. If
+  Homebrew's periodic cleanup is due during that command, it autoremoves
+  `python@3.13` before `solet-manager` can mark it. Recover with
+  `brew install python@3.13`. `solet-manager create` and `update` still plan
+  `homebrew.python_installed_on_request`, and
+  `doctor::python_installed_on_request_v1` still warns until the flag is set.
+- **`solet attest` records the interpreter the Manager runs on.** The
+  environment section adds `manager_python`, with the Manager venv's
+  `executable`, the path it `resolved` to, and its `version`. The Homebrew
+  closure it queries is now `git` alone, because that is the formula's whole
+  dependency list.
+
+- **A solet installed from stable r60 can run `solet-manager update` to this
+  release.** The update recognises stable r60 as a release it can move forward
+  from, the same as r59 and earlier.
+
+- **`solet doctor <name>` no longer reports `seed_tree_hash_mismatch` after
+  a promoted update.** Before r61, `seed_tree_verification` compared the
+  checkout with the tree `solet create` installed, so every solet updated to
+  `promoted` warned, with `expected_tree_hash` naming the old release. Now it
+  compares with the release the Manager last checked out. `doctor::manager_seed_vintage_v1`
+  reads the same identity. Solets promoted before r61 need no step: the
+  first `solet doctor <name>` after the Manager reaches r61 reads the right
+  tree. Check: in `solet doctor <name> --json`, `data.seed_tree_verification.expected_tree_hash`
+  equals `git -C <target> rev-parse HEAD^{tree}`. If it still warns
+  `seed_tree_hash_mismatch` and `expected_tree_hash` is the promoted
+  release's tree, the checkout was moved by hand. Do not reset it. Run
+  `solet-manager update <name> --dry-run` and follow what it says.
+- **A freshly created solet no longer warns about the create's own edits.**
+  `seed_tree_verification` `tracked_tree_deviation` and
+  `doctor::release_identity_v1` `working_tree_dirty` no longer fire for the
+  five tracked files `solet create` edits on purpose: `AGENTS.md` and
+  `CLAUDE.md` (the hydration block), `root_manifest.yaml` (the solet name),
+  and the two coordination-hook manifests
+  `plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/hooks.json`
+  and `plugins/github_midwife_plugin/codex_plugin/coordination-hooks/hooks/hooks.json`
+  (the venv interpreter). Both checks list them under `accepted_manager_edits`
+  instead. The Manager records a digest of each file as its apply step
+  writes it. A later edit to one of those files, including a mode change such
+  as `chmod +x`, or any edit to another
+  tracked file, still warns and names the path. That is your edit, not the
+  Manager's. This covers solets created by an r61 or later Manager.
+  A solet created earlier has no such record, so it keeps warning about
+  those five files. If `git -C <target> diff --name-only` lists only
+  those five paths, that warning is expected and needs no action.
+- **`unrecognised_genesis_step_status` for `install_autostart=deferred` is
+  gone.** Genesis records `deferred` when the first boot waits for the
+  Core AI asset or the llama.cpp configuration. The later LaunchAgent step
+  installs autostart, and its own check grades that step. If this warning
+  still names another status, report it upstream.
+- **Two warnings remain and are expected on a healthy solet:**
+  `router_port_outside_expected_range` (it compares each colour's own
+  ephemeral port with the router's public port range) and
+  `offline_credential_copy_absent` (it looks for a Keychain account that
+  only the development checkout's offline tools read). Both are open
+  doctor defects. No action is needed.
+
 ## 2026-09-29 — r60: a newer Manager finishes an update an older one started
 
 **Solet Manager manager-v0.1.0-r60.** This is a full seed build for

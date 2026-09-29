@@ -38,8 +38,10 @@ you'd rather do it.
 
 ## Before you start
 
-- You need the Solet Manager installed: `brew install
-  solet-public/tap/solet`. Replace `<name>` with your solet's name and
+- You need the Solet Manager installed:
+  `HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet`.
+  If Python 3.13 is already installed, Homebrew prints a line saying so; that
+  is expected, and your Python is left as it is. Replace `<name>` with your solet's name and
   `<folder>` with the folder it lives in, throughout this guide.
 - **If you installed your solet with `solet create`** (the usual way),
   there is nothing to enroll: go straight to Step 1. The first update

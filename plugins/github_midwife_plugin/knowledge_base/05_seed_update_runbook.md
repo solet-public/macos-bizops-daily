@@ -37,15 +37,16 @@ the human notification channel that tells you to run that upgrade at all.
 Run the two commands together, in that order. The first, `brew tab
 --installed-on-request python@3.13`, changes only Homebrew's receipt flag for the
 shared `python@3.13`: it installs and upgrades nothing. It is needed because
-Homebrew currently keeps that Python only as this formula's dependency, and a later
-Manager release (planned as r61) stops depending on it; once that happens `brew autoremove`
-(which `brew upgrade` runs in its periodic cleanup) would delete the interpreter
-every solet `.venv` links. Marking it installed-on-request first makes that
-impossible. Running the flag command twice is harmless. This release still
-depends on `python@3.13`, so a bare `brew upgrade solet` loses nothing today;
-`solet-manager create` and `update` mark the flag themselves the next time they
-run, and `solet-manager doctor` warns with `python_not_installed_on_request`
-until then.
+a Manager installed before r61 left that Python recorded only as the formula's
+dependency, and from r61 the formula no longer depends on it, so `brew autoremove`
+(which `brew upgrade` runs in its periodic cleanup) would otherwise delete the
+interpreter every solet `.venv` links. Marking it installed-on-request first makes
+that impossible. Running the flag command twice is harmless. Do not rely on a
+bare `brew upgrade solet`: `solet-manager create` and `update` mark the flag
+themselves the next time they run, and `solet-manager doctor` warns with
+`python_not_installed_on_request` until then, but a bare upgrade whose periodic
+cleanup is due removes the Python before either runs. From r61 the Manager
+itself never upgrades `python@3.13`.
 
 **Subscribe to the seed repository's releases on GitHub**: **Watch → Custom
 → Releases** at the repository this clone was born from, not the default
@@ -151,7 +152,7 @@ or this `inspect`, and `solet update` / `solet import` refuse with a pointer to
 the `solet-manager` command. `solet inspect` is a different, active probe.
 
 ```bash
-brew install solet-public/tap/solet                       # once; for every later release run: brew tab --installed-on-request python@3.13 && brew upgrade solet
+HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet   # once; an 'already installed' line for python@3.13 is expected; for every later release run: brew tab --installed-on-request python@3.13 && brew upgrade solet
 solet-manager inspect --target <clone> --channel stable   # classify; exit 3 attention_required is the normal answer for a real clone
 solet-manager import <name> --target <clone> --channel stable --dry-run
 solet-manager import <name> --target <clone> --channel stable --yes --approval-fingerprint <fingerprint from the dry-run>

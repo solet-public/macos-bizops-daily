@@ -10,6 +10,7 @@ from .adapters import AdapterRegistry, OperationResult, invoke_adapter, resolve_
 from .completion_verifier import rebind_completion_probes, run_completion_probes
 from .config import CreateConfig
 from .contracts import ContractBundle
+from .create_applied_edits import record_applied_edits, tracked_edit_digests
 from .errors import OperationAttemptMismatch, StateConflictError
 from .flow import (
     PlannedOperation,
@@ -552,9 +553,22 @@ def _apply_operation(
         approval=applying.approval_fingerprint,
         attempt=attempt,
     )
+    target = Path(applying.target)
+    before = tracked_edit_digests(target, applying.seed.tree_hash)
     result = normalize_apply_result(
         invoke_adapter(registry, runner=operation.runner, request=request)
     )
+    if result.checkpoint_status is CheckpointStatus.APPLIED:
+        # iss_9cd4359a: the doctor accepts exactly the tracked bytes an approved apply left behind.
+        record_applied_edits(
+            paths,
+            name=applying.name,
+            target=applying.target,
+            create_operation_id=applying.operation_id,
+            operation_id=operation.operation_id,
+            before=before,
+            after=tracked_edit_digests(target, applying.seed.tree_hash),
+        )
     applied = _record_operation_result(
         applying,
         operation,
