@@ -163,6 +163,9 @@ class Knobs:
     knowledge_removal: bool = False
     journal_version: Literal[5, 4] = 5
     router: bool = False
+    #: The shipped bundle's own lifecycle strategy (``router_preferred``) with NO declared router: what every stable create has
+    #: (iss_6fd900ab).  The default seals ``single_color_required``, which routes around the router branch a real solet takes.
+    shipped_strategy: bool = False
     genesis_untracked: bool = True
     #: Extra ``(path, content)`` files the candidate ships (iss_f1d8cfc2: a changed coordination-hook manifest).
     candidate_files: tuple[tuple[str, str], ...] = ()
@@ -315,7 +318,7 @@ def assembled_seed() -> tuple[Path, str]:
 
 
 def _seed_key(knobs: Knobs) -> tuple[object, ...]:
-    return (knobs.git_metadata == "gitattributes_tracked_edit", knobs.router, knobs.knowledge_removal, knobs.overlap, knobs.untracked_collision, knobs.kb_addition is not None, knobs.candidate_files)
+    return (knobs.git_metadata == "gitattributes_tracked_edit", knobs.router, knobs.shipped_strategy, knobs.knowledge_removal, knobs.overlap, knobs.untracked_collision, knobs.kb_addition is not None, knobs.candidate_files)
 
 
 def _release_json(release: Release) -> dict[str, str]:
@@ -350,7 +353,13 @@ def sealed_source(knobs: Knobs) -> tuple[Path, Release, Release, dict[str, bytes
 
 
 def _seed_repository(source: Path, knobs: Knobs) -> tuple[Release, Release, dict[str, bytes], str]:
-    """Copy the assembled bundle into ``source``, seal r1, then seal the append-only r2 (section 3.2)."""
+    """Copy the assembled bundle into ``source``, seal r1, then seal the append-only r2 (section 3.2).
+
+    The r2 transition bundle declares the lifecycle strategy the knobs ask for.  A fixture that only stands in for a
+    router install (``router``) or for the shipped bundle on a solet with no router identity (``shipped_strategy``)
+    seals ``router_preferred``, which is what the real flow declares; every other fixture seals
+    ``single_color_required``, the strategy that routes around the router branch a real created solet takes.
+    """
     bundle, _ = assembled_seed()
     shutil.copytree(bundle, source, symlinks=True)
     git(source, "init", "--quiet", "-b", "main")
@@ -364,7 +373,7 @@ def _seed_repository(source: Path, knobs: Knobs) -> tuple[Release, Release, dict
     if knobs.git_metadata == "gitattributes_tracked_edit":
         baseline_files[".gitattributes"] = "* text=auto\n"
     baseline = seal(source, "a" * 40, "b" * 64, "r1", baseline_files)
-    strategy = "router_preferred" if knobs.router else "single_color_required"
+    strategy = "router_preferred" if knobs.router or knobs.shipped_strategy else "single_color_required"
     document = bundle_document(baseline, strategy=strategy, knowledge_removals=["github_midwife_plugin"] if knobs.knowledge_removal else None, operations=default_operations())
     files = bundle_files(document)
     contract = bundle_digest(files)

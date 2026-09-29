@@ -243,7 +243,8 @@ def _require_identity(record: InstanceInventoryRecordV2) -> None:
     except OSError as exc:
         raise ManagedIdentityDriftError("the enrolled target no longer exists", repair="Re-inspect the target; the enrolled path no longer names a directory.") from exc
     expected = record.target
-    same = (info.st_dev, info.st_ino) == (expected.filesystem_identity.device, expected.filesystem_identity.inode) and (parent.st_dev, parent.st_ino) == (expected.parent_filesystem_identity.device, expected.parent_filesystem_identity.inode)
+    # ``device`` is not compared: st_dev is renumbered across boots; the canonical path plus both inodes name the directory (iss_2ea57f17).
+    same = info.st_ino == expected.filesystem_identity.inode and parent.st_ino == expected.parent_filesystem_identity.inode
     if not same or target.is_symlink():
         raise ManagedIdentityDriftError("target filesystem identity differs from the enrolled record", repair="Re-inspect the target; the enrolled path no longer names the same directory.")
 

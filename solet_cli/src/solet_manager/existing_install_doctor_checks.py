@@ -101,7 +101,8 @@ def _enrollment_drift(probe: DoctorProbe) -> DiagnosticCheck:
     identity = probe.inspection.target_identity
     observed: dict[str, JsonValue] = {"canonical_display": str(identity.canonical_display), "device": identity.target_device, "inode": identity.target_inode}
     expected = cast(dict[str, JsonValue], cached.get("target_identity", {}))
-    same = expected.get("canonical_display") == observed["canonical_display"] and cast(dict[str, JsonValue], expected.get("filesystem_identity", {})) == {"device": identity.target_device, "inode": identity.target_inode}
+    # The cached ``device`` is not compared: st_dev is renumbered across boots (iss_2ea57f17).
+    same = expected.get("canonical_display") == observed["canonical_display"] and cast(dict[str, JsonValue], expected.get("filesystem_identity", {})).get("inode") == identity.target_inode
     return verdict("enrollment_drift", same, "Live target identity against the cached enrollment inspection.", "manager_static", reason="enrollment_identity_drift", observed=observed, expected=expected)
 
 

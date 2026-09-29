@@ -500,10 +500,12 @@ def _inspect(
 def _require_target_identity(result: ExistingInstallInspectionResult, record: InstanceInventoryRecordV2) -> None:
     observed = result.target_identity
     target = record.target
+    # The enrolled ``device`` is not compared: macOS renumbers a volume's st_dev across boots, and the canonical path
+    # plus the target's and its parent's inode already refuse a different directory (iss_2ea57f17).
     matches = (
         str(observed.canonical_display) == target.canonical_path
-        and (observed.target_device, observed.target_inode) == (target.filesystem_identity.device, target.filesystem_identity.inode)
-        and (observed.parent_device, observed.parent_inode) == (target.parent_filesystem_identity.device, target.parent_filesystem_identity.inode)
+        and observed.target_inode == target.filesystem_identity.inode
+        and observed.parent_inode == target.parent_filesystem_identity.inode
     )
     if not matches:
         raise ManagedIdentityDriftError(

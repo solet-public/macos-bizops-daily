@@ -162,7 +162,7 @@ def _assert_router_preview(fixture: Fixture, controller: FakeSeedController) -> 
     preview = preview_update_instance(fixture.request)
     _check(preview.status == "runtime_preview_ready", f"router preview ready: {preview.status} {preview.error_kind} {preview.data.get('blocked')} {preview.data.get('lifecycle')}")
     lifecycle = preview.data["lifecycle"]
-    _check(data(lifecycle, "strategy") == "router_cutover" and data(lifecycle, "zero_downtime_rollback") is True and data(lifecycle, "launch_topology") == "legacy_direct", "router strategy fixed at preview")
+    _check(data(lifecycle, "strategy") == "router_cutover" and data(lifecycle, "zero_downtime_rollback") is True and data(lifecycle, "launch_topology") == "materialized_supervisor", "router strategy fixed at preview on a materialized supervisor")
     receipt = data(lifecycle, "cutover_probe_receipt")
     _check(data(receipt, "probed") is True and data(receipt, "mutated") is False and data(receipt, "status") == "ok", "seed probe phase returned probed/mutated=false")
     _check(data(preview.data["runtime_baseline"], "attestation") is not None and data(data(preview.data["runtime_baseline"], "attestation"), "current_release_id") == BASELINE, "preview attestation names the runtime baseline")

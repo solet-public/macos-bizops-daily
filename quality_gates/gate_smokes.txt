@@ -5162,6 +5162,7 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/target_git_hardening_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/create_origin_blocked_create_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/hook_interpreter_pin_update_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_legacy_direct_runtime_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: quality_gates/tests/smoke_contract_lint_gate_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it calls checkout_only_consistency_violations directly to prove the repo-level contract-lint gate, which is in no capability bundle (fixture_build_tooling)
 # not shipped: ananta/tests/core/orchestration/selected_inference_startup_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin; absent from macos_free_minimal and macos_samantha, which ship default_inference_plugin instead (iss_76ae2d4d, cross_bundle_transition)
 # not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
@@ -5433,6 +5434,10 @@ ananta/tests/llm/session_ledger/embedding_token_budget_smoke.py
 # applies, promotes and stays pinned on the new tree, and the doctor admits it; an extra edit, another interpreter
 # or a symlinked alias still refuse executed_code_modified; a candidate changing a pinned manifest refuses with
 # "upgrade the Manager" (iss_c1a7df20); landing guard: either hooks.json changing fails until iss_c1a7df20 lands.
+# iss_6fd900ab, iss_2ea57f17 (r59): a solet created and enrolled the real way (real roster with the router plugin, the shipped
+# router_preferred strategy, a legacy_direct plist, an attest that raises) previews single_color_restart and promotes; a new st_dev
+# for the same inode keeps update and doctor working while another directory still refuses; a solet stopped at source_advanced on a
+# renumbered device finishes with the fixed Manager's preview and apply.
 # iss_59385149: the repo-level shipped-smoke checkout-only contract lint gate goes RED on a marker
 # without a contract entry, a contract entry without a manifest exclude, and a contract entry without
 # a marker; reproduces the exact three-file state that broke r50's publish (master 87796aab4); GREEN

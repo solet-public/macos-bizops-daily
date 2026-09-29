@@ -2,6 +2,40 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-29 — r59: `solet-manager update` finishes on a solet the Manager created
+
+**Solet Manager manager-v0.1.0-r59.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows once an update from stable r57 reaches `promoted` on a macOS 27 guest.
+
+- **`solet-manager update` now finishes on a solet that `solet create` made.**
+  Until now the update moved the clone to the new release and then stopped at
+  the runtime step with `lifecycle_strategy_unproven`, and no command could
+  finish it or undo it. A solet the Manager created is started directly by its
+  LaunchAgent, so it has no blue-green release to switch between and cannot
+  report a release identity for the router to check. The update now restarts that solet in
+  place, waits for its bridge to report healthy, and promotes it. A solet that
+  runs behind a router as a materialized release still switches over through
+  the router, as before.
+- **If an update stopped with `lifecycle_strategy_unproven`, upgrade the
+  Manager and run the update again.** Run `brew upgrade solet`, then
+  `solet-manager update <name> --dry-run`. The preview now shows the runtime
+  plan as `single_color_restart`. Apply it with `solet-manager update <name>
+  --yes --approval-fingerprint <the runtime fingerprint it prints>`. Nothing
+  has to be undone first, there is no new command, and a solet that has
+  restarted since the update stopped finishes the same way.
+- **Restarting the Mac no longer makes `update` and `doctor` refuse with
+  `managed_identity_drift`.** macOS can give a volume a different device
+  number after a reboot. The Manager recorded that number when it enrolled the
+  solet and compared it on every later run, so the same directory could look
+  like a different one. It now identifies the solet by its path and its
+  directory's inode, and ignores the recorded device number, so a solet
+  enrolled by an earlier Manager keeps working without being enrolled again. A
+  different directory at the same path is still refused. The same change stops
+  the Manager counting one solet twice, and refusing to register another solet,
+  after such a reboot.
+
 ## 2026-09-29 — r58: the update refreshes an existing solet's fleet launcher
 
 **Solet Manager manager-v0.1.0-r58.** This is a full seed build for

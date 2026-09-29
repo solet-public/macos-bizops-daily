@@ -676,6 +676,13 @@ def _truthful_row(paths: ManagerPaths, record: InstanceInventoryRecordV2, descri
     return replace(record, inspection_bundle_digest=digest, last_verified_operation_id=operation_id)
 
 
+def _target_path(root: Path, router: bool) -> Path:
+    """Where the fixture clone lives.  A router install launches as a materialized supervisor: its plist names ``releases/current``
+    (``derive_launch_topology``), and only that shape can attest, so router cutover applies to it and never to the direct launch
+    ``solet create`` writes (iss_6fd900ab)."""
+    return root / "releases" / "current" / "target" if router else root / "target"
+
+
 def build_fixture(root: Path, *, document: Callable[[Release], dict[str, Any]] | None = None, router: bool = False, roster: tuple[str, ...] = ("github_midwife_plugin",), legacy_plist: bool = True, host: FakeHost | None = None, extra_candidate_files: dict[str, str | bytes] | None = None, truthful: bool = False, at_candidate: bool = False, baseline_extra: dict[str, str | bytes] | None = None, candidate_removals: tuple[str, ...] = ()) -> Fixture:
     """``at_candidate=True`` (Step 6, F-ZD-1) clones the target already AT the candidate release and enrols it there."""
     root.mkdir(parents=True, exist_ok=True)
@@ -697,7 +704,7 @@ def build_fixture(root: Path, *, document: Callable[[Release], dict[str, Any]] |
     for removed in candidate_removals:
         (source / removed).unlink()
     candidate = seal(source, "c" * 40, "d" * 64, "r2", candidate_tree_files(files, extra=extra_candidate_files))
-    target = root / "target"
+    target = _target_path(root, router)
     _clone(source, target)
     enrolled = candidate if at_candidate else baseline
     git(target, "checkout", "--quiet", "-B", "main", enrolled.commit)

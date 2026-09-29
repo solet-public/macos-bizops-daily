@@ -44,6 +44,7 @@ from .existing_install_adapters import (
 from .existing_install_bundle import CLONE_EXCLUDE_DESTINATION, STAGE_ORDER, DependencyPiece, ManagedArtifact, RuntimeOperation
 from .host_platform import HostPlatform, HostPlatformError, read_host_platform
 from .launch_topology import (
+    LEGACY_DIRECT,
     SUPPORTED_TOPOLOGIES,
     derive_launch_topology,
     launchagent_plist_path,
@@ -851,6 +852,10 @@ def _lifecycle(context: PlanContext, artifact_states: tuple[ManagedArtifactState
     facts = _lifecycle_facts(context, artifact_states)
     if facts.raw_plist is None or facts.topology not in SUPPORTED_TOPOLOGIES:
         return facts.unproven(), 0
+    if facts.topology == LEGACY_DIRECT:
+        # A legacy_direct process is not behind a materialized release, so ``SOLET_RELEASE_ID`` is never set and it can
+        # never attest: router cutover is structurally unreachable for it, whatever the roster or the record say (iss_6fd900ab).
+        return _single_color_observation(context, facts)
     identity = context.record.service_identity
     roster = _selected_plugins(Path(context.record.target.canonical_path) / "profile" / "config" / "manifest.yaml")
     router_declared = identity.router_label is not None and identity.router_socket is not None

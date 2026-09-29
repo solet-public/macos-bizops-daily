@@ -119,10 +119,15 @@ def _v2_identity_keys(record: InstanceInventoryRecordV2) -> RegistryIdentityKeys
 def is_create_origin_alias(legacy: InstanceRecord, record: InstanceInventoryRecordV2) -> bool:
     """Coalesce only a complete create-origin identity, never mutable release fields."""
     keys = _v1_identity_keys(legacy)
+    recorded = _v2_identity_keys(record)
+    # The v1 row's identity is stat-ed live; the v2 row's ``device`` was pinned at enrollment and st_dev is renumbered
+    # across boots, so the inode alone joins the two (iss_2ea57f17).
     return (
         record.management_origin is ManagementOrigin.CREATE
         and keys.filesystem_identity is not None
-        and keys == _v2_identity_keys(record)
+        and recorded.filesystem_identity is not None
+        and keys.filesystem_identity[1] == recorded.filesystem_identity[1]
+        and replace(keys, filesystem_identity=None) == replace(recorded, filesystem_identity=None)
     )
 
 

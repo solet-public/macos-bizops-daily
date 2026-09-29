@@ -202,7 +202,18 @@ was written to the target. The doctor also answers `3` with
 it, with the full report still rendered. `1` — a required doctor check
 failed on evidence (the row names the reason). `2` — the target is not a
 Solet checkout at all (`target_identity_invalid`, an identity substituted
-under the enrolled path): stop and ask. A terminal update (`blocked`, `failed`) has one named answer:
+under the enrolled path): stop and ask. A clone that reboots onto a new device number is not drift: `update` and
+`doctor` prove the enrolled directory by its canonical path and the inode of
+the target and its parent, never by the recorded `st_dev`, so a different
+directory at that path is still `managed_identity_drift` and the same one is
+not. (`import` still binds the device number into the instance id it derives;
+that is tracked as `iss_d2fa8dbe`.) An update that stopped with `lifecycle_strategy_unproven` (the Manager
+before r59 stopped every created solet there, at `source_advanced`, with no
+verb to go on or back) needs no reconcile and no manual Part C: run
+`brew upgrade solet`, then `update <name> --dry-run` (the runtime plan is now
+`single_color_restart`) and `--yes --approval-fingerprint` with the runtime
+fingerprint it prints, and it finishes through the final doctor to
+`promoted`. A terminal update (`blocked`, `failed`) has one named answer:
 `solet-manager reconcile <name> --dry-run` plans the successor, `--yes
 --approval-fingerprint` mints it, `--abandon --yes` abandons or retires
 before the fast-forward, `--release-pointer --yes` releases a stale pointer.
@@ -232,9 +243,11 @@ the healthy state, not an error.
   `HOMUNCULUS_*` keys in `~/.claude.json` when no Claude Code process is
   running — while one runs it returns `blocked coding_agent_running` with
   "Quit Claude Code, then re-run --yes".
-- Step 4 restart and wait → `lifecycle.cutover` (router present) or
-  `lifecycle.restart_single_color`; readiness is `bridge_health_healthy`
-  within the bundle's budget. A release the old preflight cannot install is
+- Step 4 restart and wait → `lifecycle.restart_single_color` for a
+  `legacy_direct` LaunchAgent (every solet `solet create` makes, whether or
+  not the router plugin is on its roster) and `lifecycle.cutover` only for a
+  materialized supervisor release behind the router; readiness is
+  `bridge_health_healthy` within the bundle's budget. A release the old preflight cannot install is
   expressed by the candidate bundle declaring `single_color_required`; you
   no longer need to know that exception.
 - Step 4a export root → `migration_export_root_containment` propagates an
