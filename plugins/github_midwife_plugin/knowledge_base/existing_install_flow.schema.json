@@ -233,6 +233,11 @@
           "pattern": "rendered-from: \\{TEMPLATE_REF\\}@\\{TEMPLATE_DIGEST\\}"
         },
         "template_ref": {"type": "string", "pattern": "^plugins/github_midwife_plugin/knowledge_base/hydration_templates/[A-Za-z0-9_.-]+$"},
+        "section_end": {
+          "type": "string",
+          "pattern": "^[^\\n]+$",
+          "description": "A rendered_whole file the operator also writes into. Only the text above the first line that starts with this value is refreshed; everything from that line on is kept byte-for-byte."
+        },
         "template_digest": {"$ref": "#/definitions/digest"},
         "previous_template_digests": {
           "type": "array",

@@ -16,6 +16,8 @@ boundary when no runtime stage could run on this host, and
 
 from __future__ import annotations
 
+import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -23,8 +25,9 @@ from typing import cast
 from .errors import HostRequirementError, SourceTransitionIncompleteError, UpdateFailedError
 from .existing_install_inspection import ExistingInstallFacts
 from .host_software import host_checks, host_requirement_reason, host_section
-from .local_state import LocalStateDelta, ObservedLocalState, allowed_service_write, compare, observe_local_state, snapshot_from_journal
+from .local_state import LocalStateDelta, ObservedLocalState, allowed_service_write, compare, observe_entry, observe_local_state, snapshot_from_journal
 from .models import JsonValue
+from .target_git import run_target_git
 from .update_journal import DOCTOR_STATUSES
 from .update_runtime_plan import RuntimeSeams
 from .update_topology import LocalState
@@ -37,6 +40,8 @@ _SERVICE_WRITE_STATUSES = frozenset({"lifecycle_advanced", "runtime_reconciling"
 #: Row statuses between the first apply write and the journaled re-baseline: ``applying`` (the apply may have run
 #: before the crash) and ``applied`` (it did; the postcondition and the re-baseline were not yet recorded).
 _IN_FLIGHT_ROW_STATUSES = frozenset({"applying", "applied"})
+#: The clone's local ignore file, relative to the target: the one in-``.git`` path an operation may declare.
+CLONE_EXCLUDE_RELATIVE = ".git/info/exclude"
 
 
 def host_preflight(seams: RuntimeSeams, target: Path) -> dict[str, JsonValue]:
@@ -101,7 +106,8 @@ def verify_local_state(target: Path, facts: ExistingInstallFacts, journal: dict[
     # The crash window of section 6.6: an operation journaled in flight may already have written its declared
     # targets without the re-baseline having been recorded; those paths are the operation's pending re-baseline,
     # not a violation, and the executor journals them when the row verifies.
-    in_flight = in_flight_declared_targets(journal, target)
+    declared_in_flight = in_flight_declared_targets(journal, target)
+    in_flight = declared_in_flight | paths_ignored_by_declared_exclude(target, declared_in_flight, delta.hard, current, last_observed)
     _require_tracked_unchanged(current, observed, tuple(path for path in delta.tracked if path not in in_flight))
     allowance = cast(str, journal["status"]) in _SERVICE_WRITE_STATUSES
     additions = _service_write_additions(target, current, observed, tuple(path for path in delta.committed if path not in in_flight), allowance)
@@ -130,13 +136,13 @@ def _service_write_additions(target: Path, current: LocalState, observed: Observ
     return tuple(additions)
 
 
-def rebaseline_revision(journal: dict[str, JsonValue], observed: ObservedLocalState, last_observed: ObservedLocalState | None, operation_id: str, declared: frozenset[str], name: str) -> tuple[dict[str, JsonValue], dict[str, JsonValue]] | None:
+def rebaseline_revision(journal: dict[str, JsonValue], observed: ObservedLocalState, last_observed: ObservedLocalState | None, operation_id: str, declared: frozenset[str], name: str, target: Path) -> tuple[dict[str, JsonValue], dict[str, JsonValue]] | None:
     """Section 6.6, the per-operation carve-out: a hard-tier change outside the operation's declared targets is a
     ``preservation_violated`` failure; declared changes re-baseline ``current`` with a journaled revision; a
     preserved-surface change is disclosed.  Returns ``(revision, current)`` or ``None`` when nothing moved."""
     current = _current(journal)
     delta = compare(current, observed, last_observed)
-    undeclared = sorted(set(delta.hard) - declared)
+    undeclared = sorted(set(delta.hard) - declared - paths_ignored_by_declared_exclude(target, declared, delta.hard, current, last_observed))
     if undeclared:
         paths = ", ".join(undeclared)
         raise UpdateFailedError("preservation_violated", f"{operation_id} changed preserved local state outside its declared targets: {paths}", repair=f"Retain all evidence; {operation_id} wrote {paths} without declaring it; {REPAIR_RECONCILE_DRY_RUN.format(name=name)}")
@@ -149,6 +155,40 @@ def rebaseline_revision(journal: dict[str, JsonValue], observed: ObservedLocalSt
     else:
         revision = {"operation_id": operation_id, "preserved_surface_delta": list(delta.surface)}
     return revision, observed.snapshot()
+
+
+def paths_ignored_by_declared_exclude(target: Path, declared: frozenset[str], paths: Iterable[str], current: LocalState, previous: ObservedLocalState | None) -> frozenset[str]:
+    """The hard-tier paths an operation made ignored by declaring the clone's ignore file, and changed in no other way.
+
+    The committed tier inventories untracked files, so an ignore rule moves every file it covers out of that
+    inventory.  An operation that declared ``.git/info/exclude`` is allowed that one effect.  A path is admitted
+    only when both hold: its entry is exactly the pre-operation one (kind, mode and size from the journaled
+    inventory ``current``, and the per-entry digest when the in-process observation ``previous`` has it), and
+    ``git check-ignore -v`` names the clone's own ``.git/info/exclude`` as the source that ignores it.  A deleted,
+    truncated, rewritten or symlinked path, and one ignored by any other source, stays a violation.  On the resume
+    path (``previous`` is ``None``) the journal holds no per-entry digest, so a same-size content change cannot
+    be told apart from no change and is admitted.
+    """
+    if CLONE_EXCLUDE_RELATIVE not in declared:
+        return frozenset()
+    rows = {row[0]: row for row in current.committed_inventory}
+    digests = {} if previous is None else {entry.path: entry.digest for entry in previous.committed}
+    return frozenset(path for path in paths if _unchanged_since_journal(target, path, rows, digests) and _ignored_by_clone_exclude(target, path))
+
+
+def _unchanged_since_journal(target: Path, path: str, rows: dict[str, tuple[str, str, str, int]], digests: dict[str, str]) -> bool:
+    """The path still exists and reads exactly as the pre-operation row (and in-process digest, when there is one) recorded it."""
+    if path not in rows or not os.path.lexists(target / path):
+        return False
+    entry = observe_entry(target, path)
+    return entry.inventory() == rows[path] and digests.get(path, entry.digest) == entry.digest
+
+
+def _ignored_by_clone_exclude(target: Path, path: str) -> bool:
+    """``git check-ignore -v`` names the clone's own ``.git/info/exclude`` as the source that ignores ``path``."""
+    verbose = run_target_git(("-C", str(target), "check-ignore", "-v", "--", path))
+    sources = tuple(f"{root / CLONE_EXCLUDE_RELATIVE}:" for root in (target, target.resolve()))
+    return verbose.returncode == 0 and verbose.stdout.decode("utf-8", "surrogateescape").partition("\t")[0].startswith(sources)
 
 
 def in_flight_declared_targets(journal: dict[str, JsonValue], target: Path) -> frozenset[str]:

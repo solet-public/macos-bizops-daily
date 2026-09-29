@@ -41,7 +41,7 @@ from .existing_install_adapters import (
     run_ps,
     run_security_metadata,
 )
-from .existing_install_bundle import STAGE_ORDER, DependencyPiece, ManagedArtifact, RuntimeOperation
+from .existing_install_bundle import CLONE_EXCLUDE_DESTINATION, STAGE_ORDER, DependencyPiece, ManagedArtifact, RuntimeOperation
 from .host_platform import HostPlatform, HostPlatformError, read_host_platform
 from .launch_topology import (
     SUPPORTED_TOPOLOGIES,
@@ -63,6 +63,7 @@ from .models import (
 from .reconciliation_request import ReconciliationOutcome, build_reconciliation_envelope
 from .target_git import GitLayout, run_target_git
 from .update_candidate import UpdateCandidate
+from .update_clone_exclude import planned_exclude_covers
 
 __all__ = [
     "REQUIRED_DISTRIBUTIONS",
@@ -645,9 +646,9 @@ def _validate_destinations(context: PlanContext, blocked: list[tuple[str, str]])
         )
         resolved.append((artifact, destination))
         relative = _relative_to_target(destination, target)
-        if relative is None:
+        if relative is None or artifact.logical_destination == CLONE_EXCLUDE_DESTINATION:
             continue
-        if not _is_ignored(target, relative):
+        if not _is_ignored(target, relative) and not _planned_exclude_covers(context, relative):
             blocked.append((artifact.artifact_id, "in_target_destination_not_ignored"))
             continue
         if tree_paths is None:
@@ -656,6 +657,15 @@ def _validate_destinations(context: PlanContext, blocked: list[tuple[str, str]])
         if ancestors & tree_paths:
             blocked.append((artifact.artifact_id, "in_target_destination_tracked"))
     return tuple(resolved)
+
+
+def _planned_exclude_covers(context: PlanContext, relative: str) -> bool:
+    commit = context.candidate.fields.commit
+
+    def read(template_ref: str) -> str:
+        return _git(context.cache_repository, ("show", f"{commit}:{template_ref}"), "candidate clone-exclude template is unreadable", layout=context.cache_layout).decode("utf-8", "strict")
+
+    return planned_exclude_covers(context.candidate.bundle.managed_artifacts, read, relative)
 
 
 def _relative_to_target(destination: str, target: Path) -> str | None:

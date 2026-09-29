@@ -134,7 +134,7 @@ def _check_refresh_classes_match_disk_and_bundle() -> None:
     declared = {Path(row["template_ref"]).name for row in json.loads(_BUNDLE.read_text(encoding="utf-8"))["managed_artifacts"]}
     managed = {name for name, refresh_class in classes.items() if refresh_class == "managed"}
     _check("the `managed` rows are exactly the templates existing_install_flow.json declares", bool(declared) and managed == declared, f"managed-only={sorted(managed - declared)} declared-only={sorted(declared - managed)}")
-    _check("the fleet file is never `managed` while its destination is inside the clone", classes["fleet_functions.zsh.template"] == "operator-input-manual", f"fleet class: {classes['fleet_functions.zsh.template']}")
+    _check("the fleet file is `managed` only through the clone-exclude block that makes its destination ignored", classes["fleet_functions.zsh.template"] == "managed" and classes["clone_exclude_block.template"] == "managed", f"fleet class: {classes['fleet_functions.zsh.template']}, exclude class: {classes['clone_exclude_block.template']}")
 
 
 def _check_no_surviving_tokens(name: str, rendered: str) -> None:

@@ -51,6 +51,16 @@
       "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
       "manifest_sha256": "fbcd04c3abf4af903aebe0cb046ce15c455e1386486773accf9680aa4720f75a",
       "legacy_anchor_id": null
+    },
+    {
+      "repository": "https://github.com/solet-public/macos-bizops.git",
+      "commit": "8b3fe23d447e384541bd5a18a7d7090fa41ae5a6",
+      "tree": "cca735f8bc96613146587f17fddc03062fd52006",
+      "provenance_sha256": "b81551a3fecc4f47e1d49dd0a0b8959c363f5acbe2ac0828927f50722698e2d8",
+      "seed_id": "b3bd36fd-28b7-5b8c-98e5-05096d2b7748",
+      "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+      "manifest_sha256": "fbcd04c3abf4af903aebe0cb046ce15c455e1386486773accf9680aa4720f75a",
+      "legacy_anchor_id": null
     }
   ],
   "source_operation": {
@@ -226,6 +236,34 @@
       "template_digest": "sha256:dbe3ca27f4b9e7ba99ee9f3bf98c3bf2b8834642b0ec4760160cd600bf31a7d0",
       "previous_template_digests": [
         "sha256:cf5c4aa4e76627a3f2868fd33f58b0533e96a2d4c9de3a09175ec3c9269f3d11"
+      ]
+    },
+    {
+      "artifact_id": "clone_exclude_block",
+      "kind": "managed_block",
+      "logical_destination": "{TARGET}/.git/info/exclude",
+      "preservation_class": "operator_owned_with_managed_block",
+      "marker": {
+        "begin": "# BEGIN SOLET {NAME} v{TEMPLATE_DIGEST8}",
+        "end": "# END SOLET {NAME}"
+      },
+      "stamp": null,
+      "template_ref": "plugins/github_midwife_plugin/knowledge_base/hydration_templates/clone_exclude_block.template",
+      "template_digest": "sha256:d9e958361e2c5b8166725f7fbe4116b32c23f2c54981116a0cffbb635aeada46",
+      "previous_template_digests": []
+    },
+    {
+      "artifact_id": "fleet_launcher",
+      "kind": "rendered_whole",
+      "logical_destination": "{TARGET}/client/{NAME}-fleet.zsh",
+      "preservation_class": "operator_owned_with_managed_block",
+      "marker": null,
+      "stamp": "# rendered-from: {TEMPLATE_REF}@{TEMPLATE_DIGEST}",
+      "section_end": "# One function per role the operator chose in Step 4a.",
+      "template_ref": "plugins/github_midwife_plugin/knowledge_base/hydration_templates/fleet_functions.zsh.template",
+      "template_digest": "sha256:29dd71b6a903dae327725f027018863be7cac65d5bb3950179cd678b8dfa2b50",
+      "previous_template_digests": [
+        "sha256:fc0c8a250da87222f50d07a28003332073a76d495d5a70fe93dc33ea80655157"
       ]
     }
   ],

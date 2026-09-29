@@ -22,6 +22,7 @@ from .host_platform import HostPlatform
 from .models import JsonValue, OperationType
 
 __all__ = [
+    "CLONE_EXCLUDE_DESTINATION",
     "DECLARABLE_OPERATION_REFS",
     "EXISTING_OPERATIONS",
     "FLOW_ID",
@@ -95,6 +96,8 @@ _PRESERVED_NEVER_PREFIXES = (
     "{HOME}/.claude/projects/",
     "{HOME}/Library/Keychains/",
 )
+#: The one path inside ``.git/`` an artifact may name: the clone's local, never-committed ignore file.
+CLONE_EXCLUDE_DESTINATION = "{TARGET}/.git/info/exclude"
 _PRESERVED_NEVER_EXACT = frozenset(
     {
         "{TARGET}/AGENTS.md",
@@ -252,6 +255,8 @@ class ManagedArtifact:
     template_ref: str
     template_digest: str
     previous_template_digests: tuple[str, ...]
+    #: A ``rendered_whole`` file the operator also writes into: only the text above the first line starting with this is refreshed.
+    section_end: str | None = None
 
     @property
     def in_target(self) -> bool:
@@ -556,10 +561,12 @@ def _artifact(value: JsonValue) -> ManagedArtifact:
             "previous_template_digests",
         },
         "managed_artifact",
+        optional={"section_end"},
     )
     kind = _one_of(row["kind"], _ARTIFACT_KINDS, "managed_artifact.kind")
     destination = _destination(row)
-    preservation = _preservation(row, kind)
+    section_end = _section_end(row.get("section_end"), kind)
+    preservation = _preservation(row, kind, section_end)
     marker_begin, marker_end = _marker(row["marker"], kind)
     stamp = _stamp(row["stamp"], kind)
     template_ref = _text(row["template_ref"], "managed_artifact.template_ref")
@@ -578,6 +585,7 @@ def _artifact(value: JsonValue) -> ManagedArtifact:
         template_ref,
         _pattern(row["template_digest"], _DIGEST, "managed_artifact.template_digest"),
         previous,
+        section_end,
     )
 
 
@@ -585,18 +593,33 @@ def _destination(row: dict[str, JsonValue]) -> str:
     destination = _text(row["logical_destination"], "managed_artifact.logical_destination")
     if not destination.startswith(_DESTINATION_ROOTS) or "/../" in destination or destination.endswith("/"):
         raise ContractError(f"managed_artifact.logical_destination is not rooted at a closed template root: {destination!r}")
-    if destination in _PRESERVED_NEVER_EXACT or destination.startswith(_PRESERVED_NEVER_PREFIXES):
+    if destination != CLONE_EXCLUDE_DESTINATION and (destination in _PRESERVED_NEVER_EXACT or destination.startswith(_PRESERVED_NEVER_PREFIXES)):
         raise ContractError(f"managed_artifact destination is inside a preserved-never surface: {destination!r}")
+    if destination == CLONE_EXCLUDE_DESTINATION and row["kind"] != "managed_block":
+        raise ContractError("the clone ignore file may only carry a managed_block artifact")
     return destination
 
 
-def _preservation(row: dict[str, JsonValue], kind: str) -> str:
+def _section_end(value: JsonValue | None, kind: str) -> str | None:
+    if value is None:
+        return None
+    if kind != "rendered_whole":
+        raise ContractError("only a rendered_whole artifact declares a section_end")
+    text = _text(value, "managed_artifact.section_end")
+    if "\n" in text:
+        raise ContractError("managed_artifact.section_end must be one line")
+    return text
+
+
+def _preservation(row: dict[str, JsonValue], kind: str, section_end: str | None) -> str:
     preservation = _one_of(row["preservation_class"], _PRESERVATION_CLASSES, "managed_artifact.preservation_class")
     if preservation == "preserved_never":
         raise ContractError("a managed artifact cannot declare preservation_class preserved_never")
     if kind == "managed_block" and preservation != "operator_owned_with_managed_block":
         raise ContractError("a managed_block artifact must be operator_owned_with_managed_block")
-    if kind != "managed_block" and preservation != "manager_generated_whole":
+    if kind != "managed_block" and section_end is not None and preservation != "operator_owned_with_managed_block":
+        raise ContractError("a section-bounded artifact must be operator_owned_with_managed_block")
+    if kind != "managed_block" and section_end is None and preservation != "manager_generated_whole":
         raise ContractError("a whole-file artifact must be manager_generated_whole")
     return preservation
 

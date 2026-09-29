@@ -264,13 +264,17 @@ def _verdict(
         ("non-allowlisted cited-path findings in shipped markdown", citations),
         ("reserved-identity matches in shipped files", identity),
         ("folded identity classification anchor drift", report.identity_anchor_violations),
+        ("minting-identity markers in shipped files", report.operator_identity),
         ("tolerated-debt baseline drift", drift),
         ("cited-path findings in root instruction docs", root_instruction_findings),
     ):
         if lines:
             _print_findings(header, lines)
 
-    if any((citations, identity, report.identity_anchor_violations, drift, root_instruction_findings)):
+    if any((
+        citations, identity, report.identity_anchor_violations, report.operator_identity,
+        drift, root_instruction_findings,
+    )):
         return EXIT_BLOCKING
     print("✅ shipped_doc_gate: no blocking findings; tolerated debt at declared baseline")
     return EXIT_OK

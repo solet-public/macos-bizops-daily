@@ -195,6 +195,8 @@ def _inputs(runtime: FakeRuntime, target: Path, *ids: str) -> dict[str, Any]:
         "shell_startup_block": str(runtime.home / ".zshrc"),
         "user_claude_md_section": str(runtime.home / ".claude" / "CLAUDE.md"),
         "feedback_skill": str(runtime.home / ".claude" / "skills" / "feedback" / "SKILL.md"),
+        "clone_exclude_block": str(target / ".git" / "info" / "exclude"),
+        "fleet_launcher": str(target / "client" / f"{_NAME}-fleet.zsh"),
     }
     return {"artifact_ids": list(ids), "planned_destinations": [f"{item}={destinations[item]}" for item in ids]}
 
@@ -447,6 +449,179 @@ def _check_skill_edited_is_left(target: Path, runtime: FakeRuntime, skill: Path,
         _check((applied["checkpoint_status"], skill.read_text(), len(runtime.writes)) == ("applied", edited, writes), f"{label}: left byte-for-byte")
 
 
+_FLEET_TEMPLATE = "fleet_functions.zsh.template"
+_FLEET_REF = f"plugins/github_midwife_plugin/knowledge_base/hydration_templates/{_FLEET_TEMPLATE}"
+_FLEET_STAMP = "# rendered-from: {TEMPLATE_REF}@{TEMPLATE_DIGEST}"
+_FLEET_MARKER = "# One function per role the operator chose in Step 4a."
+_R56_FLEET = _PLUGIN_ROOT / "tests" / "fixtures" / "hydration_predecessors" / "fleet_functions_r56.fixture"
+_EXCLUDE_TEMPLATE = "clone_exclude_block.template"
+_ROLE_FUNCTIONS = "\nclaude-iris-lead() { _claude_for_iris Lead }\nclaude-iris-restart-lead() {\n  tmux kill-session -t =Lead 2>/dev/null\n  _claude_for_iris Lead\n}\n"
+
+
+def _fleet_artifact(previous: list[str]) -> dict[str, Any]:
+    """The record the shipped bundle must declare for the fleet launcher: refreshed above the role-function line only."""
+    return {"artifact_id": "fleet_launcher", "kind": "rendered_whole", "logical_destination": "{TARGET}/client/{NAME}-fleet.zsh", "preservation_class": "operator_owned_with_managed_block", "marker": None, "stamp": _FLEET_STAMP, "section_end": _FLEET_MARKER, "template_ref": _FLEET_REF, "template_digest": _digest(_FLEET_TEMPLATE), "previous_template_digests": previous}
+
+
+def _exclude_artifact() -> dict[str, Any]:
+    """The record the shipped bundle must declare for the clone's local ignore file."""
+    return {"artifact_id": "clone_exclude_block", "kind": "managed_block", "logical_destination": "{TARGET}/.git/info/exclude", "preservation_class": "operator_owned_with_managed_block", "marker": {"begin": "# BEGIN SOLET {NAME} v{TEMPLATE_DIGEST8}", "end": "# END SOLET {NAME}"}, "stamp": None, "template_ref": f"plugins/github_midwife_plugin/knowledge_base/hydration_templates/{_EXCLUDE_TEMPLATE}", "template_digest": _digest(_EXCLUDE_TEMPLATE), "previous_template_digests": []}
+
+
+def _fleet_render(template: bytes, digest: str | None, controller: str) -> str:
+    """The fleet file as hydration renders it: tokens replaced literally, the stamp first when ``digest`` is given."""
+    body = template.decode("utf-8").replace("{{SOLET_NAME}}", _NAME).replace("{{GIT_CONTROLLER_NAME}}", controller)
+    if digest is None:
+        return body
+    return _FLEET_STAMP.replace("{TEMPLATE_REF}", _FLEET_REF).replace("{TEMPLATE_DIGEST}", digest) + "\n" + body
+
+
+def _refreshed(candidate: str, original: str) -> str:
+    """What a refresh must produce: the candidate's launcher section, then the installed file from the marker line on, untouched."""
+    return candidate.partition(_FLEET_MARKER)[0] + _FLEET_MARKER + original.partition(_FLEET_MARKER)[2]
+
+
+def _fleet_target(root: Path) -> Path:
+    """A Git target whose predecessor commit carries the real r56 fleet template and whose candidate declares both shipped in-clone artifacts."""
+    target = root / "target"
+    templates = target / "plugins/github_midwife_plugin/knowledge_base/hydration_templates"
+    templates.mkdir(parents=True)
+    _git(target, "init", "--quiet", "-b", "main")
+    _git(target, "config", "user.name", "Fixture")
+    _git(target, "config", "user.email", "fixture@example.invalid")
+    (templates / _FLEET_TEMPLATE).write_bytes(_R56_FLEET.read_bytes())
+    _git(target, "add", "-A")
+    _git(target, "commit", "--quiet", "-m", "predecessor")
+    predecessor = _git(target, "rev-parse", "HEAD")
+    for name in (_FLEET_TEMPLATE, _EXCLUDE_TEMPLATE):
+        (templates / name).write_bytes((_TEMPLATES / name).read_bytes())
+    bundle = _bundle(predecessor, artifacts=[_exclude_artifact(), _fleet_artifact([sha256_bytes(_R56_FLEET.read_bytes())])])
+    (target / "plugins/github_midwife_plugin/knowledge_base/existing_install_flow.json").write_text(json.dumps(bundle, indent=2))
+    _git(target, "add", "-A")
+    _git(target, "commit", "--quiet", "-m", "candidate")
+    return target
+
+
+def _check_fleet_declared() -> None:
+    """The shipped bundle declares the exclude block first and the fleet launcher with the r56 digest as its predecessor."""
+    rows = json.loads((_KB / "existing_install_flow.json").read_text())["managed_artifacts"]
+    shipped = {row["artifact_id"]: row for row in rows}
+    _check(shipped.get("clone_exclude_block") == _exclude_artifact(), "declared record: the clone's local ignore file as a managed block")
+    _check(shipped.get("fleet_launcher") == _fleet_artifact([sha256_bytes(_R56_FLEET.read_bytes())]), "declared record: the fleet launcher, refreshed above the role-function line, r56 digest as previous")
+    _check([row["artifact_id"] for row in rows].index("clone_exclude_block") < [row["artifact_id"] for row in rows].index("fleet_launcher"), "the exclude block is written before the file it ignores")
+    _check(b"_tmux_host_for_" not in _R56_FLEET.read_bytes() and b"_tmux_host_for_" in (_TEMPLATES / _FLEET_TEMPLATE).read_bytes(), "the r56 fixture is the launcher without tmux hosting and the shipped template is not")
+    _check((_R56_FLEET.read_bytes().count(_FLEET_MARKER.encode()), (_TEMPLATES / _FLEET_TEMPLATE).read_bytes().count(_FLEET_MARKER.encode())) == (1, 1), "the section marker occurs once in the r56 and the shipped template")
+
+
+def _check_fleet_refresh(root: Path) -> None:
+    target = _fleet_target(root)
+    runtime = FakeRuntime(root / "home")
+    fleet = target / "client" / f"{_NAME}-fleet.zsh"
+    ref = "existing::hydration.reconcile"
+    current, previous = (_TEMPLATES / _FLEET_TEMPLATE).read_bytes(), _R56_FLEET.read_bytes()
+    absent = _probe(target, runtime, ref, "fleet_launcher")
+    row = _state(absent, "fleet_launcher")
+    _check((absent["checkpoint_status"], row["state"], row["action"], row["conflict"]) == ("verified", "absent", "none", "none"), "no fleet file: reported absent, no action, no conflict")
+    writes = len(runtime.writes)
+    _apply(target, runtime, ref, "fleet_launcher")
+    _check((fleet.exists(), len(runtime.writes)) == (False, writes), "no fleet file: apply creates nothing")
+    _check_fleet_legacy_replaced(target, runtime, fleet, ref, current, previous)
+    _check_fleet_stamped_previous(target, runtime, fleet, ref, current, previous)
+    _check_fleet_edited_is_left(target, runtime, fleet, ref, current, previous)
+
+
+def _check_fleet_legacy_replaced(target: Path, runtime: FakeRuntime, fleet: Path, ref: str, current: bytes, previous: bytes) -> None:
+    fleet.parent.mkdir(parents=True)
+    original = _fleet_render(previous, None, "Lead-Git") + _ROLE_FUNCTIONS
+    fleet.write_text(original)
+    fleet.chmod(0o640)
+    controller_line = '  GIT_CONTROLLER_NAME="Lead-Git" \\'
+    _check(controller_line in original.splitlines() and "_tmux_host_for_" not in original, "fixture: the installed r56 launcher has the operator's controller and role functions but no tmux hosting")
+    probe = _probe(target, runtime, ref, "fleet_launcher")
+    row = _state(probe, "fleet_launcher")
+    _check((probe["checkpoint_status"], row["state"], row["action"], row["conflict"]) == ("pending", "legacy_matched", "render_whole", "none"), "an r56 launcher with custom role functions is recognised as the previous render")
+    _check([(action["id"], action["target"]) for action in probe["planned_actions"]] == [("hydrate.fleet_launcher", str(fleet))], "the dry-run plan names the fleet file write")
+    _check(fleet.read_text() == original, "probe writes nothing")
+    _check(_apply(target, runtime, ref, "fleet_launcher")["checkpoint_status"] == "applied", "apply succeeds")
+    refreshed = fleet.read_text()
+    _check(refreshed == _refreshed(_fleet_render(current, _digest(_FLEET_TEMPLATE), "Lead-Git"), original), "the launcher section is the stamped candidate render, the operator's tail is unchanged")
+    _check(refreshed.count(_FLEET_MARKER) == 1 and refreshed.partition(_FLEET_MARKER)[2] == original.partition(_FLEET_MARKER)[2], "role functions and everything below the marker are byte-identical")
+    _check(controller_line in refreshed.splitlines() and "_tmux_host_for_iris" in refreshed, "the operator's GIT_CONTROLLER_NAME line is unchanged and the launcher now hosts each role in tmux")
+    _check(fleet.stat().st_mode & 0o777 == 0o640, "the file mode survives the refresh")
+    again = _probe(target, runtime, ref, "fleet_launcher", purpose="post_apply")
+    _check((again["checkpoint_status"], _state(again, "fleet_launcher")["state"], _state(again, "fleet_launcher")["expected_sha256"]) == ("verified", "stamped_current", sha256_bytes(refreshed.encode())), "post-apply the launcher reads back as stamped current")
+    writes = len(runtime.writes)
+    _apply(target, runtime, ref, "fleet_launcher")
+    _check((fleet.read_text(), len(runtime.writes)) == (refreshed, writes), "a second update rewrites nothing")
+
+
+def _check_fleet_stamped_previous(target: Path, runtime: FakeRuntime, fleet: Path, ref: str, current: bytes, previous: bytes) -> None:
+    previous_digest = sha256_bytes(previous)
+    original = _fleet_render(previous, previous_digest, "Git-Controller") + _ROLE_FUNCTIONS
+    fleet.write_text(original)
+    row = _state(_probe(target, runtime, ref, "fleet_launcher"), "fleet_launcher")
+    _check((row["state"], row["action"], row["stamped_digest"]) == ("stamped_previous", "render_whole", previous_digest), "a launcher stamped with the r56 digest is a previous render")
+    _apply(target, runtime, ref, "fleet_launcher")
+    _check(fleet.read_text() == _refreshed(_fleet_render(current, _digest(_FLEET_TEMPLATE), "Git-Controller"), original), "a stamped previous launcher is replaced above the marker only")
+    solo = _fleet_render(previous, None, "") + _ROLE_FUNCTIONS
+    fleet.write_text(solo)
+    _check(_state(_probe(target, runtime, ref, "fleet_launcher"), "fleet_launcher")["state"] == "legacy_matched", "a blank controller choice is kept as chosen and still matches")
+
+
+def _check_fleet_edited_is_left(target: Path, runtime: FakeRuntime, fleet: Path, ref: str, current: bytes, previous: bytes) -> None:
+    """An edited launcher section is reported and left byte-for-byte; it never blocks the update."""
+    r56_text = _fleet_render(previous, None, "Lead-Git")
+    current_text = _fleet_render(current, _digest(_FLEET_TEMPLATE), "Lead-Git")
+    for label, edited, expected in (
+        ("unstamped edit of the r56 launcher section", r56_text.replace("_claude_for_iris() {", "export MY_EDIT=1\n_claude_for_iris() {", 1) + _ROLE_FUNCTIONS, "unknown_origin"),
+        ("stamped edit of the current launcher section", current_text.replace("_claude_for_iris() {", "export MY_EDIT=1\n_claude_for_iris() {", 1) + _ROLE_FUNCTIONS, "locally_modified"),
+        ("launcher whose marker line was deleted", r56_text.replace(_FLEET_MARKER, "# roles") + _ROLE_FUNCTIONS, "unknown_origin"),
+        ("launcher whose controller line was deleted", "\n".join(line for line in r56_text.splitlines() if "GIT_CONTROLLER_NAME=" not in line) + "\n" + _ROLE_FUNCTIONS, "unknown_origin"),
+    ):
+        fleet.write_text(edited)
+        writes = len(runtime.writes)
+        probe = _probe(target, runtime, ref, "fleet_launcher")
+        row = _state(probe, "fleet_launcher")
+        _check((probe["checkpoint_status"], row["state"], row["action"], row["conflict"]) == ("verified", expected, "none", "none"), f"{label}: reported as {expected}, no action, no conflict")
+        applied = _apply(target, runtime, ref, "fleet_launcher")
+        _check((applied["checkpoint_status"], fleet.read_text(), len(runtime.writes)) == ("applied", edited, writes), f"{label}: left byte-for-byte")
+    doubled = _ROLE_FUNCTIONS + _FLEET_MARKER + "\n# a copied marker inside the operator's own functions\n"
+    _check(ops._split_section(current_text + doubled, _FLEET_MARKER) == (current_text.partition(_FLEET_MARKER)[0], _FLEET_MARKER + current_text.partition(_FLEET_MARKER)[2] + doubled), "a duplicated marker splits at its first occurrence")  # noqa: SLF001
+    fleet.write_text(r56_text + doubled)
+    _apply(target, runtime, ref, "fleet_launcher")
+    _check(fleet.read_text() == _refreshed(current_text, r56_text + doubled), "a marker copied into the role functions is kept with them, byte-for-byte")
+    tail_only = current_text + _ROLE_FUNCTIONS + "alias extra='echo more'\n"
+    fleet.write_text(tail_only)
+    row = _state(_probe(target, runtime, ref, "fleet_launcher"), "fleet_launcher")
+    _check((row["state"], row["action"]) == ("stamped_current", "none"), "operator additions below the marker never make the section stale")
+
+
+def _check_clone_exclude(root: Path) -> None:
+    """The local ignore file gains one versioned block, keeps every other line, and then ignores the client directory."""
+    target = _fleet_target(root)
+    runtime = FakeRuntime(root / "home")
+    ref = "existing::hydration.reconcile"
+    exclude = target / ".git" / "info" / "exclude"
+    original = exclude.read_text()
+    _check(subprocess.run(("git", "-C", str(target), "check-ignore", "-q", "--no-index", "--", f"client/{_NAME}-fleet.zsh"), env=_ENV, check=False).returncode == 1, "fixture: the clone does not ignore client/")
+    probe = _probe(target, runtime, ref, "clone_exclude_block")
+    row = _state(probe, "clone_exclude_block")
+    _check((probe["checkpoint_status"], row["state"], row["action"]) == ("pending", "absent", "append_block"), "no block: the plan appends one")
+    _check([(action["id"], action["target"]) for action in probe["planned_actions"]] == [("hydrate.clone_exclude_block", str(exclude))], "the dry-run plan names the ignore file write")
+    _check(exclude.read_text() == original, "probe writes nothing")
+    _apply(target, runtime, ref, "clone_exclude_block")
+    written = exclude.read_text()
+    begin, end = marker_lines("# BEGIN SOLET {NAME} v{TEMPLATE_DIGEST8}", "# END SOLET {NAME}", _NAME, _digest(_EXCLUDE_TEMPLATE))
+    _check(written.startswith(original) and f"{begin}\n" in written and "\nclient/\n" in written and written.rstrip("\n").endswith(end), "the block is appended under the versioned marker and the existing lines are untouched")
+    _check(subprocess.run(("git", "-C", str(target), "check-ignore", "-q", "--no-index", "--", f"client/{_NAME}-fleet.zsh"), env=_ENV, check=False).returncode == 0, "the clone now ignores the fleet file")
+    again = _probe(target, runtime, ref, "clone_exclude_block", purpose="post_apply")
+    _check((again["checkpoint_status"], _state(again, "clone_exclude_block")["state"]) == ("verified", "stamped_current"), "post-apply the block reads back as stamped current")
+    writes = len(runtime.writes)
+    exclude.write_text(written + "profile/local/\n")
+    _apply(target, runtime, ref, "clone_exclude_block")
+    _check((exclude.read_text(), len(runtime.writes)) == (written + "profile/local/\n", writes), "an operator line after the block survives and a second update rewrites nothing")
+
+
 def _check_rename_migration(root: Path) -> None:
     target, _ = _target(root)
     runtime = FakeRuntime(root / "home")
@@ -601,6 +776,9 @@ def main() -> int:
         _check_whole_file_and_plist(root / "whole")
         _check_feedback_skill_declared()
         _check_feedback_skill_refresh(root / "skill")
+        _check_fleet_declared()
+        _check_fleet_refresh(root / "fleet")
+        _check_clone_exclude(root / "exclude")
         _check_rename_migration(root / "rename")
         _check_export_root_and_cache(root / "export")
         _check_dependency_route(root / "route")

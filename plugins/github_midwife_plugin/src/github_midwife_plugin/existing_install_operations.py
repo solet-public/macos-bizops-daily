@@ -19,12 +19,15 @@ conflict, never a side to pick.  The one exception is a ``rendered_whole``
 file (a user-scope file such as the ``/feedback`` skill): it is only ever
 refreshed, so a missing one is not created and an edited one is reported in its
 state row (``locally_modified`` or ``unknown_origin``) and left in place without
-blocking the update.
+blocking the update.  A ``rendered_whole`` file that declares a ``section_end``
+(the fleet launcher, which also holds the operator's own role functions) is
+refreshed above that line only.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -122,6 +125,7 @@ class ArtifactDeclaration:
     template_ref: str
     template_digest: str
     previous_template_digests: tuple[str, ...]
+    section_end: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,6 +307,8 @@ def _full_digest(match: BlockMatch, artifact: ArtifactDeclaration) -> str:
 
 
 def _whole_file_state(artifact: ArtifactDeclaration, destination: str, existing: str | None, mode: int, context: _Context) -> ArtifactState:
+    if artifact.section_end is not None:
+        return _section_state(artifact, destination, existing, mode, context)
     outcome = _Outcome(artifact, destination, existing, mode)
     candidate = _whole_render(artifact, _template_bytes(context.request.target, artifact.template_ref), artifact.template_digest, context, stamped=True)
     if existing is None:
@@ -313,6 +319,68 @@ def _whole_file_state(artifact: ArtifactDeclaration, destination: str, existing:
     if stamped is not None:
         return _stamped_whole_state(outcome, existing, stamped, candidate, context)
     return _unstamped_whole_state(outcome, existing, candidate, context)
+
+
+_CONTROLLER_LINE = re.compile(r'^[ \t]*GIT_CONTROLLER_NAME="([^"\n]*)" \\$', re.MULTILINE)
+
+
+def _section_state(artifact: ArtifactDeclaration, destination: str, existing: str | None, mode: int, context: _Context) -> ArtifactState:
+    """Refresh only the launcher section of a file the operator also writes into.
+
+    The section is the text above the first line starting with ``section_end``; the operator's role functions
+    below it are kept byte-for-byte.  The one operator-chosen value inside the section, the ``GIT_CONTROLLER_NAME``
+    line, is read from the file and rendered back unchanged, so a section that differs from a known render only
+    in that value still matches it.  A missing file is not created; a section that matches no known render, or
+    that has lost its marker or its controller line, is reported and left in place without blocking the update.
+    """
+    outcome = _Outcome(artifact, destination, existing, mode)
+    if existing is None:
+        return outcome.state("absent", "none", None, None, None)
+    split = _split_section(existing, cast(str, artifact.section_end))
+    controller = None if split is None else _CONTROLLER_LINE.search(split[0])
+    if split is None or controller is None:
+        return outcome.state("unknown_origin", "none", None, None, None)
+    head, tail = split
+    values = {"{{GIT_CONTROLLER_NAME}}": controller.group(1)}
+    candidate_head = _render_section(artifact, _template_bytes(context.request.target, artifact.template_ref), artifact.template_digest, context, values, stamped=True)
+    if candidate_head is None:
+        raise RuntimeError(f"{artifact.artifact_id}: the candidate template has no line starting {artifact.section_end!r}")
+    if head == candidate_head:
+        return outcome.state("stamped_current", "none", artifact.template_digest, None, None)
+    return _older_section_state(outcome, head, candidate_head + tail, values, context)
+
+
+def _older_section_state(outcome: _Outcome, head: str, refreshed: str, values: dict[str, str], context: _Context) -> ArtifactState:
+    """A section that is not the candidate's: a previous render is replaced, anything else is reported and left."""
+    artifact = outcome.artifact
+    stamped = stamped_digest(head, cast(str, artifact.stamp), artifact.template_ref)
+    if stamped is not None:
+        previous = _template_bytes_by_digest(artifact, stamped, context)
+        if previous is not None and head == _render_section(artifact, previous, stamped, context, values, stamped=True):
+            return outcome.state("stamped_previous", "render_whole", stamped, None, refreshed)
+        return outcome.state("locally_modified", "none", stamped, None, None)
+    for digest in (*artifact.previous_template_digests, artifact.template_digest):
+        previous = _template_bytes_by_digest(artifact, digest, context)
+        if previous is not None and head == _render_section(artifact, previous, digest, context, values, stamped=False):
+            return outcome.state("legacy_matched", "render_whole", None, None, refreshed)
+    return outcome.state("unknown_origin", "none", None, None, None)
+
+
+def _render_section(artifact: ArtifactDeclaration, template_bytes: bytes, digest: str, context: _Context, values: dict[str, str], *, stamped: bool) -> str | None:
+    """The launcher section of one render of the template, or ``None`` when that template has no section marker."""
+    rendered = _whole_render(artifact, template_bytes, digest, context, stamped=stamped, extra_values=values)
+    part = _split_section(rendered, cast(str, artifact.section_end))
+    return None if part is None else part[0]
+
+
+def _split_section(text: str, section_end: str) -> tuple[str, str] | None:
+    """``(refreshed section, kept remainder)``, split before the first line that starts with ``section_end``."""
+    offset = 0
+    for line in text.split("\n"):
+        if line.startswith(section_end):
+            return text[:offset], text[offset:]
+        offset += len(line) + 1
+    return None
 
 
 def _absent_whole_state(outcome: _Outcome, candidate: str) -> ArtifactState:
@@ -344,12 +412,12 @@ def _edit_conflict(artifact: ArtifactDeclaration, reason: str) -> str | None:
     return None if artifact.kind == "rendered_whole" else reason
 
 
-def _whole_render(artifact: ArtifactDeclaration, template_bytes: bytes, digest: str, context: _Context, *, stamped: bool) -> str:
+def _whole_render(artifact: ArtifactDeclaration, template_bytes: bytes, digest: str, context: _Context, *, stamped: bool, extra_values: dict[str, str] | None = None) -> str:
     request = context.request
     if artifact.kind == "launchd_plist":
         stamp = stamp_line(cast(str, artifact.stamp), artifact.template_ref, digest) if stamped else None
         return render_launchagent_plist(request.name, request.target, context.runtime.home, template_text=template_bytes.decode("utf-8"), stamp=stamp, stamped=stamped).decode("utf-8")
-    body = render_tokens(template_bytes.decode("utf-8"), _values(request))
+    body = render_tokens(template_bytes.decode("utf-8"), {**_values(request), **(extra_values or {})})
     if not stamped:
         return body
     return insert_stamp(body, stamp_line(cast(str, artifact.stamp), artifact.template_ref, digest), after_line=_stamp_position(body))
@@ -442,6 +510,7 @@ def _artifacts(bundle: JsonObject) -> list[ArtifactDeclaration]:
                 str(row["template_ref"]),
                 str(row["template_digest"]),
                 tuple(cast(list[str], row["previous_template_digests"])),
+                cast(str | None, row.get("section_end")),
             )
         )
     return rows

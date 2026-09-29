@@ -46,7 +46,7 @@ A launcher must not `exec claude` in whatever terminal it was typed into. Headle
 
 To reach a running role: `tmux attach -t =<role>` (the `=` makes the match exact); `tmux ls` lists them; `C-b d` detaches and leaves the session running. The fleet environment knobs (`<solet>_FLEET_SKIP_PERMISSIONS`, `_FLEET_MCP_CHANNELS`, `_FLEET_TRANSPORT`) are forwarded into the new pane with `tmux -e`, because a tmux server that is already running does not inherit them from the launching shell. tmux itself is installed by the setup flow's `setup::tmux.install` (Homebrew `tmux`).
 
-A solet hydrated before the tmux host existed still has the old launcher in `<clone>/client/<solet>-fleet.zsh`. That file is a rendered copy, not part of `~/.zshrc` and not a Manager-managed artifact, so an update does not change it: follow the seed update runbook's Part C Step 5, "Exact re-render of the fleet file", which replaces the launcher functions and keeps your role functions and your Git-Controller choice.
+A solet hydrated before the tmux host existed still has the old launcher in `<clone>/client/<solet>-fleet.zsh`. That file is a rendered copy that also holds your own role functions. `solet-manager update` replaces its launcher section, the text above the line `# One function per role the operator chose in Step 4a.`, and keeps your role functions and your Git-Controller choice byte-for-byte. The preview lists the change, and the update keeps a copy of the file first. A launcher section you edited is left as it is and the preview says so; for that case, or when you update by hand, follow the seed update runbook's Part C Step 5, "Exact re-render of the fleet file", which does the same replacement.
 
 ## Model and effort
 

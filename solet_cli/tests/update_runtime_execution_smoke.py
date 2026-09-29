@@ -44,8 +44,10 @@ seams.  Legs:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, cast
@@ -68,11 +70,15 @@ from _step5_support import (  # noqa: E402
     runtime_fingerprint,
     template_bytes,
 )
+from _step6_support import SimulatedCrash  # noqa: E402
+from solet_manager import update_execution as execution_module  # noqa: E402
 from solet_manager import update_runtime_execution as executor  # noqa: E402
 from solet_manager.errors import ProbeDriftError, UpdateBlockedError, UpdateFailedError  # noqa: E402
+from solet_manager.local_state import observe_local_state  # noqa: E402
 from solet_manager.managed_artifact_backup import backup_root, file_sha256  # noqa: E402
 from solet_manager.models import ManagementState, ReleaseIdentity  # noqa: E402
 from solet_manager.update_execution import apply_update, preview_update_instance  # noqa: E402
+from solet_manager.update_local_state import CLONE_EXCLUDE_RELATIVE, paths_ignored_by_declared_exclude, rebaseline_revision  # noqa: E402
 from solet_manager.update_runtime_plan import STEP5_CAPABILITIES, STEP5_MANAGED_SUB_SURFACES, STEP5_NON_TOUCH_SURFACES  # noqa: E402
 
 _CHECKS = 0
@@ -432,6 +438,211 @@ def _assert_edited_skill_left_alone(root: Path, edited: str) -> None:
     _check(not (root_backup / "feedback_skill").exists(), "an untouched skill takes no backup")
 
 
+_FLEET_TEMPLATE = "fleet_functions.zsh.template"
+_EXCLUDE_TEMPLATE = "clone_exclude_block.template"
+_FLEET_MARKER = "# One function per role the operator chose in Step 4a."
+_R56_FLEET = _ROOT / "plugins/github_midwife_plugin/tests/fixtures/hydration_predecessors/fleet_functions_r56.fixture"
+_ROLES = "\nclaude-fixture-lead() { _claude_for_fixture Lead }\nclaude-fixture-restart-lead() {\n  tmux kill-session -t =Lead 2>/dev/null\n  _claude_for_fixture Lead\n}\n"
+
+
+#: The other untracked files every genesis-born clone keeps under ``client/``; ignoring the directory moves them out of the untracked inventory too.
+_CLIENT_FILES = {"client/fixture.zsh": "source client/fixture-fleet.zsh\n", "client/bin/claude-fixture": "#!/bin/zsh\nexec claude\n"}
+
+
+def _r56_fleet_file(controller: str) -> str:
+    """An r56 solet's fleet file as hydration wrote it, with the operator's role functions below the marker."""
+    return _R56_FLEET.read_text(encoding="utf-8").replace("{{SOLET_NAME}}", "fixture").replace("{{GIT_CONTROLLER_NAME}}", controller) + _ROLES
+
+
+def _fleet_fixture(root: Path, installed: str | None) -> Fixture:
+    """A fixture whose baseline holds the r56 fleet template, whose candidate holds the shipped templates and declares the SHIPPED exclude block and fleet launcher, with ``installed`` at the clone's fleet file."""
+    shipped = {row["artifact_id"]: row for row in json.loads((_ROOT / KB / "existing_install_flow.json").read_text())["managed_artifacts"]}
+    fixture = build_fixture(
+        root,
+        document=lambda baseline: bundle_document(baseline, artifacts=[*default_artifacts(), shipped["clone_exclude_block"], shipped["fleet_launcher"]]),
+        baseline_extra={f"{TEMPLATES}/{_FLEET_TEMPLATE}": _R56_FLEET.read_bytes()},
+        extra_candidate_files={f"{TEMPLATES}/{_FLEET_TEMPLATE}": template_bytes(_FLEET_TEMPLATE), f"{TEMPLATES}/{_EXCLUDE_TEMPLATE}": template_bytes(_EXCLUDE_TEMPLATE)},
+    )
+    for relative, text in _CLIENT_FILES.items():
+        (fixture.target / relative).parent.mkdir(parents=True, exist_ok=True)
+        (fixture.target / relative).write_text(text, encoding="utf-8")
+    if installed is not None:
+        (fixture.target / "client" / "fixture-fleet.zsh").write_text(installed, encoding="utf-8")
+    return fixture
+
+
+def _clone_ignores_client(fixture: Fixture) -> bool:
+    return subprocess.run(("git", "-C", str(fixture.target), "check-ignore", "-q", "--no-index", "--", "client/fixture-fleet.zsh"), check=False).returncode == 0
+
+
+def _assert_fleet_launcher_refresh(root: Path) -> None:
+    """r58 hands-off fix: an update refreshes an r56 fleet launcher above the role functions and never blocks on a clone that does not ignore ``client/``."""
+    old = _r56_fleet_file("Lead-Git")
+    stale = _fleet_fixture(root / "stale", old)
+    fleet = stale.target / "client" / "fixture-fleet.zsh"
+    exclude = stale.target / ".git" / "info" / "exclude"
+    exclude_before = exclude.read_bytes()
+    _check(not _clone_ignores_client(stale), "fixture: the clone does not ignore client/")
+    advance_to_source_advanced(stale)
+    preview = preview_update_instance(stale.request)
+    rows = {cast(str, data(row, "artifact_id")): row for row in cast(list[Any], preview.data["managed_artifacts"])}
+    _check(preview.status == "runtime_preview_ready" and preview.exit_code == 0 and not preview.data["blocked"], f"a clone that does not ignore client/ no longer blocks the update: {preview.status} {preview.data.get('blocked')}")
+    _check((data(rows["clone_exclude_block"], "state"), data(rows["clone_exclude_block"], "action")) == ("absent", "append_block"), "the dry-run plan shows the exclude block as an action")
+    _check((data(rows["fleet_launcher"], "state"), data(rows["fleet_launcher"], "action"), data(rows["fleet_launcher"], "conflict")) == ("legacy_matched", "render_whole", None), "the dry-run plan shows the launcher refresh as an action")
+    _check((fleet.read_text(encoding="utf-8"), exclude.read_bytes()) == (old, exclude_before), "the dry-run wrote nothing")
+    applied = apply_update(stale.request, cast(str, preview.data["runtime_approval_fingerprint"]))
+    _check(applied.status == "promoted" and applied.exit_code == 0, f"update promoted: {applied.status} {applied.error_kind} {applied.message}")
+    refreshed = fleet.read_text(encoding="utf-8")
+    _check(refreshed.partition(_FLEET_MARKER)[2] == old.partition(_FLEET_MARKER)[2] and refreshed.count(_FLEET_MARKER) == 1, "role functions and everything below the marker are byte-identical")
+    _check('  GIT_CONTROLLER_NAME="Lead-Git" \\' in refreshed.splitlines() and "_tmux_host_for_fixture" in refreshed and "_tmux_host_for_fixture" not in old, "the operator's GIT_CONTROLLER_NAME is kept and the launcher now hosts each role in tmux")
+    _check(_clone_ignores_client(stale) and exclude.read_bytes().startswith(exclude_before), "the clone now ignores client/ and its other ignore lines are untouched")
+    _check(all((stale.target / relative).read_text(encoding="utf-8") == text for relative, text in _CLIENT_FILES.items()), "the other untracked client files became ignored and were not touched, and the update still promoted")
+    _assert_fleet_backups_and_digests(stale, cast(str, applied.data["operation_id"]), old, exclude_before)
+    _assert_edited_fleet_launcher_left_alone(root / "edited", old.replace("_claude_for_fixture() {", "export MY_EDIT=1\n_claude_for_fixture() {", 1))
+    _assert_absent_fleet_launcher_unaffected(root / "absent")
+
+
+def _assert_fleet_backups_and_digests(fixture: Fixture, operation: str, old: str, exclude_before: bytes) -> None:
+    root_backup = backup_root(fixture.paths, fixture.record().instance_id, operation)
+    _check((root_backup / "fleet_launcher" / "before.bytes").read_bytes() == old.encode("utf-8") and (root_backup / "clone_exclude_block" / "before.bytes").read_bytes() == exclude_before, "both files were backed up byte-for-byte before the writes")
+    afters = {item["artifact_id"]: item["after_sha256"] for item in _hydration_after_digests(fixture)}
+    _check(afters.get("fleet_launcher") == file_sha256(fixture.target / "client" / "fixture-fleet.zsh") and afters.get("clone_exclude_block") == file_sha256(fixture.target / ".git" / "info" / "exclude"), "the journaled after digests equal the written files")
+
+
+def _assert_edited_fleet_launcher_left_alone(root: Path, edited: str) -> None:
+    fixture = _fleet_fixture(root, edited)
+    fleet = fixture.target / "client" / "fixture-fleet.zsh"
+    advance_to_source_advanced(fixture)
+    preview = preview_update_instance(fixture.request)
+    rows = {cast(str, data(row, "artifact_id")): row for row in cast(list[Any], preview.data["managed_artifacts"])}
+    _check(preview.status == "runtime_preview_ready" and not preview.data["blocked"], f"an edited launcher does not block the update: {preview.status} {preview.data.get('blocked')}")
+    _check((data(rows["fleet_launcher"], "state"), data(rows["fleet_launcher"], "action"), data(rows["fleet_launcher"], "conflict")) == ("unknown_origin", "none", None), "the preview reports the edited launcher as unknown origin with no action")
+    applied = apply_update(fixture.request, cast(str, preview.data["runtime_approval_fingerprint"]))
+    _check(applied.status == "promoted", f"the update still promotes: {applied.status} {applied.error_kind}")
+    _check(fleet.read_text(encoding="utf-8") == edited, "the operator's edited launcher is left byte-for-byte")
+    root_backup = backup_root(fixture.paths, fixture.record().instance_id, cast(str, applied.data["operation_id"]))
+    _check(not (root_backup / "fleet_launcher").exists(), "an untouched launcher takes no backup")
+
+
+def _assert_absent_fleet_launcher_unaffected(root: Path) -> None:
+    fixture = _fleet_fixture(root, None)
+    fleet = fixture.target / "client" / "fixture-fleet.zsh"
+    advance_to_source_advanced(fixture)
+    preview = preview_update_instance(fixture.request)
+    rows = {cast(str, data(row, "artifact_id")): row for row in cast(list[Any], preview.data["managed_artifacts"])}
+    _check(preview.status == "runtime_preview_ready" and not preview.data["blocked"], f"a clone with no fleet file is not blocked: {preview.status} {preview.data.get('blocked')}")
+    _check((data(rows["fleet_launcher"], "state"), data(rows["fleet_launcher"], "action")) == ("absent", "none"), "the preview shows no launcher action")
+    applied = apply_update(fixture.request, cast(str, preview.data["runtime_approval_fingerprint"]))
+    _check(applied.status == "promoted" and not fleet.exists(), f"the update promotes and creates no fleet file: {applied.status} {applied.error_kind}")
+
+
+@dataclass(frozen=True)
+class _Listing:
+    values: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _Facts:
+    """The three listings ``observe_local_state`` reads, taken straight from Git."""
+
+    tracked_paths: _Listing
+    untracked_paths: _Listing
+    staged_paths: _Listing
+
+
+def _carve_facts(target: Path) -> Any:
+    status = subprocess.run(("git", "-C", str(target), "status", "--porcelain=v1", "--untracked-files=all"), capture_output=True, text=True, check=True).stdout
+    tracked = subprocess.run(("git", "-C", str(target), "ls-files"), capture_output=True, text=True, check=True).stdout.split()
+    untracked = tuple(sorted(line[3:] for line in status.splitlines() if line.startswith("?? ")))
+    return _Facts(_Listing(tuple(sorted(tracked))), _Listing(untracked), _Listing(()))
+
+
+def _carve_target(root: Path) -> Path:
+    """A committed clone with the untracked files a genesis-born clone keeps: ``client/`` files and an operator's ``notes.txt``."""
+    target = root
+    (target / "client" / "bin").mkdir(parents=True)
+    subprocess.run(("git", "init", "--quiet", str(target)), check=True)
+    (target / "README").write_text("r\n", encoding="utf-8")
+    subprocess.run(("git", "-C", str(target), "add", "README"), check=True)
+    subprocess.run(("git", "-C", str(target), "-c", "user.name=x", "-c", "user.email=x@example.invalid", "commit", "--quiet", "-m", "i"), check=True)
+    (target / "client" / "a.zsh").write_text("alpha\n", encoding="utf-8")
+    (target / "client" / "bin" / "tool").write_text("#!/bin/zsh\n", encoding="utf-8")
+    (target / "notes.txt").write_text("operator notes\n", encoding="utf-8")
+    return target
+
+
+def _carve_admitted(root: Path, mutate: Any, *, exclude: str = "client/\n", declared: frozenset[str] = frozenset({CLONE_EXCLUDE_RELATIVE}), resume: bool = False) -> bool:
+    """Whether the per-operation re-baseline admits ``mutate`` made alongside an ignore-file edit (``False`` = ``preservation_violated``).
+
+    ``resume`` passes no in-process observation, as a re-entered update has none.
+    """
+    target = _carve_target(root)
+    before = observe_local_state(target, _carve_facts(target))
+    journal = cast(Any, {"local_state": {"current": before.snapshot()}})
+    with (target / ".git" / "info" / "exclude").open("a", encoding="utf-8") as stream:
+        stream.write(exclude)
+    mutate(target)
+    after = observe_local_state(target, _carve_facts(target))
+    try:
+        rebaseline_revision(journal, after, None if resume else before, "op_x", declared, "fixture", target)
+    except UpdateFailedError as exc:
+        _check(exc.error_kind == "preservation_violated", f"the refusal is preservation_violated: {exc.error_kind}")
+        return False
+    return True
+
+
+def _replace_with_symlink(target: Path) -> None:
+    (target / "client" / "a.zsh").unlink()
+    os.symlink("/etc/hosts", target / "client" / "a.zsh")
+
+
+def _assert_ignore_carve_out_is_narrow(root: Path) -> None:
+    """Only a path that is unchanged and that the clone's own ignore file now covers is admitted, and only when that file was declared."""
+    write = lambda text: (lambda target: (target / "client" / "a.zsh").write_text(text, encoding="utf-8"))  # noqa: E731
+    _check(_carve_admitted(root / "control", lambda target: None), "control: an ignore-file edit alone is admitted")
+    _check(not _carve_admitted(root / "undeclared", lambda target: None, declared=frozenset()), "control: without the declared ignore file the vanished files are a violation")
+    _check(not _carve_admitted(root / "same_size", write("omega\n")), "a client file rewritten at the same size is a violation")
+    _check(not _carve_admitted(root / "truncated", write("")), "a client file truncated to 0 bytes is a violation")
+    _check(not _carve_admitted(root / "truncated_resume", write(""), resume=True), "a truncation is caught on the resume path too")
+    _check(not _carve_admitted(root / "symlink", _replace_with_symlink), "a client file replaced by a symlink is a violation")
+    _check(not _carve_admitted(root / "deleted", lambda target: (target / "client" / "a.zsh").unlink()), "a deleted client file is a violation")
+    _check(not _carve_admitted(root / "widened", lambda target: (target / "notes.txt").write_text("CLOBBERED\n", encoding="utf-8"), exclude="client/\n*.txt\n"), "an edit hidden only by a widened ignore pattern is a violation")
+    other = _carve_target(root / "other_source")
+    before = observe_local_state(other, _carve_facts(other))
+    (other / ".gitignore").write_text("client/\n", encoding="utf-8")
+    vanished = ["client/a.zsh", "client/bin/tool"]
+    _check(paths_ignored_by_declared_exclude(other, frozenset({CLONE_EXCLUDE_RELATIVE}), vanished, before.state, before) == frozenset(), "a path ignored by any source other than the clone's ignore file is not admitted")
+    (other / ".gitignore").unlink()
+    with (other / ".git" / "info" / "exclude").open("a", encoding="utf-8") as stream:
+        stream.write("client/\n")
+    _check(paths_ignored_by_declared_exclude(other, frozenset({CLONE_EXCLUDE_RELATIVE}), [*vanished, "client/gone.zsh", "notes.txt"], before.state, before) == frozenset(vanished), "unchanged paths the ignore file covers are admitted; a path the journal never held and an unignored path are not")
+
+
+def _assert_fleet_crash_resume(root: Path) -> None:
+    """A crash after the hydration writes and before the re-baseline resumes and promotes: the vanished client files are still admitted."""
+    old = _r56_fleet_file("Lead-Git")
+    fixture = _fleet_fixture(root, old)
+    fleet = fixture.target / "client" / "fixture-fleet.zsh"
+    exclude = fixture.target / ".git" / "info" / "exclude"
+    exclude_before = exclude.read_bytes()
+    advance_to_source_advanced(fixture)
+    fingerprint = cast(str, preview_update_instance(fixture.request).data["runtime_approval_fingerprint"])
+    real = execution_module._Execution.rebaseline_local_state  # noqa: SLF001
+
+    def crash(self: Any, journal: Any, operation_id: str, declared: frozenset[str]) -> Any:
+        if CLONE_EXCLUDE_RELATIVE in declared:
+            raise SimulatedCrash("after the hydration writes, before the re-baseline")
+        return real(self, journal, operation_id, declared)
+
+    with patch.object(execution_module._Execution, "rebaseline_local_state", crash):  # noqa: SLF001
+        expect(SimulatedCrash, lambda: apply_update(fixture.request, fingerprint), "crash injection did not fire")
+    _check(exclude.read_bytes() != exclude_before and "_tmux_host_for_fixture" in fleet.read_text(encoding="utf-8"), "both writes landed before the crash")
+    resumed = apply_update(fixture.request, fingerprint)
+    _check(resumed.status == "promoted", f"the resume promotes: {resumed.status} {resumed.error_kind} {resumed.message}")
+    _check(fleet.read_text(encoding="utf-8").partition(_FLEET_MARKER)[2] == old.partition(_FLEET_MARKER)[2], "the resume kept the role functions byte-for-byte")
+    _check(all((fixture.target / relative).read_text(encoding="utf-8") == text for relative, text in _CLIENT_FILES.items()), "the other client files are untouched by the resume")
+
+
 def _assert_strategy_selection(root: Path) -> None:
     forced = build_fixture(root / "forced", document=lambda baseline: bundle_document(baseline, strategy="single_color_required"), router=True)
     advance_to_source_advanced(forced)
@@ -466,6 +677,9 @@ def main() -> int:
         _assert_retry_safe_dependency(root / "retry")
         _assert_d1_destination_rules(root / "d1")
         _assert_feedback_skill_refresh(root / "skill")
+        _assert_fleet_launcher_refresh(root / "fleet")
+        _assert_ignore_carve_out_is_narrow(root / "carve")
+        _assert_fleet_crash_resume(root / "crash_resume")
         _assert_strategy_selection(root / "strategy")
     _check(subprocess.run(("git", "--version"), capture_output=True, check=False).returncode == 0, "git present")
     print(f"update_runtime_execution_smoke OK: {_CHECKS} checks passed")

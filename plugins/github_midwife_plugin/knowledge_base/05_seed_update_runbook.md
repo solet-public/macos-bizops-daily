@@ -245,10 +245,12 @@ the healthy state, not an error.
   (`plugins/github_midwife_plugin/knowledge_base/plugin_transitions.json`) to a solet whose profile still
   carries the predecessor plugin. See "Plugin transitions: LM Studio solets
   move to the Apple-native stack" below.
-- Step 5 hydration re-run → `hydration_reconcile` for the four declared
+- Step 5 hydration re-run → `hydration_reconcile` for the six declared
   managed artifacts: the instance LaunchAgent plist, the `~/.zshrc` block,
-  the `~/.claude/CLAUDE.md` section, and the `/feedback` skill
-  (`~/.claude/skills/feedback/SKILL.md`) (the rest: Part B). The skill is
+  the `~/.claude/CLAUDE.md` section, the `/feedback` skill
+  (`~/.claude/skills/feedback/SKILL.md`), the block that makes the clone
+  ignore `client/` (`<clone>/.git/info/exclude`), and the fleet launcher
+  (`<clone>/client/<name>-fleet.zsh`) (the rest: Part B). The skill is
   **refresh-only**: the update replaces it only when it is byte-identical to a
   render of a previous release's template (which is every solet that still has
   the r56 skill, whose filing steps fail for an account without repository
@@ -258,6 +260,22 @@ the healthy state, not an error.
   final doctor reports `managed_artifact:feedback_skill` as verified-and-left
   as it is, and the manual step in Part C Step 5 is how to bring the fix into
   it. A missing skill is not created.
+  The fleet launcher is refreshed **above the line `# One function per role
+  the operator chose in Step 4a.` only** (r58). Your role functions, your
+  `GIT_CONTROLLER_NAME` choice and everything from that line down stay
+  byte-for-byte. The update replaces the launcher section only when it is
+  byte-identical to a render of the r56 template with your own
+  `GIT_CONTROLLER_NAME` value, and it backs the file up first. A section you
+  edited, or one from any other release, is not overwritten and does not stop
+  the update: the preview lists it with `state: unknown_origin` (or
+  `locally_modified`) and `action: none`, and the manual steps in Part C
+  Step 5 are how to bring the change into it. A clone with no fleet file is
+  left without one. Because `client/` sits inside the clone and existing
+  clones do not ignore it, the preview also lists an action that adds `client/`
+  to the clone's `.git/info/exclude`, a local file Git never commits; it is a
+  marked block, backed up like the rest, and the files already in `client/`
+  are not touched. Without that ignore rule the update plan would refuse
+  the fleet file and stop the update for every solet (design section 6.3).
 - Step 6.1 plugin cache → `plugin_cache_refresh` (diff-based;
   `plugin_cache_current` in doctor section 11).
 - Step 6.4 KB re-install → `runtime.knowledge_reinstall` for every
@@ -338,18 +356,16 @@ Each of these stays manual because no Manager surface owns it; the reason
 is given with the step so the next release can close it deliberately.
 
 1. **Target-root `AGENTS.md`/`CLAUDE.md` hydration block, `client/bin/*`
-   launchers, `~/.claude/settings.json` hooks, the rename skill, fleet
-   functions.** Not declared managed artifacts in the shipped bundle;
-   `hydration_reconcile` owns only the four it declares (the `/feedback`
-   skill is one of them; see Part A). Re-run Part C Step 5 for these, by hand
-   (seed-side artifact declarations are follow-up D7). The fleet file
-   (`client/<name>-fleet.zsh`) and the rest of `client/` stay manual for a
-   stated reason: they sit inside the clone, `client/` is not git-ignored in
-   existing clones, and the update plan refuses any destination inside the
-   target that the target does not ignore (design section 6.3), which would
-   stop the update for every solet, including the ones with no fleet file.
-   Part C Step 5 gives the exact steps for the fleet file and for a
-   hand-edited feedback skill.
+   launchers, `~/.claude/settings.json` hooks, the rename skill.** Not
+   declared managed artifacts in the shipped bundle; `hydration_reconcile`
+   owns only the six it declares (the `/feedback` skill and the fleet
+   launcher are two of them; see Part A). Re-run Part C Step 5 for these, by
+   hand (seed-side artifact declarations are follow-up D7). The rest of
+   `client/` stays manual for a stated reason: it sits inside the clone, and
+   no artifact declares it. The update ignores `client/` in the clone only so
+   it can refresh the fleet launcher. Part C Step 5 also gives the exact
+   steps for a hand-edited feedback skill and for a fleet launcher the
+   update left alone.
 2. **The first-time export/workspace root answer** (Part C Step 4a). No CLI
    carrier for the answer exists; `migration_export_root_containment`
    blocks with `export_root_ambiguous` or `none` and that text, and
@@ -727,7 +743,9 @@ paragraph — read at update time, not detected at runtime — is the
 mechanism.
 
 **Exact re-render of the fleet file and of a hand-edited feedback skill (r57).**
-Both are plain renders you can do yourself with the solet's name in place of
+Since r58 the Manager path in Part A refreshes the fleet launcher itself; these
+steps stay as the fallback, for a launcher the preview listed as edited or of
+unknown origin, and for the manual path. Both are plain renders you can do yourself with the solet's name in place of
 `<name>` and `<clone>` for its directory. Replace tokens by literal text
 substitution only, never `str.format` and never a shell heredoc (the templates
 carry live `$VAR` references). Take each backup path from `test -f`, adding

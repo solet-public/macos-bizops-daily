@@ -92,7 +92,7 @@ _PUBLIC_R48_PREDECESSOR: dict[str, str | None] = {
     "manifest_sha256": "a38db6f97b8aadf17670fa8fa9677dbaf93623e13814abc3a4061ec7e4c8d60b",
     "legacy_anchor_id": None,
 }
-#: Stable r55 and r56 (iss_933eff4e): every stable release must accept the stable release before it.
+#: Stable r55, r56 and r57 (iss_933eff4e): every stable release must accept the stable release before it.
 _PUBLIC_R55_COMMIT = "1dedebb6622ee6559d549eac4a2465591c130d80"
 _PUBLIC_R55_TREE = "fe3bf23261cd2e1ba88b16e2640b38e0378e38cd"
 _PUBLIC_R55_PREDECESSOR: dict[str, str | None] = {
@@ -113,6 +113,18 @@ _PUBLIC_R56_PREDECESSOR: dict[str, str | None] = {
     "tree": _PUBLIC_R56_TREE,
     "provenance_sha256": "b05b2f4afdbcdb98c76978dc45beb1e42abd5e417e1734ea4ddc39c1b6755560",
     "seed_id": "50837fd9-78d7-5480-aecf-9a03bcafb586",
+    "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+    "manifest_sha256": "fbcd04c3abf4af903aebe0cb046ce15c455e1386486773accf9680aa4720f75a",
+    "legacy_anchor_id": None,
+}
+_PUBLIC_R57_COMMIT = "8b3fe23d447e384541bd5a18a7d7090fa41ae5a6"
+_PUBLIC_R57_TREE = "cca735f8bc96613146587f17fddc03062fd52006"
+_PUBLIC_R57_PREDECESSOR: dict[str, str | None] = {
+    "repository": "https://github.com/solet-public/macos-bizops.git",
+    "commit": _PUBLIC_R57_COMMIT,
+    "tree": _PUBLIC_R57_TREE,
+    "provenance_sha256": "b81551a3fecc4f47e1d49dd0a0b8959c363f5acbe2ac0828927f50722698e2d8",
+    "seed_id": "b3bd36fd-28b7-5b8c-98e5-05096d2b7748",
     "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
     "manifest_sha256": "fbcd04c3abf4af903aebe0cb046ce15c455e1386486773accf9680aa4720f75a",
     "legacy_anchor_id": None,
@@ -204,12 +216,19 @@ def _check_public_r48_predecessor(bundle: TransitionBundle) -> None:
 
 
 def _check_public_later_predecessors(bundle: TransitionBundle) -> None:
-    """Stable r55 and r56 (iss_933eff4e) are listed with their published identities; each commit with another tree is not."""
-    for label, commit, tree, expected in (("r55", _PUBLIC_R55_COMMIT, _PUBLIC_R55_TREE, _PUBLIC_R55_PREDECESSOR), ("r56", _PUBLIC_R56_COMMIT, _PUBLIC_R56_TREE, _PUBLIC_R56_PREDECESSOR)):
+    """Stable r55, r56 and r57 (iss_933eff4e) are listed with their published identities; each commit with another tree is not."""
+    for label, commit, tree, expected in (("r55", _PUBLIC_R55_COMMIT, _PUBLIC_R55_TREE, _PUBLIC_R55_PREDECESSOR), ("r56", _PUBLIC_R56_COMMIT, _PUBLIC_R56_TREE, _PUBLIC_R56_PREDECESSOR), ("r57", _PUBLIC_R57_COMMIT, _PUBLIC_R57_TREE, _PUBLIC_R57_PREDECESSOR)):
         _check(bundle.predecessor_for(commit, _PUBLIC_R43_TREE) is None, f"public {label} commit with wrong tree remains refused")
         listed = bundle.predecessor_for(commit, tree)
         assert listed is not None, f"published public {label} predecessor is supported"
         _check(asdict(listed) == expected, f"public {label} descriptor matches published artefacts")
+
+
+def _check_shipped_in_clone_artifacts(bundle: Any) -> None:
+    _check({item.artifact_id for item in bundle.managed_artifacts if item.in_target} == {"clone_exclude_block", "fleet_launcher"}, "the current release declares exactly the fleet launcher and the clone-exclude block that ignores it as in-target artifacts (section 6.3)")
+    _check({item.artifact_id for item in bundle.managed_artifacts} == {"instance_launchagent_plist", "shell_startup_block", "user_claude_md_section", "feedback_skill", "clone_exclude_block", "fleet_launcher"}, "shipped artifacts")
+    _check([item.artifact_id for item in bundle.managed_artifacts if item.in_target] == ["clone_exclude_block", "fleet_launcher"], "the clone-exclude block precedes the file it makes ignored, so hydration writes it first")
+    _check(bundle.artifact("fleet_launcher").section_end == "# One function per role the operator chose in Step 4a.", "the fleet launcher is refreshed above the role-function line only")
 
 
 def _check_shipped_bundle() -> None:
@@ -240,8 +259,7 @@ def _check_shipped_bundle() -> None:
     _check(asdict(public_r43) == _PUBLIC_R43_PREDECESSOR, "public r43 descriptor matches published artefacts")
     _check_public_r48_predecessor(bundle)
     _check_public_later_predecessors(bundle)
-    _check(all(not artifact.in_target for artifact in bundle.managed_artifacts), "the current release declares no in-target artifact (section 6.3)")
-    _check({item.artifact_id for item in bundle.managed_artifacts} == {"instance_launchagent_plist", "shell_startup_block", "user_claude_md_section", "feedback_skill"}, "shipped artifacts")
+    _check_shipped_in_clone_artifacts(bundle)
     _check(bundle.lifecycle.strategy == "router_preferred", "shipped lifecycle strategy")
     for artifact in bundle.managed_artifacts:
         template = _ROOT / artifact.template_ref
@@ -324,6 +342,36 @@ def _check_parser_refusals() -> None:
     _expect_contract_error(mutate(lambda d: d["managed_artifacts"][1].__setitem__("marker", {"begin": "# BEGIN SOLET {NAME}", "end": "# END SOLET {NAME}"})), "unversioned marker refused")
     _expect_contract_error(mutate(lambda d: d["managed_artifacts"][0].__setitem__("stamp", None)), "whole-file artifact without a stamp refused")
     _expect_contract_error(mutate(lambda d: d["supported_predecessors"].clear()), "no predecessors refused")
+
+
+def _check_section_and_exclude_refusals() -> None:
+    """The one path allowed inside ``.git`` is the clone's ignore file, as a managed block; ``section_end`` belongs to a rendered whole file that the operator also writes into."""
+    shipped = _shipped_document()
+
+    def mutate(artifact_id: str, edit: Any) -> dict[str, Any]:
+        document = copy.deepcopy(shipped)
+        edit(next(row for row in document["managed_artifacts"] if row["artifact_id"] == artifact_id))
+        return document
+
+    parse_transition_bundle(json.dumps(shipped).encode())
+    for destination in ("{TARGET}/.git/config", "{TARGET}/.git/hooks/pre-commit", "{TARGET}/.git/info/attributes"):
+        _expect_contract_error(mutate("clone_exclude_block", lambda row, destination=destination: row.__setitem__("logical_destination", destination)), f"a path inside .git other than the ignore file is refused: {destination}")
+    _expect_contract_error(mutate("fleet_launcher", lambda row: row.__setitem__("logical_destination", "{TARGET}/.git/info/exclude")), "the ignore file may only carry a managed block")
+    _expect_contract_error(mutate("clone_exclude_block", lambda row: row.__setitem__("section_end", "# x")), "section_end on a managed block refused")
+    _expect_contract_error(mutate("fleet_launcher", lambda row: row.__setitem__("preservation_class", "manager_generated_whole")), "a section-bounded artifact is operator-owned")
+    _expect_contract_error(mutate("fleet_launcher", lambda row: row.__setitem__("section_end", "# a\n# b")), "a multi-line section_end refused")
+    _expect_contract_error(mutate("feedback_skill", lambda row: row.__setitem__("preservation_class", "operator_owned_with_managed_block")), "a whole-file artifact without a section_end stays manager-generated")
+
+
+def _check_exclude_coverage_rule() -> None:
+    """The plan lifts the in-clone refusal only for a path a literal line of the exclude block really covers."""
+    from solet_manager.update_clone_exclude import exclude_covers
+
+    block = "# Rendered launcher files live here and are never committed.\nclient/\n"
+    _check(exclude_covers(block, "client/iris-fleet.zsh") and exclude_covers(block, "client/bin/claude-iris"), "a directory line covers every path under it")
+    _check(exclude_covers("client/iris-fleet.zsh\n", "client/iris-fleet.zsh") and not exclude_covers("client/iris-fleet.zsh\n", "client/other.zsh"), "a file line covers exactly that file")
+    _check(not exclude_covers(block, "clients/x") and not exclude_covers(block, "docs/client/x") and not exclude_covers(block, "client"), "a directory line does not cover a sibling, a nested match or the bare name")
+    _check(not any(exclude_covers(text, "client/x") for text in ("*\n", "client/*\n", "*.zsh\n", "cli?nt/\n", "cl[i]ent/\n", "!client/\n", "# client/\n", "\\client/\n", "\n")), "globs, negations, comments and blank lines cover nothing")
 
 
 def _check_enumerations() -> None:
@@ -465,6 +513,8 @@ def _check_three_validators() -> None:
 def main() -> int:
     _check_shipped_bundle()
     _check_parser_refusals()
+    _check_section_and_exclude_refusals()
+    _check_exclude_coverage_rule()
     _check_enumerations()
     _check_static_reachability()
     _check_three_validators()

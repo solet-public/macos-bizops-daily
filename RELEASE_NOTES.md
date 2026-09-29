@@ -2,6 +2,34 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-29 — r58: the update refreshes an existing solet's fleet launcher
+
+**Solet Manager manager-v0.1.0-r58.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows once an update from stable r57 has been checked.
+
+- **`solet-manager update` now replaces an existing solet's fleet launcher.**
+  The launcher section of `client/<name>-fleet.zsh`, everything above the line
+  `# One function per role the operator chose in Step 4a.`, is replaced with
+  the current one, so each role runs in its own named tmux session. Your role
+  functions, your Git-Controller choice and anything else below that line are
+  kept exactly as they are. The preview lists the change and the update keeps
+  a copy of the file first. A launcher section you edited, or one from a
+  release the update does not recognise, is left as it is and listed in the
+  preview; it does not stop the update. A solet with no fleet file is not
+  given one. To make that possible the update also adds `client/` to the
+  clone's local ignore file, `.git/info/exclude`, which Git never commits; the
+  preview lists that change too, and the files already in `client/` are not
+  touched. The manual steps in the seed-update runbook (Part C, Step 5) remain
+  as the fallback.
+- **A solet installed from stable r57 can run `solet-manager update` to this
+  release.** The update accepts only listed stable releases, matched exactly by
+  commit and tree, and r57 was not listed, so a solet on r57 would have been
+  refused with `predecessor_unsupported` before anything changed. It is now
+  listed, with its published identity (`solet-public/macos-bizops` commit
+  `8b3fe23d`).
+
 ## 2026-09-29 — r57: feedback without repository access, and fixes from the first real-Mac update
 
 **Solet Manager manager-v0.1.0-r57.** This is a full seed build for

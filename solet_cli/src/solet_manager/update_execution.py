@@ -989,7 +989,7 @@ class _Execution:
         """Section 6.6, the per-operation carve-out (see :func:`rebaseline_revision`); re-inspects the target first."""
         result = _inspect(self.request, self.record, self.descriptor.metadata)
         observed = observe_local_state(_target_path(self.record), result.facts)
-        revision = rebaseline_revision(journal, observed, self.last_observed, operation_id, declared, self.record.name)
+        revision = rebaseline_revision(journal, observed, self.last_observed, operation_id, declared, self.record.name, _target_path(self.record))
         self.last_observed = observed
         return revision
 

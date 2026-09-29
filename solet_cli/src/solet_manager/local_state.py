@@ -50,6 +50,7 @@ __all__ = [
     "ObservedLocalState",
     "allowed_service_write",
     "compare",
+    "observe_entry",
     "observe_local_state",
     "snapshot_from_journal",
 ]
@@ -128,6 +129,11 @@ def commitment(entries: tuple[ObservedEntry, ...]) -> str | None:
         return None
     rows: list[JsonValue] = [[entry.path, entry.kind, entry.mode, entry.size, entry.digest] for entry in sorted(entries, key=lambda item: item.path)]
     return canonical_sha256(rows)
+
+
+def observe_entry(target: Path, relative: str) -> ObservedEntry:
+    """One local entry as the commitment reads it: kind, mode, size and digest (symlinks by their stored target)."""
+    return _observe(target, relative)
 
 
 def _observe(target: Path, relative: str) -> ObservedEntry:
