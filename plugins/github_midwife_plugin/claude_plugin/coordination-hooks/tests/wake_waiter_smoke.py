@@ -55,11 +55,25 @@ _REPO = Path(__file__).resolve().parents[5]
 _HOOK_ROOT = Path(__file__).resolve().parent.parent / "hooks"
 sys.path.insert(0, str(_REPO / "plugins/github_midwife_plugin/src"))
 
-from github_midwife_plugin.coordination_hook_installation import (  # noqa: E402
-    ReceiptSurface,
-    build_receipt,
-    publish_receipt,
-)
+_SKIP_EXIT_CODE = 77  # quality_gates/run_smokes.py reports this as SKIPPED, not passed
+
+try:
+    from github_midwife_plugin.coordination_hook_installation import (  # noqa: E402
+        ReceiptSurface,
+        build_receipt,
+        publish_receipt,
+    )
+except ModuleNotFoundError as exc:
+    # Only the absent sibling is a disclosed skip. Any other missing module,
+    # including one github_midwife_plugin itself needs, is a real defect.
+    if (exc.name or "").split(".")[0] != "github_midwife_plugin":
+        raise
+    print(
+        "SKIP: github_midwife_plugin is not importable (this smoke builds a "
+        "coordination-hook receipt with it, and this tree ships the hooks "
+        "without that sibling plugin)."
+    )
+    raise SystemExit(_SKIP_EXIT_CODE) from exc
 
 # Strings the stub writes to stdout and stderr. If the hook relayed child output
 # in any form, one of these would surface in its own streams.

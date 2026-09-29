@@ -142,6 +142,14 @@ def _check_formula_install_shape(formula: str, lock: dict[str, object]) -> None:
         "def caveats" in formula and "Next: run solet create" in formula,
         "formula prints the standard separate setup instruction",
     )
+    caveats = formula.split("def caveats", 1)[1].split("\n  end", 1)[0]
+    _check(
+        all(
+            token in caveats
+            for token in ("python@3.13", "-25293", "--dry-run", "brew pin python@3.13", "Always Allow")
+        ),
+        "formula caveats name the shared-python Keychain risk, the check, the pin, and the recovery",
+    )
     _check(
         "include Language::Python::Virtualenv" in formula,
         "formula imports Homebrew's Python virtualenv helpers",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from .adapter_protocol import probe_timeout_seconds
 from .adapters import OperationRequest, OperationResult
 from .contracts import ContractBundle
 from .errors import StateConflictError
@@ -38,7 +39,11 @@ def operation_request(
         answers_fingerprint=answers_fingerprint or transaction.answers_fingerprint,
         approval_fingerprint=approval,
         dry_run=phase == "probe",
-        timeout_seconds=operation.apply_timeout_seconds if phase == "apply" else 30,
+        timeout_seconds=(
+            operation.apply_timeout_seconds
+            if phase == "apply"
+            else probe_timeout_seconds(operation.operation_ref)
+        ),
         public_inputs=operation.public_inputs,
     )
 
@@ -78,7 +83,7 @@ def operation_probe_request(
         answers_fingerprint=transaction.answers_fingerprint,
         approval_fingerprint=None,
         dry_run=True,
-        timeout_seconds=30,
+        timeout_seconds=probe_timeout_seconds(probe_ref),
         public_inputs=probe_public_inputs(transaction, probe_ref),
     )
 

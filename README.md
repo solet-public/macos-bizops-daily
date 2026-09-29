@@ -43,6 +43,14 @@ These commands are deliberately separate. Homebrew installs only the manager;
 `solet create` previews its own machine and instance changes and asks before it
 writes them. Do not join the commands with `&&`.
 
+If another solet already runs on this Mac from its own clone, know that
+installing the manager can upgrade the shared `python@3.13`, and that any solet
+whose `.venv` links it has its Keychain credentials refused (`-25293`) at its
+next restart. The manager formula's caveats and the tap README give the check to
+run first and how to make Homebrew refuse instead. To recover, in a logged-in
+GUI session read each of that solet's Keychain items once and answer Always
+Allow.
+
 If Homebrew is not installed, start at [brew.sh](https://brew.sh). That is
 Homebrew's installer and canonical source. This seed does not provide a Solet
 installer script or a `curl | bash` alternative.

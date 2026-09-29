@@ -54,6 +54,9 @@ from .protocol import (
     validate_route_inputs,
 )
 
+#: The shared Homebrew framework whose upgrade strands other solets' Keychain ACLs (iss_d62aeab7).
+_PYTHON_FRAMEWORK = "python@3.13"
+
 _ROUTES: dict[str, tuple[str, str]] = {
     "request_homebrew_install": ("setup::homebrew.request_install", "operation"),
     "install_python_runtime": ("setup::python.install_313", "operation"),
@@ -160,7 +163,7 @@ def _homebrew_failure_result(
 ) -> dict[str, Any]:
     """Retain Homebrew command evidence in the existing closed result fields."""
 
-    if isinstance(error, HomebrewInstallError) and error.unrecognized_line is not None and not error.blocked_upgrades:
+    if isinstance(error, HomebrewInstallError) and error.unrecognized_line is not None:
         excerpt = error.unrecognized_line[:160]
         if len(error.unrecognized_line) > 160:
             excerpt += "…"
@@ -181,6 +184,43 @@ def _homebrew_failure_result(
         evidence_items=evidence_items,
         repair=repair,
     )
+
+
+def _upgraded_dependency_evidence(runtime: AdapterRuntime, upgraded: tuple[str, ...]) -> list[dict[str, Any]]:
+    """Record the dependency upgrades Homebrew's own plan required for an approved install."""
+
+    if not upgraded:
+        return []
+    items = [
+        evidence(
+            runtime,
+            evidence_id="homebrew.upgraded_dependencies",
+            kind="homebrew_plan",
+            status="verified",
+            summary="Homebrew upgraded formula-required dependencies as part of the approved install.",
+            observed=list(upgraded),
+            expected=None,
+            source="brew-install-dry-run",
+        )
+    ]
+    if _PYTHON_FRAMEWORK in upgraded:
+        items.append(
+            evidence(
+                runtime,
+                evidence_id="homebrew.python_framework_upgraded",
+                kind="homebrew_plan",
+                status="verified",
+                summary=(
+                    f"{_PYTHON_FRAMEWORK} was upgraded. Any solet whose .venv links it is refused its Keychain "
+                    "credentials (-25293) at its next restart until each item is re-authorized: read it once in a "
+                    "logged-in GUI session and answer Always Allow."
+                ),
+                observed=[_PYTHON_FRAMEWORK],
+                expected=None,
+                source="brew-install-dry-run",
+            )
+        )
+    return items
 
 
 def _postgres_install_apply_result(
@@ -504,7 +544,7 @@ def _coding_tool_route(request: Request, runtime: AdapterRuntime) -> dict[str, A
             repair=f"Resolve Homebrew before applying the approved {package} installation.",
         )
     try:
-        run_homebrew_install_required(
+        installed = run_homebrew_install_required(
             runtime,
             brew,
             package,
@@ -524,6 +564,7 @@ def _coding_tool_route(request: Request, runtime: AdapterRuntime) -> dict[str, A
         evidence_items = _executable_resolution_evidence(
             runtime, executable_name, executable, f"The {executable_name} executable was resolved after Homebrew cask installation."
         )
+    evidence_items = [*evidence_items, *_upgraded_dependency_evidence(runtime, installed.upgraded_dependencies)]
     return result(request, status="applied", evidence_items=evidence_items)
 
 
@@ -578,23 +619,8 @@ def _postgres_install_route(request: Request, runtime: AdapterRuntime) -> dict[s
             repair="Resolve Homebrew before applying the approved PostgreSQL actions.",
         )
     try:
-        failed_start = apply_postgres_install_actions(runtime, brew, actions)
+        applied = apply_postgres_install_actions(runtime, brew, actions)
     except HomebrewInstallError as exc:
-        if exc.blocked_upgrades:
-            packages = ", ".join(exc.blocked_upgrades)
-            return _homebrew_failure_result(
-                request,
-                error_kind="postgres_dependency_upgrade_blocked",
-                evidence_items=evidence_items,
-                repair=(
-                    f"Homebrew proposed upgrading installed dependencies ({packages}) "
-                    "during PostgreSQL setup; that proposed upgrade was not run. "
-                    "Check the installed versions and the formula's requirements before "
-                    "an explicit, reviewed repair. Preserve compliant dependencies and "
-                    "rerun the setup preview before resuming."
-                ),
-                error=exc,
-            )
         return _homebrew_failure_result(
             request,
             error_kind="postgres_install_failed",
@@ -610,7 +636,8 @@ def _postgres_install_route(request: Request, runtime: AdapterRuntime) -> dict[s
             repair="Inspect the Homebrew package state and resume after repairing it.",
             error=exc,
         )
-    return _postgres_install_apply_result(request, runtime, evidence_items, failed_start)
+    evidence_items = [*evidence_items, *_upgraded_dependency_evidence(runtime, applied.upgraded_dependencies)]
+    return _postgres_install_apply_result(request, runtime, evidence_items, applied.failed_start)
 
 
 def _bind_homebrew_actions(actions: list[dict[str, Any]], brew: str) -> list[dict[str, Any]]:

@@ -119,6 +119,21 @@ def main() -> int:
     _check(_homebrew_install_plan_allowed(allowed.stdout, "tmux"), "manager accepts exact dry-run")
     _check(not _homebrew_install_plan_allowed(hidden_upgrade.stdout, "tmux"), "manager rejects hidden upgrade")
 
+    counted_upgrade = CommandOutcome(
+        0, False, 1, "Would install 1 formula:\ntmux\nWould upgrade 2 dependencies for tmux:\nreadline\nxz\n", ""
+    )
+    mismatched_upgrade = CommandOutcome(
+        0, False, 1, "Would install 1 formula:\ntmux\nWould upgrade 2 dependencies for tmux:\nreadline\n", ""
+    )
+    foreign_upgrade = CommandOutcome(
+        0, False, 1, "Would install 1 formula:\ntmux\nWould upgrade 1 dependency for python@3.13:\nreadline\n", ""
+    )
+    _check(homebrew_install_plan_error(counted_upgrade, "tmux") is None, "counted dependency upgrade is allowed")
+    _check(_homebrew_install_plan_allowed(counted_upgrade.stdout, "tmux"), "manager accepts counted dependency upgrade")
+    for label, refused in (("count-mismatched", mismatched_upgrade), ("foreign-parent", foreign_upgrade)):
+        _check(homebrew_install_plan_error(refused, "tmux") is not None, f"{label} upgrade fails closed")
+        _check(not _homebrew_install_plan_allowed(refused.stdout, "tmux"), f"manager rejects {label} upgrade")
+
     sf_acquisition = HomebrewAcquisition("formula", "sf", ("node",))
     sf_closure = CommandOutcome(0, False, 1, "Would install 2 formulae:\nnode\nsf\n", "")
     sf_extra = CommandOutcome(0, False, 1, "Would install 3 formulae:\nnode\npython@3.13\nsf\n", "")

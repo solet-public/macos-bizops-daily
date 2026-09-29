@@ -90,6 +90,9 @@ you'd rather do it.
 
 ## Step 1 — get the update
 
+Every command here is `solet-manager`, not `solet`: `solet --help` does not list
+update, and `solet update` only points you back to `solet-manager update`.
+
 ```bash
 brew upgrade solet-public/tap/solet
 solet-manager update <name> --dry-run

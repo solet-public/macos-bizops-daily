@@ -7,6 +7,7 @@ companion ``legacy_plugin_coexistence_smoke.py``; no capability bundle ships bot
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,9 +15,11 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'ananta/src'))
 sys.path.insert(0, str(ROOT / 'plugins/macos_inference_plugin/src'))
 
+from ananta.core.config.config_manager import ConfigManager  # noqa: E402
 from ananta.core.config.config_provider import ConfigProvider  # noqa: E402
 from ananta.core.plugins.capabilities import validate_service_provider  # noqa: E402
 from ananta.core.plugins.plugin_base import PluginReadiness  # noqa: E402
+from ananta.core.plugins.plugin_initializer import _load_yaml_defaults_for_instance  # noqa: E402
 from ananta.interfaces import InferenceRequest, InferenceServiceUnavailableError, InferenceValidationError  # noqa: E402
 from ananta.services.context_management.compaction_types import WarmingRequest  # noqa: E402
 from ananta.services.inference_service.interfaces.provider import InferenceProvider  # noqa: E402
@@ -162,13 +165,36 @@ def check_missing_sdk() -> None:
             raise AssertionError('missing SDK succeeded')
 
 
+def check_activation_without_config_file() -> None:
+    """A plugin added to an existing solet has no ``config/plugins/<name>.json``.
+
+    The platform's merge layer (``plugin.yaml`` defaults under the override file)
+    must then supply every field the strict schema requires (iss_c30afc3e).
+    """
+    plugin = Plugin()
+    plugin_root = ROOT / 'plugins/macos_inference_plugin'
+    assert (plugin_root / 'plugin.yaml').read_bytes() == (
+        plugin_root / 'src/macos_inference_plugin/resources/plugin.yaml').read_bytes(), (
+        'the source-tree and packaged plugin.yaml copies must stay identical')
+    yaml_defaults = _load_yaml_defaults_for_instance(plugin)
+    assert yaml_defaults == default_config(), (
+        f'plugin.yaml defaults drifted from default_config.json: '
+        f'{sorted(set(default_config()) ^ set(yaml_defaults))}')
+    with tempfile.TemporaryDirectory() as app_home:
+        provider = ConfigManager(app_home).get_plugin_config_provider(plugin.name, yaml_defaults)
+        plugin.set_config_provider(provider)
+        plugin.prepare_for_readiness()
+    assert plugin.is_ready(), 'plugin without a config file did not activate'
+
+
 def main() -> int:
     check_config()
+    check_activation_without_config_file()
     check_missing_sdk()
     check_plugin()
     check_unavailable_reasons()
     check_unsupported_operations()
-    print('plugin_contract_smoke: config, protocol, degraded-not-error, recovery, warming, routing PASS')
+    print('plugin_contract_smoke: config, no-config-file activation, protocol, degraded-not-error, recovery, warming, routing PASS')
     return 0
 
 

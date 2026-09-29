@@ -15,6 +15,13 @@ documentation says, please tell us. Use the issue forms:
 - **Closure confirmation** — confirming a fix landed, or that it did not
 - **Feedback round (parent issue)** — a batch of items from an ongoing adoption
 
+You do not need to be added to this repository to file one. Any GitHub account
+can open an issue: use the forms in a browser at the repository's issue
+chooser, or, from a solet, follow the upstream feedback runbook
+(`plugins/github_midwife_plugin/knowledge_base/07_upstream_feedback_runbook.md`),
+which files the same items with the GitHub CLI. Labels and links between issues
+are ours to add when we triage, so you never need to set them.
+
 The forms exist because the evidence they ask for is what makes a report
 actionable. A defect report with the version, the command, and the actual
 output is worth more to us than a patch.

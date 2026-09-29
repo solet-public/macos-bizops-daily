@@ -1,5 +1,5 @@
 name: Feedback round (parent issue)
-description: The container for a multi-item round. File this first, then attach each item's issue to it as a sub-issue.
+description: The container for a multi-item round. File this first, then file each item's issue and add a checklist of their links to this issue's body.
 title: "Part N — feedback round from <your-solet-name>"
 labels: ["feedback-round"]
 body:
@@ -46,9 +46,10 @@ body:
     attributes:
       label: Items in this round
       description: >-
-        One line per item — number, class, and one-line summary. Attach each
-        item's issue as a sub-issue once filed; this list is the human-readable
-        index of the same thing.
+        One line per item — number, class, and one-line summary. Once an item's
+        issue is filed, edit this issue and add a checklist line for it,
+        `- [ ] #<issue number>`; this list is the human-readable index of the
+        same thing. You opened this issue, so you can edit it.
       value: |
         | Item | Class | Summary |
         |---|---|---|

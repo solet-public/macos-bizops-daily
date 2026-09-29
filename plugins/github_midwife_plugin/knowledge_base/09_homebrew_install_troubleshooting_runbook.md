@@ -53,6 +53,23 @@ Homebrew versions have no trust store and install directly. Record which
 case the machine was in; it decides whether an upgrade later needs the same
 step.
 
+## Before `brew install`: another solet on the same Mac
+
+Installing the Manager can upgrade the shared `python@3.13`, because Homebrew
+treats a dependency as satisfied only at its latest version. Any solet whose
+`.venv` links that Python, including one the Manager did not create, then has
+its Keychain credentials refused (`-25293`, "make sure executable is signed
+with codesign util") at its next restart: the Keychain ACL of an ad-hoc-signed
+binary pins its exact code-directory hash. Run `brew install --dry-run
+solet-public/tap/solet` first and look for `python@3.13` under `Would upgrade`;
+`brew pin python@3.13` makes the install stop instead (`brew unpin` when the
+move is intended). To recover a solet already affected, in a logged-in GUI
+session (not SSH) read each of its Keychain items once under its current
+interpreter and answer **Always Allow**, not Allow. After `solet-manager
+import`, `solet doctor <name>` reports `doctor::python_interpreter_drift_v1`
+for a venv created under one `python@3.13` version that now resolves to
+another; it does not see a same-version revision bump.
+
 ## The loop: preview, approve, repeat
 
 `solet create` is not a single run. Each pass is one of two things:
@@ -171,8 +188,10 @@ this shared service. A stale loaded definition requires host-level
 coordination; setup reports it rather than replacing a running shared job.
 `solet doctor <name> --json` reports a separate login-item advisory; unreadable
 state is unknown, and does not change completion verification.
-`solet inspect <name> --json` reads named LM Studio conditions without starting
-the daemon or loading a model.
+`solet inspect --target <path> --json` reads named LM Studio conditions without
+starting the daemon or loading a model. It is an active probe that may run
+binaries inside the target, not a passive read; for a read-only classification
+of an existing solet use `solet-manager inspect`.
 
 ## macOS 26 (Tahoe): llama.cpp for a fresh macos-bizops create
 
@@ -437,4 +456,5 @@ directly beforehand.
 File issues on the seed repository (`solet-public/macos-bizops`) with
 `solet --version`, the exact command, and the full JSON it printed. A precise
 report with the transaction journal attached is the fastest route to a fix;
-pull requests are not accepted.
+pull requests are not accepted. The upstream feedback runbook has the filing
+path that works for an ordinary account with no repository access.

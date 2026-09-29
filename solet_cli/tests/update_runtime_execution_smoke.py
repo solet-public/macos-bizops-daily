@@ -53,6 +53,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _step5_support import (  # noqa: E402
+    KB,
+    TEMPLATES,
     FakeHost,
     Fixture,
     advance_to_source_advanced,
@@ -64,6 +66,7 @@ from _step5_support import (  # noqa: E402
     expect,
     git,
     runtime_fingerprint,
+    template_bytes,
 )
 from solet_manager import update_runtime_execution as executor  # noqa: E402
 from solet_manager.errors import ProbeDriftError, UpdateBlockedError, UpdateFailedError  # noqa: E402
@@ -373,6 +376,62 @@ def _assert_d1_destination_rules(root: Path) -> None:
     _check("probe_drift" in cast(ProbeDriftError, exc).error_kind, "a change to a consulted ignore source between preview and apply is probe_drift")
 
 
+_ROOT = Path(__file__).resolve().parents[2]
+_SKILL_TEMPLATE = "feedback_skill_SKILL.md.template"
+_R56_SKILL = _ROOT / "plugins/github_midwife_plugin/tests/fixtures/hydration_predecessors/feedback_skill_r56.fixture"
+
+
+def _feedback_skill_fixture(root: Path, installed: str) -> Fixture:
+    """A fixture whose baseline holds the r56 feedback template, whose candidate holds the shipped one and declares the SHIPPED ``feedback_skill`` artifact, with ``installed`` at the user-scope skill path."""
+    shipped = {row["artifact_id"]: row for row in json.loads((_ROOT / KB / "existing_install_flow.json").read_text())["managed_artifacts"]}
+    reference = f"{TEMPLATES}/{_SKILL_TEMPLATE}"
+    fixture = build_fixture(root, document=lambda baseline: bundle_document(baseline, artifacts=[*default_artifacts(), shipped["feedback_skill"]]), baseline_extra={reference: _R56_SKILL.read_bytes()}, extra_candidate_files={reference: template_bytes(_SKILL_TEMPLATE)})
+    skill = fixture.home / ".claude" / "skills" / "feedback" / "SKILL.md"
+    skill.parent.mkdir(parents=True, exist_ok=True)
+    skill.write_text(installed, encoding="utf-8")
+    return fixture
+
+
+def _assert_feedback_skill_refresh(root: Path) -> None:
+    """r57 hands-off fix: an update replaces an installed r56 feedback skill, and leaves an operator-edited one alone."""
+    old = _R56_SKILL.read_text(encoding="utf-8").replace("{{SOLET_NAME}}", "fixture")
+    _check("--label defect" in old, "fixture: the installed skill carries the defective --label step")
+    stale = _feedback_skill_fixture(root / "stale", old)
+    skill = stale.home / ".claude" / "skills" / "feedback" / "SKILL.md"
+    advance_to_source_advanced(stale)
+    preview = preview_update_instance(stale.request)
+    rows = {cast(str, data(row, "artifact_id")): row for row in cast(list[Any], preview.data["managed_artifacts"])}
+    row = rows["feedback_skill"]
+    _check(preview.status == "runtime_preview_ready" and preview.exit_code == 0, f"preview with a stale skill is ready: {preview.status} {preview.data.get('blocked')}")
+    _check((data(row, "state"), data(row, "action"), data(row, "conflict")) == ("legacy_matched", "render_whole", None), "the dry-run plan shows the skill replacement as part of the approved plan")
+    _check(skill.read_text(encoding="utf-8") == old, "the dry-run wrote nothing")
+    applied = apply_update(stale.request, cast(str, preview.data["runtime_approval_fingerprint"]))
+    _check(applied.status == "promoted" and applied.exit_code == 0, f"update promoted: {applied.status} {applied.error_kind} {applied.message}")
+    refreshed = skill.read_text(encoding="utf-8")
+    _check(refreshed.startswith("---\nname: feedback\n") and "--label defect" not in refreshed and "issues/$PARENT_NUMBER/sub_issues" not in refreshed, "the installed skill is now the fixed one, front matter first")
+    root_backup = backup_root(stale.paths, stale.record().instance_id, cast(str, applied.data["operation_id"]))
+    _check((root_backup / "feedback_skill" / "before.bytes").read_bytes() == old.encode("utf-8"), "the r56 skill was backed up byte-for-byte before the write")
+    afters = {item["artifact_id"]: item["after_sha256"] for item in _hydration_after_digests(stale)}
+    _check(afters.get("feedback_skill") == file_sha256(skill), "the journaled after digest equals the installed skill")
+    _assert_edited_skill_left_alone(root / "edited", old + "\nAlways file as urgent.\n")
+
+
+def _assert_edited_skill_left_alone(root: Path, edited: str) -> None:
+    fixture = _feedback_skill_fixture(root, edited)
+    skill = fixture.home / ".claude" / "skills" / "feedback" / "SKILL.md"
+    advance_to_source_advanced(fixture)
+    preview = preview_update_instance(fixture.request)
+    rows = {cast(str, data(row, "artifact_id")): row for row in cast(list[Any], preview.data["managed_artifacts"])}
+    row = rows["feedback_skill"]
+    _check(preview.status == "runtime_preview_ready" and not preview.data["blocked"], f"an edited skill does not block the update: {preview.status} {preview.data.get('blocked')}")
+    _check((data(row, "state"), data(row, "action"), data(row, "conflict")) == ("unknown_origin", "none", None), "the preview reports the edited skill as unknown origin with no action")
+    applied = apply_update(fixture.request, cast(str, preview.data["runtime_approval_fingerprint"]))
+    _check(applied.status == "promoted", f"the update still promotes: {applied.status} {applied.error_kind}")
+    _check(skill.read_text(encoding="utf-8") == edited, "the operator's edited skill is left byte-for-byte")
+    root_backup = backup_root(fixture.paths, fixture.record().instance_id, cast(str, applied.data["operation_id"]))
+    _check(not (root_backup / "feedback_skill").exists(), "an untouched skill takes no backup")
+
+
 def _assert_strategy_selection(root: Path) -> None:
     forced = build_fixture(root / "forced", document=lambda baseline: bundle_document(baseline, strategy="single_color_required"), router=True)
     advance_to_source_advanced(forced)
@@ -406,6 +465,7 @@ def main() -> int:
         _assert_launchctl_failures(root / "launchctl")
         _assert_retry_safe_dependency(root / "retry")
         _assert_d1_destination_rules(root / "d1")
+        _assert_feedback_skill_refresh(root / "skill")
         _assert_strategy_selection(root / "strategy")
     _check(subprocess.run(("git", "--version"), capture_output=True, check=False).returncode == 0, "git present")
     print(f"update_runtime_execution_smoke OK: {_CHECKS} checks passed")

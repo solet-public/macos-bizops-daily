@@ -84,7 +84,7 @@ def run_create_command(
 
 
 def run_inspect_command(args: argparse.Namespace) -> CommandResult:
-    """Run passive inspection using only the caller-supplied target path."""
+    """Run the active ``solet inspect`` probe (may run target binaries) on the caller-supplied path."""
     if not isinstance(args.target, Path):
         raise AssertionError("inspect parser did not provide a target path")
     return inspect_target(args.target)

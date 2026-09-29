@@ -75,10 +75,68 @@
 # started it. The gate is FAIL-OPEN when unset, so "no block happened" is not
 # evidence it is armed -- prove one real block from a non-controller session
 # before believing it (runbook Step 4a).
+# tmux self-hosting. Every fleet session runs inside a tmux session named
+# exactly its role. Headless sessions are not supported: the solet drives and
+# wakes a session through its tmux pane, so a session started in a bare
+# terminal tab cannot be reached. Contract of _tmux_host_for_{{SOLET_NAME}}:
+#   - not inside tmux, or inside some OTHER tmux session: create a detached
+#     session named <role>, run this same launcher inside it, then attach
+#     (switch-client when nested). Attach is a child, not an exec, so
+#     detaching (C-b d) returns to the shell and the session keeps running.
+#     Returns 2: the caller must NOT exec claude here.
+#   - inside the tmux session named <role>: this IS the inner invocation.
+#     Returns 0: the caller execs claude in the pane.
+#   - a session named <role> already exists: attach to it (switch-client when
+#     nested) instead of starting a second copy. Returns 2. To replace the
+#     running session use the restart variant below.
+#   - tmux missing: refuse loudly (return 1). No bare-terminal fallback.
+# The {{SOLET_NAME}}_FLEET_* knobs below are forwarded into the new pane with
+# tmux -e, so a knob exported in the launching shell reaches the session even
+# when a tmux server is already running with a different environment.
+_tmux_host_for_{{SOLET_NAME}}() {
+  local host="$1"        # tmux session name == role
+  local inner_cmd="$2"   # zsh command line to run inside the new pane
+  local tmux_bin
+  tmux_bin="$(command -v tmux)" || {
+    echo "[launcher] REFUSED: tmux is not installed; every fleet session must run in tmux. Install it (brew install tmux) and retry." >&2
+    return 1
+  }
+  if [[ -n "$TMUX" ]] && [[ "$("$tmux_bin" display-message -p '#S' 2>/dev/null)" == "$host" ]]; then
+    return 0
+  fi
+  if ! "$tmux_bin" has-session -t "=$host" 2>/dev/null; then
+    local -a env_flags
+    local knob
+    for knob in {{SOLET_NAME}}_FLEET_SKIP_PERMISSIONS {{SOLET_NAME}}_FLEET_MCP_CHANNELS {{SOLET_NAME}}_FLEET_TRANSPORT; do
+      [[ -n "${(P)knob}" ]] && env_flags+=(-e "$knob=${(P)knob}")
+    done
+    "$tmux_bin" new-session -d -s "$host" -c "$PWD" "${env_flags[@]}" "zsh -ic ${(q)inner_cmd}" || return 1
+    echo "[launcher] tmux session '$host' created; attaching (detach with C-b d, the session keeps running)"
+  else
+    echo "[launcher] tmux session '$host' already exists; attaching"
+  fi
+  if [[ -n "$TMUX" ]]; then
+    "$tmux_bin" switch-client -t "=$host"
+  else
+    "$tmux_bin" attach-session -t "=$host"
+  fi
+  return 2
+}
+
 _claude_for_{{SOLET_NAME}}() {
   local role="$1"
   local model="$2"    # optional CLI model alias; empty = settings.json default
   local effort="$3"   # optional effort level; empty = settings.json default
+
+  # Re-enter THIS function inside the role's tmux session with the same three
+  # args, positionally quoted so an empty arg stays an empty arg.
+  _tmux_host_for_{{SOLET_NAME}} "$role" \
+    "_claude_for_{{SOLET_NAME}} ${(q)role} ${(q)model} ${(q)effort}"
+  case $? in
+    0) ;;
+    2) return 0 ;;
+    *) return 1 ;;
+  esac
 
   typeset -a extra_flags
   [[ -n "$model" ]]  && extra_flags+=(--model "$model")
@@ -105,13 +163,17 @@ _claude_for_{{SOLET_NAME}}() {
 #
 # claude-{{SOLET_NAME}}-coordinator() { _claude_for_{{SOLET_NAME}} Coordinator }
 #
-# Restart variant (kill any running session under this role label first,
-# then launch fresh in the current pane -- mirrors the single-session
-# launcher's restart shape):
+# Each role function creates (or attaches to) the tmux session named for the
+# role, so `claude-{{SOLET_NAME}}-coordinator` from any terminal tab is safe to
+# repeat. Attach later with: tmux attach -t =Coordinator   (list: tmux ls).
+#
+# Restart variant (kill any running session under this role label and its
+# tmux session first, then launch fresh in a new tmux session):
 #
 # claude-{{SOLET_NAME}}-restart-coordinator() {
 #   local pids
 #   pids="$(pgrep -f "claude .*--name Coordinator( |\$)" 2>/dev/null)"
 #   [[ -n "$pids" ]] && echo "$pids" | xargs kill 2>/dev/null && sleep 1
+#   tmux kill-session -t =Coordinator 2>/dev/null
 #   _claude_for_{{SOLET_NAME}} Coordinator
 # }

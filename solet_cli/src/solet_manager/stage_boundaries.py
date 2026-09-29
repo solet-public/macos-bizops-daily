@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from .adapter_protocol import probe_timeout_seconds
 from .adapters import AdapterRegistry, OperationRequest, OperationResult, invoke_adapter
 from .contracts import ContractBundle, knowledge_readiness_budget, startup_readiness_budget
 from .errors import StateConflictError
@@ -178,7 +179,7 @@ def _invoke_boundary_probe(
             answers=answers,
         )
     public_inputs = probe_public_inputs(transaction, str(definition["probe_ref"]))
-    timeout_seconds = 30
+    timeout_seconds = probe_timeout_seconds(str(definition["probe_ref"]))
     if boundary == "exit" and probe_id in startup_readiness_budget(bundle).consumer_probe_refs:
         readiness = startup_readiness_budget(bundle)
         timeout_seconds = readiness.parent_budget_seconds

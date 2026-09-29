@@ -8,7 +8,7 @@ Article Role: operations_runbook
 
 Article Tags: planning-stage:solet-lifecycle, evidence-category:operations-runbook, domain:local-solet, domain:client-deployment, consumer_profile:both
 
-Embedding Description: How a deployed solet's driving agent reports platform defects, asks questions, requests features, proposes a design, and confirms fixes upstream to the maintainers of the seed it was born from — filing every item as a GitHub issue through the seed repository's issue forms, why the seed accepts bug reports but not pull requests or patches, what to do when you are carrying a local fix or divergence and want to know whether upstream wants it, sending an RFC-shaped design proposal as a feature-request issue carrying the design in its body, grouping a round under a parent issue with sub-issues, the numbered item vocabulary that keeps every item individually answerable, the evidence and content rules for what may and may not appear in an outbound report, and how answers come back as issue closures and GitHub releases.
+Embedding Description: How a deployed solet's driving agent reports platform defects, asks questions, requests features, proposes a design, and confirms fixes upstream to the maintainers of the seed it was born from — filing every item as a GitHub issue through the seed repository's issue forms, why the seed accepts bug reports but not pull requests or patches, what to do when you are carrying a local fix or divergence and want to know whether upstream wants it, sending an RFC-shaped design proposal as a feature-request issue carrying the design in its body, filing with an ordinary read-only GitHub account that is not a repository collaborator and so cannot set labels or sub-issue links, grouping a multi-item round under a parent issue whose body carries a checklist of the item issues, what to do when the GitHub CLI is missing or not signed in, the numbered item vocabulary that keeps every item individually answerable, the evidence and content rules for what may and may not appear in an outbound report, and how answers come back as issue closures and GitHub releases.
 
 **When you need this**: you hit a platform defect, a confusing behavior, or a missing capability and want the maintainers to know; the operator asks "can we get this fixed upstream?"; you are carrying a local fix or divergence and need to know whether upstream wants it; you are wondering whether to open a pull request or send a patch; you sent feedback in a previous round and need to check what happened to it; you want to propose a design rather than report a problem; deciding what is safe to include in an outbound report.
 
@@ -42,10 +42,40 @@ It also does not constrain you. This code is Apache-2.0: you already have the ri
 
 ### Filing an item as an issue
 
-1. **File non-interactively with `gh issue create --body-file`.** The issue forms are a browser UI; mirror the matching form's required visible field labels in the draft, add the checked content-gate acknowledgement, and apply that form's label. The API does not enforce the fields, so verify the structured draft before sending rather than relying on a chooser.
-2. **One issue per item.** Resist the urge to fold three defects into one issue; each needs its own disposition, and a merged issue can only be closed once.
-3. **A multi-item round gets a parent issue.** File a parent issue for the round, then attach each item's issue to it as a sub-issue. The parent carries the round's context and gives both sides one place to see what is still open; the children carry the individually answerable items.
-4. **A single-item round needs no parent.** File the one issue.
+**What a filer can and cannot do.** Any GitHub account can open an issue on the seed repository, comment on it, and edit the title and body of an issue it opened itself. Setting a label or a sub-issue link is different: it needs triage or write access, which an adopter's own account does not have. GitHub does not refuse the attempt loudly. Issue creation through the API drops a label the filer may not set and still succeeds ("Labels are silently dropped otherwise", GitHub's REST documentation), and the sub-issues endpoint answers `404 Not Found` (reported upstream as issue 65). The web issue forms are the one place a label is applied for the filer, because the form declares it. Maintainers classify at triage, so nothing below needs a label, a sub-issue link, collaborator access or a pull request. Every step uses only what a read-only account can do.
+
+**The class travels in the body.** Start every draft with a first line `Class: defect`, `Class: question`, `Class: feature-request`, `Class: closure-confirmation` or `Class: feedback-round`. The title carries the item number. A maintainer can then label at triage from the text alone, whichever way the issue was filed.
+
+**One canonical path, from a headless driving session** (the GitHub CLI signed in as the operator's own account):
+
+1. **One issue per item.** Resist the urge to fold three defects into one issue; each needs its own disposition, and a merged issue can only be closed once. File it with `gh issue create --repo "$REPOSITORY" --title ... --body-file ...`, with no label option. The draft mirrors the matching form's required visible field labels and ends with the checked content-gate acknowledgement. The API does not enforce the fields, so verify the structured draft before sending rather than relying on a chooser.
+2. **A multi-item round gets a parent issue.** File the parent first, using the feedback-round structure, and read its number from the URL `gh issue create` prints.
+3. **Each item points at its parent in its own body.** Put `Round: #<parent number>` on the second line of every item draft, and start the title with the item number (`§N.M — summary`).
+4. **The parent lists its items in its own body.** After the items exist, add one checklist line per item under "Items in this round", `- [ ] #<item number> — §N.M — class — summary`, and update the parent with `gh issue edit "$PARENT_NUMBER" --repo "$REPOSITORY" --body-file ...`. You opened the parent, so GitHub lets you edit it. If the edit is refused, post the same checklist as a comment on the parent with `gh issue comment`. Any account may comment.
+5. **A single-item round needs no parent.** File the one issue.
+
+```bash
+gh --version && gh auth status
+REPOSITORY="$(gh repo view "$(git remote get-url origin)" --json nameWithOwner --jq .nameWithOwner)"
+PARENT_URL="$(gh issue create --repo "$REPOSITORY" --title "Part N — feedback round from <solet-name>" --body-file workbench/part-N-round.md)"
+PARENT_NUMBER="${PARENT_URL##*/}"
+CHILD_URL="$(gh issue create --repo "$REPOSITORY" --title "§N.M — concise summary" --body-file workbench/part-N-item-M.md)"
+gh issue edit "$PARENT_NUMBER" --repo "$REPOSITORY" --body-file workbench/part-N-round.md
+```
+
+**In a browser.** Open `https://github.com/<owner>/<repo>/issues/new/choose` (the owner and repository come from `git remote get-url origin`), pick the form for the item's class, and submit it. The form applies its own label. For a round, submit the Feedback round form first. Then submit each item's form with `§N.M (round #<parent number>)` in its Item number field, and edit the parent's body to add the checklist of item links.
+
+**If `gh` is missing or not signed in.** Do not install it mid-round, and do not start a browser login flow. Save the round as one local Markdown file under `workbench/` (create the directory if it does not exist), named like part-N-round.md: the parent first, then each item under its own `## §N.M` heading, each starting with its `Class:` line. Tell the operator the file path and the new-issue URL above, and let them paste each section into its own form. Nothing is filed until they do.
+
+<!-- not-attempt:start -->
+**What you must NOT attempt.** Each of these fails for a filer without write access, and several fail silently:
+
+- Do not pass `--label` to `gh issue create`, and do not follow it with `gh issue edit --add-label`. The first drops the label and reports success, and the second is refused.
+- Do not attach items through the sub-issues API (`gh api ... /sub_issues`). It answers `404` for a filer without write access.
+- Do not use `gh issue create --web`. It needs a browser that a headless session does not have.
+- Do not open a pull request, push a branch or send a patch. The repository accepts none of them.
+- Do not ask for collaborator access, and do not re-file an issue to fix its labels.
+<!-- not-attempt:end -->
 
 Outbound sends are external publication: get the operator's explicit yes before filing, and let them see what is being sent. This is one conversation, not a standing burden — an operator can grant standing approval for feedback that passes the content gate below.
 

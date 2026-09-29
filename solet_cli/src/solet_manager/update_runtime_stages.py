@@ -15,14 +15,14 @@ from typing import TYPE_CHECKING, cast
 from .adapter_protocol import OperationResult
 from .errors import AdapterProtocolError, BackupMissingError, RestoreTargetDivergedError, UpdateBlockedError, UpdateFailedError
 from .existing_install_bundle import RuntimeOperation
-from .managed_artifact_backup import backup_root, file_sha256, restore_artifact, write_backup
+from .managed_artifact_backup import action_backup_key, backup_root, file_sha256, legacy_indexed_backup_covers, restore_artifact, write_backup
 from .models import CheckpointStatus, JsonValue, ManagedArtifactState, RuntimePlan
 from .update_runtime_plan import artifact_states
 
 if TYPE_CHECKING:
     from .update_runtime_execution import RuntimeExecution
 
-__all__ = ["artifact_state", "hydrate_one", "hydration_stage", "require_backups_on_reentry", "require_plist_expected"]
+__all__ = ["artifact_state", "backup_targets", "hydrate_one", "hydration_stage", "require_backups_on_reentry", "require_plist_expected"]
 _RECONCILE = "Run `solet-manager reconcile {name} --dry-run` to plan a successor operation."
 
 
@@ -32,11 +32,26 @@ def require_backups_on_reentry(execution: RuntimeExecution, operation: RuntimeOp
     if row["status"] != "applying":
         return
     root = backup_root(execution.paths, execution.record.instance_id, execution.operation_id)
-    for index, action in enumerate(probe.planned_actions):
-        if not Path(action.target).is_absolute():
+    for action in probe.planned_actions:
+        target = Path(action.target)
+        if not target.is_absolute():
             continue
-        if not (root / f"{operation.operation_id}.{index}" / "before.json").is_file():
+        if (root / action_backup_key(operation.operation_id, action.id) / "before.json").is_file():
+            continue
+        if not legacy_indexed_backup_covers(execution.paths, execution.record.instance_id, execution.operation_id, operation.operation_id, target):
             raise BackupMissingError(f"{operation.operation_id} re-entered applying without its backup record for {action.target}", repair=_RECONCILE.format(name=execution.record.name))
+
+def backup_targets(execution: RuntimeExecution, operation: RuntimeOperation, probe: OperationResult) -> None:
+    """Capture each planned absolute target's entry state, keyed by action id, before apply."""
+    for action in probe.planned_actions:
+        target = Path(action.target)
+        if not target.is_absolute():
+            continue
+        if legacy_indexed_backup_covers(execution.paths, execution.record.instance_id, execution.operation_id, operation.operation_id, target):
+            continue  # an r56 Manager keyed this backup by list position; it is the true entry state, never re-capture over it
+        record = write_backup(execution.paths, execution.record.instance_id, execution.operation_id, action_backup_key(operation.operation_id, action.id), target)
+        execution._record(operation.operation_id, "manager", None, status=None, note={"backup": record.to_dict()})  # noqa: SLF001
+
 
 _REFUSALS = frozenset({CheckpointStatus.BLOCKED, CheckpointStatus.AWAITING_USER, CheckpointStatus.FAILED})
 

@@ -29,6 +29,13 @@ target_queries:
   - "how do I contribute a fix upstream to the seed"
   - "does upstream want my patch"
   - "group a multi item feedback round under a parent issue"
+  # Added 2026-09-29 with the r57 feedback-path fix: the questions a filer with an
+  # ordinary, non-collaborator GitHub account asks when the label or sub-issue
+  # step fails, or when the GitHub CLI is missing. Not yet run against a
+  # re-indexed article: retrieval needs the live embedding index.
+  - "can I file feedback from a github account that is not a repository collaborator"
+  - "my issue label was dropped and the sub-issue link returned 404"
+  - "gh is not installed or not signed in how do I send feedback upstream"
   - "what is safe to include in an outbound feedback report"
   - "carrying a local fix should we upstream it"
   - "how do I find out that my reported item was fixed"

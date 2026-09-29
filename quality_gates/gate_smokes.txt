@@ -103,6 +103,7 @@ plugins/macos_self_deployment_plugin/tests/router_socket_wait_smoke.py
 plugins/macos_self_deployment_plugin/tests/prepare_readiness_restore_race_smoke.py
 plugins/macos_self_deployment_plugin/tests/router_socket_ownership_smoke.py
 plugins/macos_self_deployment_plugin/tests/readiness_arming_smoke.py
+plugins/macos_self_deployment_plugin/tests/stray_cold_start_guard_smoke.py
 # r38 C2: router authority is the only release boundary for deferred local
 # inference work; a merely registered inactive color cannot start it.
 plugins/macos_self_deployment_plugin/tests/cold_boot_post_registration_release_smoke.py
@@ -4800,6 +4801,14 @@ solet_cli/tests/doctor_genesis_marker_census_smoke.py
 # cannot drift silently. Offline: constructed `psql --version` output only.
 solet_cli/tests/doctor_postgres_pin_census_smoke.py
 
+# Python interpreter drift (iss_d62aeab7, macos-bizops issue 73, r57): a Homebrew
+# python@3.13 upgrade replaces the ad-hoc-signed interpreter a solet's .venv links,
+# and every Keychain ACL pinned to the old binary then refuses with -25293. This
+# registers the doctor advisory that compares the version pyvenv.cfg recorded with
+# the Cellar version the interpreter link resolves to now. It does NOT read an ACL
+# or hash a signature. Offline: constructed directory trees only, nothing executed.
+solet_cli/tests/doctor_python_interpreter_census_smoke.py
+
 # Router identity read-back (D-7.4 iss_c30be917, 2026-09-05): _verify_router_up
 # returns on ANY status reply containing router_started_at -- no pid, port or
 # identity comparison -- so an INCUMBENT router already listening at the socket is
@@ -5161,6 +5170,7 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: plugins/github_midwife_plugin/tests/plugin_transition_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin/resources/default_config.json; absent from macos_free_minimal and macos_samantha; its fixture copies that file from the repository into every target (cross_bundle_transition)
 # not shipped: solet_cli/tests/update_plugin_transition_deferral_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin/resources/default_config.json; absent from macos_free_minimal and macos_samantha; its fixture copies that file from the repository into every target (cross_bundle_transition)
 # not shipped: solet_cli/tests/update_transition_bundle_candidates_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builds each bundle's candidate from seed_resolver, and the seed factory is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_stable_r48_predecessor_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it builds its candidate with update_transition_bundle_candidates_smoke's seed_resolver fixture, and the seed factory is in no capability bundle (fixture_build_tooling)
 
 # LM Studio provisioning, singleton login and passive diagnostics
 plugins/github_midwife_plugin/tests/lm_studio_provisioning_smoke.py
@@ -5193,6 +5203,9 @@ solet_cli/tests/update_inventory_publication_smoke.py
 # Existing-Solet Step-4 `solet-manager update` argument contract and closed error/exit projection.
 solet_cli/tests/update_cli_smoke.py
 
+# `solet` points existing-solet verbs at `solet-manager`; `solet inspect` states it is an active probe (iss_a047d26c, iss_389fda4c).
+solet_cli/tests/solet_cli_manager_pointer_smoke.py
+
 # Existing-Solet Step-4 end-to-end: preview, hostile-config refusal, ignored-file collision, exact fast-forward, crash resume, blocked journal.
 solet_cli/tests/update_execution_smoke.py
 
@@ -5210,6 +5223,7 @@ solet_cli/tests/existing_install_bundle_smoke.py
 solet_cli/tests/reconciliation_request_smoke.py
 solet_cli/tests/managed_artifact_backup_smoke.py
 solet_cli/tests/update_runtime_execution_smoke.py
+solet_cli/tests/update_backup_action_keying_smoke.py
 solet_cli/tests/existing_install_router_cutover_smoke.py
 plugins/github_midwife_plugin/tests/existing_install_operations_smoke.py
 
@@ -5409,6 +5423,9 @@ ananta/tests/llm/session_ledger/embedding_token_budget_smoke.py
 # and Apple-native predecessors update; macOS 26 keeps LM Studio for embeddings and summaries (rul_5cc2910c); a host
 # that later reaches macOS 27 switches at the next release; an interrupted switch
 # is put back; a fresh solet never gets the transition-retained plugins; LM Studio and its models stay byte-identical.
+# iss_ae956dd6 (r56), iss_933eff4e (r57): a stable r48, r55 or r56 solet (real roster, judged at the real commit and tree against
+# the shipped predecessor rows) previews an actionable plan and promotes verified; an unlisted published commit and the r48 commit
+# with r43's tree are refused.
 # iss_fcbfabb7: a create blocked only at completion (the r46-r48 embeddings checks) updates and
 # promotes; one predicate gates update and import at preview and apply; installs in flight and identity
 # mismatches still refuse; the predicate is proven over every checkpoint assignment.
@@ -5433,3 +5450,14 @@ plugins/github_midwife_plugin/tests/llama_cpp_missing_model_warning_smoke.py
 plugins/github_midwife_plugin/tests/llama_cpp_server_probe_budget_smoke.py
 plugins/github_midwife_plugin/tests/tahoe_closure_no_macos27_wheel_smoke.py
 plugins/openai_embeddings_plugin/tests/llama_cpp_token_budget_smoke.py
+solet_cli/tests/probe_timeout_override_smoke.py
+# feedback-path drift guard (r57, iss_fe707974 / iss_c3afc869): an adopter's own GitHub
+# account is an ordinary read-only account on the seed repository, so a label passed at
+# issue creation is silently dropped, the sub-issues endpoint answers 404, and
+# `gh issue create --web` needs a browser a headless solet lacks. The runbook and the
+# /feedback skill template are the canonical path; this fails if any shipped feedback
+# surface (discovered by glob, forms and CONTRIBUTING.md included) reintroduces `--label`,
+# the sub_issues API, an "attach as a sub-issue" step, `--web` or an un-negated "submit a
+# PR". RED against the r56 text (7 findings in 5 files), GREEN after. Offline, reads shipped
+# files only; `--root <tree>` runs it against another checkout.
+plugins/github_midwife_plugin/tests/feedback_path_drift_guard_smoke.py

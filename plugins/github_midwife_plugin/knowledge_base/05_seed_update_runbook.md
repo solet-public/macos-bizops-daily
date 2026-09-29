@@ -134,6 +134,10 @@ and similar), or that redirects its work tree (`core.worktree`, or
 and `update` all refuse with `git_execution_surface_unsafe` and the
 repair: remove that configuration from the checkout, then retry.
 
+These are `solet-manager` verbs. `solet --help` does not list `import`, `update`
+or this `inspect`, and `solet update` / `solet import` refuse with a pointer to
+the `solet-manager` command. `solet inspect` is a different, active probe.
+
 ```bash
 brew install solet-public/tap/solet                       # once; brew upgrade for every later release
 solet-manager inspect --target <clone> --channel stable   # classify; exit 3 attention_required is the normal answer for a real clone
@@ -241,9 +245,19 @@ the healthy state, not an error.
   (`plugins/github_midwife_plugin/knowledge_base/plugin_transitions.json`) to a solet whose profile still
   carries the predecessor plugin. See "Plugin transitions: LM Studio solets
   move to the Apple-native stack" below.
-- Step 5 hydration re-run → `hydration_reconcile` for the three declared
+- Step 5 hydration re-run → `hydration_reconcile` for the four declared
   managed artifacts: the instance LaunchAgent plist, the `~/.zshrc` block,
-  the `~/.claude/CLAUDE.md` section (the rest: Part B).
+  the `~/.claude/CLAUDE.md` section, and the `/feedback` skill
+  (`~/.claude/skills/feedback/SKILL.md`) (the rest: Part B). The skill is
+  **refresh-only**: the update replaces it only when it is byte-identical to a
+  render of a previous release's template (which is every solet that still has
+  the r56 skill, whose filing steps fail for an account without repository
+  access), and it backs the old file up first like every managed artifact. A skill you edited is not
+  overwritten and does not stop the update: the preview lists it with
+  `state: unknown_origin` (or `locally_modified`) and `action: none`, the
+  final doctor reports `managed_artifact:feedback_skill` as verified-and-left
+  as it is, and the manual step in Part C Step 5 is how to bring the fix into
+  it. A missing skill is not created.
 - Step 6.1 plugin cache → `plugin_cache_refresh` (diff-based;
   `plugin_cache_current` in doctor section 11).
 - Step 6.4 KB re-install → `runtime.knowledge_reinstall` for every
@@ -324,11 +338,18 @@ Each of these stays manual because no Manager surface owns it; the reason
 is given with the step so the next release can close it deliberately.
 
 1. **Target-root `AGENTS.md`/`CLAUDE.md` hydration block, `client/bin/*`
-   launchers, `~/.claude/settings.json` hooks, the rename/feedback skills,
-   fleet functions.** Not declared managed artifacts in the shipped bundle;
-   `hydration_reconcile` owns only the three it declares. Re-run Part C
-   Step 5 for these, by hand (seed-side artifact declarations are follow-up
-   D7).
+   launchers, `~/.claude/settings.json` hooks, the rename skill, fleet
+   functions.** Not declared managed artifacts in the shipped bundle;
+   `hydration_reconcile` owns only the four it declares (the `/feedback`
+   skill is one of them; see Part A). Re-run Part C Step 5 for these, by hand
+   (seed-side artifact declarations are follow-up D7). The fleet file
+   (`client/<name>-fleet.zsh`) and the rest of `client/` stay manual for a
+   stated reason: they sit inside the clone, `client/` is not git-ignored in
+   existing clones, and the update plan refuses any destination inside the
+   target that the target does not ignore (design section 6.3), which would
+   stop the update for every solet, including the ones with no fleet file.
+   Part C Step 5 gives the exact steps for the fleet file and for a
+   hand-edited feedback skill.
 2. **The first-time export/workspace root answer** (Part C Step 4a). No CLI
    carrier for the answer exists; `migration_export_root_containment`
    blocks with `export_root_ambiguous` or `none` and that text, and
@@ -371,6 +392,7 @@ is given with the step so the next release can close it deliberately.
 ## Step 2 — pull, fast-forward only
 
 ```bash
+OLD=$(git -C <clone> rev-parse HEAD)   # keep this: Step 3 diffs against it
 git -C <clone> pull --ff-only
 ```
 
@@ -436,6 +458,66 @@ when it matters. Then, for each new plugin:
 
 If in doubt, this install form is idempotent — re-running it on an
 already-installed plugin is harmless.
+
+**Local packages are not only `plugins/<name>`.** A plugin can depend on a
+package that lives in the clone but outside `plugins/` — `solet_setup_contracts/`
+is the one today — and a plugin installed without it fails to import. Do not
+work from a list of names. Ask each `pyproject.toml` the pull changed which of
+its `dependencies` name a project that lives in this clone:
+
+```bash
+<clone>/.venv/bin/python - <clone> "$OLD" <<'EOF'
+import re, subprocess, sys, tomllib
+from pathlib import Path
+
+clone, old = Path(sys.argv[1]).resolve(), sys.argv[2]
+canon = lambda name: re.sub(r"[-_.]+", "-", name).lower()
+local: dict[str, Path] = {}  # project name -> its directory, for every pyproject.toml in the clone
+for pyproject in [*clone.glob("*/pyproject.toml"), *clone.glob("plugins/*/pyproject.toml")]:
+    project = tomllib.loads(pyproject.read_text()).get("project")
+    if project:
+        local[canon(project["name"])] = pyproject.parent
+changed = subprocess.run(
+    ["git", "-C", str(clone), "diff", "--name-only", f"{old}..HEAD", "--", "*/pyproject.toml"],
+    check=True, capture_output=True, text=True).stdout.split()
+for rel in changed:
+    for requirement in tomllib.loads((clone / rel).read_text())["project"].get("dependencies", []):
+        name = canon(re.split(r"[<>=!~;\[ ]", requirement, maxsplit=1)[0])
+        if name in local:
+            print(f"{rel}: needs {local[name].relative_to(clone)}")
+EOF
+```
+
+Every directory it prints gets the same install form as a plugin, run BEFORE
+the plugin that needs it (for example
+`pip install --no-build-isolation -e <clone>/solet_setup_contracts`). An empty
+output means no changed plugin gained a local dependency. Editable installs
+are idempotent, so installing a directory that was already present is harmless.
+
+## Step 3b — renamed commands (the bridge console script, `solet` → `solet-bridge`)
+
+The `agent_messaging_plugin` console script was renamed from `solet` to
+`solet-bridge` (2026-08-26). There is no compatibility alias: the old name is
+gone from the venv once the plugin is reinstalled, so any operator symlink or
+script that still points at `<clone>/.venv/bin/solet` is now dangling.
+`solet call …`, `solet health` and `solet watch …` are spelled
+`solet-bridge call …`, `solet-bridge health` and `solet-bridge watch …`; the
+bare name `solet` is the Manager, which has no `call` subcommand at all.
+
+A clone born before the rename has a named launcher symlink at
+`~/.local/bin/<name>` that targets the old script. Reinstall the messaging
+plugin so the new console script exists, then re-point the link:
+
+```bash
+<clone>/.venv/bin/python -m pip install --no-build-isolation -e <clone>/plugins/agent_messaging_plugin
+readlink ~/.local/bin/<name>            # …/.venv/bin/solet means it still needs the fix
+ln -sfn <clone>/.venv/bin/solet-bridge ~/.local/bin/<name>
+test -x ~/.local/bin/<name> && <name> health
+```
+
+`ln -sfn` replaces only the link and leaves the clone untouched. Update any
+shell function, LaunchAgent argument or note of your own that spells
+`.venv/bin/solet` the same way.
 
 ## Step 3a — the solet rename migration (MANDATORY when the update crosses 2026-08-13)
 
@@ -644,6 +726,54 @@ as a standalone change justified by this one gap alone. Until then, this
 paragraph — read at update time, not detected at runtime — is the
 mechanism.
 
+**Exact re-render of the fleet file and of a hand-edited feedback skill (r57).**
+Both are plain renders you can do yourself with the solet's name in place of
+`<name>` and `<clone>` for its directory. Replace tokens by literal text
+substitution only, never `str.format` and never a shell heredoc (the templates
+carry live `$VAR` references). Take each backup path from `test -f`, adding
+`-HHMMSS` if it already exists; never overwrite a backup.
+
+*The `/feedback` skill.* The Manager path in Part A already replaces the r56
+skill; do this only when the preview listed it as edited, or when you are on
+the manual path.
+
+1. Read `~/.claude/skills/feedback/SKILL.md`. It is the broken r56 copy if it
+   has no heading `What you must NOT attempt`; the fixed skill always has one.
+2. Copy it to `~/.claude/skills/feedback/SKILL.md.pre-r57-<YYYYMMDD>`. If you
+   had edited it, show the operator what they changed (a diff against the
+   r56 template with the name filled in) so they can say what to keep.
+3. Read `<clone>/plugins/github_midwife_plugin/knowledge_base/hydration_templates/feedback_skill_SKILL.md.template`,
+   replace its one `{{SOLET_NAME}}` with `<name>`, write the result to
+   `~/.claude/skills/feedback/SKILL.md` (mode 0644), and re-apply any kept
+   edit on top.
+4. Check: the file's first line is `---`, and
+   `grep -c 'What you must NOT attempt' ~/.claude/skills/feedback/SKILL.md`
+   prints `1`.
+
+*The fleet file*, only if `<clone>/client/<name>-fleet.zsh` exists. The file
+holds two things: the launcher functions from the template, and the role
+functions you (or the operator) wrote below the line `# One function per role
+the operator chose in Step 4a.` Replace the first and keep the second.
+
+1. Read the file's `GIT_CONTROLLER_NAME="..."` line. The quoted value is the
+   operator's Step 4a choice. No such line means a solo deployment.
+2. Copy the file to `<clone>/client/<name>-fleet.zsh.pre-r57-<YYYYMMDD>`.
+3. Render `<clone>/plugins/github_midwife_plugin/knowledge_base/hydration_templates/fleet_functions.zsh.template`
+   in memory: replace every `{{SOLET_NAME}}` with `<name>`; replace
+   `{{GIT_CONTROLLER_NAME}}` with the value from step 1, or, for a solo
+   deployment, delete the whole line `  GIT_CONTROLLER_NAME="{{GIT_CONTROLLER_NAME}}" \`.
+4. In the existing file, replace everything above the line `# One function
+   per role the operator chose in Step 4a.` with the same region of the
+   render, and leave that line and everything below it untouched.
+5. For each existing `claude-<name>-restart-<role>` function, add the line
+   `tmux kill-session -t =<Role> 2>/dev/null` before its final
+   `_claude_for_<name> <Role>` call, as the template's commented restart
+   example shows. Role functions themselves need no change.
+6. Check: `zsh -n <clone>/client/<name>-fleet.zsh` prints nothing, and
+   `grep -c '_tmux_host_for_<name>' <clone>/client/<name>-fleet.zsh` prints
+   at least `2`. Tell the operator to open a new terminal: a shell that
+   already sourced the old file keeps the old functions.
+
 A release that ADDS a plugin needs one more route. Step 3's editable install
 puts the new code in the venv, but the pull never touches the clone's
 genesis-written `profile/config/manifest.yaml`, so the plugin stays
@@ -651,6 +781,24 @@ installed-but-inert until it is listed there. Add it to that manifest's
 `plugins:` list, restart again (Step 4), then run the hydration runbook's
 Step 4c for it — the `hydration_guidance.md` glob picks up the new plugin's
 activation work and first-use credential contract.
+
+A newly added plugin also has no config file: the pull never writes
+`profile/config/plugins/<plugin>.json`. The checked-in starting point is
+`plugins/github_midwife_plugin/knowledge_base/profile_baseline/<plugin>.json`
+(a baseline exists only for the plugins listed there). Copy it into place only
+if the live file is absent — never over an existing one:
+
+```bash
+cp -n <clone>/plugins/github_midwife_plugin/knowledge_base/profile_baseline/<plugin>.json \
+  <clone>/profile/config/plugins/<plugin>.json
+```
+
+A plugin whose `plugin.yaml` declares a default for every field it requires
+activates without the file (`macos_inference_plugin` does from r57; before
+that, activation failed on `context.attachment_scan_limit`). A field with no
+default anywhere — `coreai_embeddings_plugin`'s `asset_root` — still needs the
+operator's answer: without it the plugin raises `asset_root must be an
+absolute directory path` when it prepares.
 
 ## Step 6 — the four stale copies a restart alone does not refresh
 
@@ -990,7 +1138,7 @@ numbered document.** The item vocabulary you already use is unchanged — rounds
 are still `Part N`, items are still `§N.M`, the four item classes are the same,
 and the evidence and content rules are the same. What changed is where an item
 goes: each item is filed through the repository's issue form for its class,
-a multi-item round gets a parent issue with the items attached as sub-issues,
+a multi-item round gets a parent issue whose body carries a checklist of the items,
 and a design proposal — an RFC-shaped document — is a feature-request issue
 carrying the design in its body. **The repository accepts no pull requests and
 no patches** (see `CONTRIBUTING.md`); Apache-2.0 already lets you fork and

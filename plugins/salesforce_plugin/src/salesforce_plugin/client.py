@@ -25,8 +25,10 @@ operator registered.
 
 from __future__ import annotations
 
+import itertools
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -337,16 +339,41 @@ def _sf_install_plan_is_exact(output: str) -> bool:
     """Accept exactly the reviewed ``sf`` formula and its declared Node closure."""
 
     lines = [line.strip() for line in output.splitlines()]
-    if _sf_plan_has_prohibited_mutation(lines):
+    if _sf_plan_has_prohibited_mutation(lines, {"sf", "node"}):
         return False
     return _sf_install_items(lines) == {"sf", "node"}
 
 
-def _sf_plan_has_prohibited_mutation(lines: list[str]) -> bool:
-    """Reject a dry-run that contains any unreviewed package mutation kind."""
+def _sf_plan_has_prohibited_mutation(lines: list[str], parents: set[str]) -> bool:
+    """Reject any unreviewed mutation kind; formula-required upgrades of the closure's dependencies are the install."""
 
-    prohibited = ("Would upgrade", "Would reinstall", "Would remove", "Would unlink")
-    return any(line.startswith(prohibited) for line in lines)
+    prohibited = ("Would reinstall", "Would remove", "Would unlink")
+    return any(line.startswith(prohibited) for line in lines) or not _dependency_upgrades_are_reviewed(lines, parents)
+
+
+_UPGRADE_DEPENDENCY_HEADER = re.compile(
+    r"^Would upgrade (?P<count>[1-9][0-9]*) dependenc(?:y|ies) for (?P<parent>.+):$"
+)
+_UPGRADE_ITEM = re.compile(r"^[a-z0-9][a-z0-9@._+/-]*(?:\s+[0-9][A-Za-z0-9@._+/-]*)?$")
+
+
+def _upgrade_block_is_reviewed(header: re.Match[str], followers: list[str]) -> bool:
+    """A block's items run to the next ``Would`` heading and must match its declared count."""
+
+    items = [item for item in itertools.takewhile(lambda line: not line.startswith("Would "), followers) if item]
+    return len(items) == int(header["count"]) and all(_UPGRADE_ITEM.fullmatch(item) for item in items)
+
+
+def _dependency_upgrades_are_reviewed(lines: list[str], parents: set[str]) -> bool:
+    """Allow only complete ``Would upgrade N dependencies for <parent>:`` blocks of the requested closure."""
+
+    for index, line in enumerate(lines):
+        if not line.startswith("Would upgrade"):
+            continue
+        header = _UPGRADE_DEPENDENCY_HEADER.fullmatch(line)
+        if header is None or header["parent"] not in parents or not _upgrade_block_is_reviewed(header, lines[index + 1 :]):
+            return False
+    return True
 
 
 def _sf_install_items(lines: list[str]) -> set[str] | None:

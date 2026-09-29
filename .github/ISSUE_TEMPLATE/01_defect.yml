@@ -8,8 +8,9 @@ body:
       value: >-
         One defect per issue. If you have three, file three — each needs its own
         disposition, and a merged issue can only be closed once. Filing several
-        items in one round? File the **Feedback round** issue first and attach
-        these to it as sub-issues.
+        items in one round? File the **Feedback round** issue first, then add
+        its number after the item number below, as `(round #123)`, and add this
+        issue to the round's checklist.
 
   - type: input
     id: item_number
@@ -19,6 +20,8 @@ body:
         Your round and item number, as `§N.M` — part number, item number. Put the
         same value at the front of the issue title. This is what lets a later
         round, a release note, or a maintainer's reply cite this item precisely.
+        Part of a multi-item round? Add the round's parent issue after the
+        number, as `§42.3 (round #123)`.
       placeholder: "§42.3"
     validations:
       required: true

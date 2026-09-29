@@ -42,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"solet-manager {MANAGER_VERSION}")
     commands = parser.add_subparsers(dest="command")
-    inspect = commands.add_parser("inspect", help="Passively inspect an existing Solet checkout.")
+    inspect = commands.add_parser("inspect", help="Read-only classification of an existing Solet checkout; runs no target code (unlike `solet inspect`).")
     inspect.add_argument("--target", type=Path, required=True)
     inspect.add_argument("--channel", required=True)
     inspect.add_argument("--json", action="store_true", dest="as_json")

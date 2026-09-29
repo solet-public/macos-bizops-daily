@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import stat
 import uuid
 from dataclasses import dataclass
@@ -26,8 +27,11 @@ from .private_json import load_json_object
 from .state_io import atomic_write_json, ensure_private_directory
 from .transaction import utc_now
 
-__all__ = ["BackupRecord", "backup_root", "file_sha256", "read_backup", "restore_artifact", "write_backup"]
+__all__ = ["BackupRecord", "action_backup_key", "backup_root", "file_sha256", "legacy_indexed_backup_covers", "read_backup", "restore_artifact", "write_backup"]
 
+_ACTION_ID = re.compile(r"^[a-z][a-z0-9_.-]{1,127}$")
+_LEGACY_INDEX = re.compile(r"^[0-9]+$")
+_MAX_SEGMENT = 200
 _BEFORE_BYTES = "before.bytes"
 _BEFORE_JSON = "before.json"
 _RECORD_KEYS = frozenset({"artifact_id", "destination", "mode", "sha256", "captured_at", "absent"})
@@ -56,6 +60,41 @@ class BackupRecord:
 def backup_root(paths: ManagerPaths, instance_id: str, operation_id: str) -> Path:
     journal = paths.operation_path(instance_id, operation_id)
     return journal.parent / operation_id / "backups"
+
+
+def action_backup_key(operation_id: str, action_id: str) -> str:
+    """The single path segment that keys a planned action's backup: ``<operation_id>.<action_id>``.
+
+    Action ids are unique within one probe result (the adapter protocol refuses
+    duplicates) and match the closed id grammar, so the key is already a safe
+    segment.  Unlike a list position it survives a re-plan after a crash.  A
+    combined key past the 255-byte segment limit is folded to a digest.
+    """
+    if _ACTION_ID.fullmatch(action_id) is None:
+        raise StateError(f"planned action id is not a safe backup key: {action_id!r}")
+    key = f"{operation_id}.{action_id}"
+    if len(key) <= _MAX_SEGMENT:
+        return key
+    return f"{operation_id[:64]}.{hashlib.sha256(key.encode()).hexdigest()[:32]}"
+
+
+def legacy_indexed_backup_covers(paths: ManagerPaths, instance_id: str, operation_id: str, row_id: str, target: Path) -> bool:
+    """Whether an r56-era ``<row_id>.<index>`` backup (under ``operation_id``) already records ``target``'s entry state.
+
+    An operation begun by an r56 Manager keyed its backups by list position.
+    Such a record is matched by its recorded destination, never by index, so a
+    shifted plan cannot alias it onto another target; every legacy record is
+    read through the closed-shape check and a corrupt one fails loudly.
+    """
+    root = backup_root(paths, instance_id, operation_id)
+    if not root.is_dir():
+        return False
+    for directory in sorted(root.glob(f"{row_id}.*")):
+        if _LEGACY_INDEX.fullmatch(directory.name.removeprefix(f"{row_id}.")) is None:
+            continue
+        if read_backup(paths, instance_id, operation_id, directory.name).destination == str(target):
+            return True
+    return False
 
 
 def file_sha256(path: Path) -> str | None:

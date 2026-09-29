@@ -47,7 +47,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "plugins" / "salesforce_plugin" / "src"))
 
 from salesforce_plugin.app_config import AppConfigError, AppConfigLoader  # noqa: E402
-from salesforce_plugin.client import SalesforceCliExecutor  # noqa: E402
+from salesforce_plugin.client import SalesforceCliExecutor, _sf_install_plan_is_exact  # noqa: E402
 from salesforce_plugin.constants import (  # noqa: E402
     ERROR_AUTH_FAILED,
     ERROR_NOT_CONFIGURED,
@@ -401,6 +401,24 @@ def test_cli_provisioning() -> None:
     )
 
 
+def test_sf_plan_dependency_upgrades() -> None:
+    """A formula-required dependency upgrade is part of the sf install; anything looser stays refused."""
+
+    head = "Would install 2 formulae:\nnode\nsf\n"
+    _assert(
+        "counted dependency upgrade for sf is accepted",
+        _sf_install_plan_is_exact(head + "Would upgrade 2 dependencies for sf:\nreadline\nxz\n"),
+        "upgrade block",
+    )
+    for label, tail in (
+        ("count mismatch", "Would upgrade 2 dependencies for sf:\nreadline\n"),
+        ("unrelated parent", "Would upgrade 1 dependency for python@3.13:\nreadline\n"),
+        ("headerless upgrade", "Would upgrade 1 dependency:\npython@3.13\n"),
+        ("reinstall", "Would reinstall 1 dependency for sf:\nreadline\n"),
+    ):
+        _assert(f"sf plan with {label} stays refused", not _sf_install_plan_is_exact(head + tail), tail)
+
+
 def main() -> int:
     print("\nsalesforce_plugin org-binding smoke tests")
     print("=" * 47)
@@ -418,6 +436,7 @@ def main() -> int:
     test_run_rest_no_content_on_empty_stdout()
     test_run_rest_error_array()
     test_readiness_pulls_config_from_manager()
+    test_sf_plan_dependency_upgrades()
     test_edge_parity()
     test_cli_provisioning()
     print()

@@ -21,12 +21,17 @@ _SCHEMA = json.loads((_ROOT / "plugins/github_midwife_plugin/knowledge_base/setu
 
 from bootstrap_adapter.homebrew import (
     HomebrewInstallError,
-    _homebrew_plan_is_exact,
+    _inspect_homebrew_plan,
     homebrew_guard_environment,
     run_homebrew_install_required,
 )
 from bootstrap_adapter.models import AdapterRuntime, PostgresObservation, RolePolicyObservation
-from bootstrap_adapter.routes import _coding_tool_route, _postgres_configure_route, _postgres_install_route
+from bootstrap_adapter.routes import (
+    _coding_tool_route,
+    _postgres_configure_route,
+    _postgres_install_route,
+    _upgraded_dependency_evidence,
+)
 
 _RECEIPT_049_CODEX = "==> Would install 1 cask:\ncodex\n"
 _RECEIPT_054_POSTGRES_STDOUT = """codex-cli 0.153.4
@@ -74,6 +79,10 @@ llama.cpp
 libomp
 ggml
 """
+
+def _homebrew_plan_is_exact(output: str, *, kind: str, package: str) -> bool:
+    return _inspect_homebrew_plan(output, kind=kind, package=package).exact
+
 
 def _check(condition: object, label: str) -> None:
     if not condition:
@@ -159,21 +168,18 @@ def _check_failure_envelopes() -> None:
     )
 
 
-def _check_r44_postgres_dependency_upgrade_is_explicitly_blocked(*, installed: bool) -> None:
-    calls: list[list[str]] = []
+def _check_r44_postgres_dependency_upgrade_proceeds() -> None:
+    """The verbatim r44 plan is the formula's own requirement: install proceeds, names are evidence."""
+
+    commands: list[list[str]] = []
 
     def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
-        calls.append(command)
+        commands.append(command)
         if command[1:] == ["install", "--dry-run", "postgresql@17"]:
             return subprocess.CompletedProcess(command, 0, _R44_POSTGRES_UPGRADE_PLAN, "")
-        if command[1:] == ["list", "--versions", "postgresql@17"]:
-            return subprocess.CompletedProcess(
-                command,
-                0 if installed else 1,
-                "postgresql@17 17.10\n" if installed else "",
-                "",
-            )
-        raise AssertionError(f"unexpected package mutation: {command}")
+        if "--dry-run" in command:
+            return subprocess.CompletedProcess(command, 0, f"==> Would install 1 formula:\n{command[-1]}\n", "")
+        return subprocess.CompletedProcess(command, 0, "", "")
 
     runtime = AdapterRuntime(
         run=run,
@@ -182,29 +188,122 @@ def _check_r44_postgres_dependency_upgrade_is_explicitly_blocked(*, installed: b
         name="fixture",
         target=Path("/fixture"),
     )
-    observation = PostgresObservation(True, "/fixture/brew", False, False, None, False, None)
-    with patch("bootstrap_adapter.routes.postgres_observation", return_value=observation):
-        failed = _postgres_install_route(_request("install_postgresql"), runtime)
+    fresh = PostgresObservation(True, "/fixture/brew", False, False, None, False, None)
+    refreshed = PostgresObservation(True, "/fixture/brew", True, True, 17, True, False)
+    with (
+        patch("bootstrap_adapter.routes.postgres_observation", return_value=fresh),
+        patch("bootstrap_adapter.postgres_install.postgres_observation", return_value=refreshed),
+        patch("bootstrap_adapter.postgres_install.wait_for_postgres_ready", return_value=True),
+    ):
+        applied = _postgres_install_route(_request("install_postgresql"), runtime)
+    _check(applied["checkpoint_status"] == "applied", "r44 dependency upgrades no longer stop the PostgreSQL install")
     _check(
-        failed["checkpoint_status"] == "failed"
-        and failed["error_kind"] == "postgres_dependency_upgrade_blocked",
-        "r44 dependency upgrades receive a specific fail-closed result",
+        commands
+        == [
+            ["/fixture/brew", "install", "--dry-run", "postgresql@17"],
+            ["/fixture/brew", "install", "postgresql@17"],
+            ["/fixture/brew", "services", "start", "postgresql@17"],
+            ["/fixture/brew", "install", "--dry-run", "pgvector"],
+            ["/fixture/brew", "install", "pgvector"],
+        ],
+        "the install is the plain formula install: no brew upgrade, no --ignore-dependencies",
     )
+    recorded = [item for item in applied["evidence"] if item["id"] == "homebrew.upgraded_dependencies"]
     _check(
-        "readline, xz" in failed["repair"]
-        and "that proposed upgrade was not run" in failed["repair"]
-        and "Preserve compliant dependencies" in failed["repair"],
-        "r44 repair names exact upgrades and requires reviewed continuation",
+        len(recorded) == 1 and recorded[0]["observed"] == ["readline", "xz"],
+        "the upgraded dependency names readline, xz are recorded as evidence",
     )
+    jsonschema.Draft7Validator(_SCHEMA).validate(applied)
+
+
+def _check_python_framework_upgrade_is_flagged() -> None:
+    """An accepted python@3.13 upgrade is the one that can strand another solet's Keychain ACLs (iss_d62aeab7)."""
+
+    runtime = AdapterRuntime(
+        run=lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, "", ""),
+        which=lambda name: "/fixture/brew" if name == "brew" else None,
+        now=lambda: datetime(2026, 9, 29, tzinfo=UTC),
+        name="fixture",
+        target=Path("/fixture"),
+    )
+    ordinary = _upgraded_dependency_evidence(runtime, ("readline", "xz"))
+    _check([item["id"] for item in ordinary] == ["homebrew.upgraded_dependencies"], "an ordinary upgrade adds no python warning")
+    flagged = _upgraded_dependency_evidence(runtime, ("readline", "python@3.13"))
     _check(
-        failed["stdout"] == _R44_POSTGRES_UPGRADE_PLAN
-        and calls == [
+        [item["id"] for item in flagged] == ["homebrew.upgraded_dependencies", "homebrew.python_framework_upgraded"],
+        "a python@3.13 upgrade adds its own evidence item after the names",
+    )
+    warning = flagged[1]
+    _check(warning["observed"] == ["python@3.13"], "the warning records the framework that moved")
+    _check(
+        "-25293" in warning["summary"] and "Always Allow" in warning["summary"],
+        "the warning names the failure and the recovery",
+    )
+    _check(flagged[0]["observed"] == ["readline", "python@3.13"], "the full upgrade list is still recorded unchanged")
+    evidence_schema = {"$ref": "#/definitions/evidence", "definitions": _SCHEMA["definitions"]}
+    for item in flagged:
+        jsonschema.Draft7Validator(evidence_schema).validate(item)
+
+
+def _check_dependency_upgrade_grammar_stays_closed() -> None:
+    """Only a complete, counted upgrade block for the requested package is accepted."""
+
+    head = "==> Would install 1 formula:\npostgresql@17\n"
+    accepted = {
+        "plural": head + "==> Would upgrade 2 dependencies for postgresql@17:\nreadline\nxz\n",
+        "singular": head + "==> Would upgrade 1 dependency for postgresql@17:\nreadline\n",
+        "versioned_items": head + "==> Would upgrade 1 dependency for postgresql@17:\nreadline 8.2.13\n",
+    }
+    refused = {
+        "declares_two_lists_one": head + "==> Would upgrade 2 dependencies for postgresql@17:\nreadline\n",
+        "declares_one_lists_two": head + "==> Would upgrade 1 dependency for postgresql@17:\nreadline\nxz\n",
+        "unrelated_parent": head + "==> Would upgrade 1 dependency for unrelated:\nreadline\n",
+        "malformed_item": head + "==> Would upgrade 1 dependency for postgresql@17:\nRead Line!\n",
+        "unprefixed_notice": head + "Would upgrade 1 dependency for postgresql@17:\nreadline\n\x1b[0m",
+        "formula_upgrade": head + "==> Would upgrade 1 formula:\npython@3.13\n",
+        "reinstall": head + "==> Would reinstall 1 dependency for postgresql@17:\nreadline\n",
+    }
+    for name, plan in accepted.items():
+        _check(
+            _homebrew_plan_is_exact(plan, kind="formula", package="postgresql@17"),
+            f"{name} dependency upgrade block is accepted",
+        )
+    for name, plan in refused.items():
+        _check(
+            not _homebrew_plan_is_exact(plan, kind="formula", package="postgresql@17"),
+            f"{name} dependency upgrade block stays refused",
+        )
+    inspected = _inspect_homebrew_plan(accepted["plural"], kind="formula", package="postgresql@17")
+    _check(inspected.upgraded_dependencies == ("readline", "xz"), "accepted upgrades are reported in plan order")
+
+    commands: list[list[str]] = []
+
+    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        if "--dry-run" in command:
+            return subprocess.CompletedProcess(command, 0, refused["declares_two_lists_one"], "")
+        return subprocess.CompletedProcess(command, 1, "", "")
+
+    runtime = AdapterRuntime(
+        run=run,
+        which=lambda name: "/fixture/brew" if name == "brew" else None,
+        now=lambda: datetime(2026, 9, 23, tzinfo=UTC),
+        name="fixture",
+        target=Path("/fixture"),
+    )
+    try:
+        run_homebrew_install_required(runtime, "/fixture/brew", "postgresql@17", "PostgreSQL")
+    except HomebrewInstallError:
+        pass
+    else:
+        raise AssertionError("a count-mismatched upgrade block was accepted")
+    _check(
+        commands == [
             ["/fixture/brew", "install", "--dry-run", "postgresql@17"],
             ["/fixture/brew", "list", "--versions", "postgresql@17"],
         ],
-        "r44 plan is retained and no install, upgrade, or reinstall command runs",
+        "a count-mismatched upgrade block runs no install command",
     )
-    jsonschema.Draft7Validator(_SCHEMA).validate(failed)
 
 
 def _check_incomplete_and_decorated_plans_refuse_before_mutation() -> None:
@@ -307,11 +406,10 @@ def _check_incomplete_and_decorated_plans_refuse_before_mutation() -> None:
         except HomebrewInstallError as exc:
             reported_line = exc.unrecognized_line
             _check(
-                exc.blocked_upgrades == ()
-                and exc.outcome.stdout == stdout[:16_384]
+                exc.outcome.stdout == stdout[:16_384]
                 and exc.outcome.stderr == stderr[:16_384]
                 and exc.outcome.output_complete == output_complete,
-                f"{name}/{state} keeps bounded diagnostics without inventing complete upgrade evidence",
+                f"{name}/{state} keeps bounded diagnostics",
             )
             _check(
                 (reported_line is not None and "unrecognized dry-run line" in str(exc))
@@ -681,8 +779,9 @@ def main() -> int:
         "llama.cpp's reviewed dependencies are not approved for other packages",
     )
     _check_failure_envelopes()
-    _check_r44_postgres_dependency_upgrade_is_explicitly_blocked(installed=False)
-    _check_r44_postgres_dependency_upgrade_is_explicitly_blocked(installed=True)
+    _check_r44_postgres_dependency_upgrade_proceeds()
+    _check_python_framework_upgrade_is_flagged()
+    _check_dependency_upgrade_grammar_stays_closed()
     _check_incomplete_and_decorated_plans_refuse_before_mutation()
     _check_fresh_postgres_plans_pgvector_before_apply()
     _check_postgres_service_readiness_outcomes()

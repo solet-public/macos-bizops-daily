@@ -2,6 +2,152 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-29 — r57: feedback without repository access, and fixes from the first real-Mac update
+
+**Solet Manager manager-v0.1.0-r57.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate, then published to stable
+`solet-public/macos-bizops`. Most of the fixes below come from the first
+update of a stable r56 solet on a real Mac. That update used the manual git
+path rather than `solet-manager update`.
+
+Changes since r56 (source `23fa8c996`):
+
+- **A solet installed from stable r55 or r56 can run `solet-manager update`.**
+  The update accepts only listed stable releases, matched exactly by commit
+  and tree. Neither release was listed, so a solet on either would have been
+  refused with `predecessor_unsupported` before anything changed, the same
+  way r48 solets were until r56. Both are now listed, with their published
+  identities (`solet-public/macos-bizops` commits `1dedebb6` and `d81e014a`).
+  What the update changes depends on what the solet has installed, not on
+  which release it came from, so a solet that is already current is left as
+  it is.
+- **A stable cut now refuses to leave the live stable release unlisted.** A
+  publish to `solet-public/macos-bizops` stops at its predecessor step with
+  `stable_head_not_supported_predecessor` unless the source's list of
+  supported predecessors names the current live stable release by commit and
+  tree. Daily and staging targets are unaffected.
+- A commit that is not a listed release is still refused.
+- **Setup on macOS 26 allows llama.cpp's first start more time.** Its first
+  version check prepares the graphics backend and can take close to 30
+  seconds on a new Mac. That one check now gets 90 seconds; every other setup
+  check keeps 30 seconds.
+- **The summaries check waits up to 10 seconds instead of 2.** A busy
+  llama.cpp summaries service is no longer reported unavailable. When it
+  really is unavailable, the error now reads "Inference server not available
+  at <address>" instead of naming LM Studio.
+- **Setup no longer stops when Homebrew needs to upgrade a package it
+  depends on.** On a Mac whose Homebrew was not freshly updated, installing
+  PostgreSQL could ask to upgrade older copies of libraries such as readline
+  and xz, and setup refused with a manual repair step. Those upgrades are part
+  of installing the package, so setup now lets Homebrew do them and records
+  their names in the setup result. Anything else unexpected in Homebrew's
+  plan, such as a removal, a reinstall, or a package that was not asked for,
+  is still refused before anything changes.
+- **An update that stopped partway can now be resumed.** Before an update
+  changes a file it keeps a copy, so a crash can be undone. Those copies were
+  filed by each step's position in the plan, and when the plan came out
+  slightly different on the resume, the update refused with
+  `backup_missing` and the solet was stuck. Copies are now filed by the
+  step's name. An update that an r56 Manager started and an r57 Manager
+  resumes still finds its copies, matched by the file each one protects.
+- **Coding sessions started from the solet's fleet launcher now run in tmux.**
+  Each role gets its own named tmux session, which lets the solet reach and
+  wake the session. Attach with `tmux attach -t =<role>`; list sessions with
+  `tmux ls`. An update does not replace an existing solet's fleet file; the
+  seed-update runbook (Part C, Step 5) gives the exact steps, which keep your
+  role functions. The launcher refuses with a clear message if tmux is
+  missing.
+- **Anyone can now send feedback, with no repository access.** The
+  feedback runbook and the `/feedback` skill used to tell a solet to label its
+  issues and link them as sub-issues. An ordinary GitHub account can do
+  neither, and GitHub drops the label and refuses the link without saying
+  why. There is now one path:
+  - a solet files each item with `gh issue create --body-file`, with no label
+    and the item's class on the first line of the body;
+  - each item names its round with `Round: #N`, and the author edits a list
+    of item links into their own round issue;
+  - in a browser, the issue forms work as before and apply their own label;
+  - without `gh`, or with `gh` not signed in, the round is saved as a
+    Markdown file for the operator to paste into the forms.
+  The issue forms, runbooks and CONTRIBUTING.md now all say the same, and a
+  check fails if any of them brings back labels, sub-issue links, a
+  browser-only step or a pull-request step. The earlier entries here that
+  describe `--web` filing and sub-issues are superseded.
+- **Updating now fixes the `/feedback` skill on existing solets.**
+  `solet-manager update` replaces the old skill, which told your solet to set
+  labels and link sub-issues, with the fixed one, after saving a backup. A
+  skill you edited yourself is left alone, and the update preview says so.
+- **Loading the solet's LaunchAgent a second time no longer starts a stray
+  copy.** Running `launchctl load` while the solet was already running used
+  to start a second process. That process registered as an idle colour and
+  never went away, could answer real commands, and first deleted the running
+  instance's socket and port files. A process started without an assigned
+  colour now checks the running instance first and, if it is alive, exits
+  cleanly without being relaunched. Crash recovery and a normal first start
+  are unchanged.
+- **`solet --help` now points to `solet-manager` for import, update and
+  inspect.** Updating or importing an existing solet is done with
+  `solet-manager`, a separate command installed alongside `solet`. `solet
+  update` and `solet import` now print the exact `solet-manager` command
+  instead of an unknown-command error. `solet inspect --target` help now says
+  plainly that it is an active probe that may run programs inside the target;
+  `solet-manager inspect` is the read-only check. The seed-update runbook and
+  owner guide say the same.
+- **Updating a solet by hand no longer breaks it.** The seed-update runbook
+  now covers three gaps:
+  - the solet's command-line bridge was renamed from `solet` to
+    `solet-bridge` (2026-08-26), and the runbook gives the one-line fix for a
+    launcher that still points at the old name;
+  - its dependency step now finds new top-level packages such as
+    `solet_setup_contracts`, not only new plugins;
+  - a newly added plugin's starting config comes from `profile_baseline/`.
+- **`macos_inference_plugin` starts without a config file.** Added to an
+  existing solet, it crashed on `context.attachment_scan_limit` because its
+  `plugin.yaml` declared only 4 of its 25 required settings. It now declares
+  all of them.
+- **Warning: installing the Manager can cut off another solet's Keychain
+  access.** Homebrew upgrades its shared `python@3.13` when the Manager is
+  installed. Another solet on the same Mac whose environment uses that Python
+  then cannot read its Keychain credentials (error `-25293`) until each one
+  is allowed again (macOS "Always Allow"). The install notes, READMEs and
+  troubleshooting runbook now explain how to check first
+  (`brew install --dry-run`), how to prevent it (`brew pin python@3.13`) and
+  how to recover. `solet doctor` also warns when a solet's Python changed
+  after its environment was created.
+
+Known limits:
+
+- Unchanged from r56, plus:
+- An update does not yet replace the fleet launcher file inside the clone.
+  Use the runbook step above.
+- Installing the Manager can still upgrade the shared `python@3.13`; r57
+  warns about it and explains recovery, but does not prevent it.
+
+## 2026-09-28 — r56: solets on stable r48 can update
+
+**Solet Manager manager-v0.1.0-r56.** This is a full seed build for
+`solet-public/macos-bizops-daily`, with Manager artifacts in
+dwestgate/homebrew-tap-validate. A stable cut to `solet-public/macos-bizops`
+follows only after an existing-solet update round from stable r48 reaches its
+end state on this build.
+
+Changes since r55 (source `380585edb`):
+
+- **A solet installed from stable r48 can run `solet-manager update`.**
+  The update accepts only listed stable releases, matched exactly by commit
+  and tree. The list named r43 but not r48 (`solet-public/macos-bizops`
+  commit `ea6ee0cb`), so every r48 solet was refused with
+  `predecessor_unsupported` before anything changed. r48 is now listed, with
+  its published identity. An r48 solet already uses Core AI embeddings and
+  Apple Foundation Models summaries, so the update has nothing to switch and
+  leaves its plugins and bindings as they are.
+- A commit that is not a listed release is still refused.
+
+Known limits:
+
+- Unchanged from r55.
+
 ## 2026-09-28 — r55: setup on macOS 26 waits for llama.cpp's first start
 
 **Solet Manager manager-v0.1.0-r55.** This is a full seed build for

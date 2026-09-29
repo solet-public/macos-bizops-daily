@@ -206,13 +206,13 @@ def _check_probe_expectation_advisory_contract(flow: dict[str, Any]) -> None:
     for path in _MANAGER_SOURCE_ROOT.rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         readers.extend(
-            f"{path.relative_to(_REPO_ROOT)}:{node.lineno}"
+            str(path.relative_to(_REPO_ROOT))
             for node in ast.walk(tree)
             if isinstance(node, ast.Constant) and node.value == "expectation"
         )
     _check(
         "probe expectation has exactly one manager reader and it labels the value advisory",
-        readers == ["solet_cli/src/solet_manager/completion_verifier.py:95"]
+        readers == ["solet_cli/src/solet_manager/completion_verifier.py"]
         and '"declared_expectation_advisory"' in (
             _MANAGER_SOURCE_ROOT / "solet_manager" / "completion_verifier.py"
         ).read_text(encoding="utf-8"),

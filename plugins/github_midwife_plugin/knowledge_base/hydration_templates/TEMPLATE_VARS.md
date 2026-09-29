@@ -60,6 +60,46 @@ reconcile the runbook against it — the dependency runs one way.
 | `launchagent.plist.template` | `~/Library/LaunchAgents/local.solet.<name>.plist`, rendered by `autostart.SimpleAutostartRenderer` at genesis and by `existing::autostart.reconcile` on update, with a `<!-- rendered-from: <template_ref>@<sha256> -->` stamp as its second line. The layout is byte-for-byte the plist the renderer used to hand-build (every field is load-bearing on the boot path); values are XML-escaped before substitution | 0644 |
 | `user_claude_md_section.template` | `~/.claude/CLAUDE.md` (USER scope, **CREATE-or-merge** of one marker-delimited section) — the production instruction surface (operator ruling 2026-08-01: nobody launches production sessions from the deployment directory, so `<clone>/CLAUDE.md` reaches nobody there). Body is the operator's **ruled minimal bootstrap**: the first sentence plus the ONE action that brings up knowledge-base page zero — deliberately nothing else, because page zero is what orients the session. ⚠ The installer takes this body **from this template**, never from a literal of its own: the pinned query (`"session start orientation"`) is tuned *with* page zero and re-validated by that article's retrieval test, so a baked-in copy would drift out of retrieval silently. ⚠ The marker is **deployment-keyed AND versioned** (`<!-- BEGIN SOLET <name> v1 -->`): the key is what lets a second solet install alongside the first without clobbering it, and the version is what lets a later installer recognise an out-of-date section and re-merge rather than duplicate. This file is one the user owns wholesale — merge the section, never rewrite the file | 0644 |
 
+## Refresh class on update
+
+Hydration renders each template once, at birth; nothing re-renders it when the
+solet updates unless the release says so. This table classifies every template
+by what an update may safely do to its rendered copy. It carries one row per
+template on disk, and `hydration_templates_render_smoke.py` fails if a template
+has no row, a row has no template, or the `managed` rows differ from the
+artifacts `existing_install_flow.json` declares.
+
+| Class | Meaning |
+|---|---|
+| `managed` | Declared in `existing_install_flow.json`. `solet-manager update` re-renders it in the approved plan, with a backup, and never overwrites a copy the operator edited. |
+| `refresh-safe-manual` | A pure render of tokens an update knows, with no operator input, so re-rendering by hand is safe. Not `managed`, for the reason given. |
+| `operator-input-manual` | The render depends on an operator choice recorded only in the rendered file, or the file holds operator additions. Re-render by hand, carrying the choice and the additions over. |
+| `user-owned` | The operator edits it or a tool merges into it. Never re-rendered wholesale. |
+
+| Template | Class | Reason |
+|---|---|---|
+| `launchagent.plist.template` | `managed` | `instance_launchagent_plist` |
+| `zshrc_block.template` | `managed` | `shell_startup_block`, a marker-delimited block |
+| `user_claude_md_section.template` | `managed` | `user_claude_md_section`, a marker-delimited block |
+| `feedback_skill_SKILL.md.template` | `managed` | `feedback_skill`, refresh-only: an edited copy is reported and left, a missing one is not created |
+| `rename_skill_SKILL.md.template` | `refresh-safe-manual` | user scope, but its bytes are identical at r43, r56 and this release, so there is nothing to deliver yet |
+| `solet.zsh.template` | `refresh-safe-manual` | inside the clone under `client/`; the update plan refuses in-target destinations the clone does not git-ignore, and existing clones do not ignore `client/` |
+| `launch.template` | `refresh-safe-manual` | same: `client/bin/` |
+| `claude_session_overlay.json.template` | `refresh-safe-manual` | same: `client/` |
+| `marketplace_json.template` | `refresh-safe-manual` | same: inside the clone (`.claude-plugin/`) |
+| `codex_marketplace_json.template` | `refresh-safe-manual` | same: inside the clone (`.agents/plugins/`) |
+| `claude_launcher.template` | `operator-input-manual` | carries the operator's `GIT_CONTROLLER_NAME` choice, or its absence, and operator launcher edits |
+| `codex_launcher.template` | `operator-input-manual` | same |
+| `fleet_functions.zsh.template` | `operator-input-manual` | same choice, and the operator's role functions live below the `# One function per role` line of the rendered file |
+| `CLAUDE.md.template` | `user-owned` | `<clone>/CLAUDE.md` is a preserved-never surface in the bundle contract |
+| `AGENTS.md.template` | `user-owned` | same |
+| `claude_settings.json.template` | `user-owned` | reference shape only; the live `~/.claude/settings.json` is a structural merge into the user's own file |
+| `zshrc.template` | `user-owned` | whole-file replacement of the user's startup file, only on an accepted offer |
+
+The exact manual re-render steps for the fleet file and for an edited feedback
+skill are in the seed update runbook, Part C Step 5. The other manual rows are
+re-rendered by re-running hydration Step 2, as that step describes.
+
 This directory stays **FLAT** — the KB manifest's single exclude pattern
 (`hydration_templates/*`) relies on it (`Path.match` has no recursive `**`).
 

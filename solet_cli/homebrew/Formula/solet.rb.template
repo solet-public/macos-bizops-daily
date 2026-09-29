@@ -128,6 +128,15 @@ class Solet < Formula
   def caveats
     <<~EOS
       Next: run solet create
+
+      Installing this formula can upgrade the shared python@3.13. Any solet whose
+      .venv links that Python, including one the Manager did not create, can then
+      lose its Keychain credentials (error -25293) on its next restart.
+      Before an install or upgrade, add --dry-run: it lists python@3.13 under Would upgrade.
+      To make brew refuse instead of upgrading: brew pin python@3.13
+      Recovery: in a logged-in GUI session, read each Keychain item that solet
+      owns once and answer Always Allow. After solet-manager import, solet doctor
+      names a venv that needs this.
     EOS
   end
 

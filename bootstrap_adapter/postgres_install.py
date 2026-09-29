@@ -32,11 +32,19 @@ def _start_service(runtime: AdapterRuntime, brew: str) -> PostgresServiceStart:
     return PostgresServiceStart(outcome, polled_ready and observation.ready, observation)
 
 
+@dataclass(frozen=True)
+class PostgresInstallApply:
+    """The failed service start, if any, and the dependencies Homebrew upgraded on the way."""
+
+    failed_start: PostgresServiceStart | None
+    upgraded_dependencies: tuple[str, ...]
+
+
 def apply_postgres_install_actions(
     runtime: AdapterRuntime,
     brew: str,
     actions: Sequence[dict[str, Any]],
-) -> PostgresServiceStart | None:
+) -> PostgresInstallApply:
     """Apply the approved package/service plan without retaining stale readiness."""
 
     packages = {
@@ -44,16 +52,17 @@ def apply_postgres_install_actions(
         "postgres.install_pgvector_formula": ("pgvector", "pgvector install"),
     }
     refreshed: PostgresObservation | None = None
+    upgraded: list[str] = []
     for item in actions:
         action_id = str(item["id"])
         if action_id == "postgres.start_homebrew_service":
             transition = _start_service(runtime, brew)
             refreshed = transition.observation
             if not transition.ready:
-                return transition
+                return PostgresInstallApply(transition, tuple(upgraded))
             continue
         if action_id == "postgres.install_pgvector_formula" and (refreshed is not None and refreshed.pgvector_available is True):
             continue
         package, label = packages[action_id]
-        run_homebrew_install_required(runtime, brew, package, label)
-    return None
+        upgraded.extend(run_homebrew_install_required(runtime, brew, package, label).upgraded_dependencies)
+    return PostgresInstallApply(None, tuple(dict.fromkeys(upgraded)))

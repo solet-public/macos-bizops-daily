@@ -80,6 +80,7 @@ from macos_self_deployment_plugin import (
     stale_runtime_cleanup,
     stop_self_runner,
     stop_self_watchdog,
+    stray_start_guard,
 )
 from macos_self_deployment_plugin.autostart_manager import AutostartManager
 from macos_self_deployment_plugin.constants import (
@@ -824,6 +825,17 @@ class MacosSelfDeploymentPlugin(  # noqa: D101 — class docstring on first line
             )
             raise RuntimeError(msg)
         self._solet_name = solet_name
+
+        # A colourless boot beside a live active colour exits 0 BEFORE the scrub
+        # below, which would otherwise delete the live instance's socket and port
+        # files.  See ``stray_start_guard``.
+        stray_start_guard.decline_if_stray_start(
+            solet_name=solet_name,
+            socket_path=_router_socket_path(solet_name),
+            explicit_color=bool(os.environ.get(ENV_SOLET_COLOR, "")),
+            orchestrator_ref=getattr(self, "orchestrator_ref", None),
+            logger=self.logger,
+        )
 
         # F2 Phase 0c: scrub stale runtime files (left by a crashed prior
         # the solet or router) BEFORE the router-socket check or any port-

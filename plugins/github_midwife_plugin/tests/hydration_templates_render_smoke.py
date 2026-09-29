@@ -24,6 +24,9 @@ documented render contract (literal `{{TOKEN}}` replacement, per
 6. The generated CLAUDE.md and prompt hook lead with the no-MCP local
    `<name>` command, and never reintroduce the old "skip Step Zero until
    MCP is registered" guidance.
+7. `TEMPLATE_VARS.md`'s refresh-class table has one row per template with a
+   class from the closed vocabulary, and its `managed` rows are exactly the
+   templates `existing_install_flow.json` declares as managed artifacts.
 
 Run directly: ``.venv/bin/python3 plugins/github_midwife_plugin/tests/hydration_templates_render_smoke.py``.
 """
@@ -34,6 +37,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "knowledge_base" / "hydration_templates"
@@ -111,6 +115,26 @@ def _check_file_map_matches_disk() -> None:
         documented <= on_disk,
         f"documented-but-missing templates: {documented - on_disk}",
     )
+
+
+_REFRESH_CLASSES = frozenset({"managed", "refresh-safe-manual", "operator-input-manual", "user-owned"})
+_REFRESH_ROW = re.compile(r"^\| `([a-zA-Z0-9_.]+\.template)` \| `([a-z-]+)` \|", re.MULTILINE)
+_BUNDLE = _TEMPLATES_DIR.parent / "existing_install_flow.json"
+
+
+def _check_refresh_classes_match_disk_and_bundle() -> None:
+    """Every template has exactly one refresh class, and `managed` is exactly what the shipped bundle declares."""
+    text = _TEMPLATE_VARS.read_text(encoding="utf-8")
+    section = text.split("## Refresh class on update", 1)[1].split("\n## ", 1)[0].split("This directory stays", 1)[0]
+    rows = _REFRESH_ROW.findall(section)
+    classes = dict(rows)
+    on_disk = {p.name for p in _TEMPLATES_DIR.glob("*.template")}
+    _check("refresh-class table has one row per template", len(rows) == len(classes) and set(classes) == on_disk, f"rows={sorted(classes)} missing={sorted(on_disk - set(classes))} extra={sorted(set(classes) - on_disk)}")
+    _check("every refresh class is in the closed vocabulary", set(classes.values()) <= _REFRESH_CLASSES, f"unknown classes: {sorted(set(classes.values()) - _REFRESH_CLASSES)}")
+    declared = {Path(row["template_ref"]).name for row in json.loads(_BUNDLE.read_text(encoding="utf-8"))["managed_artifacts"]}
+    managed = {name for name, refresh_class in classes.items() if refresh_class == "managed"}
+    _check("the `managed` rows are exactly the templates existing_install_flow.json declares", bool(declared) and managed == declared, f"managed-only={sorted(managed - declared)} declared-only={sorted(declared - managed)}")
+    _check("the fleet file is never `managed` while its destination is inside the clone", classes["fleet_functions.zsh.template"] == "operator-input-manual", f"fleet class: {classes['fleet_functions.zsh.template']}")
 
 
 def _check_no_surviving_tokens(name: str, rendered: str) -> None:
@@ -504,6 +528,51 @@ def _check_rename_and_fleet_templates() -> None:
         "fleet launcher must export FLEET_TRANSPORT from the per-name "
         "operator knob, defaulting to watch",
     )
+    _check_fleet_tmux_hosting(fleet)
+
+
+def _check_fleet_tmux_hosting(fleet: str) -> None:
+    """Fleet sessions must be created in a named tmux session, never a bare tab.
+
+    Headless sessions are unsupported: the solet drives and wakes a session
+    through its tmux pane. The shipped template once carried no tmux at all, so
+    a user's fleet launcher started sessions the solet could not reach.
+    """
+    for snippet in (
+        "_tmux_host_for_iris()",
+        'new-session -d -s "$host"',
+        'has-session -t "=$host"',
+        "attach-session -t",
+        "switch-client -t",
+        "zsh -ic ${(q)inner_cmd}",
+        "_claude_for_iris ${(q)role} ${(q)model} ${(q)effort}",
+        "exec claude",
+    ):
+        _check(
+            f"fleet launcher: tmux host path contains {snippet!r}",
+            snippet in fleet,
+            "fleet template must host each role in a named tmux session with "
+            "quoted re-entry and an idempotent attach",
+        )
+    _check(
+        "fleet launcher: no operator home path baked into the template",
+        "/Users/" not in fleet and "/opt/homebrew/bin/tmux" not in fleet,
+        "fleet template must stay generic and find tmux on PATH",
+    )
+    with tempfile.TemporaryDirectory() as scratch:
+        script = Path(scratch) / "iris-fleet.zsh"
+        script.write_text(fleet, encoding="utf-8")
+        missing = subprocess.run(
+            ["/bin/zsh", "-f", "-c", f"PATH=/nonexistent; source {script}; _claude_for_iris Coordinator"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    _check(
+        "fleet launcher: missing tmux refuses loudly and never runs claude",
+        missing.returncode == 1 and "REFUSED: tmux is not installed" in missing.stderr,
+        f"expected exit 1 with a REFUSED message, got {missing.returncode}: {missing.stderr!r}",
+    )
 
 
 def _check_git_controller_export() -> None:
@@ -688,6 +757,7 @@ def main() -> int:
     try:
         _check_directory_is_flat()
         _check_file_map_matches_disk()
+        _check_refresh_classes_match_disk_and_bundle()
         _check_all_templates()
         _check_no_mcp_first_generated_guidance()
     except SmokeFailureError as exc:

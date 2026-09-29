@@ -197,7 +197,7 @@ def test_unavailable_boot_degrades_then_recovers() -> None:
         _check(not plugin.is_ready(), "plugin is explicitly unready during the retry window")
         _check(
             plugin.get_readiness_error()
-            == "LM Studio not available at http://localhost:1234/v1 after router registration",
+            == "Inference server not available at http://localhost:1234/v1 after router registration",
             "readiness error names the unavailable endpoint",
         )
         release_retry.set()
@@ -210,7 +210,7 @@ def test_unavailable_boot_degrades_then_recovers() -> None:
             "retry rechecks availability until the first successful response",
         )
         _check(prewarm_calls == [True], "prewarm runs once after availability succeeds")
-        wait_lines = [line for line in capture.messages if "LM Studio not available" in line]
+        wait_lines = [line for line in capture.messages if "Inference server not available" in line]
         _check(len(wait_lines) == 1, "one actionable waiting line is logged, not one per retry")
     finally:
         test_logger.removeHandler(capture)
@@ -260,7 +260,7 @@ def test_cold_prewarm_does_not_delay_startup_readiness() -> None:
 def test_inference_is_refused_while_unready() -> None:
     plugin = Plugin()
     plugin.provider = _EventuallyAvailableProvider("http://localhost:1234/v1", "test-model", 30)
-    plugin.set_error("LM Studio not available at http://localhost:1234/v1")
+    plugin.set_error("Inference server not available at http://localhost:1234/v1")
     raised: Exception | None = None
     try:
         plugin.generate_completion(
@@ -275,7 +275,7 @@ def test_inference_is_refused_while_unready() -> None:
         raised = exc
     _check(raised is not None, "inference is refused clearly while the plugin is unready")
     _check(
-        raised is not None and "LM Studio not available" in str(raised),
+        raised is not None and "Inference server not available" in str(raised),
         "unready inference error preserves the actionable readiness detail",
     )
 
@@ -284,7 +284,7 @@ def test_text_completion_is_refused_while_unready() -> None:
     """Context compaction reaches this method without generate_completion()."""
     plugin = Plugin()
     plugin.provider = _EventuallyAvailableProvider("http://localhost:1234/v1", "test-model", 30)
-    plugin.set_error("LM Studio not available at http://localhost:1234/v1")
+    plugin.set_error("Inference server not available at http://localhost:1234/v1")
     raised: Exception | None = None
     try:
         plugin.generate_text_completion(
@@ -298,7 +298,7 @@ def test_text_completion_is_refused_while_unready() -> None:
     )
     _check(
         isinstance(raised, InferenceServiceUnavailableError)
-        and "LM Studio not available" in str(raised),
+        and "Inference server not available" in str(raised),
         "text completion preserves the actionable readiness detail",
     )
 

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -295,11 +297,11 @@ def homebrew_install_plan_error(outcome: CommandOutcome, acquisition: HomebrewAc
     if not outcome.ok or outcome.stdout_truncated or outcome.stderr_truncated:
         return "Homebrew dry-run did not produce a complete successful plan."
     expected = _homebrew_acquisition(acquisition)
+    approved = {expected.name, *expected.approved_closure}
     lines = [line.strip() for line in f"{outcome.stdout}\n{outcome.stderr}".splitlines()]
-    if _has_prohibited_homebrew_mutation(lines):
+    if _has_prohibited_homebrew_mutation(lines, approved):
         return "Homebrew dry-run includes an unapproved package mutation."
     items = _homebrew_install_items(lines, expected)
-    approved = {expected.name, *expected.approved_closure}
     if items is None or len(items) != len(approved) or set(items) != approved:
         return "Homebrew dry-run install set differs from the approved package closure."
     return None
@@ -313,11 +315,36 @@ def _homebrew_acquisition(acquisition: HomebrewAcquisition | str) -> HomebrewAcq
     return acquisition
 
 
-def _has_prohibited_homebrew_mutation(lines: list[str]) -> bool:
-    """Reject non-install mutations even when Homebrew reports an install set too."""
+def _has_prohibited_homebrew_mutation(lines: list[str], parents: set[str]) -> bool:
+    """Reject non-install mutations, except formula-required upgrades of the approved closure's dependencies."""
 
-    prohibited = ("Would upgrade", "Would reinstall", "Would remove", "Would unlink")
-    return any(line.startswith(prohibited) for line in lines)
+    prohibited = ("Would reinstall", "Would remove", "Would unlink")
+    return any(line.startswith(prohibited) for line in lines) or not _dependency_upgrades_are_reviewed(lines, parents)
+
+
+_UPGRADE_DEPENDENCY_HEADER = re.compile(
+    r"^Would upgrade (?P<count>[1-9][0-9]*) dependenc(?:y|ies) for (?P<parent>.+):$"
+)
+_UPGRADE_ITEM = re.compile(r"^[a-z0-9][a-z0-9@._+/-]*(?:\s+[0-9][A-Za-z0-9@._+/-]*)?$")
+
+
+def _upgrade_block_is_reviewed(header: re.Match[str], followers: list[str]) -> bool:
+    """A block's items run to the next ``Would`` heading and must match its declared count."""
+
+    items = [item for item in itertools.takewhile(lambda line: not line.startswith("Would "), followers) if item]
+    return len(items) == int(header["count"]) and all(_UPGRADE_ITEM.fullmatch(item) for item in items)
+
+
+def _dependency_upgrades_are_reviewed(lines: list[str], parents: set[str]) -> bool:
+    """Allow only complete ``Would upgrade N dependencies for <parent>:`` blocks of the requested closure."""
+
+    for index, line in enumerate(lines):
+        if not line.startswith("Would upgrade"):
+            continue
+        header = _UPGRADE_DEPENDENCY_HEADER.fullmatch(line)
+        if header is None or header["parent"] not in parents or not _upgrade_block_is_reviewed(header, lines[index + 1 :]):
+            return False
+    return True
 
 
 def bounded_command_outcome(

@@ -7,7 +7,7 @@ import pwd
 import re
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .models import INSTALL_TIMEOUT_SECONDS, AdapterError, AdapterRuntime
 
@@ -57,6 +57,7 @@ class CommandOutcome:
     stdout: str
     stderr: str
     output_complete: bool = True
+    upgraded_dependencies: tuple[str, ...] = ()
 
 
 class CommandExecutionError(AdapterError):
@@ -77,7 +78,6 @@ class HomebrewInstallError(CommandExecutionError):
         message: str,
         *,
         outcome: CommandOutcome,
-        blocked_upgrades: tuple[str, ...] = (),
         unrecognized_line: str | None = None,
     ) -> None:
         if unrecognized_line is not None:
@@ -86,7 +86,6 @@ class HomebrewInstallError(CommandExecutionError):
                 excerpt += "…"
             message = f"{message}; unrecognized dry-run line {excerpt!r}"
         super().__init__(message, outcome=outcome)
-        self.blocked_upgrades = blocked_upgrades
         self.unrecognized_line = unrecognized_line
 
 
@@ -102,15 +101,31 @@ class _UnrecognizedPlanLineError(ValueError):
 class _PlanInspection:
     exact: bool
     unrecognized_line: str | None = None
+    upgraded_dependencies: tuple[str, ...] = ()
 
 
 @dataclass
 class _PlanAccumulator:
     package_blocks: list[list[str]] = field(default_factory=list)
     dependency_blocks: list[tuple[str, list[str]]] = field(default_factory=list)
+    upgrade_blocks: list[list[str]] = field(default_factory=list)
     block_counts: list[tuple[list[str], int]] = field(default_factory=list)
     current_items: list[str] | None = None
     current_parent: str | None = None
+    current_is_upgrade: bool = False
+
+    def begin_upgrade(self, line: str, *, package: str, reviewed: frozenset[str]) -> None:
+        """Open a ``Would upgrade N dependencies for <parent>:`` block for this plan."""
+
+        header = _UPGRADE_DEPENDENCY_HEADER.fullmatch(line)
+        if header is None or header["parent"] not in {package, *reviewed}:
+            raise _UnrecognizedPlanLineError(line)
+        items: list[str] = []
+        self.current_items = items
+        self.current_parent = header["parent"]
+        self.current_is_upgrade = True
+        self.block_counts.append((items, int(header["count"])))
+        self.upgrade_blocks.append(items)
 
     def begin(self, line: str, *, kind: str, package: str, reviewed: frozenset[str]) -> None:
         block = _plan_block_header(line, kind=kind)
@@ -120,6 +135,7 @@ class _PlanAccumulator:
         if parent is not None and parent not in {package, *reviewed}:
             raise _UnrecognizedPlanLineError(line)
         self.current_items = items
+        self.current_is_upgrade = False
         self.current_parent = parent
         self.block_counts.append((items, declared_count))
         if parent is None:
@@ -132,7 +148,7 @@ class _PlanAccumulator:
             raise _UnrecognizedPlanLineError(line)
         name = _plan_item_name(line)
         allowed = {package} if self.current_parent is None else reviewed
-        if name is None or name not in allowed:
+        if name is None or (not self.current_is_upgrade and name not in allowed):
             raise _UnrecognizedPlanLineError(line)
         self.current_items.append(name)
 
@@ -249,9 +265,7 @@ def _plan_item_name(line: str) -> str | None:
     return None if package_item is None else package_item["name"]
 
 
-def _homebrew_install_items(
-    lines: list[str], *, kind: str, package: str
-) -> tuple[list[list[str]], list[tuple[str, list[str]]]] | None:
+def _homebrew_install_items(lines: list[str], *, kind: str, package: str) -> _PlanAccumulator | None:
     """Accept only requested or reviewed items; expose every unknown line."""
 
     state = _PlanAccumulator()
@@ -260,12 +274,15 @@ def _homebrew_install_items(
         if line.startswith("Would install"):
             state.begin(line, kind=kind, package=package, reviewed=reviewed_dependencies)
             continue
+        if line.startswith("Would upgrade"):
+            state.begin_upgrade(line, package=package, reviewed=reviewed_dependencies)
+            continue
         if _known_plan_information(line):
             continue
         state.add_item(line, package=package, reviewed=reviewed_dependencies)
     if any(len(items) != declared_count for items, declared_count in state.block_counts):
         return None
-    return state.package_blocks, state.dependency_blocks
+    return state
 
 
 def _dependency_closure_is_exact(package: str, dependency_blocks: list[tuple[str, list[str]]]) -> bool:
@@ -296,14 +313,19 @@ def _inspect_homebrew_plan(output: str, *, kind: str, package: str) -> _PlanInsp
         return _PlanInspection(False, exc.line)
     if parsed is None:
         return _PlanInspection(False)
-    package_blocks, dependency_blocks = parsed
-    if not package_blocks or any(items != [package] for items in package_blocks):
+    return _inspect_parsed_plan(parsed, package=package)
+
+
+def _inspect_parsed_plan(parsed: _PlanAccumulator, *, package: str) -> _PlanInspection:
+    """Require the requested package and a reachable dependency closure; keep upgrade names as evidence."""
+
+    if not parsed.package_blocks or any(items != [package] for items in parsed.package_blocks):
         return _PlanInspection(False)
-    return _PlanInspection(_dependency_closure_is_exact(package, dependency_blocks))
-
-
-def _homebrew_plan_is_exact(output: str, *, kind: str, package: str) -> bool:
-    return _inspect_homebrew_plan(output, kind=kind, package=package).exact
+    if not _dependency_closure_is_exact(package, parsed.dependency_blocks):
+        return _PlanInspection(False)
+    # Formula-required dependency upgrades are part of the install; the names are receipt evidence.
+    upgraded = tuple(dict.fromkeys(name for items in parsed.upgrade_blocks for name in items))
+    return _PlanInspection(True, upgraded_dependencies=upgraded)
 
 
 def _has_plan_control_characters(output: str) -> bool:
@@ -324,43 +346,14 @@ def _unsafe_plan_line(output: str) -> str | None:
         return next(line for line in output.split("\n") if _has_plan_control_characters(line))
     for raw_line in output.split("\n"):
         line = raw_line.strip()
+        normalized = line.removeprefix("==> ")
+        if _UPGRADE_DEPENDENCY_HEADER.fullmatch(normalized) is not None:
+            continue
         if line.startswith("==> ") and not line.startswith(("==> Would install ", "==> Downloading ")):
             return line
-        normalized = line.removeprefix("==> ")
         if re.search(r"\bwould\b", normalized, flags=re.IGNORECASE) and not normalized.startswith("Would install "):
             return line
     return None
-
-
-def _upgrade_block_items(lines: list[str], start: int, declared_count: int) -> list[str] | None:
-    items: list[str] = []
-    for line in lines[start:]:
-        if line.startswith("Would "):
-            break
-        item = _VERSIONED_PACKAGE_ITEM.fullmatch(line)
-        if item is not None:
-            items.append(item["name"])
-    return items if len(items) == declared_count else None
-
-
-def _blocked_dependency_upgrades(output: str, *, package: str) -> tuple[str, ...]:
-    """Name only well-formed upgrade blocks attributed to this package."""
-
-    if _has_plan_control_characters(output):
-        return ()
-    lines = _normalized_plan_lines(output)
-    upgrades: list[str] = []
-    for index, line in enumerate(lines):
-        if not line.startswith("Would upgrade"):
-            continue
-        match = _UPGRADE_DEPENDENCY_HEADER.fullmatch(line)
-        if match is None or match["parent"] != package:
-            return ()
-        items = _upgrade_block_items(lines, index + 1, int(match["count"]))
-        if items is None:
-            return ()
-        upgrades.extend(items)
-    return tuple(dict.fromkeys(upgrades))
 
 
 def _homebrew_package_is_installed(
@@ -402,8 +395,6 @@ def _inspect_dry_run(outcome: CommandOutcome, output: str, *, kind: str, package
 
     if outcome.returncode != 0 or not outcome.output_complete:
         return _PlanInspection(False)
-    if _homebrew_plan_is_exact(output, kind=kind, package=package):
-        return _PlanInspection(True)
     return _inspect_homebrew_plan(output, kind=kind, package=package)
 
 
@@ -415,7 +406,11 @@ def run_homebrew_install_required(
     *,
     kind: str = "formula",
 ) -> CommandOutcome:
-    """Fail before apply when Homebrew proposes collateral package mutation."""
+    """Fail before apply when Homebrew proposes collateral package mutation.
+
+    Dependency upgrades the formula itself requires are part of the install (rul_e45fb5b3);
+    their names ride the returned outcome as evidence.
+    """
 
     if kind not in {"cask", "formula"}:
         raise AdapterError(f"{label} has an unreviewed Homebrew package kind")
@@ -442,11 +437,6 @@ def run_homebrew_install_required(
         raise HomebrewInstallError(
             f"{label} dry-run proposed an unapproved package mutation",
             outcome=dry_run_outcome,
-            blocked_upgrades=(
-                _blocked_dependency_upgrades(plan_output, package=package)
-                if dry_run_outcome.output_complete
-                else ()
-            ),
             unrecognized_line=inspection.unrecognized_line,
         )
     mutation_environment = {**environment, **_HOMEBREW_INSTALL_MUTATION_ENV}
@@ -456,6 +446,7 @@ def run_homebrew_install_required(
         environment=mutation_environment,
     )
     _require_homebrew_command_outcome(outcome, label=label, phase="install")
+    outcome = replace(outcome, upgraded_dependencies=inspection.upgraded_dependencies)
     if outcome.returncode != 0:
         if _homebrew_package_is_installed(
             runtime,

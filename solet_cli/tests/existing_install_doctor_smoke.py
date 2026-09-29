@@ -38,6 +38,7 @@ from solet_manager import update_execution as execution_module  # noqa: E402
 from solet_manager.doctor_journal import read_doctor_journal  # noqa: E402
 from solet_manager.errors import ManagerError  # noqa: E402
 from solet_manager.existing_install_doctor import run_doctor  # noqa: E402
+from solet_manager.existing_install_doctor_probe import artifact_check  # noqa: E402
 from solet_manager.existing_solet_diagnostics import DiagnosticStatus  # noqa: E402
 from solet_manager.models import CommandResult  # noqa: E402
 from solet_manager.rendering import render_human, render_json  # noqa: E402
@@ -511,7 +512,25 @@ def _assert_rendering(root: Path) -> None:
     _check("Step-6" not in human and "Step-6" not in render_json(result), "no Step-6 placeholder survives in any rendered string")
 
 
+def _assert_refresh_only_artifact_grading() -> None:
+    """A refresh-only ``rendered_whole`` file is settled when absent or operator-edited; the same states still fail or go missing for every other kind."""
+
+    def graded(kind: str, state: str, conflict: str = "none") -> DiagnosticStatus:
+        return artifact_check("managed_artifact:probe", "probe", {"artifact_id": "probe", "kind": kind, "state": state, "conflict": conflict}, "fixture").status
+
+    for state in ("absent", "locally_modified", "unknown_origin"):
+        _check(graded("rendered_whole", state) is DiagnosticStatus.VERIFIED, f"a rendered_whole file that is {state} is settled, not a failure")
+    settled = artifact_check("managed_artifact:probe", "probe", {"artifact_id": "probe", "kind": "rendered_whole", "state": "unknown_origin", "conflict": "none"}, "fixture")
+    _check("left as it is" in settled.summary and cast(dict[str, Any], settled.observed)["state"] == "unknown_origin", "the settled check still reports the state it observed")
+    _check(graded("rendered_whole", "legacy_matched") is DiagnosticStatus.MISSING and graded("rendered_whole", "stamped_current") is DiagnosticStatus.VERIFIED, "a stale render is still missing and a current one verified")
+    _check(graded("managed_block", "absent") is DiagnosticStatus.MISSING, "an absent managed block is still missing")
+    _check(graded("managed_block", "unknown_origin", "managed_block_unknown_origin") is DiagnosticStatus.FAILED, "an unknown-origin managed block still fails")
+    _check(graded("launchd_plist", "locally_modified", "managed_file_locally_modified") is DiagnosticStatus.FAILED, "an edited LaunchAgent plist still fails")
+    _check(graded("launchd_plist", "unknown_origin") is DiagnosticStatus.FAILED, "an unclassified LaunchAgent state is never settled")
+
+
 def main() -> int:
+    _assert_refresh_only_artifact_grading()
     with db_spy(), TemporaryDirectory() as temporary:
         root = Path(temporary).resolve()
         _assert_diagnostic_import(root / "diagnostic")

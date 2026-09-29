@@ -194,6 +194,7 @@ def _inputs(runtime: FakeRuntime, target: Path, *ids: str) -> dict[str, Any]:
         "instance_launchagent_plist": str(runtime.home / "Library" / "LaunchAgents" / f"local.solet.{_NAME}.plist"),
         "shell_startup_block": str(runtime.home / ".zshrc"),
         "user_claude_md_section": str(runtime.home / ".claude" / "CLAUDE.md"),
+        "feedback_skill": str(runtime.home / ".claude" / "skills" / "feedback" / "SKILL.md"),
     }
     return {"artifact_ids": list(ids), "planned_destinations": [f"{item}={destinations[item]}" for item in ids]}
 
@@ -334,6 +335,116 @@ def _check_whole_file_and_plist(root: Path) -> None:
     inputs["planned_destinations"] = [f"shell_startup_block={runtime.home}/.zshrc.other"]
     unplanned = cast(dict[str, Any], dispatch_request(_request(target, "existing::hydration.reconcile", phase="apply", inputs=inputs), runtime))
     _check(unplanned["error_kind"] == "preserved_surface_write_refused" and not (runtime.home / ".zshrc").exists(), "a destination the plan did not name is refused with no write")
+
+
+_SKILL_TEMPLATE = "feedback_skill_SKILL.md.template"
+_SKILL_REF = f"plugins/github_midwife_plugin/knowledge_base/hydration_templates/{_SKILL_TEMPLATE}"
+_SKILL_STAMP = "<!-- rendered-from: {TEMPLATE_REF}@{TEMPLATE_DIGEST} -->"
+_R56_SKILL = _PLUGIN_ROOT / "tests" / "fixtures" / "hydration_predecessors" / "feedback_skill_r56.fixture"
+
+
+def _skill_artifact(previous: list[str]) -> dict[str, Any]:
+    """The record the shipped bundle must declare for the feedback skill (whole file, user scope, refresh-only)."""
+    return {"artifact_id": "feedback_skill", "kind": "rendered_whole", "logical_destination": "{HOME}/.claude/skills/feedback/SKILL.md", "preservation_class": "manager_generated_whole", "marker": None, "stamp": _SKILL_STAMP, "template_ref": _SKILL_REF, "template_digest": _digest(_SKILL_TEMPLATE), "previous_template_digests": previous}
+
+
+def _skill_render(template: bytes, digest: str | None) -> str:
+    """The feedback skill as genesis (``digest is None``) or a refresh renders it: the stamp sits AFTER the front matter."""
+    body = template.decode("utf-8").replace("{{SOLET_NAME}}", _NAME)
+    if digest is None:
+        return body
+    head, separator, rest = body.partition("\n---\n")
+    return f"{head}{separator}{_SKILL_STAMP.replace('{TEMPLATE_REF}', _SKILL_REF).replace('{TEMPLATE_DIGEST}', digest)}\n{rest}"
+
+
+def _skill_target(root: Path) -> Path:
+    """A Git target whose predecessor commit carries the real r56 feedback template and whose candidate declares the skill."""
+    target = root / "target"
+    templates = target / "plugins/github_midwife_plugin/knowledge_base/hydration_templates"
+    templates.mkdir(parents=True)
+    _git(target, "init", "--quiet", "-b", "main")
+    _git(target, "config", "user.name", "Fixture")
+    _git(target, "config", "user.email", "fixture@example.invalid")
+    (templates / _SKILL_TEMPLATE).write_bytes(_R56_SKILL.read_bytes())
+    _git(target, "add", "-A")
+    _git(target, "commit", "--quiet", "-m", "predecessor")
+    predecessor = _git(target, "rev-parse", "HEAD")
+    (templates / _SKILL_TEMPLATE).write_bytes((_TEMPLATES / _SKILL_TEMPLATE).read_bytes())
+    bundle = _bundle(predecessor, artifacts=[_skill_artifact([sha256_bytes(_R56_SKILL.read_bytes())])])
+    (target / "plugins/github_midwife_plugin/knowledge_base/existing_install_flow.json").write_text(json.dumps(bundle, indent=2))
+    _git(target, "add", "-A")
+    _git(target, "commit", "--quiet", "-m", "candidate")
+    return target
+
+
+def _check_feedback_skill_declared() -> None:
+    """The shipped bundle declares the skill exactly as the refresh contract needs, with the r56 digest as its predecessor."""
+    shipped = {row["artifact_id"]: row for row in json.loads((_KB / "existing_install_flow.json").read_text())["managed_artifacts"]}
+    _check("feedback_skill" in shipped, "the shipped bundle declares the feedback skill")
+    _check(shipped["feedback_skill"] == _skill_artifact([sha256_bytes(_R56_SKILL.read_bytes())]), "declared record: user-scope whole file, front-matter-safe stamp, r56 digest as previous")
+    _check(b"--label defect" in _R56_SKILL.read_bytes() and b"--label defect" not in (_TEMPLATES / _SKILL_TEMPLATE).read_bytes(), "the r56 fixture is the broken skill and the shipped template is not")
+
+
+def _check_feedback_skill_refresh(root: Path) -> None:
+    target = _skill_target(root)
+    runtime = FakeRuntime(root / "home")
+    skill = runtime.home / ".claude" / "skills" / "feedback" / "SKILL.md"
+    ref = "existing::hydration.reconcile"
+    current, previous = (_TEMPLATES / _SKILL_TEMPLATE).read_bytes(), _R56_SKILL.read_bytes()
+    absent = _probe(target, runtime, ref, "feedback_skill")
+    _check((absent["checkpoint_status"], _state(absent, "feedback_skill")["state"], _state(absent, "feedback_skill")["action"]) == ("verified", "absent", "none"), "a missing skill is not created: refresh-only")
+    _apply(target, runtime, ref, "feedback_skill")
+    _check(not skill.exists(), "apply on a missing skill writes nothing")
+    _check_skill_legacy_replaced(target, runtime, skill, ref, current, previous)
+    _check_skill_stamped_previous(target, runtime, skill, ref, current, previous)
+    _check_skill_edited_is_left(target, runtime, skill, ref, current, previous)
+
+
+def _check_skill_legacy_replaced(target: Path, runtime: FakeRuntime, skill: Path, ref: str, current: bytes, previous: bytes) -> None:
+    skill.parent.mkdir(parents=True)
+    skill.write_text(_skill_render(previous, None))
+    skill.chmod(0o640)
+    _check("--label defect" in skill.read_text(), "fixture: the installed skill carries the defective --label step")
+    probe = _probe(target, runtime, ref, "feedback_skill")
+    row = _state(probe, "feedback_skill")
+    _check((probe["checkpoint_status"], row["state"], row["action"]) == ("pending", "legacy_matched", "render_whole"), "the genesis-era r56 skill is recognised as the previous render and planned for replacement")
+    planned = [(action["id"], action["target"]) for action in probe["planned_actions"]]
+    _check(planned == [("hydrate.feedback_skill", str(skill))], f"the dry-run plan names the skill write: {planned}")
+    _check(skill.read_text() == _skill_render(previous, None), "probe writes nothing")
+    _check(_apply(target, runtime, ref, "feedback_skill")["checkpoint_status"] == "applied", "apply succeeds")
+    refreshed = skill.read_text()
+    _check(refreshed == _skill_render(current, _digest(_SKILL_TEMPLATE)), "the skill is now the stamped candidate render")
+    _check(refreshed.startswith("---\nname: feedback\n") and "--label defect" not in refreshed and "issues/$PARENT_NUMBER/sub_issues" not in refreshed, "front matter still first; no --label step, no sub-issues POST")
+    _check(skill.stat().st_mode & 0o777 == 0o640, "the file mode survives the refresh")
+    again = _probe(target, runtime, ref, "feedback_skill", purpose="post_apply")
+    _check((again["checkpoint_status"], _state(again, "feedback_skill")["state"], _state(again, "feedback_skill")["expected_sha256"]) == ("verified", "stamped_current", sha256_bytes(refreshed.encode())), "post-apply the skill reads back as stamped current")
+    writes = len(runtime.writes)
+    _apply(target, runtime, ref, "feedback_skill")
+    _check((skill.read_text(), len(runtime.writes)) == (refreshed, writes), "a second update rewrites nothing")
+
+
+def _check_skill_stamped_previous(target: Path, runtime: FakeRuntime, skill: Path, ref: str, current: bytes, previous: bytes) -> None:
+    previous_digest = sha256_bytes(previous)
+    skill.write_text(_skill_render(previous, previous_digest))
+    row = _state(_probe(target, runtime, ref, "feedback_skill"), "feedback_skill")
+    _check((row["state"], row["action"], row["stamped_digest"]) == ("stamped_previous", "render_whole", previous_digest), "a skill stamped with the r56 digest is a previous render")
+    _apply(target, runtime, ref, "feedback_skill")
+    _check(skill.read_text() == _skill_render(current, _digest(_SKILL_TEMPLATE)), "a stamped previous render is replaced by the candidate")
+
+
+def _check_skill_edited_is_left(target: Path, runtime: FakeRuntime, skill: Path, ref: str, current: bytes, previous: bytes) -> None:
+    """An operator-edited skill is reported and left byte-for-byte; it never blocks the update."""
+    for label, edited, expected in (
+        ("unstamped edit of the r56 render", _skill_render(previous, None) + "\nAlways file as urgent.\n", "unknown_origin"),
+        ("stamped edit of the current render", _skill_render(current, _digest(_SKILL_TEMPLATE)) + "\nAlways file as urgent.\n", "locally_modified"),
+    ):
+        skill.write_text(edited)
+        writes = len(runtime.writes)
+        probe = _probe(target, runtime, ref, "feedback_skill")
+        row = _state(probe, "feedback_skill")
+        _check((probe["checkpoint_status"], row["state"], row["action"], row["conflict"]) == ("verified", expected, "none", "none"), f"{label}: reported as {expected}, no action, no conflict")
+        applied = _apply(target, runtime, ref, "feedback_skill")
+        _check((applied["checkpoint_status"], skill.read_text(), len(runtime.writes)) == ("applied", edited, writes), f"{label}: left byte-for-byte")
 
 
 def _check_rename_migration(root: Path) -> None:
@@ -488,6 +599,8 @@ def main() -> int:
         _check_managed_block_table(root / "blocks")
         _check_stamped_previous(root / "previous")
         _check_whole_file_and_plist(root / "whole")
+        _check_feedback_skill_declared()
+        _check_feedback_skill_refresh(root / "skill")
         _check_rename_migration(root / "rename")
         _check_export_root_and_cache(root / "export")
         _check_dependency_route(root / "route")

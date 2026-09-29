@@ -38,6 +38,7 @@ from ananta.interfaces import (  # noqa: E402
 )
 
 from default_inference_plugin.providers.lm_studio_provider import (  # noqa: E402
+    AVAILABILITY_TIMEOUT_SECONDS,
     LMStudioProvider,
 )
 
@@ -187,8 +188,13 @@ def test_model_loaded_is_required_for_availability() -> None:
         "the no-model readiness error names the configured model",
     )
     _check(
-        unavailable_session.calls == [("http://localhost:1234/v1/models", {"timeout": 2})],
-        "availability checks the OpenAI-compatible models endpoint",
+        unavailable_session.calls
+        == [("http://localhost:1234/v1/models", {"timeout": AVAILABILITY_TIMEOUT_SECONDS})],
+        "availability checks the OpenAI-compatible models endpoint with the named timeout",
+    )
+    _check(
+        2 < AVAILABILITY_TIMEOUT_SECONDS <= 30,
+        "the availability timeout outlasts a busy single-slot server yet still fails fast",
     )
 
     ready_session = _ModelsSession({"data": [{"id": "test-model"}]})

@@ -37,6 +37,7 @@ __all__ = ["STALE_ARTIFACT_STATES", "VERIFIED_ARTIFACT_STATES", "DoctorProbe", "
 
 VERIFIED_ARTIFACT_STATES = frozenset({"stamped_current"})
 STALE_ARTIFACT_STATES = frozenset({"stamped_previous", "legacy_matched"})
+_REFRESH_ONLY_SETTLED_STATES = frozenset({"absent", "locally_modified", "unknown_origin"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,9 +215,21 @@ def artifact_facts(probe: DoctorProbe) -> dict[str, dict[str, str]]:
     return facts
 
 
+def _refresh_only_check(check_id: str, artifact_id: str, facts: dict[str, str], source: str) -> DiagnosticCheck | None:
+    """A ``rendered_whole`` file is only ever refreshed, so absent or operator-edited is the settled state an update leaves it in."""
+    state = facts.get("state", "unknown")
+    if facts.get("kind") != "rendered_whole" or state not in _REFRESH_ONLY_SETTLED_STATES:
+        return None
+    observed: dict[str, JsonValue] = dict(facts)
+    return check(check_id, DiagnosticStatus.VERIFIED, f"Managed artifact {artifact_id} is {state}: it is refresh-only, so it was left as it is and never overwritten.", source, observed=observed, expected="stamped_current_or_left_in_place")
+
+
 def artifact_check(check_id: str, artifact_id: str, facts: dict[str, str] | None, source: str) -> DiagnosticCheck:
     if facts is None:
         return unknown(check_id, f"No probe reported managed artifact {artifact_id}.", source, reason="artifact_unreported")
+    settled = _refresh_only_check(check_id, artifact_id, facts, source)
+    if settled is not None:
+        return settled
     state, conflict = facts.get("state", "unknown"), facts.get("conflict", "none")
     observed: dict[str, JsonValue] = dict(facts)
     if conflict != "none":

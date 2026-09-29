@@ -52,6 +52,7 @@ from solet_manager.existing_install_bundle import (  # noqa: E402
     DECLARABLE_OPERATION_REFS,
     EXISTING_OPERATIONS,
     SEED_SIDE_OPERATION_REFS,
+    TransitionBundle,
     parse_transition_bundle,
     transition_bundle_digest,
 )
@@ -76,6 +77,44 @@ _PUBLIC_R43_PREDECESSOR: dict[str, str | None] = {
     "seed_id": "72586d56-7826-5706-a210-68827676ffb0",
     "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
     "manifest_sha256": "6af4e689b3f1519b5a31eb854172aca354ecb79892acc24c84cd4c08d1c348c7",
+    "legacy_anchor_id": None,
+}
+#: Stable r48 (iss_ae956dd6): the next published stable release real users installed after r43.
+_PUBLIC_R48_COMMIT = "ea6ee0cbfd1d3715a3aa588d4c45bafd96fc1421"
+_PUBLIC_R48_TREE = "7bd118d64755d1ac23d8e152158c911ea5ebd386"
+_PUBLIC_R48_PREDECESSOR: dict[str, str | None] = {
+    "repository": "https://github.com/solet-public/macos-bizops.git",
+    "commit": _PUBLIC_R48_COMMIT,
+    "tree": _PUBLIC_R48_TREE,
+    "provenance_sha256": "d7b9e73d34eb4261420ee2cf853a40c3452b33bf4673604587901ff7a33013c5",
+    "seed_id": "b4d95d6d-b7b8-5785-819a-786851159496",
+    "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+    "manifest_sha256": "a38db6f97b8aadf17670fa8fa9677dbaf93623e13814abc3a4061ec7e4c8d60b",
+    "legacy_anchor_id": None,
+}
+#: Stable r55 and r56 (iss_933eff4e): every stable release must accept the stable release before it.
+_PUBLIC_R55_COMMIT = "1dedebb6622ee6559d549eac4a2465591c130d80"
+_PUBLIC_R55_TREE = "fe3bf23261cd2e1ba88b16e2640b38e0378e38cd"
+_PUBLIC_R55_PREDECESSOR: dict[str, str | None] = {
+    "repository": "https://github.com/solet-public/macos-bizops.git",
+    "commit": _PUBLIC_R55_COMMIT,
+    "tree": _PUBLIC_R55_TREE,
+    "provenance_sha256": "4fb7b8db5ff4823dd84570a43d033eb8fd5aad2430b97dd5d25e7d1320897f42",
+    "seed_id": "32f22688-b568-5bd6-9231-3be4433295fa",
+    "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+    "manifest_sha256": "738bc4311700bc6b9fe5aab61d36483521d155a012f7eda2cbd1ca845be1b853",
+    "legacy_anchor_id": None,
+}
+_PUBLIC_R56_COMMIT = "d81e014adce8ed4b4258db35a4f46339431ea158"
+_PUBLIC_R56_TREE = "f95d890e2bb36c889c9e3ea0e4b3976c50336769"
+_PUBLIC_R56_PREDECESSOR: dict[str, str | None] = {
+    "repository": "https://github.com/solet-public/macos-bizops.git",
+    "commit": _PUBLIC_R56_COMMIT,
+    "tree": _PUBLIC_R56_TREE,
+    "provenance_sha256": "b05b2f4afdbcdb98c76978dc45beb1e42abd5e417e1734ea4ddc39c1b6755560",
+    "seed_id": "50837fd9-78d7-5480-aecf-9a03bcafb586",
+    "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+    "manifest_sha256": "fbcd04c3abf4af903aebe0cb046ce15c455e1386486773accf9680aa4720f75a",
     "legacy_anchor_id": None,
 }
 _MANAGER = _ROOT / "solet_cli" / "src" / "solet_manager"
@@ -155,6 +194,24 @@ def _directory_digest(files: dict[str, bytes]) -> str:
     return f"sha256:{digest.hexdigest()}"
 
 
+def _check_public_r48_predecessor(bundle: TransitionBundle) -> None:
+    """Stable r48 (iss_ae956dd6) is listed with its published identity; its commit with another tree is not."""
+    _check(bundle.predecessor_for(_PUBLIC_R48_COMMIT, _PUBLIC_R43_TREE) is None, "public r48 commit with wrong tree remains refused")
+    public_r48 = bundle.predecessor_for(_PUBLIC_R48_COMMIT, _PUBLIC_R48_TREE)
+    _check(public_r48 is not None, "published public r48 predecessor is supported")
+    assert public_r48 is not None
+    _check(asdict(public_r48) == _PUBLIC_R48_PREDECESSOR, "public r48 descriptor matches published artefacts")
+
+
+def _check_public_later_predecessors(bundle: TransitionBundle) -> None:
+    """Stable r55 and r56 (iss_933eff4e) are listed with their published identities; each commit with another tree is not."""
+    for label, commit, tree, expected in (("r55", _PUBLIC_R55_COMMIT, _PUBLIC_R55_TREE, _PUBLIC_R55_PREDECESSOR), ("r56", _PUBLIC_R56_COMMIT, _PUBLIC_R56_TREE, _PUBLIC_R56_PREDECESSOR)):
+        _check(bundle.predecessor_for(commit, _PUBLIC_R43_TREE) is None, f"public {label} commit with wrong tree remains refused")
+        listed = bundle.predecessor_for(commit, tree)
+        assert listed is not None, f"published public {label} predecessor is supported"
+        _check(asdict(listed) == expected, f"public {label} descriptor matches published artefacts")
+
+
 def _check_shipped_bundle() -> None:
     document = _shipped_document()
     schema = json.loads((_KB / "existing_install_flow.schema.json").read_text())
@@ -181,8 +238,10 @@ def _check_shipped_bundle() -> None:
     _check(public_r43 is not None, "published public r43 predecessor is supported")
     assert public_r43 is not None
     _check(asdict(public_r43) == _PUBLIC_R43_PREDECESSOR, "public r43 descriptor matches published artefacts")
+    _check_public_r48_predecessor(bundle)
+    _check_public_later_predecessors(bundle)
     _check(all(not artifact.in_target for artifact in bundle.managed_artifacts), "the current release declares no in-target artifact (section 6.3)")
-    _check({item.artifact_id for item in bundle.managed_artifacts} == {"instance_launchagent_plist", "shell_startup_block", "user_claude_md_section"}, "shipped artifacts")
+    _check({item.artifact_id for item in bundle.managed_artifacts} == {"instance_launchagent_plist", "shell_startup_block", "user_claude_md_section", "feedback_skill"}, "shipped artifacts")
     _check(bundle.lifecycle.strategy == "router_preferred", "shipped lifecycle strategy")
     for artifact in bundle.managed_artifacts:
         template = _ROOT / artifact.template_ref

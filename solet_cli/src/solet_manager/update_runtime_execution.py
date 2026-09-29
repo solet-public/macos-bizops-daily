@@ -56,7 +56,6 @@ from .errors import (
 from .existing_install_bundle import SYNTHESISED_OPERATION_TYPES, RuntimeOperation
 from .existing_install_inspection import ExistingInstallInspectionResult
 from .maintenance_inventory import publish_needs_attention, read_maintenance_inventory_v2
-from .managed_artifact_backup import write_backup
 from .models import (
     ActiveOperation,
     CheckpointStatus,
@@ -469,7 +468,7 @@ class RuntimeExecution:
             raise UpdateBlockedError(cast(str, pre.error_kind), f"{operation.operation_id} refused before apply: {pre.repair}", repair=pre.repair or self._reconcile_repair())
         if self.operation_type(operation.operation_id) == OperationType.BACKED_UP_ARTIFACT.value:
             stages.require_backups_on_reentry(self, operation, pre)
-            self._backup_targets(operation, pre)
+            stages.backup_targets(self, operation, pre)
         self._apply_and_verify(operation, inputs, contradiction)
 
     def _reconcile_repair(self) -> str:
@@ -506,14 +505,6 @@ class RuntimeExecution:
             raise UpdateFailedError(contradiction, f"{operation.operation_id} apply reported success but its postcondition does not verify", repair=f"Retain all evidence; {self._reconcile_repair()}")
         self._rebaseline(operation)
         self._set_status(operation.operation_id, "verified")
-
-    def _backup_targets(self, operation: RuntimeOperation, probe: OperationResult) -> None:
-        for index, action in enumerate(probe.planned_actions):
-            target = Path(action.target)
-            if not target.is_absolute():
-                continue
-            record = write_backup(self.paths, self.record.instance_id, self.operation_id, f"{operation.operation_id}.{index}", target)
-            self._record(operation.operation_id, "manager", None, status=None, note={"backup": record.to_dict()})
 
     def _set_status(self, operation_id: str, status: str) -> None:
         self._record(operation_id, "manager", None, status=status, note={"status": status})

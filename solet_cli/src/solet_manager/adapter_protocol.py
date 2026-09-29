@@ -29,6 +29,11 @@ from .errors import AdapterProtocolError
 from .models import CheckpointStatus, JsonValue
 
 PROTOCOL_VERSION = 1
+DEFAULT_PROBE_TIMEOUT_SECONDS = 30
+# The first llama-server launch initializes ggml's Metal backend; the r55 macOS 26
+# guest needed about 26 s end to end, so the default 30 s budget left no margin
+# (iss_1086dfbb).  Only this probe gets more; the global default stays put.
+PROBE_TIMEOUT_OVERRIDES: dict[str, int] = {"setup::llama_cpp.server_available": 90}
 CREATE_FLOW_ID = "macos.repository_setup"
 EXISTING_INSTALL_FLOW_ID = "existing-install"
 EXISTING_INSTALL_REF_PREFIX = "existing::"
@@ -80,6 +85,12 @@ _EMPTY_ACTION_PURPOSES = {
     "stage_entry",
     "stage_exit",
 }
+
+
+def probe_timeout_seconds(probe_ref: str) -> int:
+    """Return the Manager's budget for one probe, honoring its per-probe override."""
+
+    return PROBE_TIMEOUT_OVERRIDES.get(probe_ref, DEFAULT_PROBE_TIMEOUT_SECONDS)
 
 
 @dataclass(frozen=True)

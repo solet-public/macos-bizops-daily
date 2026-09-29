@@ -25,10 +25,15 @@ from solet_manager.models import CheckpointStatus  # noqa: E402
 
 from bootstrap_adapter.homebrew import (  # noqa: E402
     HomebrewInstallError,
-    _homebrew_plan_is_exact,
+    _inspect_homebrew_plan,
     run_homebrew_install_required,
 )
 from bootstrap_adapter.models import AdapterRuntime  # noqa: E402
+
+
+def _homebrew_plan_is_exact(output: str, *, kind: str, package: str) -> bool:
+    return _inspect_homebrew_plan(output, kind=kind, package=package).exact
+
 
 _CONTRACTS = _ROOT / "plugins/github_midwife_plugin/knowledge_base"
 _LEGACY_FLOW = (
@@ -124,8 +129,7 @@ def _check_nonzero_dry_run_warning_is_refused() -> None:
     except HomebrewInstallError as exc:
         _check(
             exc.outcome.returncode == 1
-            and exc.outcome.stderr == _INSTALLED_WARNING
-            and exc.blocked_upgrades == (),
+            and exc.outcome.stderr == _INSTALLED_WARNING,
             "nonzero dry-run warning is not a verified no-op",
         )
     else:

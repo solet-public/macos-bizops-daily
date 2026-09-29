@@ -15,7 +15,7 @@ body:
     id: item_number
     attributes:
       label: Item number
-      description: The new item number for this confirmation, as `§N.M`. Repeat it at the front of the issue title.
+      description: The new item number for this confirmation, as `§N.M`. Repeat it at the front of the issue title. Part of a multi-item round? Add the round's parent issue after the number, as `§42.3 (round #123)`.
       placeholder: "§43.1"
     validations:
       required: true

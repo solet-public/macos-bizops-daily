@@ -201,7 +201,7 @@ class InferenceServiceInterface(ABC):
 
     @abstractmethod
     def validate_availability(self) -> ActionResult:
-        """Check if inference service available (<2s)."""
+        """Check if inference service is available, bounded by the provider's availability timeout."""
         pass
 
     @abstractmethod

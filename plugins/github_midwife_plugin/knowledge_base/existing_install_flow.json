@@ -21,6 +21,36 @@
       "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
       "manifest_sha256": "6af4e689b3f1519b5a31eb854172aca354ecb79892acc24c84cd4c08d1c348c7",
       "legacy_anchor_id": null
+    },
+    {
+      "repository": "https://github.com/solet-public/macos-bizops.git",
+      "commit": "ea6ee0cbfd1d3715a3aa588d4c45bafd96fc1421",
+      "tree": "7bd118d64755d1ac23d8e152158c911ea5ebd386",
+      "provenance_sha256": "d7b9e73d34eb4261420ee2cf853a40c3452b33bf4673604587901ff7a33013c5",
+      "seed_id": "b4d95d6d-b7b8-5785-819a-786851159496",
+      "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+      "manifest_sha256": "a38db6f97b8aadf17670fa8fa9677dbaf93623e13814abc3a4061ec7e4c8d60b",
+      "legacy_anchor_id": null
+    },
+    {
+      "repository": "https://github.com/solet-public/macos-bizops.git",
+      "commit": "1dedebb6622ee6559d549eac4a2465591c130d80",
+      "tree": "fe3bf23261cd2e1ba88b16e2640b38e0378e38cd",
+      "provenance_sha256": "4fb7b8db5ff4823dd84570a43d033eb8fd5aad2430b97dd5d25e7d1320897f42",
+      "seed_id": "32f22688-b568-5bd6-9231-3be4433295fa",
+      "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+      "manifest_sha256": "738bc4311700bc6b9fe5aab61d36483521d155a012f7eda2cbd1ca845be1b853",
+      "legacy_anchor_id": null
+    },
+    {
+      "repository": "https://github.com/solet-public/macos-bizops.git",
+      "commit": "d81e014adce8ed4b4258db35a4f46339431ea158",
+      "tree": "f95d890e2bb36c889c9e3ea0e4b3976c50336769",
+      "provenance_sha256": "b05b2f4afdbcdb98c76978dc45beb1e42abd5e417e1734ea4ddc39c1b6755560",
+      "seed_id": "50837fd9-78d7-5480-aecf-9a03bcafb586",
+      "origin_id": "31bfa93c-fe20-4988-b019-f8186684e88e",
+      "manifest_sha256": "fbcd04c3abf4af903aebe0cb046ce15c455e1386486773accf9680aa4720f75a",
+      "legacy_anchor_id": null
     }
   ],
   "source_operation": {
@@ -183,6 +213,19 @@
       "template_digest": "sha256:f18e3ad0f57b41c488ad8815a96e29e24d08ecfb1140ee7c9fc4afa9eb668ef1",
       "previous_template_digests": [
         "sha256:f18e3ad0f57b41c488ad8815a96e29e24d08ecfb1140ee7c9fc4afa9eb668ef1"
+      ]
+    },
+    {
+      "artifact_id": "feedback_skill",
+      "kind": "rendered_whole",
+      "logical_destination": "{HOME}/.claude/skills/feedback/SKILL.md",
+      "preservation_class": "manager_generated_whole",
+      "marker": null,
+      "stamp": "<!-- rendered-from: {TEMPLATE_REF}@{TEMPLATE_DIGEST} -->",
+      "template_ref": "plugins/github_midwife_plugin/knowledge_base/hydration_templates/feedback_skill_SKILL.md.template",
+      "template_digest": "sha256:dbe3ca27f4b9e7ba99ee9f3bf98c3bf2b8834642b0ec4760160cd600bf31a7d0",
+      "previous_template_digests": [
+        "sha256:cf5c4aa4e76627a3f2868fd33f58b0533e96a2d4c9de3a09175ec3c9269f3d11"
       ]
     }
   ],

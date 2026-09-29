@@ -4,19 +4,103 @@ optional: false
 implements:
   - interface: InferenceProvider
 config:
-  model:
-    type: string
-    required: true
-    default: apple-system
-  timeout_seconds:
+  "context.attachment_scan_limit":
     type: integer
     required: true
-    default: 120
-  temperature:
+    default: 10
+  "context.auto_compact":
+    type: boolean
+    required: true
+    default: false
+  "context.chars_per_token":
+    type: integer
+    required: true
+    default: 4
+  "context.discovery_intent_max_tokens":
+    type: integer
+    required: true
+    default: 400
+  "context.discovery_intent_temperature":
+    type: number
+    required: true
+    default: 0.0
+  "context.discovery_min_similarity_threshold":
+    type: number
+    required: true
+    default: 0.5
+  "context.id_address_key":
+    type: null
+    required: true
+    default: null
+  "context.id_source":
+    type: string
+    required: true
+    default: plugin_root
+  "context.max_char_count":
+    type: integer
+    required: true
+    default: 262144
+  "context.min_summary_tokens":
+    type: integer
+    required: true
+    default: 500
+  "context.mode":
+    type: string
+    required: true
+    default: platform
+  "context.model_context_tokens":
+    type: integer
+    required: true
+    default: 8192
+  "context.precache_char_count":
+    type: integer
+    required: true
+    default: 10000
+  "context.soft_max_char_count":
+    type: integer
+    required: true
+    default: 60000
+  "context.summary_temperature":
     type: number
     required: true
     default: 0.1
+  "context.supports_clear":
+    type: boolean
+    required: true
+    default: false
+  "context.supports_compaction":
+    type: boolean
+    required: true
+    default: true
+  "context.target_char_count":
+    type: integer
+    required: true
+    default: 20000
+  "context.warm_max_tokens":
+    type: integer
+    required: true
+    default: 1
+  "context.warm_temperature":
+    type: number
+    required: true
+    default: 0.0
+  "context.warming_enabled":
+    type: boolean
+    required: true
+    default: false
   max_tokens:
     type: integer
     required: true
     default: 1024
+  model:
+    type: string
+    required: true
+    default: apple-system
+  temperature:
+    type: number
+    required: true
+    default: 0.1
+  timeout_seconds:
+    type: integer
+    required: true
+    default: 120

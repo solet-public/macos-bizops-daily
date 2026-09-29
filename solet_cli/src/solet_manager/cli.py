@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shlex
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -24,6 +25,7 @@ from .doctor import InstallationDoctor
 from .errors import (
     ApprovalFingerprintMalformedError,
     ApprovalFingerprintRequiredError,
+    InvocationError,
     ManagerError,
 )
 from .identity_reconciliation import IdentityReconciliationManager
@@ -37,10 +39,21 @@ from .rollback_repair import RollbackRepairExecutor
 __all__ = ["CreateManager", "_parse_decisions", "build_parser", "main", "run"]
 
 
+_MANAGER_ONLY_VERBS = ("import", "update")
+_MANAGER_EPILOG = """\
+Existing-solet lifecycle lives in the separate `solet-manager` command, not here:
+  solet-manager inspect   classify an existing solet checkout (read-only, no target code runs)
+  solet-manager import    preview or enroll an existing solet
+  solet-manager update    preview or apply the enrolled-channel update
+Run `solet-manager --help` for its options."""
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="solet",
         description="Create and operate local Solet instances.",
+        epilog=_MANAGER_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"solet {MANAGER_VERSION}")
     parser.add_argument("--json", action="store_true", help="Render the same typed result as JSON.")
@@ -130,7 +143,12 @@ def build_parser() -> argparse.ArgumentParser:
     attest.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
     inspect = commands.add_parser(
         "inspect",
-        help="Passively inspect a seed-built target by filesystem path.",
+        help="Actively probe a seed-built target by filesystem path; may run target binaries.",
+        description=(
+            "Active, identity-validated probe of a seed-built target. It may run binaries "
+            "inside the target, and target mutation is not prevented. For a read-only "
+            "classification of an existing solet checkout use `solet-manager inspect`."
+        ),
     )
     inspect.add_argument("--target", type=Path, required=True)
     inspect.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
@@ -177,11 +195,24 @@ def build_parser() -> argparse.ArgumentParser:
     reconcile_identity.add_argument("--approval-fingerprint")
     reconcile_identity.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
     add_release_proof_parser(commands)
+    for verb in _MANAGER_ONLY_VERBS:
+        pointer = commands.add_parser(verb, help=f"Not here: this is `solet-manager {verb}`.")
+        pointer.add_argument("rest", nargs=argparse.REMAINDER)
     return parser
+
+
+def _manager_pointer(args: argparse.Namespace) -> str:
+    return f"`solet {args.command}` does not exist; run `{shlex.join(['solet-manager', args.command, *args.rest])}`."
+
+
+def _reject_manager_only_verb(args: argparse.Namespace) -> None:
+    if args.command in _MANAGER_ONLY_VERBS:
+        raise InvocationError(_manager_pointer(args))
 
 
 def run(argv: Sequence[str] | None = None) -> CommandResult:
     args = build_parser().parse_args(argv)
+    _reject_manager_only_verb(args)
     if args.command in {"create", "reconcile-contract", "reconcile-adapter", "reconcile-identity"}:
         _validate_approval_carrier(args)
     if args.command in {"inspect", "release-proof"}:
@@ -292,6 +323,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     parsed: argparse.Namespace | None = None
     try:
         parsed = parser.parse_args(argv)
+        if parsed.command in _MANAGER_ONLY_VERBS:
+            print(_manager_pointer(parsed), file=sys.stderr)
+            raise SystemExit(int(ExitCode.INVALID))
         result = run(argv)
     except ManagerError as exc:
         result = CommandResult(

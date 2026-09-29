@@ -241,9 +241,9 @@ def _new_preview(
             "new create expected a target path that does not exist; found an "
             f"existing non-empty or non-directory path at {config.target}",
             repair=(
-                "Choose a target path that does not exist. To diagnose this path "
-                f"without changing it, run `solet inspect --target "
-                f"{shlex.quote(str(config.target))}`."
+                "Choose a target path that does not exist. To classify this path "
+                f"without running its code, run `solet-manager inspect --target "
+                f"{shlex.quote(str(config.target))} --channel stable`."
             ),
         )
     seed = load_seed_lock(seed_lock_path)

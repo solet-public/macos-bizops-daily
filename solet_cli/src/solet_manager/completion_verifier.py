@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from .adapter_protocol import probe_timeout_seconds
 from .adapters import AdapterRegistry, OperationRequest, invoke_adapter
 from .contracts import ContractBundle, startup_readiness_budget
 from .inference_probe_policy import advisory_inference_probe_result
@@ -46,7 +47,7 @@ def _run_completion_probe(
     attempt = next_attempt(transaction, probe_id)
     readiness = startup_readiness_budget(bundle)
     public_inputs = probe_public_inputs(transaction, str(definition["probe_ref"]))
-    timeout_seconds = 30
+    timeout_seconds = probe_timeout_seconds(str(definition["probe_ref"]))
     if (
         "completion" in readiness.consumer_probe_purposes
         and probe_id in readiness.consumer_probe_refs

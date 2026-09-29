@@ -18,6 +18,11 @@ from ananta.interfaces import (
 
 logger = logging.getLogger(__name__)
 
+# A single-slot llama-server that is busy generating on a slow host can take
+# longer than 2 s to answer GET /models (iss_9073a6d3).  Still short enough that
+# a server which is down fails fast.
+AVAILABILITY_TIMEOUT_SECONDS = 10
+
 
 class LMStudioProvider:
     """LM Studio provider via OpenAI-compatible API.
@@ -220,9 +225,9 @@ class LMStudioProvider:
             ) from e
 
     def validate_availability(self) -> ActionResult:
-        """Quick health check (<2s)."""
+        """Quick health check, bounded by AVAILABILITY_TIMEOUT_SECONDS."""
         try:
-            response = self.session.get(f"{self.base_url}/models", timeout=2)
+            response = self.session.get(f"{self.base_url}/models", timeout=AVAILABILITY_TIMEOUT_SECONDS)
             response.raise_for_status()
             models_data = response.json()
             loaded_models = self._loaded_model_ids(models_data)

@@ -260,7 +260,7 @@ class Plugin(
         if result.get("action_status") == ActionStatus.ERROR.value:
             assert self.config_provider is not None
             endpoint = str(self.config_provider.get("base_url"))
-            error_message = f"LM Studio not available at {endpoint} after router registration"
+            error_message = f"Inference server not available at {endpoint} after router registration"
             self.set_error(error_message)
             self.logger.warning("%s — waiting", error_message)
             self._start_availability_retry()

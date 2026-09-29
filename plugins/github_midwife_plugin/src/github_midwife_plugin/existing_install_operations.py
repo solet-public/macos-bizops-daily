@@ -15,7 +15,11 @@ This module owns the dispatch table and the managed-artifact three-way engine
 honours: a destination the Manager plan did not name is refused
 (``preserved_surface_write_refused``), and a managed block or rendered file
 whose local bytes match neither the previous nor the candidate render is a
-conflict, never a side to pick.
+conflict, never a side to pick.  The one exception is a ``rendered_whole``
+file (a user-scope file such as the ``/feedback`` skill): it is only ever
+refreshed, so a missing one is not created and an edited one is reported in its
+state row (``locally_modified`` or ``unknown_origin``) and left in place without
+blocking the update.
 """
 
 from __future__ import annotations
@@ -43,6 +47,7 @@ from .managed_render import (
     append_block,
     block_text,
     find_blocks,
+    insert_stamp,
     marker_lines,
     render_tokens,
     replace_block,
@@ -301,20 +306,42 @@ def _whole_file_state(artifact: ArtifactDeclaration, destination: str, existing:
     outcome = _Outcome(artifact, destination, existing, mode)
     candidate = _whole_render(artifact, _template_bytes(context.request.target, artifact.template_ref), artifact.template_digest, context, stamped=True)
     if existing is None:
-        return outcome.state("absent", "render_whole", None, None, candidate)
+        return _absent_whole_state(outcome, candidate)
     if existing == candidate:
         return outcome.state("stamped_current", "none", artifact.template_digest, None, None)
     stamped = stamped_digest(existing, cast(str, artifact.stamp), artifact.template_ref)
     if stamped is not None:
-        previous = _template_bytes_by_digest(artifact, stamped, context)
-        if previous is not None and existing == _whole_render(artifact, previous, stamped, context, stamped=True):
-            return outcome.state("stamped_previous", "render_whole", stamped, None, candidate)
-        return outcome.state("locally_modified", "none", stamped, "managed_file_locally_modified", None)
+        return _stamped_whole_state(outcome, existing, stamped, candidate, context)
+    return _unstamped_whole_state(outcome, existing, candidate, context)
+
+
+def _absent_whole_state(outcome: _Outcome, candidate: str) -> ArtifactState:
+    """A missing LaunchAgent plist is created; a missing ``rendered_whole`` file is left missing, because it is only ever refreshed."""
+    if outcome.artifact.kind == "rendered_whole":
+        return outcome.state("absent", "none", None, None, None)
+    return outcome.state("absent", "render_whole", None, None, candidate)
+
+
+def _stamped_whole_state(outcome: _Outcome, existing: str, stamped: str, candidate: str, context: _Context) -> ArtifactState:
+    artifact = outcome.artifact
+    previous = _template_bytes_by_digest(artifact, stamped, context)
+    if previous is not None and existing == _whole_render(artifact, previous, stamped, context, stamped=True):
+        return outcome.state("stamped_previous", "render_whole", stamped, None, candidate)
+    return outcome.state("locally_modified", "none", stamped, _edit_conflict(artifact, "managed_file_locally_modified"), None)
+
+
+def _unstamped_whole_state(outcome: _Outcome, existing: str, candidate: str, context: _Context) -> ArtifactState:
+    artifact = outcome.artifact
     for digest in (*artifact.previous_template_digests, artifact.template_digest):
         previous = _template_bytes_by_digest(artifact, digest, context)
         if previous is not None and existing == _whole_render(artifact, previous, digest, context, stamped=False):
             return outcome.state("legacy_matched", "render_whole", None, None, candidate)
-    return outcome.state("unknown_origin", "none", None, "managed_block_unknown_origin", None)
+    return outcome.state("unknown_origin", "none", None, _edit_conflict(artifact, "managed_block_unknown_origin"), None)
+
+
+def _edit_conflict(artifact: ArtifactDeclaration, reason: str) -> str | None:
+    """An edited Manager-owned file blocks the update; an edited ``rendered_whole`` file is reported in its state row and left in place."""
+    return None if artifact.kind == "rendered_whole" else reason
 
 
 def _whole_render(artifact: ArtifactDeclaration, template_bytes: bytes, digest: str, context: _Context, *, stamped: bool) -> str:
@@ -325,11 +352,19 @@ def _whole_render(artifact: ArtifactDeclaration, template_bytes: bytes, digest: 
     body = render_tokens(template_bytes.decode("utf-8"), _values(request))
     if not stamped:
         return body
-    stamp = stamp_line(cast(str, artifact.stamp), artifact.template_ref, digest)
-    if body.startswith("#!"):
-        first, _, rest = body.partition("\n")
-        return f"{first}\n{stamp}\n{rest}"
-    return f"{stamp}\n{body}"
+    return insert_stamp(body, stamp_line(cast(str, artifact.stamp), artifact.template_ref, digest), after_line=_stamp_position(body))
+
+
+def _stamp_position(body: str) -> int:
+    """How many lines stay above the stamp: a shebang line, or a front-matter block that must remain first in the file."""
+    lines = body.split("\n")
+    if lines[0].startswith("#!"):
+        return 1
+    if lines[0] == "---":
+        closing = next((index for index, line in enumerate(lines[1:], 1) if line == "---"), None)
+        if closing is not None:
+            return closing + 1
+    return 0
 
 
 def _block_body(template_bytes: bytes, artifact: ArtifactDeclaration, request: AdapterRequest) -> str:

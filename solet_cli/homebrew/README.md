@@ -24,6 +24,31 @@ solet create bizops
 Homebrew prints `Next: run solet create` as a conventional caveat; it does not
 launch the wizard or mutate instance/user state during `brew install`.
 
+### Shared `python@3.13`: risk to other solets on the machine
+
+The Formula declares `depends_on "python@3.13"`. Homebrew treats a dependency as
+satisfied only when its latest version is installed, so `brew install` upgrades
+an older `python@3.13` as an ordinary dependency, and no `depends_on` option
+avoids that. The upgrade replaces the ad-hoc-signed interpreter that every
+Python venv linking Homebrew's framework resolves to. A Keychain ACL on an
+ad-hoc-signed binary pins its exact code-directory hash, so any solet whose
+`.venv` links that Python, including one the Manager did not create, is refused
+on every credential read (`-25293`) at its next restart.
+
+- **Check first:** `brew install --dry-run solet-public/tap/solet` lists
+  `python@3.13` under `Would upgrade N dependencies for solet:` when it will move.
+- **Refuse instead of upgrading:** `brew pin python@3.13` makes the install stop
+  with `You must brew unpin python@3.13`; `brew unpin` when the move is intended.
+- **Recovery:** in a logged-in GUI session (not SSH), read each Keychain item
+  the affected solet owns once under its current interpreter and answer
+  **Always Allow**; plain Allow is asked again on every spawn. After
+  `solet-manager import <name> --target <clone>`, `solet doctor <name>` reports
+  `doctor::python_interpreter_drift_v1` for a venv created under one
+  `python@3.13` version that now resolves to another.
+- **Limit of that check:** it compares the version the venv recorded with the
+  Cellar version it resolves to. It does not see a same-version revision bump
+  and it cannot tell that the items were re-authorized afterwards.
+
 The public distribution route is the upstream `solet-public/homebrew-tap`
 repository (Homebrew shorthand `solet-public/tap`). That route does not require
 acceptance into `homebrew/core`. Before publication, acceptance uses a

@@ -35,6 +35,19 @@ A **restart variant** of the same table (kill any running session under that rol
 
 A seed-hydration plugin may ship a *template* for producing this launcher for a brand-new clone (offered during first-run hydration, before an operator has a live launcher of their own). That template is the wizard that writes the file at birth; it is not the place to look for or edit an existing, already-hydrated operator's live configuration. If a launcher already exists, edit it directly.
 
+## Every fleet session runs in tmux
+
+A launcher must not `exec claude` in whatever terminal it was typed into. Headless sessions are unsupported, and the solet drives and wakes a session by sending keystrokes to its tmux pane, so a session outside tmux cannot be reached. The launcher therefore hosts each role in a tmux session named exactly the role, through a helper (`_tmux_host_for_<solet>` in the shipped fleet template) that the shared `_claude_for_<solet>` calls first:
+
+- Not in tmux, or in a different tmux session: create a detached session named `<role>`, run the same launcher inside it with its arguments quoted (`${(q)role} ${(q)model} ${(q)effort}`, so an empty argument stays empty), then attach (`switch-client` when already inside tmux). The helper returns 2 and the outer call returns without launching `claude`; only the inner call in the pane reaches `exec claude`.
+- Already inside the session named `<role>`: this is the inner call; proceed to `exec claude`.
+- A session named `<role>` already exists: attach to it rather than start a second copy. The restart variant kills the old `claude` process and the old tmux session first.
+- tmux missing: refuse loudly with exit 1. There is no bare-terminal fallback.
+
+To reach a running role: `tmux attach -t =<role>` (the `=` makes the match exact); `tmux ls` lists them; `C-b d` detaches and leaves the session running. The fleet environment knobs (`<solet>_FLEET_SKIP_PERMISSIONS`, `_FLEET_MCP_CHANNELS`, `_FLEET_TRANSPORT`) are forwarded into the new pane with `tmux -e`, because a tmux server that is already running does not inherit them from the launching shell. tmux itself is installed by the setup flow's `setup::tmux.install` (Homebrew `tmux`).
+
+A solet hydrated before the tmux host existed still has the old launcher in `<clone>/client/<solet>-fleet.zsh`. That file is a rendered copy, not part of `~/.zshrc` and not a Manager-managed artifact, so an update does not change it: follow the seed update runbook's Part C Step 5, "Exact re-render of the fleet file", which replaces the launcher functions and keeps your role functions and your Git-Controller choice.
+
 ## Model and effort
 
 Both are ordinary per-session CLI flags on the `claude` invocation: `--model <alias>` and `--effort <level>` (`low`, `medium`, `high`, `xhigh`, `max`). Passing neither flag inherits the operator's `~/.claude/settings.json` defaults (`model` and `effortLevel` keys). A launcher function typically builds these as optional flags — an empty argument expands to zero flags rather than an empty-string flag value — so existing callers that don't pass a model/effort stay byte-identical after adding the parameters.
