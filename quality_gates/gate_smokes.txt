@@ -5171,6 +5171,7 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/update_legacy_direct_runtime_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_resume_pinned_predecessor_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports update_legacy_direct_runtime_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/doctor_promoted_seed_identity_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_hydration_block_carry_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: quality_gates/tests/smoke_contract_lint_gate_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it calls checkout_only_consistency_violations directly to prove the repo-level contract-lint gate, which is in no capability bundle (fixture_build_tooling)
 # not shipped: ananta/tests/core/orchestration/selected_inference_startup_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin; absent from macos_free_minimal and macos_samantha, which ship default_inference_plugin instead (iss_76ae2d4d, cross_bundle_transition)
 # not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
@@ -5494,3 +5495,9 @@ plugins/github_midwife_plugin/tests/feedback_path_drift_guard_smoke.py
 # file, a chmod before or after the apply, a staged edit behind the Manager's bytes, an edit to any other tracked file,
 # a pre-apply edit, a failed apply's writes and another create's ledger all still warn; a re-create drops the old rows.
 solet_cli/tests/create_applied_edits_doctor_smoke.py
+# iss_f89ab692 (r63): a release that changes AGENTS.md/CLAUDE.md no longer refuses a created solet's update on
+# tracked_overlap_present when the only local change is the create's own hydration block (pre-ledger: Genesis's render
+# of the committed template; r61+: the create-applied-edits ledger digest); the update carries the block onto the
+# candidate's bytes and the ledger follows; a user line inside or outside the block and a mode change still block,
+# a candidate that leaves the block no anchor is refused hydration_block_uncarriable, and a refused or interrupted
+# fast-forward never loses the block. RED on master cfc64c45b (tracked_overlap_present for both populations).

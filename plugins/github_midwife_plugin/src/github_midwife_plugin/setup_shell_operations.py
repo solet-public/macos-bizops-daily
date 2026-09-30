@@ -6,6 +6,12 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+from solet_setup_contracts.agent_instruction_block import (
+    AGENT_INSTRUCTION_FILES,
+    merge_agent_block,
+    render_agent_instructions,
+)
+
 from .managed_render import (
     TEMPLATE_ROOT_REF,
     append_block,
@@ -164,10 +170,14 @@ def _rendered_files(request: AdapterRequest) -> dict[Path, tuple[str, int]]:
             if template_name in _STAMPED_SHELL_TEMPLATES:
                 content = _stamped(content, template_name)
         rendered[destination] = (content, mode)
-    for runner_file in ("CLAUDE.md", "AGENTS.md"):
+    for runner_file in AGENT_INSTRUCTION_FILES:
         destination = request.target / runner_file
-        managed = _render(_TEMPLATES / f"{runner_file}.template", values)
-        rendered[destination] = (_merge_agent_block(read_file(destination), managed), 0o644)
+        managed = render_agent_instructions(
+            (_TEMPLATES / f"{runner_file}.template").read_text(encoding="utf-8"),
+            name=request.name,
+            clone_dir=str(request.target),
+        )
+        rendered[destination] = (merge_agent_block(read_file(destination), managed), 0o644)
     return rendered
 
 
@@ -200,22 +210,6 @@ def _zsh_quote(value: str) -> str:
     """Return one zsh word without permitting expansion or command substitution."""
 
     return "'" + value.replace("'", "'\"'\"'") + "'"
-
-
-def _merge_agent_block(existing: str, managed: str) -> str:
-    begin = "<!-- BEGIN SOLET HYDRATION -->"
-    end = "<!-- END SOLET HYDRATION -->"
-    start = managed.find(begin)
-    finish = managed.find(end)
-    block = (
-        managed[start : finish + len(end)] if start >= 0 and finish >= start else managed.strip()
-    )
-    old_start = existing.find(begin)
-    old_end = existing.find(end)
-    if old_start >= 0 and old_end >= old_start:
-        return existing[:old_start] + block + existing[old_end + len(end) :]
-    separator = "\n\n" if existing.strip() else ""
-    return existing.rstrip() + separator + block + "\n"
 
 
 def _stamped(content: str, template_name: str) -> str:

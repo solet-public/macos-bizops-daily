@@ -28,6 +28,7 @@ from .update_execution import (
     target_head,
     terminal_repair,
 )
+from .update_hydration_carry import UNCARRIABLE_REASON, uncarriable_repair
 from .update_journal import DOCTOR_STATUSES, RUNTIME_STATUSES, TERMINAL_UPDATE_STATUSES, read_update_journal
 from .update_preview import VERIFY_PREVIEW_MESSAGE, VERIFY_PREVIEW_STATUS
 from .update_runtime_plan import build_runtime_plan
@@ -123,6 +124,9 @@ def _preview_data(probe: UpdateProbe, paths: ManagerPaths) -> dict[str, JsonValu
             # iss_f1d8cfc2: preserved tracked paths proved byte-exact installer interpreter pins (disclosed, bound by digest above).
             "installer_pins": list(probe.installer_pins),
         },
+        # iss_f89ab692: each file whose create hydration block the planned ``target.carry_hydration_block`` merges onto the
+        # candidate's bytes -- the basis that attested the block and the digests before and after (bound by the fingerprint).
+        "hydration_carry": probe.hydration.rows(),
         "planned_actions": list(probe.planned_actions),
         "source_mode": probe.source_mode,
         "candidate_ref": candidate.candidate_ref,
@@ -131,7 +135,7 @@ def _preview_data(probe: UpdateProbe, paths: ManagerPaths) -> dict[str, JsonValu
             "target_byte_writes": 0,
             "manager_state_writes": 0,
             "manager_cache_writes": 1 if candidate.cache_status == "acquired" else 0,
-            "non_touch_surfaces": list(NON_TOUCH_SURFACES),
+            "non_touch_surfaces": list(probe.hydration.untouched(NON_TOUCH_SURFACES)),
             "capabilities": list(STEP4_CAPABILITIES),
             "unreachable": ["adapters", "dependencies", "migrations", "hydration", "launchd_router", "restart", "doctor", "promotion"],
         },
@@ -191,6 +195,8 @@ def _blocked_repair(probe: UpdateProbe) -> dict[str, JsonValue]:
         joined = ", ".join(paths)
         if reason == "tracked_overlap_present":
             repairs[reason] = _overlap_repair(paths, probe.installer_pins, probe.record.name)
+        elif reason == UNCARRIABLE_REASON:
+            repairs[reason] = uncarriable_repair(paths, probe.record.name)
         elif reason in _REPAIRS:
             repairs[reason] = _REPAIRS[reason].format(paths=joined)
     return repairs

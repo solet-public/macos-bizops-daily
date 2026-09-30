@@ -35,7 +35,7 @@ from .errors import SourceError
 from .existing_install_inspection import ExistingInstallFacts, RawRow
 from .target_git import run_target_git
 
-__all__ = ["BlobReader", "installer_pinned_paths", "read_target_blob"]
+__all__ = ["BlobReader", "installer_pinned_paths", "read_target_blob", "worktree_bytes"]
 
 #: ``<commit>:<path>`` -> the committed bytes; raises when the object is unreadable.
 type BlobReader = Callable[[str], bytes]
@@ -60,7 +60,7 @@ def installer_pinned_paths(target: Path, facts: ExistingInstallFacts, read_blob:
             expected = pin_hook_interpreter(read_blob(f"{head}:{path}"), interpreter)
         except HookManifestError:
             continue
-        if expected is not None and _worktree_bytes(target, path) == expected:
+        if expected is not None and worktree_bytes(target, path) == expected:
             pinned.append(path)
     return tuple(sorted(pinned))
 
@@ -81,7 +81,7 @@ def _content_only(row: RawRow) -> bool:
     return row.status == "M" and row.old_mode == row.new_mode and row.new_mode in _REGULAR_MODES
 
 
-def _worktree_bytes(target: Path, path: str) -> bytes | None:
+def worktree_bytes(target: Path, path: str) -> bytes | None:
     """The regular file's bytes, never through a final-component symlink; ``None`` when it is not a regular file."""
     try:
         descriptor = os.open(target / path, os.O_RDONLY | os.O_NOFOLLOW)

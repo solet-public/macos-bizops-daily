@@ -2,6 +2,37 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-30 — r63: an update carries the create's hydration block in `AGENTS.md` and `CLAUDE.md`; a solet on the previous stable seed can update
+
+**Solet Manager manager-v0.1.0-r63.**
+
+To take this release, upgrade the Manager, then update the solet:
+
+1. `brew update && brew tab --installed-on-request python@3.13 && brew upgrade solet`, then `brew list --versions solet`. It prints `solet <release>_<formula revision>`, taken from the `solet-0.1.0-r<release>` archive name (stable r61 prints `solet 61_36`). The release part must be `63` or later.
+2. `solet-manager update <name> --dry-run`. Apply the plan with `solet-manager update <name> --yes --approval-fingerprint <fingerprint>`, using the fingerprint that dry run printed. Repeat both steps until the result is `promoted`.
+
+- **An update no longer stops on the hydration block in `AGENTS.md` and
+  `CLAUDE.md`** (`iss_f89ab692`). Before, a release that changed either file
+  made `solet-manager update <name> --dry-run` return `update_blocked`
+  with `tracked_overlap_present` naming them on every created solet, because
+  `solet create` adds the hydration block to both. The preview now lists each
+  such file under `data.hydration_carry` and plans
+  `target.carry_hydration_block`, and the approval fingerprint covers it. After
+  the update, each file is the new release's text with the same block
+  appended. A solet created by an r61 or later Manager keeps its
+  create-edits record in step, so `solet doctor` still accepts both files.
+  Solets created before r61 are recognised too: the file must be exactly what
+  `solet create` wrote for that solet's name and directory. You no longer need
+  the manual workaround (restore both files, update, put the block back).
+- **What still blocks.** `tracked_overlap_present` still refuses any other
+  local change to a file the release changes: a line you added inside or
+  outside the block, or a changed file mode (which also reports
+  `tracked_shape_changed`). A release whose text leaves the block nowhere to
+  go is refused with the new reason `hydration_block_uncarriable`. Its repair
+  names the file and gives the manual recovery. The Manager never drops the
+  block and never overwrites your edit.
+- **A solet on stable r61 can update to r63.** The stable r61 seed head (commit `1e167174`) is now a listed supported predecessor in `existing_install_flow.json`, so `solet-manager update` accepts it as a starting point and the next stable publish no longer refuses it as an unlisted head (`iss_933eff4e`, `iss_16d3aa5a`).
+
 ## 2026-09-29 — r62: a stable publish names its own predecessor row and resumes after its own push; a swap keeps the live bridge port; shipped text names the real embedding and inference defaults
 
 **Solet Manager manager-v0.1.0-r62.**

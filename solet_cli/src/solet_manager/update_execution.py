@@ -107,6 +107,7 @@ from .state_io import ensure_private_directory, instance_lock
 from .target_git import GitLayout, run_target_git
 from .transaction import utc_now
 from .update_candidate import TRANSITION_BUNDLE_DIRECTORY, UpdateCandidate, acquire_pinned_candidate, acquire_update_candidate
+from .update_hydration_carry import CarryPlan, carry_into_journal, put_back, set_aside, with_carry
 from .update_journal import (
     DOCTOR_STATUSES,
     FRONTIER_STATUSES,
@@ -244,6 +245,8 @@ class UpdateProbe:
     host: dict[str, JsonValue] = field(default_factory=lambda: {})
     #: iss_f1d8cfc2: the tracked hook manifests proved to carry exactly the installer's interpreter pin.
     installer_pins: tuple[str, ...] = ()
+    #: iss_f89ab692: the overlapped files whose only local change is the create's hydration block.
+    hydration: CarryPlan = field(default_factory=CarryPlan)
 
     @property
     def fingerprint(self) -> str | None:
@@ -251,7 +254,7 @@ class UpdateProbe:
 
     @property
     def planned_actions(self) -> tuple[str, ...]:
-        return VERIFY_PLANNED_ACTIONS if self.source_mode == "verify" else PLANNED_ACTIONS
+        return VERIFY_PLANNED_ACTIONS if self.source_mode == "verify" else with_carry(PLANNED_ACTIONS, self.hydration)
 
 
 def preview_update_instance(request: UpdateRequest) -> CommandResult:
@@ -378,17 +381,17 @@ def probe_update(
     reduction = reduce_update(paths, record, candidate, baseline, entries, source_mode, git=_git, run_git=_run_git, cache_git=_cache_git, cache_run_git=_cache_run_git)
     operation_id = compute_update_operation_id(record.instance_id, record.source_release.commit, candidate, recovers=recovers)
     journal_path = paths.operation_path(record.instance_id, operation_id)
-    planned = VERIFY_PLANNED_ACTIONS if source_mode == "verify" else PLANNED_ACTIONS
+    planned = VERIFY_PLANNED_ACTIONS if source_mode == "verify" else with_carry(PLANNED_ACTIONS, reduction.hydration)
     actionable = actionable_reasons(reduction.reasons, source_mode)
     preview = preview_update(
         candidate,
         UpdateTopology(reduction.reasons, actionable, None if reduction.local_state is None else reduction.local_state.state),
         baseline_commit=record.source_release.commit,
-        bound_identity=_bound_identity(record, candidate, baseline, reduction.collisions, paths, journal_path, planned, recovers, reduction.local_state, binding),
+        bound_identity=_bound_identity(record, candidate, baseline, reduction.collisions, paths, journal_path, planned, recovers, reduction.local_state, binding) | reduction.hydration.bound(NON_TOUCH_SURFACES),
         planned_actions=planned,
         source_mode=source_mode,
     )
-    return UpdateProbe(record, descriptor, candidate, baseline, reduction.reasons, reduction.collisions, preview, operation_id, journal_path, source_mode, recovers, reduction.local_state, reduction.blocked_paths, host, reduction.installer_pins)
+    return UpdateProbe(record, descriptor, candidate, baseline, reduction.reasons, reduction.collisions, preview, operation_id, journal_path, source_mode, recovers, reduction.local_state, reduction.blocked_paths, host, reduction.installer_pins, reduction.hydration)
 
 
 def enrollment_binding(operation_id: str, approval_fingerprint: str) -> dict[str, JsonValue]:
@@ -707,6 +710,7 @@ def _resume_source(request: UpdateRequest, record: InstanceInventoryRecordV2, jo
     head = _head(target)
     status = cast(str, journal["status"])
     if head == cast(dict[str, JsonValue], journal["baseline"])["commit"]:
+        put_back(request.manager_paths, record, journal)
         _refuse_interrupted_merge(record, status, target, journal)
         probe = probe_update(request, record)
         if probe.fingerprint != approved or probe.operation_id != journal["operation_id"]:
@@ -945,12 +949,17 @@ class _Execution:
         if self.status == "target_fetched":
             self._advance("source_applying", "fast-forward started after lock-time revalidation")
         target = _target_path(self.record)
+        set_aside(self.request.manager_paths, self.record, self.operation_id, fresh.hydration.carries)
         completed = _run_git(target, ("merge", "--ff-only", "--no-edit", self.candidate.fields.commit), hooks_dir=self._hooks_dir())
         self.executed.append("target.fast_forward_exact_candidate")
         if completed.returncode:
+            put_back(self.request.manager_paths, self.record, self.journal)
             raise UpdateBlockedError("fast_forward_refused", f"git refused the fast-forward: {completed.stderr.decode('utf-8', 'replace').strip()}", repair="Inspect the target; no destructive recovery is attempted.")
 
     def _finish(self) -> CommandResult:
+        if self.status == "source_applying":
+            # iss_f89ab692: merge each set-aside hydration block back onto the candidate, with one journaled revision.
+            self.journal = carry_into_journal(self.request.manager_paths, self.record, self.journal_path, self.journal, self.executed)
         verified = self._verify_advanced()
         if self.status == "source_applying":
             self._advance("source_advanced", "exact candidate release identity verified after fast-forward")

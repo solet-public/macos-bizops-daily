@@ -44,6 +44,7 @@ __all__ = [
     "accepted_edit_paths",
     "applied_edits_path",
     "load_applied_edits",
+    "rebind_applied_edit",
     "record_applied_edits",
     "tracked_edit_digests",
 ]
@@ -125,6 +126,30 @@ def record_applied_edits(
     rows.update({path: AppliedEdit(path, digest, operation_id) for path, digest in changed.items()})
     ledger = AppliedEditLedger(create_operation_id, target, tuple(rows[path] for path in sorted(rows)))
     atomic_write_json(ledger_path, ledger.to_dict())
+
+
+def rebind_applied_edit(paths: ManagerPaths, *, name: str, path: str, before: str, after: str) -> bool:
+    """Move one recorded row from the bytes an update replaced to the bytes it carried there (iss_f89ab692).
+
+    An update that carries the create's hydration block onto a changed ``AGENTS.md``/``CLAUDE.md`` leaves
+    the same Manager edit at new bytes.  The row follows only when it still records ``before`` (the bytes
+    the update replaced), so a row a user edit had already invalidated is never re-attested; the row keeps
+    naming the create operation that wrote the block.  Idempotent: a row already at ``after`` is kept.
+    Returns whether the row now records ``after``.
+    """
+    ledger_path = applied_edits_path(paths, name)
+    ledger = load_applied_edits(ledger_path)
+    if ledger is None:
+        return False
+    rows = {item.path: item for item in ledger.edits}
+    row = rows.get(path)
+    if row is None or row.sha256 not in {before, after}:
+        return False
+    if row.sha256 == before:
+        rows[path] = AppliedEdit(path, after, row.operation_id)
+        updated = AppliedEditLedger(ledger.create_operation_id, ledger.target, tuple(rows[item] for item in sorted(rows)))
+        atomic_write_json(ledger_path, updated.to_dict())
+    return True
 
 
 def _bound_rows(ledger: AppliedEditLedger | None, create_operation_id: str, target: str) -> dict[str, AppliedEdit]:

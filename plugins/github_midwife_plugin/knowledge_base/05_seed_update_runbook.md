@@ -192,12 +192,25 @@ lists them). Never restore these files to the shipped `python3`: the
 coordination hooks need the pin, and the fast-forward carries the pinned
 bytes onto the new release. Any further edit to either file, or a pin to a
 different interpreter path, is refused as `executed_code_modified`, the same
-as a hand edit elsewhere under a roster plugin. The preview refuses only:
+as a hand edit elsewhere under a roster plugin.
+
+A release that changes `AGENTS.md` or `CLAUDE.md` no longer refuses on the
+hydration block `solet create` merged into them (r63, `iss_f89ab692`). When
+a file's only local change is that block, the preview lists it under
+`data.hydration_carry` and plans `target.carry_hydration_block`. After the
+fast-forward the file holds the candidate's bytes with the same block
+appended. Either of two checks attests the block. The Manager's create-edits
+record still matches the file (a solet created by an r61 or later Manager).
+Or the file is exactly `solet create`'s merge of the committed template,
+rendered for this solet's name and directory (an older solet). A line you
+added inside or outside the block, or a mode change, is still
+`tracked_overlap_present`. The preview refuses only:
 
 | Reason (`data.topology.reasons`, exit 3) | Meaning | Repair |
 |---|---|---|
 | `history_diverged` | the clone's HEAD is not an ancestor of the candidate | re-birth, or Part C if the operator wants to hand-merge |
 | `tracked_overlap_present` | the candidate changes a file this installation modified locally | keep your lines by hand: `git diff <baseline>..<candidate> -- <path>`, then preview again; the Manager never overwrites, stashes or resets a local change. If the named file is a pinned coordination-hook manifest (listed in `local_state.installer_pins`), do not edit or restore it: upgrade the Manager (`brew tab --installed-on-request python@3.13 && brew upgrade solet`) and preview again — carrying the pin across a changed manifest is a Manager capability (`iss_c1a7df20`) |
+| `hydration_block_uncarriable` | the candidate changes `AGENTS.md`/`CLAUDE.md` so the file's hydration block has no place to go (the file is deleted, or its text carries a stray `SOLET HYDRATION` marker) | follow the repair: save the block (`git diff -- <path>`), `git checkout -- <path>`, update, then copy the block back to the end of the file; the Manager never drops the block |
 | `staged_changes_present` | something is in the index | `git restore --staged <paths>` is the operator's call; the Manager never runs it |
 | `tracked_shape_changed` | a tracked path was deleted, retyped, mode-changed or symlinked | restore it to a content-only edit of the shipped regular file |
 | `executed_code_modified` | an edit under `bootstrap.py`, `bootstrap_adapter/`, an editable-installed distribution or a roster plugin, other than the installer's own interpreter pin | `git diff -- <path>` in the clone shows the local edit: undo only that edit (keep the installer's interpreter pin in a hook manifest) or move the change out of the tree, then preview again; the Manager will not execute a modified target |

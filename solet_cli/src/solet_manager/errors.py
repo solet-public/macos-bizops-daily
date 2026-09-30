@@ -211,6 +211,7 @@ STEP7_REASON_CODES = (
     "git_metadata_present",
     "host_requirement_missing",
     "host_requirement_unknown",
+    "hydration_block_uncarriable",
     "instance_requirement_missing",
     "local_state_unobserved",
     "preservation_violated",

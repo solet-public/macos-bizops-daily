@@ -47,6 +47,7 @@ from .update_execution import (
     probe_update,
     target_head,
 )
+from .update_hydration_carry import put_back
 from .update_journal import (
     ABANDONABLE_STATUSES,
     FAILURE_TERMINAL_STATUSES,
@@ -180,6 +181,9 @@ def abandon_update(request: UpdateRequest) -> CommandResult:
         if journal["source_mode"] == "verify" or head != baseline:
             raise AbandonRefusedError(f"the update ({status}) is past the fast-forward boundary; recovery is forward only", repair=f"Run `solet-manager reconcile {record.name} --dry-run`.")
         path = paths.operation_path(record.instance_id, cast(str, journal["operation_id"]))
+        # iss_f89ab692: a crash between setting a hydration block aside and the fast-forward left the file at its
+        # committed bytes; abandoning puts the operator's own bytes back, so the net target change is none.
+        restored = put_back(paths, record, journal)
         dirty_paths = dirty_tracked_paths(Path(record.target.canonical_path))
         dirty = bool(dirty_paths)
         if status in ABANDONABLE_STATUSES:
@@ -196,11 +200,16 @@ def abandon_update(request: UpdateRequest) -> CommandResult:
         if next_value is not journal:
             write_update_journal(path, journal, next_value)
         released = release_terminal_pointer(paths, record)
-        data: dict[str, JsonValue] = {"instance_id": record.instance_id, "operation_id": journal["operation_id"], "journal_status": next_value["status"], "outcome": outcome, "head_observed": head, "retirement": next_value["retirement"], "pointer_released": released is not None, "private_candidate_ref_retained": candidate_ref, "tracked_tree_dirty": dirty, "dirty_tracked_paths": list(dirty_paths), "target_byte_writes": 0}
-        message = f"{outcome}: no target byte changed; the private candidate ref {candidate_ref} remains (the Manager deletes nothing)."
+        data: dict[str, JsonValue] = {"instance_id": record.instance_id, "operation_id": journal["operation_id"], "journal_status": next_value["status"], "outcome": outcome, "head_observed": head, "retirement": next_value["retirement"], "pointer_released": released is not None, "private_candidate_ref_retained": candidate_ref, "tracked_tree_dirty": dirty, "dirty_tracked_paths": list(dirty_paths), "hydration_blocks_restored": list(restored), "target_byte_writes": len(restored)}
+        message = f"{outcome}: {_restored_clause(restored)}no target byte changed; the private candidate ref {candidate_ref} remains (the Manager deletes nothing)."
         if dirty:
             message += " The tracked tree carries local state; the Manager never discards it."
         return CommandResult(RESULT_KIND, outcome, message, ExitCode.OK, data=data)
+
+
+def _restored_clause(restored: tuple[str, ...]) -> str:
+    """iss_f89ab692: abandon names the hydration blocks it put back after an interrupted set-aside; otherwise nothing."""
+    return f"restored the hydration block the interrupted update had set aside in {', '.join(restored)}; otherwise " if restored else ""
 
 
 def release_pointer(request: UpdateRequest) -> CommandResult:

@@ -24,6 +24,7 @@ from .local_state import ObservedLocalState, observe_local_state
 from .models import InstanceInventoryRecordV2
 from .paths import ManagerPaths, update_candidate_cache
 from .update_candidate import UpdateCandidate
+from .update_hydration_carry import UNCARRIABLE_REASON, CarryPlan, plan_hydration_carry
 from .update_topology import (
     CollisionRow,
     analyze_update_topology,
@@ -52,6 +53,8 @@ class Reduction:
     blocked_paths: dict[str, list[str]]
     #: iss_f1d8cfc2: the tracked modifications proved to be exactly the installer's interpreter pin (Class T).
     installer_pins: tuple[str, ...] = ()
+    #: iss_f89ab692: the overlapped files whose only local change is the create's hydration block.
+    hydration: CarryPlan = CarryPlan()
 
 
 def reduce_update(
@@ -82,20 +85,22 @@ def reduce_update(
     local_state: ObservedLocalState | None = None
     blocked: dict[str, list[str]] = {}
     pins: tuple[str, ...] = ()
+    hydration = CarryPlan()
     if "already_current" not in reasons or source_mode == "verify":
         cache = update_candidate_cache(paths, candidate.descriptor_digest).repository
         # A baseline the channel repository has never seen is divergent history, not an error (Step 6, n5).
         # The target and the bare candidate cache are pinned differently (iss_836499b3 R2-1), hence two readers.
         if _object_exists(cache_run_git, cache, release.commit) and is_ancestor(cache_run_git, cache, release.commit, candidate.fields.commit):
-            collisions, local_state, blocked, pins = _local_state_reduction(git, cache_git, cache, record, candidate, baseline, entries)
+            collisions, local_state, blocked, pins, hydration = _local_state_reduction(paths, git, cache_git, cache, record, candidate, baseline, entries)
         else:
             reasons.add("history_diverged")
     reasons.update(row.reason for row in collisions)
     reasons.update(blocked)
-    return Reduction(tuple(sorted(reasons)), collisions, local_state, blocked, pins)
+    return Reduction(tuple(sorted(reasons)), collisions, local_state, blocked, pins, hydration)
 
 
 def _local_state_reduction(
+    paths: ManagerPaths,
     git: GitRead,
     cache_git: GitRead,
     cache: Path,
@@ -103,8 +108,8 @@ def _local_state_reduction(
     candidate: UpdateCandidate,
     baseline: ExistingInstallInspectionResult,
     entries: tuple[tuple[str, str, str], ...],
-) -> tuple[tuple[CollisionRow, ...], ObservedLocalState, dict[str, list[str]], tuple[str, ...]]:
-    """Section 6.3: the exact transition set, the landed collision proof, the Step 7 reasons, the commitment, and the installer pins."""
+) -> tuple[tuple[CollisionRow, ...], ObservedLocalState, dict[str, list[str]], tuple[str, ...], CarryPlan]:
+    """Section 6.3: the exact transition set, the landed collision proof, the Step 7 reasons, the commitment, the installer pins, and the hydration carry."""
     target = Path(record.target.canonical_path)
     transition = parse_transition_paths(
         cache_git(
@@ -121,12 +126,25 @@ def _local_state_reduction(
     except RosterUnreadableError as exc:
         raise UpdateBlockedError("profile_manifest_unreadable", f"the executed-code roots cannot be derived: {exc}", repair="Restore profile/config/manifest.yaml, then preview again.") from exc
     pins = installer_pinned_paths(target, baseline.facts, lambda spec: git(target, ("cat-file", "blob", spec), "committed hook manifest is unreadable"))
-    blocked = {reason: list(paths) for reason, paths in local_state_reasons(baseline.facts, transition, roots, case_insensitive=case_insensitive, installer_pins=pins)}
+    hydration = plan_hydration_carry(
+        paths,
+        name=record.name,
+        target=target,
+        facts=baseline.facts,
+        transition=transition,
+        read_target=lambda spec: git(target, ("cat-file", "blob", spec), "committed agent instructions are unreadable"),
+        read_candidate=lambda spec: cache_git(cache, ("cat-file", "blob", spec), "candidate agent instructions are unreadable"),
+        candidate_commit=candidate.fields.commit,
+    )
+    reasons = local_state_reasons(baseline.facts, transition, roots, case_insensitive=case_insensitive, installer_pins=pins, hydration_blocks=hydration.paths)
+    blocked = {reason: list(reason_paths) for reason, reason_paths in reasons}
+    if hydration.uncarriable:
+        blocked[UNCARRIABLE_REASON] = list(hydration.uncarriable)
     for reason in ("staged_changes_present", "tracked_shape_changed", "git_metadata_present"):
-        paths = _fact_reason_paths(baseline, reason)
-        if paths:
-            blocked[reason] = paths
-    return collisions, observe_local_state(target, baseline.facts), blocked, pins
+        fact_paths = _fact_reason_paths(baseline, reason)
+        if fact_paths:
+            blocked[reason] = fact_paths
+    return collisions, observe_local_state(target, baseline.facts), blocked, pins, hydration
 
 
 def _fact_reason_paths(baseline: ExistingInstallInspectionResult, reason: str) -> list[str]:

@@ -27,7 +27,7 @@ from .private_json import load_json_object
 from .state_io import atomic_write_json, ensure_private_directory
 from .transaction import utc_now
 
-__all__ = ["BackupRecord", "action_backup_key", "backup_root", "file_sha256", "legacy_indexed_backup_covers", "read_backup", "restore_artifact", "write_backup"]
+__all__ = ["BackupRecord", "action_backup_key", "backup_exists", "backup_root", "file_sha256", "legacy_indexed_backup_covers", "read_backup", "read_backup_bytes", "restore_artifact", "write_backup"]
 
 _ACTION_ID = re.compile(r"^[a-z][a-z0-9_.-]{1,127}$")
 _LEGACY_INDEX = re.compile(r"^[0-9]+$")
@@ -157,6 +157,19 @@ def read_backup(paths: ManagerPaths, instance_id: str, operation_id: str, artifa
         str(raw["captured_at"]),
         absent,
     )
+
+
+def backup_exists(paths: ManagerPaths, instance_id: str, operation_id: str, artifact_id: str) -> bool:
+    """Whether a backup record was written for the artifact (its bytes are validated only when read)."""
+    return (backup_root(paths, instance_id, operation_id) / artifact_id / _BEFORE_JSON).is_file()
+
+
+def read_backup_bytes(paths: ManagerPaths, instance_id: str, operation_id: str, artifact_id: str) -> bytes:
+    """The backed-up entry bytes, re-digested against their record; an absent-file backup has none."""
+    record = read_backup(paths, instance_id, operation_id, artifact_id)
+    if record.absent:
+        raise StateError(f"backup for {artifact_id} records an absent file; it carries no bytes")
+    return (backup_root(paths, instance_id, operation_id) / artifact_id / _BEFORE_BYTES).read_bytes()
 
 
 def _consistent_record(raw: dict[str, JsonValue], artifact_id: str) -> tuple[int | None, str | None, bool]:

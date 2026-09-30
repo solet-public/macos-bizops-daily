@@ -159,15 +159,19 @@ def local_state_reasons(
     *,
     case_insensitive: bool,
     installer_pins: tuple[str, ...],
+    hydration_blocks: frozenset[str] = frozenset(),
 ) -> tuple[tuple[str, tuple[str, ...]], ...]:
     """Section 6.2's candidate-dependent reasons, each with the exact paths it names.
 
     ``installer_pins`` are the tracked modifications ``installer_pins`` proved
     byte-exact installer writes (iss_f1d8cfc2): they are Class T, never
     ``executed_code_modified``, but still overlap a candidate that changes them.
+    ``hydration_blocks`` are the files ``update_hydration_carry`` proved to differ
+    only by the create's hydration block (iss_f89ab692): the candidate's own row
+    for such a file is the carry's to answer, never ``tracked_overlap_present``.
     """
     rows: list[tuple[str, tuple[str, ...]]] = []
-    overlap = tracked_overlap(facts.tracked_paths.values, transition, case_insensitive=case_insensitive)
+    overlap = _uncarried_overlap(tracked_overlap(facts.tracked_paths.values, transition, case_insensitive=case_insensitive), hydration_blocks)
     for reason in ("tracked_overlap_present", "casefold_collision"):
         paths = tuple(sorted({row.path for row in overlap if row.reason == reason}))
         if paths:
@@ -180,6 +184,11 @@ def local_state_reasons(
     if surface:
         rows.append(("preserved_surface_in_transition", surface))
     return tuple(rows)
+
+
+def _uncarried_overlap(rows: tuple[OverlapRow, ...], hydration_blocks: frozenset[str]) -> tuple[OverlapRow, ...]:
+    """Every overlap row but the candidate's own row for a file whose only local change is the hydration block (iss_f89ab692)."""
+    return tuple(row for row in rows if not (row.path in hydration_blocks and row.candidate_path == row.path))
 
 
 def shape_changed_rows(rows: tuple[RawRow, ...]) -> tuple[RawRow, ...]:
