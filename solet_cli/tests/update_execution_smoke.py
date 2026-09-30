@@ -69,6 +69,7 @@ from solet_manager.update_execution import (  # noqa: E402
     preview_update_instance,
 )
 from solet_manager.update_journal import read_update_journal  # noqa: E402
+from solet_manager.update_runtime_plan import RuntimeSeams  # noqa: E402
 
 ORIGIN_ID = "123e4567-e89b-12d3-a456-426614174001"
 CANONICAL = "https://github.com/example/seed.git"
@@ -258,8 +259,17 @@ def _fixture(root: Path, *, misbound: bool = False) -> Fixture:
     descriptor = _descriptor(candidate)
     installed = _installed(candidate, descriptor)
     _enroll(paths, target, baseline, descriptor_digest=CONTRACT if misbound else "sha256:" + "3" * 64)
-    request = UpdateRequest("fixture", paths, descriptor_loader=lambda channel, tracker: installed, transport_url=str(source))
+    request = UpdateRequest("fixture", paths, descriptor_loader=lambda channel, tracker: installed, transport_url=str(source), runtime_seams=_host_seams(root))
     return Fixture(root, source, target, paths, baseline, candidate, installed.metadata.channel_identity.descriptor_digest, request)
+
+
+def _host_seams(root: Path) -> RuntimeSeams:
+    """The host the source preview reads: a fixture HOME and a ``which`` that answers only the fixture's own ``claude``.
+
+    The preview refuses ``claude_cli_missing`` without one (iss_646b54b6), and resolving it through the real ``PATH``,
+    ``/opt/homebrew/bin`` or the developer's ``~/.local/bin`` made this smoke pass or fail with the host's own install.
+    """
+    return RuntimeSeams(home=root / "home", which=lambda name: "/fixture/bin/claude" if name == "claude" else None)
 
 
 def _expect(kind: type[Exception], action: Callable[[], object], label: str) -> Exception:

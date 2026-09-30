@@ -9,9 +9,12 @@ may be running, and the declared targets of a runtime operation whose row is
 journaled in flight (its pending re-baseline).  ``rebaseline_revision`` is
 the carve-out that follows a verified operation: a hard-tier change outside
 the declared targets is ``preservation_violated``; a declared change becomes
-a journaled revision.  ``host_preflight`` refuses before the forward-only
-boundary when no runtime stage could run on this host, and
-``require_instance_interpreter`` is its commit-time twin for ``--yes``.
+a journaled revision; a B7 creation the restarted solet made while a
+``runtime_reconcile`` operation ran is the solet's, not the operation's, and
+is disclosed as a ``service_writes`` revision (iss_d22db98a).
+``host_preflight`` refuses before the forward-only boundary when no runtime
+stage could run on this host, and ``require_instance_interpreter`` is its
+commit-time twin for ``--yes``.
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from typing import cast
 
 from .errors import HostRequirementError, SourceTransitionIncompleteError, UpdateFailedError
 from .existing_install_inspection import ExistingInstallFacts
-from .host_software import host_checks, host_requirement_reason, host_section
+from .host_software import claude_search_directories, host_section
 from .local_state import LocalStateDelta, ObservedLocalState, allowed_service_write, compare, observe_entry, observe_local_state, snapshot_from_journal
 from .models import JsonValue
 from .target_git import run_target_git
@@ -33,6 +36,10 @@ from .update_runtime_plan import RuntimeSeams
 from .update_topology import LocalState
 
 REPAIR_HOST_PYTHON = "Install Python 3.13 outside the Manager keg (`brew install python@3.13`) -- an operator action outside the Manager -- then preview again."
+REPAIR_CLAUDE_CLI = (
+    "Install the Claude Code CLI yourself -- the update never installs it: `brew install --cask claude-code`. It is looked for on PATH, then in {directories}. "
+    "Confirm `command -v claude` prints a path in the shell you run solet-manager from, then preview again."
+)
 REPAIR_INSTANCE_PYTHON = "Rebuild the instance virtual environment by hand (`python3.13 -m venv --upgrade <target>/.venv`, then reinstall the editable distributions), or restore its interpreter, then re-run --yes."
 REPAIR_RECONCILE_DRY_RUN = "Run `solet-manager reconcile {name} --dry-run` to plan a successor operation."
 #: Journal statuses under which the platform may be running and its own ``knowledge_bases/`` creation is admitted (B7).
@@ -40,18 +47,28 @@ _SERVICE_WRITE_STATUSES = frozenset({"lifecycle_advanced", "runtime_reconciling"
 #: Row statuses between the first apply write and the journaled re-baseline: ``applying`` (the apply may have run
 #: before the crash) and ``applied`` (it did; the postcondition and the re-baseline were not yet recorded).
 _IN_FLIGHT_ROW_STATUSES = frozenset({"applying", "applied"})
+#: The one applying status whose operations run after the lifecycle restart, so the running solet's own B7 creation can
+#: land inside an operation's window; the stage its ``service_writes`` revision names.
+_SERVICE_WRITE_STAGE_BY_STATUS = {"runtime_reconciling": "runtime_reconcile"}
 #: The clone's local ignore file, relative to the target: the one in-``.git`` path an operation may declare.
 CLONE_EXCLUDE_RELATIVE = ".git/info/exclude"
 
 
 def host_preflight(seams: RuntimeSeams, target: Path) -> dict[str, JsonValue]:
-    """Section 7.2: refuse before the forward-only boundary when no runtime stage could run on this host."""
+    """Section 7.2: refuse before the forward-only boundary when no runtime stage could run on this host.
+
+    iss_646b54b6: a missing Claude Code CLI is refused here too; the runtime stage's plugin-cache refresh
+    would otherwise refuse it only after the source had already advanced.
+    """
     host = host_section(seams, target)
-    reason = host_requirement_reason(tuple(host_checks(seams, target)))
+    reason = cast(str | None, host["requirement"])
     if reason == "host_requirement_missing":
         raise HostRequirementError(reason, "no Python 3.13 outside the Manager keg is installed; the source cannot advance into a runtime no stage can execute", repair=REPAIR_HOST_PYTHON, host=host)
     if reason == "host_requirement_unknown":
-        raise HostRequirementError(reason, "the host Python 3.13 probe could not run; the preview does not guess", repair="Resolve the host probe failure (see data.host), then preview again.", host=host)
+        raise HostRequirementError(reason, "a host requirement probe could not run (see data.host); the preview does not guess", repair="Resolve the host probe failure (see data.host), then preview again.", host=host)
+    if reason == "claude_cli_missing":
+        searched = ", ".join(str(directory) for directory in claude_search_directories(seams))
+        raise HostRequirementError(reason, f"the Claude Code CLI (`claude`) is not on PATH or in {searched}; the runtime stage's plugin-cache refresh needs it, so the source is not advanced", repair=REPAIR_CLAUDE_CLI.format(directories=searched), host=host)
     return host
 
 
@@ -136,25 +153,70 @@ def _service_write_additions(target: Path, current: LocalState, observed: Observ
     return tuple(additions)
 
 
-def rebaseline_revision(journal: dict[str, JsonValue], observed: ObservedLocalState, last_observed: ObservedLocalState | None, operation_id: str, declared: frozenset[str], name: str, target: Path) -> tuple[dict[str, JsonValue], dict[str, JsonValue]] | None:
+def rebaseline_revision(journal: dict[str, JsonValue], observed: ObservedLocalState, last_observed: ObservedLocalState | None, operation_id: str, declared: frozenset[str], name: str, target: Path) -> tuple[tuple[dict[str, JsonValue], ...], dict[str, JsonValue]] | None:
     """Section 6.6, the per-operation carve-out: a hard-tier change outside the operation's declared targets is a
     ``preservation_violated`` failure; declared changes re-baseline ``current`` with a journaled revision; a
-    preserved-surface change is disclosed.  Returns ``(revision, current)`` or ``None`` when nothing moved."""
+    preserved-surface change is disclosed.  Under ``runtime_reconciling`` the solet is running, so an undeclared
+    committed-tier path that is exactly a B7 creation (:func:`allowed_service_write`) is the solet's own write and
+    is disclosed as a ``service_writes`` revision instead of being blamed on the operation.  Returns
+    ``(revisions, current)`` or ``None`` when nothing moved."""
     current = _current(journal)
     delta = compare(current, observed, last_observed)
     undeclared = sorted(set(delta.hard) - declared - paths_ignored_by_declared_exclude(target, declared, delta.hard, current, last_observed))
-    if undeclared:
-        paths = ", ".join(undeclared)
+    service = _service_writes_revision(journal, target, current, observed, tuple(path for path in undeclared if path in delta.committed))
+    admitted = _service_write_paths(service)
+    _refuse_undeclared(tuple(path for path in undeclared if path not in admitted), operation_id, name)
+    operation = _operation_revision(current, observed, last_observed, delta, tuple(path for path in delta.hard if path not in admitted), operation_id)
+    revisions = tuple(item for item in (service, operation) if item is not None)
+    return (revisions, observed.snapshot()) if revisions else None
+
+
+def _refuse_undeclared(violations: tuple[str, ...], operation_id: str, name: str) -> None:
+    if violations:
+        paths = ", ".join(violations)
         raise UpdateFailedError("preservation_violated", f"{operation_id} changed preserved local state outside its declared targets: {paths}", repair=f"Retain all evidence; {operation_id} wrote {paths} without declaring it; {REPAIR_RECONCILE_DRY_RUN.format(name=name)}")
-    if not delta.hard and not delta.surface:
+
+
+def _operation_revision(current: LocalState, observed: ObservedLocalState, last_observed: ObservedLocalState | None, delta: LocalStateDelta, owned: tuple[str, ...], operation_id: str) -> dict[str, JsonValue] | None:
+    """The operation's own revision: its declared hard-tier changes re-baselined, else its preserved-surface change disclosed."""
+    if owned:
+        before = {path: _entry_digest(current, last_observed, path) for path in owned}
+        after = {path: _observed_digest(observed, path) for path in owned}
+        return {"operation_id": operation_id, "paths": list(owned), "before": cast(dict[str, JsonValue], before), "after": cast(dict[str, JsonValue], after)}
+    if delta.surface:
+        return {"operation_id": operation_id, "preserved_surface_delta": list(delta.surface)}
+    return None
+
+
+def _service_writes_revision(journal: dict[str, JsonValue], target: Path, current: LocalState, observed: ObservedLocalState, candidates: tuple[str, ...]) -> dict[str, JsonValue] | None:
+    """The ``service_writes`` revision for the B7 creations among ``candidates``, only while the solet runs across an operation."""
+    stage = _SERVICE_WRITE_STAGE_BY_STATUS.get(cast(str, journal["status"]))
+    if stage is None:
         return None
-    if delta.hard:
-        before = {path: _entry_digest(current, last_observed, path) for path in delta.hard}
-        after = {path: _observed_digest(observed, path) for path in delta.hard}
-        revision: dict[str, JsonValue] = {"operation_id": operation_id, "paths": list(delta.hard), "before": cast(dict[str, JsonValue], before), "after": cast(dict[str, JsonValue], after)}
-    else:
-        revision = {"operation_id": operation_id, "preserved_surface_delta": list(delta.surface)}
-    return revision, observed.snapshot()
+    additions = _admitted_service_writes(target, current, observed, candidates)
+    if not additions:
+        return None
+    return {"stage": stage, "service_writes": {"committed_additions": list(additions), "preserved_surface_delta": []}}
+
+
+def _service_write_paths(revision: dict[str, JsonValue] | None) -> frozenset[str]:
+    if revision is None:
+        return frozenset()
+    additions = cast(list[JsonValue], cast(dict[str, JsonValue], revision["service_writes"])["committed_additions"])
+    return frozenset(cast(str, cast(dict[str, JsonValue], item)["path"]) for item in additions)
+
+
+def _admitted_service_writes(target: Path, current: LocalState, observed: ObservedLocalState, candidates: tuple[str, ...]) -> tuple[dict[str, JsonValue], ...]:
+    """The committed-tier ``candidates`` that are exactly a B7 creation, as ``service_writes`` addition rows; anything else is left out."""
+    previous_paths = frozenset(row[0] for row in current.committed_inventory)
+    additions: list[dict[str, JsonValue]] = []
+    for path in candidates:
+        digest = allowed_service_write(target, path, previous_paths)
+        if digest is None:
+            continue
+        entry = next(item for item in observed.committed if item.path == path)
+        additions.append({"path": entry.path, "kind": entry.kind, "mode": entry.mode, "size": entry.size, "target_digest": digest})
+    return tuple(additions)
 
 
 def paths_ignored_by_declared_exclude(target: Path, declared: frozenset[str], paths: Iterable[str], current: LocalState, previous: ObservedLocalState | None) -> frozenset[str]:

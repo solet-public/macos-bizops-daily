@@ -156,6 +156,8 @@ class Knobs:
     homebrew: Literal["present", "absent"] = "present"
     tmux: Literal["present", "absent"] = "present"
     postgres_client: Literal["present", "absent"] = "present"
+    #: iss_646b54b6: the Claude Code CLI on the Manager's PATH, which the source preview now requires.
+    claude_cli: Literal["present", "absent"] = "present"
     service: Literal["healthy", "offline", "unhealthy"] = "healthy"
     keychain: Literal["present", "absent", "unqueryable"] = "present"
     permissions: Literal["unqueryable"] = "unqueryable"
@@ -660,7 +662,7 @@ def _home(root: Path, target: Path, knobs: Knobs) -> Path:
 def _cold_host(root: Path, knobs: Knobs) -> ColdHost:
     host = ColdHost(root / "host", knobs)
     host.bin.mkdir(parents=True, exist_ok=True)
-    stubs = {"python3.13": knobs.host_python == "present", "brew": knobs.homebrew == "present", "tmux": knobs.tmux == "present", "psql": knobs.postgres_client == "present"}
+    stubs = {"python3.13": knobs.host_python == "present", "brew": knobs.homebrew == "present", "tmux": knobs.tmux == "present", "psql": knobs.postgres_client == "present", "claude": knobs.claude_cli == "present"}
     for name, present in stubs.items():
         if present:
             stub = host.bin / name

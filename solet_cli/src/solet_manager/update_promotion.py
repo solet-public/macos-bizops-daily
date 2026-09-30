@@ -8,6 +8,8 @@ success, and is the only writer of ``verified_release``,
 ``last_verified_*`` and (through the release) the active pointer.  The
 sequence is crash-safe at every boundary (section 5.3): journal
 ``doctor_verified -> promoting``, the idempotent ``publish_promotion`` CAS,
+the idempotent advance of a completed create's setup-contract pin to the
+candidate's (``create_contract_advance``, iss_0a10e6db; Manager state only),
 journal ``promoting -> promoted``, then ``release_active_operation`` against
 the terminal proof.  A crash anywhere resumes by re-checking the
 preconditions against fresh reads and repeating only the idempotent step.
@@ -19,6 +21,7 @@ import re
 from typing import TYPE_CHECKING, cast
 
 from .contract_copies import read_transition_contract
+from .create_contract_advance import advance_create_contract_identity
 from .doctor_journal import doctor_operation_id, latest_run, read_doctor_journal
 from .errors import StateConflictError, StateError, TransitionContractMismatchError
 from .maintenance_inventory import publish_promotion, read_maintenance_inventory_v2
@@ -159,6 +162,10 @@ def _promote(execution: RuntimeExecution) -> None:
             current = publish_promotion(execution.paths.maintenance_inventory_path, current, operation_id=execution.operation_id, verified_release=candidate, verified_contract_digest=contract, eligibility=_eligibility(execution, candidate), doctor_evidence_digest=digest, now=utc_now())
         execution.executed.append("inventory:publish_promotion")
     execution.record = current
+    # iss_0a10e6db: the create record's setup-contract pin follows the checkout to the promoted release.
+    baseline = cast(dict[str, JsonValue], execution.journal["baseline"])
+    advanced = advance_create_contract_identity(execution.paths, current, operation_id=execution.operation_id, baseline_commit=cast(str, baseline["commit"]), candidate_commit=candidate.commit)
+    execution.executed.append(f"create_contract:{advanced}")
     deferred = deferred_rows(execution.journal)
     if deferred:
         # Before the pointer releases, so a crash cannot leave a VERIFIED row that hides a deferral (iss_6d26db73).

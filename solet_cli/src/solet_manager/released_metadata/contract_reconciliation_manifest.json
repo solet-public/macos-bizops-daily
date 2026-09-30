@@ -338,7 +338,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
@@ -362,7 +362,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
@@ -389,7 +389,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
@@ -413,7 +413,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
@@ -437,7 +437,7 @@
       },
       "destination": {
         "flow_id": "macos.repository_setup",
-        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
       },
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
@@ -463,6 +463,126 @@
       "stage_probe_mappings": [],
       "first_use_inactive_probe_migrations": [],
       "operation_statuses_to_reset": []
+    },
+    {
+      "migration_id": "macos-repository-setup-lm-studio-not-recommended-from-1dedebb6-v1",
+      "operation_statuses_to_reset": [],
+      "source": {
+        "flow_id": "macos.repository_setup",
+        "flow_source_revision": "1dedebb6622ee6559d549eac4a2465591c130d80",
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+      },
+      "destination": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
+      },
+      "stage_probe_mappings": [],
+      "first_use_inactive_probe_migrations": []
+    },
+    {
+      "migration_id": "macos-repository-setup-lm-studio-not-recommended-from-d81e014a-v1",
+      "operation_statuses_to_reset": [],
+      "source": {
+        "flow_id": "macos.repository_setup",
+        "flow_source_revision": "d81e014adce8ed4b4258db35a4f46339431ea158",
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+      },
+      "destination": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
+      },
+      "stage_probe_mappings": [],
+      "first_use_inactive_probe_migrations": []
+    },
+    {
+      "migration_id": "macos-repository-setup-lm-studio-not-recommended-from-8b3fe23d-v1",
+      "operation_statuses_to_reset": [],
+      "source": {
+        "flow_id": "macos.repository_setup",
+        "flow_source_revision": "8b3fe23d447e384541bd5a18a7d7090fa41ae5a6",
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+      },
+      "destination": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
+      },
+      "stage_probe_mappings": [],
+      "first_use_inactive_probe_migrations": []
+    },
+    {
+      "migration_id": "macos-repository-setup-lm-studio-not-recommended-from-85f2994b-v1",
+      "operation_statuses_to_reset": [],
+      "source": {
+        "flow_id": "macos.repository_setup",
+        "flow_source_revision": "85f2994b3a76aa86e33b6cd49724731280161f42",
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+      },
+      "destination": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
+      },
+      "stage_probe_mappings": [],
+      "first_use_inactive_probe_migrations": []
+    },
+    {
+      "migration_id": "macos-repository-setup-lm-studio-not-recommended-from-6b292e91-v1",
+      "operation_statuses_to_reset": [],
+      "source": {
+        "flow_id": "macos.repository_setup",
+        "flow_source_revision": "6b292e918e83520afbb4eecd79da67766a35d538",
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+      },
+      "destination": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
+      },
+      "stage_probe_mappings": [],
+      "first_use_inactive_probe_migrations": []
+    },
+    {
+      "migration_id": "macos-repository-setup-lm-studio-not-recommended-from-ee00d702-v1",
+      "operation_statuses_to_reset": [],
+      "source": {
+        "flow_id": "macos.repository_setup",
+        "flow_source_revision": "ee00d7025187733edcc79466f71c708d427c086f",
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+      },
+      "destination": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
+      },
+      "stage_probe_mappings": [],
+      "first_use_inactive_probe_migrations": []
+    },
+    {
+      "migration_id": "macos-repository-setup-lm-studio-not-recommended-from-1e167174-v1",
+      "operation_statuses_to_reset": [],
+      "source": {
+        "flow_id": "macos.repository_setup",
+        "flow_source_revision": "1e167174a086615d15abf7108ec9e4bd6111af94",
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+      },
+      "destination": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
+      },
+      "stage_probe_mappings": [],
+      "first_use_inactive_probe_migrations": []
+    },
+    {
+      "migration_id": "macos-repository-setup-lm-studio-not-recommended-from-a5732c9f-v1",
+      "operation_statuses_to_reset": [],
+      "source": {
+        "flow_id": "macos.repository_setup",
+        "flow_source_revision": "a5732c9f3d58c756c085bc76a81841c19626d156",
+        "flow_contract_digest": "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+      },
+      "destination": {
+        "flow_id": "macos.repository_setup",
+        "flow_contract_digest": "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
+      },
+      "stage_probe_mappings": [],
+      "first_use_inactive_probe_migrations": []
     }
   ]
 }

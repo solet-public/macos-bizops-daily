@@ -32,6 +32,10 @@ from .setup_operations import (
     _verified,
 )
 
+#: iss_8242b14c: ``claude plugin list --json`` prints every installed plugin (about 330 bytes a row), so the 4 KiB
+#: default truncated it past about a dozen plugins.  Every ``plugin list`` read goes through ``run_plugin_list``.
+PLUGIN_LIST_OUTPUT_LIMIT = 64 * 1024
+
 
 def plugin_install(request: AdapterRequest, runtime: Runtime) -> JsonObject:
     is_claude = request.operation_ref == "hydration::claude.install_plugin"
@@ -97,8 +101,7 @@ def _plugin_install_probe(
     selector: str,
     manifest: Path,
 ) -> JsonObject:
-    list_vector = plugin_list_vector(cli, marketplace, executable)
-    listed = runtime.run(list_vector, timeout_seconds=10)
+    list_vector, listed = run_plugin_list(runtime, cli, marketplace, executable)
     if command_output_truncated(listed):
         return _blocked(request, "output_truncated", truncated_output_repair(list_vector, listed))
     rows = plugin_list_rows(cli, listed)
@@ -218,7 +221,7 @@ def _claude_receipt_is_current(
 def _selected_claude_cache_root(
     runtime: Runtime, executable: str, marketplace: str, selector: str,
 ) -> Path | str:
-    listed = runtime.run(plugin_list_vector("claude", marketplace, executable), timeout_seconds=10)
+    _vector, listed = run_plugin_list(runtime, "claude", marketplace, executable)
     rows = plugin_list_rows("claude", listed)
     if rows is None or not any(plugin_row_visible("claude", row, selector) for row in rows):
         return "supported Claude plugin-list readback did not confirm the selected installation"
@@ -263,6 +266,12 @@ def _receipt_surfaces(request: AdapterRequest, root: Path) -> tuple[ReceiptSurfa
         shipped_checkout_root / "hooks.json",
     )
     return cache, checkout
+
+
+def run_plugin_list(runtime: Runtime, cli: str, marketplace: str, executable: str) -> tuple[tuple[str, ...], CommandOutcome]:
+    """Run the CLI's JSON plugin list at the shared ``PLUGIN_LIST_OUTPUT_LIMIT``; the vector and its outcome."""
+    vector = plugin_list_vector(cli, marketplace, executable)
+    return vector, runtime.run(vector, timeout_seconds=10, output_limit=PLUGIN_LIST_OUTPUT_LIMIT)
 
 
 def plugin_list_vector(cli: str, marketplace: str, executable: str) -> tuple[str, ...]:

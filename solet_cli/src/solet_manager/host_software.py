@@ -15,25 +15,38 @@ repair, so the source preview refuses on it before the forward-only boundary
 (section 7.2); ``instance_python`` and ``instance_bridge_cli`` are repaired by
 the dependencies stage and are disclosed, and the three advisory rows exist
 because the operator guide's restart/fleet features depend on them.
+
+The update preview adds one more row the doctor does not carry,
+``claude_cli_present`` (iss_646b54b6): the runtime stage's plugin-cache refresh
+needs the Claude Code CLI on every existing install and no stage installs it, so
+the source preview refuses ``claude_cli_missing`` before the forward-only boundary
+instead of after it.  It resolves ``claude`` exactly as the seed adapter does:
+``PATH`` first, then the two Homebrew bin directories, then ``$HOME/.local/bin`` where Claude Code's native installer puts it.
 """
 
 from __future__ import annotations
 
 import os
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .existing_solet_diagnostics import DiagnosticCheck, DiagnosticStatus
 from .models import JsonValue
 from .update_runtime_plan import RuntimeSeams
 
-__all__ = ["HOST_REQUIREMENT_CHECKS", "HostCheck", "base_python_or_none", "host_checks", "host_requirement_reason", "host_section"]
+__all__ = ["HOST_REQUIREMENT_CHECKS", "UPDATE_PREREQUISITE_CHECKS", "HostCheck", "base_python_or_none", "claude_search_directories", "host_checks", "host_requirement_reason", "host_section", "update_prerequisite_checks"]
 
 _HOMEBREW_CANDIDATES = (Path("/opt/homebrew/bin/brew"), Path("/usr/local/bin/brew"))
 _PSQL_GLOB = "/opt/homebrew/opt/postgresql@*/bin/psql"
 #: The checks the source preview refuses on when they are not ``verified`` (section 7.2, D3).
 HOST_REQUIREMENT_CHECKS = ("host_python_313",)
+#: Update-only prerequisites the source preview refuses on by their own reason (iss_646b54b6); the doctor omits them.
+UPDATE_PREREQUISITE_CHECKS = ("claude_cli_present",)
+#: The seed adapter's ``resolve_executable`` fixed directories (``setup_adapter_runtime.executable_fallback_directories``):
+#: the two Homebrew bins, then Claude Code's native-install directory under the invoking user's home.
+_HOMEBREW_BIN_DIRECTORIES = (Path("/opt/homebrew/bin"), Path("/usr/local/bin"))
+_NATIVE_BIN_RELATIVE = Path(".local") / "bin"
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,21 +90,38 @@ def host_checks(seams: RuntimeSeams, target: Path) -> tuple[HostCheck, ...]:
     )
 
 
+def claude_search_directories(seams: RuntimeSeams) -> tuple[Path, ...]:
+    """The fixed directories ``claude`` is looked for after PATH, in order: both Homebrew bins, then ``$HOME/.local/bin``."""
+    return (*_HOMEBREW_BIN_DIRECTORIES, seams.home / _NATIVE_BIN_RELATIVE)
+
+
+def update_prerequisite_checks(seams: RuntimeSeams) -> tuple[HostCheck, ...]:
+    """The update-only rows (iss_646b54b6), appended to the preview's host group after the six section-7.1 rows."""
+    row = _which("claude_cli_present", seams, "claude", tuple(directory / "claude" for directory in claude_search_directories(seams)), "The runtime stage's plugin-cache refresh needs the Claude Code CLI; the update never installs it.")
+    if row.status is DiagnosticStatus.MISSING:
+        row = replace(row, reason="claude_cli_missing")
+    return (row,)
+
+
 def host_section(seams: RuntimeSeams, target: Path) -> dict[str, JsonValue]:
     """The preview's ``host`` group (section 7.2): every row with its status, plus the refusal it implies."""
-    checks = host_checks(seams, target)
+    checks = (*host_checks(seams, target), *update_prerequisite_checks(seams))
     reason = host_requirement_reason(checks)
     return {"checks": [check.to_dict() for check in checks], "requirement": reason}
 
 
 def host_requirement_reason(checks: tuple[HostCheck, ...]) -> str | None:
-    """``host_requirement_missing`` / ``host_requirement_unknown`` when a requirement row is not verified, else ``None``."""
+    """The refusal the first unverified requirement row implies, else ``None``.
+
+    ``host_requirement_missing`` / ``host_requirement_unknown`` for the host Python; ``claude_cli_missing`` /
+    ``host_requirement_unknown`` for an update prerequisite row, when the rows include it.
+    """
     by_id = {check.check_id: check for check in checks}
-    for check_id in HOST_REQUIREMENT_CHECKS:
-        status = by_id[check_id].status
-        if status is DiagnosticStatus.MISSING:
-            return "host_requirement_missing"
-        if status is DiagnosticStatus.UNKNOWN:
+    for check_id in HOST_REQUIREMENT_CHECKS + tuple(item for item in UPDATE_PREREQUISITE_CHECKS if item in by_id):
+        check = by_id[check_id]
+        if check.status is DiagnosticStatus.MISSING:
+            return "host_requirement_missing" if check_id in HOST_REQUIREMENT_CHECKS else check.reason
+        if check.status is DiagnosticStatus.UNKNOWN:
             return "host_requirement_unknown"
     return None
 

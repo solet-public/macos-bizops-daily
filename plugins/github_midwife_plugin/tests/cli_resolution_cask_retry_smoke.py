@@ -90,8 +90,8 @@ def _check_cli_available_pre_install_never_retries() -> None:
     _check(result["checkpoint_status"] == "blocked", "pre-install probe with codex absent reports blocked")
     _check(sleep.call_count == 0, "a non-post_apply probe never retries -- the tool is legitimately absent pre-install")
     _check(
-        runtime.which_calls == ["codex", "/opt/homebrew/bin/codex", "/usr/local/bin/codex"],
-        "pre-install probe resolves once (bare name + PATH fallbacks), never retries the whole resolution",
+        runtime.which_calls == ["codex", "/opt/homebrew/bin/codex", "/usr/local/bin/codex", "/tmp/fixture-home/.local/bin/codex"],
+        "pre-install probe resolves once (bare name + the fixed fallbacks, the runtime home's native directory last), never retries the whole resolution",
     )
 
 

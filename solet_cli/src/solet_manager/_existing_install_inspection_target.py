@@ -43,6 +43,7 @@ from .existing_install_inspection import (
     _decode_line,
     _status_paths,
 )
+from .origin_identity import any_names_repository
 from .update_topology import parse_raw_diff
 
 
@@ -224,6 +225,7 @@ def _target_probe_values(
         "anchor": anchor,
         "anchor_kind": effective_anchor,
         "anchor_relation": relation,
+        "listed_ancestors": _listed_ancestors(metadata.anchors, anchor_outputs),
         "repository_relation": _repository_relation(origins, origin_values, metadata),
         "origins": origin_values,
         "tracked": tracked,
@@ -242,6 +244,11 @@ def _target_probe_values(
         "linked_worktrees": _linked_worktrees(worktrees),
         "worktrees_observed": worktrees.returncode == 0,
     }
+
+
+def _listed_ancestors(anchors: tuple[InspectionAnchor, ...], ancestry: dict[str, InspectionProbeOutput]) -> tuple[str, ...]:
+    """The anchor commits ``merge-base --is-ancestor`` proved are in HEAD's history, in anchor-table order."""
+    return tuple(anchor.commit for anchor in anchors if ancestry[anchor.anchor_id].returncode == 0)
 
 
 def _successful_line(output: InspectionProbeOutput) -> str | None:
@@ -367,7 +374,7 @@ def _anchor_identity_matches(
     return (
         anchor.commit == head
         and anchor.tree_hash == tree
-        and anchor.repository in origins
+        and any_names_repository(origins, anchor.repository)
         and anchor.provenance_sha256 == provenance_digest
         and _anchor_stamp_matches(anchor, stamp)
     )
@@ -494,17 +501,13 @@ def _repository_relation(
 ) -> RepositoryRelation:
     if output.returncode != 0:
         return RepositoryRelation.UNKNOWN
-    if metadata.channel_identity.repository in origins:
+    if any_names_repository(origins, metadata.channel_identity.repository):
         return RepositoryRelation.CANONICAL
-    reviewed = {
-        migration["from_repository"]
+    reviewed = any(
+        any_names_repository(origins, migration["from_repository"])
         for migration in metadata.seed_lock.allowed_repository_migrations
-    }
-    return (
-        RepositoryRelation.REVIEWED_HISTORICAL
-        if reviewed & set(origins)
-        else RepositoryRelation.OTHER
     )
+    return RepositoryRelation.REVIEWED_HISTORICAL if reviewed else RepositoryRelation.OTHER
 
 
 def _target_identity_checks(

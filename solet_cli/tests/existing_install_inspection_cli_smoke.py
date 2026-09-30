@@ -5,9 +5,10 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import sys
 import tempfile
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Never, cast
 from unittest.mock import patch
@@ -15,6 +16,7 @@ from unittest.mock import patch
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(_ROOT / "solet_cli" / "src"), str(_ROOT / "solet_setup_contracts" / "src")]
 
+from solet_manager import manager_cli  # noqa: E402, I001
 from solet_manager.manager_cli import build_parser, main as manager_main  # noqa: E402, I001
 from solet_manager.existing_install_inspection import (  # noqa: E402, I001
     ChannelInspectionIdentity,
@@ -91,20 +93,66 @@ def _run_cli(argv: list[str], loader: object) -> tuple[int, dict[str, object]]:
     return exit_code, cast(dict[str, object], json.loads(output.getvalue()))
 
 
+def _assert_import_update_parse(parser: argparse.ArgumentParser) -> None:
+    imported = parser.parse_args(["import", "fixture", "--target", "/tmp/existing", "--channel", "stable", "--dry-run", "--json"])
+    assert imported.command == "import" and imported.name == "fixture"
+    assert imported.target == Path("/tmp/existing") and imported.channel == "stable"
+    assert imported.dry_run and not imported.yes and imported.as_json
+    updated = parser.parse_args(["update", "fixture", "--dry-run", "--json"])
+    assert updated.command == "update" and updated.name == "fixture"
+    assert updated.dry_run and not updated.yes and updated.as_json
+
+
+def _assert_usage_error_without_mode(parser: argparse.ArgumentParser) -> None:
+    for verb in ("import", "update"):
+        try:
+            with redirect_stderr(io.StringIO()):
+                parser.parse_args([verb, "fixture"])
+        except SystemExit as error:
+            assert error.code == 2, f"{verb} without a mode or target must be a usage error"
+        else:
+            raise AssertionError(f"{verb} accepted no --dry-run/--yes mode")
+
+
 def _assert_parser_contract(parser: argparse.ArgumentParser) -> None:
-    subparsers = next(
-        action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
-    )
+    subparsers = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
     choices = subparsers.choices
-    assert set(choices) == {"inspect", "import", "update"}
-    values = parser.parse_args(
-        ["inspect", "--target", "/tmp/existing", "--channel", "stable", "--json"]
-    )
+    # Later manager verbs (doctor, reconcile, ...) are allowed; the existing-install trio must stay wired.
+    assert {"inspect", "import", "update"} <= set(choices)
+    _assert_import_update_parse(parser)
+    _assert_usage_error_without_mode(parser)
+    values = parser.parse_args(["inspect", "--target", "/tmp/existing", "--channel", "stable", "--json"])
     assert values.target == Path("/tmp/existing") and values.channel == "stable" and values.as_json
+
+
+def _assert_command_wiring() -> None:
+    """Each verb reaches its own handler: the dispatch table and a real dispatch through main."""
+    assert manager_cli._COMMANDS["inspect"] is manager_cli._inspect_result
+    assert manager_cli._COMMANDS["import"] is manager_cli._import_result
+    assert manager_cli._COMMANDS["update"] is manager_cli._update_result
+    with tempfile.TemporaryDirectory() as directory:
+        home = Path(directory).resolve()
+        (home / "target").mkdir()
+        with patch.dict(os.environ, {"SOLET_HOME": str(home)}):
+            for argv, kind in (
+                (
+                    ["import", "fixture", "--target", str(home / "target"), "--channel", "stable", "--dry-run", "--json"],
+                    "existing_install_import",
+                ),
+                (["update", "fixture", "--dry-run", "--json"], "existing_install_update"),
+            ):
+                output = io.StringIO()
+                with patch("solet_manager.manager_cli.load_installed_inspection_metadata", _metadata_failure):
+                    with redirect_stdout(output):
+                        exit_code = manager_main(argv)
+                rendered = cast(dict[str, object], json.loads(output.getvalue()))
+                assert exit_code != 0, f"{argv[0]}: the fixture is refused, not applied"
+                assert rendered["kind"] == kind, f"{argv[0]} rendered {rendered['kind']!r}, expected {kind!r}"
 
 
 def main() -> int:
     _assert_parser_contract(build_parser())
+    _assert_command_wiring()
     with tempfile.TemporaryDirectory() as directory:
         prefix = Path(directory)
         lock = prefix / "share" / "solet" / "seed.lock.json"

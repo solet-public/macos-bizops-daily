@@ -61,6 +61,7 @@ from github_midwife_plugin.setup_adapter_runtime import (  # noqa: E402
     _STRUCTURED_OUTPUT_LIMIT,
     CommandOutcome,
     bounded_command_outcome,
+    executable_fallback_directories,
 )
 from github_midwife_plugin.setup_operations import operation_handlers  # noqa: E402
 from github_midwife_plugin.setup_plugin_operations import _receipt_surfaces  # noqa: E402
@@ -144,6 +145,11 @@ class FakeRuntime:
                 CommandOutcome(0, False, 1, f"/fixture/{argv[1]}\n", ""), output_limit
             )
         return self._bounded(CommandOutcome(0, False, 1, "", ""), output_limit)
+
+    def executable_absent(self, name: str, duration_ms: int = 1) -> None:
+        """Answer ``/usr/bin/which`` for ``name`` on PATH and in every fixed fallback directory the resolver tries."""
+        for target in (name, *(f"{directory}/{name}" for directory in executable_fallback_directories(self))):
+            self.responses[("/usr/bin/which", target)] = CommandOutcome(1, False, duration_ms, "", "")
 
     @staticmethod
     def _bounded(outcome: CommandOutcome, output_limit: int) -> CommandOutcome:
@@ -487,9 +493,7 @@ def _operation_counterexamples(target: Path, runtime: FakeRuntime) -> None:
         "TCC preview does not open Settings",
     )
 
-    runtime.responses[("/usr/bin/which", "tmux")] = CommandOutcome(1, False, 1, "", "")
-    runtime.responses[("/usr/bin/which", "/opt/homebrew/bin/tmux")] = CommandOutcome(1, False, 1, "", "")
-    runtime.responses[("/usr/bin/which", "/usr/local/bin/tmux")] = CommandOutcome(1, False, 1, "", "")
+    runtime.executable_absent("tmux")
     timed_out_apply = AdapterRequest.from_dict(
         _raw_request(
             target,
@@ -797,9 +801,7 @@ def _coding_agent_cli_preconditions(target: Path) -> None:
         ("claude", "install_claude_plugin", "hydration::claude.install_plugin"),
     ):
         runtime = FakeRuntime(target / f"missing-{cli}")
-        runtime.responses[("/usr/bin/which", cli)] = CommandOutcome(1, False, 2, "", "")
-        runtime.responses[("/usr/bin/which", f"/opt/homebrew/bin/{cli}")] = CommandOutcome(1, False, 2, "", "")
-        runtime.responses[("/usr/bin/which", f"/usr/local/bin/{cli}")] = CommandOutcome(1, False, 2, "", "")
+        runtime.executable_absent(cli, 2)
         preview = _request(target, operation_id=operation_id, operation_ref=operation_ref)
         preview_result = operation_handlers()[operation_ref](preview, runtime)
         _check(preview_result["checkpoint_status"] == "blocked", f"missing {cli} preview blocks")
@@ -849,9 +851,7 @@ def _coding_agent_cli_preconditions(target: Path) -> None:
         )
 
     aggregate_runtime = FakeRuntime(target / "missing-aggregate")
-    aggregate_runtime.responses[("/usr/bin/which", "codex")] = CommandOutcome(1, False, 2, "", "")
-    aggregate_runtime.responses[("/usr/bin/which", "/opt/homebrew/bin/codex")] = CommandOutcome(1, False, 2, "", "")
-    aggregate_runtime.responses[("/usr/bin/which", "/usr/local/bin/codex")] = CommandOutcome(1, False, 2, "", "")
+    aggregate_runtime.executable_absent("codex", 2)
     aggregate = _request(
         target,
         operation_id="coding_agent_plugins",

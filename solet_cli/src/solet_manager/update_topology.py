@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 from .existing_install_inspection import ExistingInstallFacts, ObservationAvailability, ObservedBoolean, RawRow
 from .models import JsonValue
+from .origin_identity import only_names_repository
 
 # The executable-config scan and its parser live in ``target_git``, the one hardened target Git surface.
 from .target_git import parse_git_config_entries as parse_git_config_entries
@@ -374,9 +375,10 @@ def _fold(path: str) -> str:
 
 
 def origin_reason(origins: tuple[str, ...], canonical_repository: str) -> str | None:
-    """Return ``origin_unapproved`` unless ``origin`` is exactly the canonical URL.
+    """Return ``origin_unapproved`` unless the one ``origin`` URL names the canonical repository.
 
-    The reviewed historical-origin migration (``target.repoint_origin``) is not
-    executed by this increment, so a declared migration source blocks too.
+    Its HTTPS or SSH spelling is the same repository (``origin_identity``). The reviewed
+    historical-origin migration (``target.repoint_origin``) is not executed by this
+    increment, so a declared migration source blocks too.
     """
-    return None if origins == (canonical_repository,) else "origin_unapproved"
+    return None if only_names_repository(origins, canonical_repository) else "origin_unapproved"

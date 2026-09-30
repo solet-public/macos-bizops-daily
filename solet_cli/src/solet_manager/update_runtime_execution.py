@@ -337,14 +337,17 @@ class RuntimeExecution:
         return _STAGES[_APPLYING_STATUS[self.status]][0]
 
     def _rebaseline(self, operation: RuntimeOperation) -> None:
-        """Section 6.6: after an apply verifies, only the operation's declared in-tree targets may have moved."""
+        """Section 6.6: after an apply verifies, only the operation's declared in-tree targets may have moved (plus the running solet's own B7 creation, disclosed)."""
         if self.source is None:
             raise StateError("the executor carries no source execution; the local-state commitment cannot be re-baselined")
         outcome = self.source.rebaseline_local_state(self.journal, operation.operation_id, self._declared_targets(operation))
         if outcome is None:
             return
-        revision, current = outcome
-        self._write(record_local_state_revision(self.journal, revision=revision, current=current))
+        revisions, current = outcome
+        # One journal write per revision: the journal admits one new revision a write, and a ``service_writes``
+        # revision can arrive beside the operation's own (iss_fa27466f: the refresh's pin beside a KB symlink).
+        for revision in revisions:
+            self._write(record_local_state_revision(self.journal, revision=revision, current=current))
 
     def _declared_targets(self, operation: RuntimeOperation) -> frozenset[str]:
         """Every in-tree ``planned_targets`` path the operation declared, relative to the target root."""

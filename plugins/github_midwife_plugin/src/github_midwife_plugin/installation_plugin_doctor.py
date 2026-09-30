@@ -22,8 +22,8 @@ from .setup_adapter_runtime import CommandOutcome, Runtime, read_json_object, re
 from .setup_plugin_operations import (
     command_output_truncated,
     plugin_list_rows,
-    plugin_list_vector,
     plugin_row_visible,
+    run_plugin_list,
     truncated_output_repair,
 )
 
@@ -153,8 +153,7 @@ def _plugin_list_outcome(
     cli: str,
     executable: str,
 ) -> tuple[tuple[str, ...], CommandOutcome]:
-    vector = plugin_list_vector(cli, request.name.replace("_", "-"), executable)
-    return vector, runtime.run(vector, timeout_seconds=10)
+    return run_plugin_list(runtime, cli, request.name.replace("_", "-"), executable)
 
 
 def _installed_plugin_root(

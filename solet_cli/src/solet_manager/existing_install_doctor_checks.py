@@ -42,6 +42,7 @@ from .host_software import host_checks
 from .launch_topology import derive_launch_topology, launchagent_plist_path, plist_label
 from .local_state import ObservedLocalState, allowed_service_write, compare, observe_local_state, snapshot_from_journal
 from .models import DoctorContractKind, JsonValue
+from .origin_identity import only_names_repository
 from .update_journal import read_update_journal
 from .update_topology import git_metadata_paths, shape_changed_rows
 
@@ -110,7 +111,7 @@ def _source_topology(probe: DoctorProbe, name: str) -> tuple[DiagnosticCheck, ..
     del name
     facts = probe.inspection.facts
     canonical = probe.record.channel.canonical_repository
-    checks = [verdict("origin_canonical", facts.origins == (canonical,), "Every origin remote names the canonical repository.", "manager_git", reason="origin_not_canonical", observed=list(facts.origins), expected=canonical)]
+    checks = [verdict("origin_canonical", only_names_repository(facts.origins, canonical), "Every origin remote names the canonical repository.", "manager_git", reason="origin_not_canonical", observed=list(facts.origins), expected=canonical)]
     for check_id, attribute, wanted, reason in _TOPOLOGY_FACTS:
         value = cast(ObservedBoolean, getattr(facts, attribute))
         checks.append(verdict(check_id, value is wanted, f"Repository fact {attribute} inspected.", "manager_git", reason=reason, observed=value.value, expected=wanted.value))

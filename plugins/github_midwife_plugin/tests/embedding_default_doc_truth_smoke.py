@@ -3,8 +3,10 @@
 The shipped Apple-native profiles default embeddings to ``coreai_embeddings_plugin``
 (macOS 27), a macOS 26 create binds ``openai_embeddings_plugin`` to its own loopback
 llama.cpp server, and LM Studio stays supported but is not recommended
-(rul_a328cc24).  Two shipped surfaces used to say otherwise:
+(rul_a328cc24).  Three shipped surfaces used to say otherwise:
 
+* the setup flow described ``lm_studio`` as the current recommended endpoint, and its
+  inference decision listed ``lm_studio`` among the recommended options (r64, chg_04232fcc);
 * shipped prose named ``openai_embeddings_plugin`` as the current or default embedding;
 * the ``local.yaml`` profile template header claimed to be what the solet runs as and that
   every plugin in the tree is loaded.
@@ -12,21 +14,19 @@ llama.cpp server, and LM Studio stays supported but is not recommended
 Each detector is proven on a known-bad string before it is trusted on the tree, so a
 detector that stopped matching cannot read as a clean tree.  ``--root`` points the
 scan at another checkout (used to run the red leg against the pre-fix bytes).
-
-The setup flow's ``lm_studio`` and ``default_inference_plugin`` wording is deliberately not
-checked here: it moves to chg_04232fcc because macos_setup_flow.json is a digested contract
-file, so a wording edit changes the setup contract's release identity.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[3]
+_FLOW = Path("plugins/github_midwife_plugin/knowledge_base/macos_setup_flow.json")
 _TEMPLATES = (
     Path("initialization/profiles/local.yaml"),
     Path("plugins/macos_midwife_plugin/knowledge_base/profile_templates/local.yaml"),
@@ -34,6 +34,7 @@ _TEMPLATES = (
 _PROSE_ROOTS = (Path("ananta/knowledge_bases"), Path("plugins"), Path("README.md"))
 _PROSE_SUFFIXES = frozenset({".md"})
 
+_RECOMMENDED = re.compile(r"(?<!not )\b(?:recommended|current)\b", re.IGNORECASE)
 _TEMPLATE_FALSE_CLAIMS = (
     re.compile(r"This is what \w+ runs as"),
     re.compile(r"Every plugin in the tree is loaded"),
@@ -52,6 +53,26 @@ def _check(label: str, condition: bool, detail: object = "") -> None:
     if not condition:
         raise AssertionError(f"FAIL: {label}: {detail}")
     _CHECKS.append(label)
+
+
+def _lm_studio_options(node: object) -> Iterator[dict[str, object]]:
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "lm_studio" and isinstance(value, dict):
+                yield value
+            yield from _lm_studio_options(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _lm_studio_options(item)
+
+
+def lm_studio_recommended(flow: object) -> list[str]:
+    """Descriptions of every ``lm_studio`` option that calls it recommended."""
+    return [
+        str(option.get("description", ""))
+        for option in _lm_studio_options(flow)
+        if _RECOMMENDED.search(str(option.get("description", "")))
+    ]
 
 
 def template_false_claims(text: str) -> list[str]:
@@ -78,6 +99,10 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=_REPO)
     root = parser.parse_args().root
 
+    _check("detector: a recommended lm_studio option is found",
+           lm_studio_recommended({"a": [{"lm_studio": {"description": "Current recommended local endpoint."}}]}) != [])
+    _check("control: 'not recommended' is not a recommendation",
+           lm_studio_recommended({"lm_studio": {"description": "Optional; not recommended."}}) == [])
     _check("detector: the old local.yaml header is found",
            len(template_false_claims("# This is what Foo runs as. Every plugin in the tree is loaded.")) == 2)
     _check("detector: a default claim for openai_embeddings_plugin is found",
@@ -87,6 +112,21 @@ def main() -> int:
 
     _check("detector: a current default_inference_plugin claim is found",
            embedding_default_claims("**Current implementation**: `default_inference_plugin` using LM Studio") != [])
+    _check("detector: a 'current' lm_studio inference option is found",
+           lm_studio_recommended({"lm_studio": {"description": "Current supported local inference implementation."}}) != [])
+
+    flow = json.loads((root / _FLOW).read_text())
+    inference = flow["plugins"]["default_inference_plugin"]["description"]
+    _check("the default_inference_plugin entry does not call LM Studio current", not _RECOMMENDED.search(inference), inference)
+    found = lm_studio_recommended(flow)
+    _check("no setup-flow option (embeddings or inference) calls lm_studio recommended or current", not found, found)
+    lm_studio = next(_lm_studio_options(flow), None)
+    _check("lm_studio stays a supported option", lm_studio is not None and lm_studio.get("availability") == "supported")
+    inference_decision = flow["decisions"]["inference_implementation"]
+    recommended = inference_decision["recommended_option_refs"]
+    _check("the inference decision does not recommend lm_studio", "lm_studio" not in recommended, recommended)
+    _check("lm_studio stays a selectable inference option",
+           inference_decision["option_source"]["options"]["lm_studio"].get("availability") == "supported")
 
     for template in _TEMPLATES:
         if not (root / template).is_file():

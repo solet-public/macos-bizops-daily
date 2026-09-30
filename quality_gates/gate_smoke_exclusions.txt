@@ -11,7 +11,6 @@ ananta/tests/llm/session_ledger/cross_host_kara_ledger_live_smoke.py  # owner: i
 ananta/tests/llm/session_ledger/cross_source_dedupe_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 ananta/tests/platform/install_plugin_from_path_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 ananta/tests/platform/install_with_pip_dep_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
-ananta/tests/platform/wint2_driver_import_gate_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/actr_memory_plugin/tests/actr_memory_clear_session_migration_live_smoke.py  # owner: iss_fb75bf89 reason: requires a live external or production service expires: 2026-12-31
 plugins/actr_memory_plugin/tests/actr_memory_consolidation_kb_exclusion_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/actr_memory_plugin/tests/actr_memory_hard_delete_migration_live_smoke.py  # owner: iss_fb75bf89 reason: requires a live external or production service expires: 2026-12-31
@@ -42,22 +41,9 @@ plugins/aws_self_deployment_plugin/tests/cross_host_blue_green_smoke.py  # owner
 plugins/aws_undertaker_plugin/tests/aws_undertaker_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/chatgpt_export_session_source_plugin/tests/ingest_export_verb_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
 plugins/chatgpt_export_session_source_plugin/tests/resolve_blob_path_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_ai_export_session_source_plugin/tests/attachment_probe_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_ai_export_session_source_plugin/tests/cross_vendor_uuid_probe_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_ai_export_session_source_plugin/tests/extract_text_canonicalization_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_ai_export_session_source_plugin/tests/ingest_export_verb_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_ai_export_session_source_plugin/tests/parse_export_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
 plugins/claude_code_filesystem_session_source_plugin/tests/claude_code_metadata_promotion_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
 plugins/claude_code_filesystem_session_source_plugin/tests/claude_code_subagents_recursion_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
 plugins/claude_code_filesystem_session_source_plugin/tests/cross_host_subagent_push_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_code_history_session_source_plugin/tests/cursor_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_code_history_session_source_plugin/tests/nul_strip_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_code_history_session_source_plugin/tests/parser_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_code_pushed_session_source_plugin/tests/claude_code_pushed_session_source_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_code_tasks_session_source_plugin/tests/cursor_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_code_tasks_session_source_plugin/tests/multi_session_discovery_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_code_tasks_session_source_plugin/tests/parser_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/claude_code_tasks_session_source_plugin/tests/subtype_filter_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
 plugins/code_vetting_plugin/tools/test_coverage/coverage_harness_smoke.py  # owner: iss_fb75bf89 reason: operator tooling, not an offline battery smoke expires: 2026-12-31
 plugins/codex_ambient_session_source_plugin/tests/cursor_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
 plugins/codex_ambient_session_source_plugin/tests/multi_project_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
@@ -86,7 +72,6 @@ plugins/github_midwife_plugin/codex_plugin/coordination-hooks/tests/context_stat
 plugins/github_midwife_plugin/tests/cli_resolution_cask_retry_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/github_midwife_plugin/tests/install_launchagent_profile_input_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/iterm2_coding_agent_management_plugin/tests/iterm2_plugin_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
-plugins/macos_coding_agent_session_plugin/tests/coding_agent_session_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/macos_inference_plugin/tests/installed_resources_smoke.py  # owner: iss_3aa20e42 reason: requires an installed macos_inference_plugin distribution absent from the checkout .venv expires: 2026-12-31
 plugins/macos_midwife_plugin/tests/asset_corruption_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/macos_self_deployment_plugin/tests/blue_green_router/bridge_port_lifecycle_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
@@ -113,14 +98,9 @@ plugins/postgres_state_management_plugin/tests/store_abstraction_smoke.py  # own
 plugins/postgres_state_management_plugin/tests/store_postgres_backend_move_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/postgres_state_management_plugin/tests/typed_txn_ops_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 plugins/postgres_state_management_plugin/tests/tz_storage_seam_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
-plugins/session_shipper_bootstrap_plugin/tests/session_shipper_orphan_client_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/session_shipper_bootstrap_plugin/tests/session_shipper_pairing_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/session_shipper_bootstrap_plugin/tests/session_shipper_render_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
-plugins/session_shipper_bootstrap_plugin/tests/session_shipper_uninstall_symmetry_smoke.py  # owner: iss_fb75bf89 reason: session-source integration coverage awaiting isolated fixture expires: 2026-12-31
 plugins/titanv2_embeddings_plugin/tests/titanv2_embeddings_smoke.py  # owner: iss_fb75bf89 reason: pre-existing smoke awaiting offline-suitability review expires: 2026-12-31
 solet_cli/tests/contract_reconciliation_chain_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
 solet_cli/tests/contract_reconciliation_regressions_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
-solet_cli/tests/existing_install_inspection_cli_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
 solet_cli/tests/existing_install_inspection_contract_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
 solet_cli/tests/existing_install_inspection_preservation_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
 solet_cli/tests/existing_install_inspection_round17_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
@@ -139,7 +119,6 @@ solet_cli/tests/import_prepared_journal_rerun_smoke.py  # owner: iss_fb75bf89 re
 solet_cli/tests/import_preservation_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
 solet_cli/tests/import_registry_uniqueness_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
 solet_cli/tests/import_structural_exclusion_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
-solet_cli/tests/import_v1_already_managed_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
 solet_cli/tests/import_verified_pointer_recovery_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
 solet_cli/tests/inference_vacancy_profile_guard_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31
 solet_cli/tests/instance_registry_uniqueness_smoke.py  # owner: iss_fb75bf89 reason: existing-install integration coverage awaiting isolated fixture expires: 2026-12-31

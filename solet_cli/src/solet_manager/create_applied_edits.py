@@ -43,6 +43,7 @@ __all__ = [
     "accept_applied_edits",
     "accepted_edit_paths",
     "applied_edits_path",
+    "head_mode_matches",
     "load_applied_edits",
     "rebind_applied_edit",
     "record_applied_edits",
@@ -192,6 +193,11 @@ def accept_applied_edits(verification: SeedTreeVerification, accepted: frozenset
         query_error=verification.query_error,
         accepted_manager_edits=moved,
     )
+
+
+def head_mode_matches(target: Path, path: str) -> bool:
+    """The worktree file's Git mode still equals ``HEAD``'s; an unanswerable query is ``False``."""
+    return _head_modes(target, [path]).get(path) == _worktree_mode(target / path)
 
 
 def _head_modes(target: Path, paths: list[str]) -> dict[str, str]:

@@ -84,6 +84,12 @@ class ManagedIdentityDriftError(StateConflictError):
     error_kind = "managed_identity_drift"
 
 
+class ImportNotAllowedError(ManagerError):
+    """The inspection classification refuses import; the repair is the inspection's own way out."""
+
+    error_kind = "import_not_allowed"
+
+
 class OperationInProgressError(StateConflictError):
     error_kind = "operation_in_progress"
 

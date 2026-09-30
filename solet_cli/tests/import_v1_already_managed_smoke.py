@@ -12,6 +12,7 @@ from unittest.mock import patch
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(_ROOT / "solet_cli" / "src"), str(_ROOT / "solet_setup_contracts" / "src")]
 
+import solet_manager.create_origin_enrollment as create_origin_enrollment  # noqa: E402
 import solet_manager.import_enrollment as enrollment  # noqa: E402
 from import_enrollment_rerun_smoke import _inspection  # noqa: E402
 from solet_manager.errors import ManagedIdentityDriftError, OperationInProgressError  # noqa: E402
@@ -43,12 +44,23 @@ def _record(target: Path, *, commit: str = "a" * 40) -> InstanceRecord:
 
 
 def _transaction(target: Path) -> Transaction:
-    return replace(Transaction.create(
-        name="fixture", target=target, input_fingerprint="sha256:" + "1" * 64,
-        answers={}, seed=SeedLock("https://example.invalid/seed.git", None, "a" * 40, "b" * 40, "c" * 64, "profile"),
-        flow_id="flow", flow_source_revision="revision", flow_contract_digest="sha256:" + "a" * 64,
-        stage_ids=("install",), completion_probe_ids=("doctor",),
-    ), status=TransactionStatus.VERIFIED, stages={"install": CheckpointStatus.VERIFIED}, completion={"doctor": CheckpointStatus.VERIFIED})
+    return replace(
+        Transaction.create(
+            name="fixture",
+            target=target,
+            input_fingerprint="sha256:" + "1" * 64,
+            answers={},
+            seed=SeedLock("https://example.invalid/seed.git", None, "a" * 40, "b" * 40, "c" * 64, "profile"),
+            flow_id="flow",
+            flow_source_revision="revision",
+            flow_contract_digest="sha256:" + "a" * 64,
+            stage_ids=("install",),
+            completion_probe_ids=("doctor",),
+        ),
+        status=TransactionStatus.VERIFIED,
+        stages={"install": CheckpointStatus.VERIFIED},
+        completion={"doctor": CheckpointStatus.VERIFIED},
+    )
 
 
 def _assert_no_import_state(paths: ManagerPaths) -> None:
@@ -66,7 +78,7 @@ def _assert_refusals(request: ImportRequest, transaction: Transaction) -> None:
         (replace(transaction, target="/different"), ManagedIdentityDriftError),
         (replace(transaction, seed=replace(transaction.seed, commit="c" * 40)), ManagedIdentityDriftError),
     ):
-        with patch.object(enrollment, "load_transaction", return_value=value):
+        with patch.object(create_origin_enrollment, "load_transaction", return_value=value):
             try:
                 enrollment.enroll_import(request, preview.fingerprint)
             except error:
@@ -84,19 +96,16 @@ def _assert_refusals(request: ImportRequest, transaction: Transaction) -> None:
 
 
 def _tree_snapshot(root: Path) -> dict[Path, tuple[int, bytes]]:
-    return {
-        path.relative_to(root): (path.lstat().st_mode, path.read_bytes() if stat.S_ISREG(path.lstat().st_mode) else b"")
-        for path in root.rglob("*")
-    }
+    return {path.relative_to(root): (path.lstat().st_mode, path.read_bytes() if stat.S_ISREG(path.lstat().st_mode) else b"") for path in root.rglob("*")}
 
 
 def _assert_only_lock_changes(
-    before: dict[Path, tuple[int, bytes]], after: dict[Path, tuple[int, bytes]], locks: Path,
+    before: dict[Path, tuple[int, bytes]],
+    after: dict[Path, tuple[int, bytes]],
+    locks: Path,
 ) -> None:
     allowed = {path for path in before.keys() | after.keys() if path.parent == locks and path.suffix == ".lock"}
-    assert {path: value for path, value in before.items() if path not in allowed} == {
-        path: value for path, value in after.items() if path not in allowed
-    }, "refusal changed Manager state or target outside lock inodes"
+    assert {path: value for path, value in before.items() if path not in allowed} == {path: value for path, value in after.items() if path not in allowed}, "refusal changed Manager state or target outside lock inodes"
     changed = {path for path in before.keys() | after.keys() if before.get(path) != after.get(path)}
     assert changed and changed <= allowed, "expected only lock creation or chmod"
     for path in changed:
@@ -123,30 +132,52 @@ def _assert_refused_approval(request: ImportRequest, fingerprint: str, field: st
         raise AssertionError(f"refused enrollment {field} accepted")
 
 
+def _drift_fixture(root: Path, field: str) -> tuple[Path, ManagerPaths, Transaction, ImportRequest, Path]:
+    target = root / field
+    target.mkdir()
+    marker = target / "operator-owned.txt"
+    marker.write_bytes(b"unchanged")
+    paths = ManagerPaths(root / (field + "config"), root / (field + "state"), root / (field + "cache"))
+    for directory in (paths.config_dir, paths.state_dir, paths.cache_dir):
+        directory.mkdir(mode=0o700)
+    InstanceRegistry(paths.registry_path).add(_record(target))
+    transaction = _transaction(target)
+    write_transaction(paths.transaction_path("fixture"), transaction)
+    locks = paths.state_dir / "locks"
+    locks.mkdir(mode=0o700, exist_ok=True)
+    registry_lock = locks / "registry.lock"
+    registry_lock.touch(mode=0o600, exist_ok=True)
+    registry_lock.chmod(0o644)
+    return marker, paths, transaction, ImportRequest("fixture", target, "stable", paths), locks
+
+
+def _assert_drifted_preview_refused(request: ImportRequest, root: Path, field: str) -> dict[Path, tuple[int, bytes]]:
+    """A fresh preview of a drifted create transaction is refused and changes nothing."""
+    before = _tree_snapshot(root)
+    try:
+        enrollment.preview_import(request)
+    except ManagedIdentityDriftError:
+        pass
+    else:
+        raise AssertionError(f"preview accepted a create transaction whose {field} drifted")
+    assert _tree_snapshot(root) == before, "refused preview changed Manager state or target"
+    return before
+
+
 def _assert_persisted_seed_drift(root: Path) -> None:
     for field, value in (("profile", "different-profile"), ("release_tag", "different-tag"), ("approval", "invalid")):
-        target = root / field
-        target.mkdir()
-        marker = target / "operator-owned.txt"
-        marker.write_bytes(b"unchanged")
-        paths = ManagerPaths(root / (field + "config"), root / (field + "state"), root / (field + "cache"))
-        for directory in (paths.config_dir, paths.state_dir, paths.cache_dir):
-            directory.mkdir(mode=0o700)
-        InstanceRegistry(paths.registry_path).add(_record(target))
-        transaction = _transaction(target)
-        changed_seed = transaction.seed if field == "approval" else replace(transaction.seed, **{field: value})
-        write_transaction(paths.transaction_path("fixture"), replace(transaction, seed=changed_seed))
-        registry_before = paths.registry_path.read_bytes()
-        transaction_before = paths.transaction_path("fixture").read_bytes()
-        request = ImportRequest("fixture", target, "stable", paths)
-        locks = paths.state_dir / "locks"
-        locks.mkdir(mode=0o700, exist_ok=True)
-        registry_lock = locks / "registry.lock"
-        registry_lock.touch(mode=0o600, exist_ok=True)
-        registry_lock.chmod(0o644)
+        marker, paths, transaction, request, locks = _drift_fixture(root, field)
         before = _tree_snapshot(root)
         preview = enrollment.preview_import(request)
         assert _tree_snapshot(root) == before, "preview changed Manager state or target"
+        _assert_no_import_state(paths)
+        if field != "approval":
+            # The transaction drifts after a clean preview: apply refuses it, and so does a fresh preview.
+            drifted = replace(transaction, seed=replace(transaction.seed, **{field: value}))
+            write_transaction(paths.transaction_path("fixture"), drifted)
+            before = _assert_drifted_preview_refused(request, root, field)
+        registry_before = paths.registry_path.read_bytes()
+        transaction_before = paths.transaction_path("fixture").read_bytes()
         _assert_no_import_state(paths)
         _assert_refused_approval(request, preview.fingerprint, field)
         _assert_only_lock_changes(before, _tree_snapshot(root), locks.relative_to(root))
@@ -203,7 +234,7 @@ def _assert_preview_reads_enrollment(request: ImportRequest) -> None:
 
 def _assert_enrollment() -> None:
     with TemporaryDirectory() as temporary:
-        root = Path(temporary)
+        root = Path(temporary).resolve()
         target = root / "existing"
         target.mkdir()
         paths = ManagerPaths(root / "config", root / "state", root / "cache")
@@ -239,10 +270,9 @@ def _assert_enrollment() -> None:
             enrollment.inspect_existing_install = original
 
 
-
 def _assert_seed_drift() -> None:
     with TemporaryDirectory() as temporary:
-        root = Path(temporary)
+        root = Path(temporary).resolve()
         target = root / "existing"
         target.mkdir()
         paths = ManagerPaths(root / "config", root / "state", root / "cache")
@@ -254,9 +284,8 @@ def _assert_seed_drift() -> None:
         original = enrollment.inspect_existing_install
         enrollment.inspect_existing_install = lambda request, metadata_loader: _inspection(request)
         try:
-            preview = enrollment.preview_import(request)
             try:
-                enrollment.enroll_import(request, preview.fingerprint)
+                enrollment.preview_import(request)
             except ManagedIdentityDriftError:
                 pass
             else:
@@ -268,7 +297,7 @@ def _assert_seed_drift() -> None:
 
 def _assert_real_launcher_enrollment() -> None:
     with TemporaryDirectory() as temporary:
-        root = Path(temporary)
+        root = Path(temporary).resolve()
         target = root / "existing"
         client = target / "client" / "bin" / "fixture"
         client.parent.mkdir(parents=True)
@@ -285,8 +314,13 @@ def _assert_real_launcher_enrollment() -> None:
         write_transaction(paths.transaction_path("fixture"), _transaction(target))
         before = paths.registry_path.read_bytes()
         request = ImportRequest("fixture", target, "stable", paths)
-        with patch.object(Path, "home", return_value=root), patch.object(
-            enrollment, "inspect_existing_install", side_effect=lambda request, metadata_loader: _inspection(request),
+        with (
+            patch.object(Path, "home", return_value=root),
+            patch.object(
+                enrollment,
+                "inspect_existing_install",
+                side_effect=lambda request, metadata_loader: _inspection(request),
+            ),
         ):
             preview = enrollment.preview_import(request)
             assert enrollment.enroll_import(request, preview.fingerprint).status == "already_managed"

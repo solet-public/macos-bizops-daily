@@ -281,8 +281,9 @@ def _check_manifest_destination_shape() -> None:
         "sixth migration pins the four precondition-subset sibling repairs",
     )
     _check(
-        isinstance(migrations, list) and len(migrations) == 20,
-        "twenty shipped migrations including direct LM Studio pgvector reconciliation",
+        isinstance(migrations, list) and len(migrations) == 28,
+        "twenty-eight shipped migrations including direct LM Studio pgvector reconciliation "
+        "and the eight r64 bridges from 19350a8d",
     )
     _check(
         all(
@@ -293,7 +294,7 @@ def _check_manifest_destination_shape() -> None:
         ),
         "shipped destination identities are digest-only",
     )
-    _check(len(load_contract_reconciliations()) == 20, "digest-only manifest parses")
+    _check(len(load_contract_reconciliations()) == 28, "digest-only manifest parses")
 
 
 def _check_digest_tool() -> None:

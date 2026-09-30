@@ -30,7 +30,7 @@ _HISTORICAL_FIXTURES = (
 )
 _MIGRATION_ID = "macos-repository-setup-pgvector-package-postcondition-v1"
 _SOURCE_DIGEST = "sha256:c2a0386e86e0378e694f1793732fac223ec70ff3358e856b54ccf588e51024a4"
-_DESTINATION_DIGEST = "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492"
+_DESTINATION_DIGEST = "sha256:ce20096b3746db9363af96eb0416dd65d2bee96dac615e06c1d6f4d5e5bfd148"
 _ACTIVE_DESTINATION_MIGRATION_IDS = frozenset(
     {
         "macos-repository-setup-pgvector-package-postcondition-v1",
@@ -38,9 +38,21 @@ _ACTIVE_DESTINATION_MIGRATION_IDS = frozenset(
         "macos-lm-studio-provisioning-to-pgvector-package-from-92634d2b-v1",
         "macos-lm-studio-provisioning-to-pgvector-package-from-2b9eb957-v1",
         "macos-lm-studio-provisioning-to-pgvector-package-from-73af1c9d-v1",
+        # r64: one bridge per published stable seed commit that records 19350a8d.
+        "macos-repository-setup-lm-studio-not-recommended-from-1dedebb6-v1",
+        "macos-repository-setup-lm-studio-not-recommended-from-d81e014a-v1",
+        "macos-repository-setup-lm-studio-not-recommended-from-8b3fe23d-v1",
+        "macos-repository-setup-lm-studio-not-recommended-from-85f2994b-v1",
+        "macos-repository-setup-lm-studio-not-recommended-from-6b292e91-v1",
+        "macos-repository-setup-lm-studio-not-recommended-from-ee00d702-v1",
+        "macos-repository-setup-lm-studio-not-recommended-from-1e167174-v1",
+        "macos-repository-setup-lm-studio-not-recommended-from-a5732c9f-v1",
     }
 )
 _SOURCE_BUNDLE_COMMITS = {
+    "sha256:19350a8d3b0b29139afe25b6f11648c0f3f2e1fdb8ca91f81d5bfa1280fc7492": (
+        "dfe109303"
+    ),
     "sha256:515ab65fcf6d82756b3ffc6bf42f782ddc33b69907b5d32a372b019bea6a8e72": (
         "8f12bbd0f"
     ),
@@ -155,7 +167,7 @@ def _assert_grown_postconditions_reset(destination: ContractBundle) -> None:
     _check(
         {migration.migration_id for migration in active_bridges}
         == _ACTIVE_DESTINATION_MIGRATION_IDS,
-        "all five historical reconciliation bridges pin the active candidate destination",
+        "every historical reconciliation bridge pins the active candidate destination",
     )
     for migration in active_bridges:
         if migration.source_digest not in _SOURCE_BUNDLE_COMMITS:

@@ -410,6 +410,9 @@ class ExistingInstallInspectionResult:
     #: Step 7 (CH-3 measured): the anchor that proved the identity when the clone is not at the channel release,
     #: so an enrollment records the identity it proved rather than the installed channel's.
     matched_anchor: InspectionAnchor | None = None
+    #: The listed anchor commits already in HEAD's history, in anchor-table (release) order: the realign
+    #: target a refused hand-merged clone's repair names is the last of them.
+    listed_ancestors: tuple[str, ...] = ()
 
     def to_command_result(self) -> CommandResult:
         exit_code, status, error_kind = _reduce_exit(self.checks, self.classification)
@@ -462,6 +465,7 @@ class ExistingInstallInspectionResult:
             "Existing Solet inspection completed.",
             exit_code,
             error_kind,
+            import_refusal_repair(self),
             data=data,
         )
 
@@ -699,6 +703,7 @@ def _inspect_existing_install_with_metadata(
             checks,
             tracker.snapshot(),
             anchor if isinstance(anchor, InspectionAnchor) and facts.anchor_kind is not InspectionAnchorKind.CURRENT_CHANNEL else None,
+            cast(tuple[str, ...], values.get("listed_ancestors", ())),
         )
     finally:
         target.close()
@@ -737,6 +742,12 @@ def _facts_from_values(
     from ._existing_install_inspection_target import facts_from_values
 
     return facts_from_values(values, metadata)
+
+
+def import_refusal_repair(result: ExistingInstallInspectionResult) -> str | None:
+    from ._existing_install_inspection_repair import import_refusal_repair as _repair
+
+    return _repair(result)
 
 
 def classify_existing_install(facts: ExistingInstallFacts) -> ExistingInstallClassification:

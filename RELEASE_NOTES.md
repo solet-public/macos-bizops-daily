@@ -2,6 +2,168 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-30 — r64: a solet cloned from a stable seed before the Manager can be imported and updated to a working solet; `solet doctor` and `solet start` keep working after a setup-contract change
+
+**Solet Manager manager-v0.1.0-r64.**
+
+To take this release, upgrade the Manager, then update the solet:
+
+1. `brew update && brew tab --installed-on-request python@3.13 && brew upgrade solet`, then `brew list --versions solet`. It prints `solet <release>_<formula revision>`, taken from the `solet-0.1.0-r<release>` archive name (stable r61 prints `solet 61_36`). The release part must be `64` or later.
+2. `solet-manager update <name> --dry-run`. Apply the plan with `solet-manager update <name> --yes --approval-fingerprint <fingerprint>`, using the fingerprint that dry run printed. Repeat both steps until the result is `promoted`.
+
+- **`solet doctor` no longer fails with "Static artifact changed while it was inspected" when unrelated files appear in a
+  parent directory.** The static-artifact reader pinned every directory above the file it reads and compared each one's
+  modification time, change time and link count before and after the read, so any other process creating a file in a
+  shared ancestor, such as the temporary directory, made the check report a change (`iss_239f6d19`). A pinned ancestor
+  directory now has to keep its device, inode and type, so a directory that is replaced still fails; the file that is
+  read keeps the full metadata comparison, so a file modified in place still fails. Check:
+  `python3 solet_cli/tests/existing_solet_diagnostic_smoke.py` exits 0.
+
+- **`solet doctor` and `solet start` keep working after an update changes the setup contract.** When `solet-manager update`
+  promotes a release whose setup contract differs from the one the solet was created with, the promotion now moves the
+  create record's pinned setup-contract digest to the new release's, after backing up both Manager files under the
+  update operation (`iss_0a10e6db`). Before this, both commands refused with `pinned setup contract identity mismatch`
+  after any such update, for example r48 to r56, and `solet reconcile-contract` refuses a completed solet,
+  so there was no repair. The pin moves only for a solet whose setup is complete. It moves only to the digest of the
+  release's own committed contract files, and only from the contract of the create release or of the release the update
+  started from. A setup-incomplete solet still needs its declared `reconcile-contract` step. A contract file edited by
+  hand in the checkout still refuses. A solet that was already updated across such a change is repaired by its next
+  update. Check: after an update across a setup-contract change, `solet doctor <name> --json` reports
+  `data.flow_contract_digest` equal to the new release's digest instead of refusing, and
+  `python3 solet_cli/tests/update_setup_contract_advance_smoke.py` exits 0.
+- **`solet reconcile-contract` works on a setup-incomplete solet after an update changes the setup contract.** An
+  update moves the checkout's setup contract files to the new release's, but a setup-incomplete solet keeps its pin, so
+  `reconcile-contract` read the new files against the old pin and refused with `pinned setup contract identity
+  mismatch`. The solet then had no repair (`iss_eaf1a6c3`). When the checkout's contract no longer matches the pin,
+  `reconcile-contract` now reads the pinned contract from the create release's committed files in the checkout's own
+  Git history, and checks them against the pin. The checkout's contract must also be exactly the reconciliation
+  destination, and the move still needs a declared migration. A contract file edited by hand still refuses and names
+  both digests. A checkout still at its pin is reconciled exactly as before. Check: after an update across a
+  setup-contract change, `solet reconcile-contract <name> --dry-run` reports `preview_ready` instead of refusing, and
+  `python3 solet_cli/tests/contract_reconciliation_after_update_smoke.py` exits 0.
+- **A pre-Manager plain clone of a stable seed can be imported, then updated.** Before this, the Manager's reviewed
+  anchor table held one synthetic test row (`fab22b6f`, a commit not in `solet-public/macos-bizops`,
+  `iss_3272e5f6`) and no real stable seed. So a clone was provable only at the channel's own release commit, and a
+  clone of r43 or r56 was `source_identity_unproven` with no way out (`iss_6494e624`). The table now lists every stable
+  seed in `supported_predecessors` (r43 `8207c151` through r63 `a5732c9f`, now listed), each bound by commit, tree, provenance and
+  seal stamp. `solet-manager inspect` classifies a clone at one of them as importable, and `solet-manager update` then
+  runs every migration from that seed. A clone with a local commit or a hand `git merge` on top of a listed seed is
+  still refused, but `inspect` and `import --dry-run` (now `import_not_allowed` rather than `inspection_failed`) name the
+  newest listed seed in HEAD's history and print one realign command. It keeps your commit on the branch
+  `solet-pre-import-<HEAD[:12]>`, stops if that branch cannot be created, then runs `git reset --mixed <seed>`. That
+  moves HEAD and the index and changes no working file. Every refused classification now carries a repair. An origin of
+  `git@github.com:solet-public/macos-bizops.git`, or the HTTPS form without `.git`, is the canonical repository for
+  inspect, update and doctor. A different owner or repository, a scheme-less URL and a relative path are still
+  refused. Check: `solet-manager inspect --target <clone> --channel stable --json` on a clone at r56 `d81e014a`
+  reports `data.classification.import_disposition` `allow`; on a hand-merged clone it reports a `repair` containing
+  `&& git -C` and `reset --mixed`; and
+  `python3 solet_cli/tests/plain_clone_import_path_smoke.py` exits 0.
+- **An update that adds a plugin with a knowledge base no longer fails with `preservation_violated`.** After the
+  restart, the running solet links the new plugin's knowledge base as `knowledge_bases/<plugin>`. When that link appeared
+  while a post-restart step such as `plugin_cache_refresh` was running, `solet-manager update` blamed the step and
+  stopped with `preservation_violated`, for example partway through the switch from LM Studio to Core AI embeddings
+  (`iss_d22db98a`). The check after each such step now accepts the same link it already accepted at the restart: a new
+  symlink directly under `knowledge_bases/`, named for its plugin and pointing at `../plugins/<plugin>/knowledge_base`.
+  The update records the link as the solet's own write, not the step's. Any other change a step did not declare still
+  fails, including a re-pointed link or a regular file under `knowledge_bases/`. A solet that already stopped this way
+  finishes with `solet-manager reconcile <name> --dry-run`, that preview's `--yes`, and then `solet-manager update <name>`.
+  Check: `python3 solet_cli/tests/real_style_tree_5_smoke.py` exits 0 and prints `CH-48 mid-runtime`.
+
+- **Setup no longer recommends LM Studio for inference.** The inference decision
+  recommends `none`, `apple_foundation_models` and `llama_cpp`. `lm_studio` is still a
+  supported option that an owner can choose (`chg_04232fcc`, `iss_f510b5c9`). The wizard
+  lists it after the recommended options. No flow default changes, because the wizard
+  picks a default only when exactly one option is recommended. No runtime provider
+  binding changes. Check: in `plugins/github_midwife_plugin/knowledge_base/macos_setup_flow.json`,
+  `decisions.inference_implementation.recommended_option_refs` does not contain
+  `lm_studio`, `decisions.inference_implementation.option_source.options.lm_studio.availability`
+  is `supported`, and
+  `python3 solet_cli/tests/lm_studio_inference_not_recommended_wizard_smoke.py` exits 0.
+- **The setup flow's LM Studio text no longer calls it current or recommended.** The
+  embeddings `lm_studio` option now reads "not recommended (Core AI or llama.cpp are)".
+  The inference `lm_studio` option now reads "not the default". The
+  `default_inference_plugin` entry now describes an OpenAI-compatible client for
+  llama.cpp on macOS 26 and for LM Studio when selected. This is the wording r62
+  withdrew. Check: in the same file,
+  `decisions.embeddings_implementation.option_source.options.lm_studio.description`,
+  `decisions.inference_implementation.option_source.options.lm_studio.description` and
+  `plugins.default_inference_plugin.description` contain neither `current` nor an
+  un-negated `recommended`, and
+  `python3 plugins/github_midwife_plugin/tests/embedding_default_doc_truth_smoke.py`
+  exits 0.
+- **The setup contract identity moves to `sha256:ce20096b`, and a solet partway through
+  setup moves with it.** The wording above is in a digested contract file, so the
+  identity changes from `sha256:19350a8d`, which every stable seed from r55 through r63
+  records. The Manager's reconciliation manifest declares one bridge per published stable
+  seed commit at `19350a8d`: `1dedebb6`, `d81e014a`, `8b3fe23d`, `85f2994b`, `6b292e91`,
+  `ee00d702`, `1e167174` and `a5732c9f`. On a setup-incomplete solet from one of those seeds,
+  `solet reconcile-contract NAME --dry-run` previews and `--yes --approval-fingerprint`
+  applies. Every stage, probe and operation status is kept, so setup resumes where it
+  stopped. The five older bridges now target the new identity directly. Check: in
+  `solet_cli/src/solet_manager/released_metadata/contract_reconciliation_manifest.json`,
+  eight `migrations` entries have `source.flow_contract_digest` `sha256:19350a8d…` and
+  `destination.flow_contract_digest` `sha256:ce20096b…`, with empty
+  `stage_probe_mappings` and `operation_statuses_to_reset`. No entry still has
+  `destination.flow_contract_digest` `sha256:19350a8d…`.
+  `python3 solet_cli/tests/contract_reconciliation_lm_studio_not_recommended_smoke.py`
+  exits 0.
+- **`solet-manager update` names a missing Claude Code CLI before it moves the source, and registers a missing
+  coordination-hooks marketplace and installs its hooks the way `solet create` does.** An update needs the `claude` CLI for its plugin-cache refresh. Before, a host
+  without it was refused only by the runtime preview, after `update --yes` had already fast-forwarded the checkout
+  (`iss_646b54b6`). The source `update <name> --dry-run` now refuses `claude_cli_missing` first. It adds a
+  `claude_cli_present` row to `data.host`, and the repair gives the install command, `brew install --cask claude-code`.
+  The update never installs the CLI itself. It looks for `claude` on `PATH`, then in `/opt/homebrew/bin`,
+  `/usr/local/bin` and `$HOME/.local/bin`, where Claude Code's native installer puts it, so a native install is found
+  from a launchd job or a non-login shell whose `PATH` lacks that directory; the seed adapter's `claude` lookup searches
+  the same directories, and the refusal and its repair name every one of them. A solet imported from a plain clone that never ran the coding-agent
+  hydration step had no marketplace file (.claude-plugin/marketplace.json) and no marketplace under its name, so the runtime preview
+  refused `plugin_not_visible` with no command to fix it (`iss_c9a7b626`). When the clone ships its own
+  `coordination-hooks` plugin, the runtime preview now plans the steps and installs the plugin the way `solet create`
+  does (`iss_0744a64a`). It renders the file from the hydration template and pins every bare `python3` hook in the
+  tracked `hooks.json` to `<clone>/.venv/bin/python3`, using create's own interpreter pin. It then runs
+  `claude plugin marketplace add <clone>` and `claude plugin install coordination-hooks@<name>`, and publishes create's
+  coordination receipt. Each step is disclosed, covered by the runtime fingerprint, and runs only when it is still
+  needed. Create adds the marketplace every time; the update adds it only when the name is unregistered. The pin is
+  admitted as the installer's pin, as on a hydrated solet. A same-named marketplace registered from somewhere else is
+  refused as `marketplace_name_foreign` and is never replaced. The clone registered under another name, a marketplace
+  file the renderer did not write, a `.claude-plugin` symlink, an unreadable registry and a failed
+  `claude plugin list` are each refused by their own reason, with the exact command. Nothing is written outside the
+  clone. Known consequence: a later release that edits `hooks.json` refuses as `tracked_overlap_present` on these
+  solets, as it does on hydrated ones (`iss_c1a7df20`). After the update, in the clone:
+  `grep -c '"command": "python3"' plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/hooks.json`
+  prints `0`, the receipt profile/data/coordination-hooks/claude/installation.v1.json exists, and the only new `git status` line
+  is ` M` on that `hooks.json`. A solet that already has both, pinned and with a current receipt,
+  previews exactly as before. Check: `python3 solet_cli/tests/update_runtime_prereqs_preview_smoke.py` exits 0.
+- **`solet-manager update` counts an installed coordination-hooks plugin as current only when its hooks are pinned
+  and its receipt reads back.** Before, the plugin-cache refresh called an installed plugin current as soon as its
+  cache copy matched the clone. It never read the hook-interpreter pin or the coordination receipt (`iss_fa27466f`).
+  A plugin installed by hand with `claude plugin marketplace add` and `claude plugin install` therefore promoted
+  with every hook still bare `python3` and with no receipt. A stale cache was reinstalled without a re-pin or a new
+  receipt, and a receipt publish that failed was never retried. A release that changes a shipped hook file leaves
+  every solet's receipt stale, created solets included, and no update republished it. Without a current receipt,
+  the heartbeat, rotation-watch and wake hooks refuse ownership in a managed session. The refresh is now current
+  only when the cache matches the clone, the tracked `hooks.json` binds every Python hook to
+  `<clone>/.venv/bin/python3`, and the receipt reads back against the cache and the checkout. Otherwise it plans
+  create's pin (only while a hook is still bare), then an uninstall and reinstall (when the cache is stale or the
+  pin has just rewritten `hooks.json`), then create's receipt. Each step is disclosed and covered by the runtime
+  fingerprint. The pin is still admitted only as the installer's pin. A solet that is already pinned and has a
+  current receipt plans nothing, and its fingerprint does not change. A `hooks.json` bound to another interpreter
+  is refused as `hook_interpreter_foreign` and never rewritten. A release that edits `hooks.json` itself still
+  refuses as `tracked_overlap_present` on a pinned solet (`iss_c1a7df20`). Check the same three results as above.
+  Every `claude plugin list --json` read (create's plugin install probe, the receipt publish and read-back, the
+  doctor's plugin probe and the update's cache check) now uses one 64 KiB output limit. Before, three of them used
+  the 4 KiB default. On a host with more than about a dozen Claude plugins, the list was truncated, so create's probe
+  refused `output_truncated` and the receipt could not be published (`iss_8242b14c`).
+  `solet doctor` admits the pin the update writes. Its seed-tree check accepts the Claude `hooks.json` only when its
+  bytes are exactly the installer pin of the committed file and its mode is unchanged. This is the same byte check
+  the Manager's local-state check uses. Before, a solet created with bare hooks warned `tracked_tree_deviation` after
+  every update that pinned them, including an update that registered the marketplace first. A pin to another
+  interpreter, a partial pin, an edited hook or a mode change still warns. The update also records each local-state
+  revision in its own journal write, so this release's new pin is not refused when the running solet creates a
+  knowledge-base link at the same moment.
+  Check: `python3 solet_cli/tests/update_plugin_settled_preview_smoke.py` and
+  `python3 solet_cli/tests/doctor_installer_pin_seed_tree_smoke.py` exit 0.
+
 ## 2026-09-30 — r63: an update carries the create's hydration block in `AGENTS.md` and `CLAUDE.md`; a solet on the previous stable seed can update
 
 **Solet Manager manager-v0.1.0-r63.**

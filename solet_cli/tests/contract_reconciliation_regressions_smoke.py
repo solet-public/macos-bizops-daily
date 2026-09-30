@@ -10,6 +10,7 @@ from contract_reconciliation_smoke import (
     _CONTRACT_PATH,
     _LEGACY_DIGEST,
     _R18_DIGEST,
+    _R64_BRIDGE_SOURCE_DIGEST,
     _RAM_PREFLIGHT_DESTINATION_DIGEST,
     _RAM_PREFLIGHT_SOURCE_COMMIT,
     _RAM_PREFLIGHT_SOURCE_DIGEST,
@@ -222,64 +223,85 @@ def _run_destination_answer_validation_regression() -> None:
             _check(False, "destination answer-schema tightening is refused before preview")
 
 
-def _run_answer_value_migration_regression() -> None:
-    """Every active bridge rewrites the retired source spelling before validation."""
+def _answer_migration_bridges() -> tuple[ContractReconciliation, ...]:
+    """Split the active contract's bridges and return the ones that must rewrite claude_local."""
 
-    active = tuple(
+    bridges = tuple(
         item
         for item in load_contract_reconciliations(manifest_path=_RECONCILIATION_MANIFEST)
         if item.destination_digest == _RAM_PREFLIGHT_DESTINATION_DIGEST
     )
+    # r64 bridges start from 19350a8d, whose contract no longer offers claude_local,
+    # so they carry no answer rewrite; every older active bridge must.
+    r64 = tuple(item for item in bridges if item.source_digest == _R64_BRIDGE_SOURCE_DIGEST)
+    active = tuple(item for item in bridges if item.source_digest != _R64_BRIDGE_SOURCE_DIGEST)
     _check(
         {item.migration_id for item in active} == _ACTIVE_ANSWER_MIGRATION_IDS,
-        "all five active bridges declare the retired Claude source migration",
+        "all five active pre-19350a8d bridges declare the retired Claude source migration",
     )
-    for migration in active:
-        _check(
-            tuple(
-                (item.decision_id, item.from_value, item.to_value)
-                for item in migration.answer_value_migrations
-            )
-            == (("session_sources", "claude_local", "claude_code_local"),),
-            f"{migration.migration_id} declares one canonical Claude source rewrite",
+    _check(
+        len(r64) == 8 and all(item.answer_value_migrations == () for item in r64),
+        "the eight r64 bridges from 19350a8d declare no answer rewrite",
+    )
+    return active
+
+
+def _check_answer_value_migration(migration: ContractReconciliation) -> None:
+    """One active bridge declares, previews and persists the canonical Claude source rewrite."""
+
+    _check(
+        tuple(
+            (item.decision_id, item.from_value, item.to_value)
+            for item in migration.answer_value_migrations
         )
-        with tempfile.TemporaryDirectory() as raw:
-            manager, paths, original = _active_answer_migration_environment(
-                Path(raw),
-                migration,
-                session_sources=["claude_local"],
-            )
-            preview = manager.run("fixture", dry_run=True, approved_fingerprint=None)
-            _check(
-                preview.status == "preview_ready",
-                f"{migration.migration_id} previews a persisted retired Claude source",
-            )
-            prepared = manager._prepare("fixture")
-            _check(
-                prepared.transaction.answers["decisions"]["session_sources"]  # type: ignore[index]
-                == ["claude_code_local"],
-                f"{migration.migration_id} rewrites only the retired Claude source value",
-            )
-            _check(
-                load_transaction(paths.transaction_path("fixture")) == original,
-                f"{migration.migration_id} preview leaves the persisted journal unchanged",
-            )
-            applied = manager.run(
-                "fixture",
-                dry_run=False,
-                approved_fingerprint=str(preview.data["approval_fingerprint"]),
-            )
-            _check(
-                applied.status == "reconciled",
-                f"{migration.migration_id} persists the reviewed answer migration",
-            )
-            updated = load_transaction(paths.transaction_path("fixture"))
-            _check(updated is not None, f"{migration.migration_id} result journal remains readable")
-            assert updated is not None
-            _check(
-                updated.answers["decisions"]["session_sources"] == ["claude_code_local"],  # type: ignore[index]
-                f"{migration.migration_id} stores only the canonical Claude source value",
-            )
+        == (("session_sources", "claude_local", "claude_code_local"),),
+        f"{migration.migration_id} declares one canonical Claude source rewrite",
+    )
+    with tempfile.TemporaryDirectory() as raw:
+        manager, paths, original = _active_answer_migration_environment(
+            Path(raw),
+            migration,
+            session_sources=["claude_local"],
+        )
+        preview = manager.run("fixture", dry_run=True, approved_fingerprint=None)
+        _check(
+            preview.status == "preview_ready",
+            f"{migration.migration_id} previews a persisted retired Claude source",
+        )
+        prepared = manager._prepare("fixture")
+        _check(
+            prepared.transaction.answers["decisions"]["session_sources"]  # type: ignore[index]
+            == ["claude_code_local"],
+            f"{migration.migration_id} rewrites only the retired Claude source value",
+        )
+        _check(
+            load_transaction(paths.transaction_path("fixture")) == original,
+            f"{migration.migration_id} preview leaves the persisted journal unchanged",
+        )
+        applied = manager.run(
+            "fixture",
+            dry_run=False,
+            approved_fingerprint=str(preview.data["approval_fingerprint"]),
+        )
+        _check(
+            applied.status == "reconciled",
+            f"{migration.migration_id} persists the reviewed answer migration",
+        )
+        updated = load_transaction(paths.transaction_path("fixture"))
+        _check(updated is not None, f"{migration.migration_id} result journal remains readable")
+        assert updated is not None
+        _check(
+            updated.answers["decisions"]["session_sources"] == ["claude_code_local"],  # type: ignore[index]
+            f"{migration.migration_id} stores only the canonical Claude source value",
+        )
+
+
+def _run_answer_value_migration_regression() -> None:
+    """Every active bridge rewrites the retired source spelling before validation."""
+
+    active = _answer_migration_bridges()
+    for migration in active:
+        _check_answer_value_migration(migration)
     with tempfile.TemporaryDirectory() as raw:
         manager, _, _ = _active_answer_migration_environment(
             Path(raw),

@@ -310,9 +310,11 @@ def make_seams(fixture_home: Path, host: FakeHost, target: Path) -> RuntimeSeams
         run_ps=host.run_ps,
         run_security=host.run_security,
         # Step 7 section 4.1: the two host-software seams, bound to the building interpreter and to "nothing on PATH"
-        # so no Step 5/6 smoke ever consults the developer's host for Python 3.13, brew, tmux or psql.
+        # so no Step 5/6 smoke ever consults the developer's host for Python 3.13, brew, tmux or psql.  The one
+        # exception is the fixture's own ``claude`` (the path ``_host_probe`` answers), which the source preview
+        # requires (iss_646b54b6).
         resolve_base_python=lambda: Path(sys.executable),
-        which=lambda _name: None,
+        which=lambda name: "/fixture/bin/claude" if name == "claude" else None,
     )
 
 

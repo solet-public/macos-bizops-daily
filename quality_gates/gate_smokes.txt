@@ -5140,6 +5140,7 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: quality_gates/tests/macos_bizops_identity_gate_smoke.py requires workbench/2026-07-09_seed_factory_design.md; workbench/ is never_copy (origin_census)
 # not shipped: solet_cli/tests/contract_reconciliation_schema_smoke.py requires solet_cli/tools/generate_contract_reconciliation_manifest_schema.py; **/tools/ is a pruned operator-tooling class (generator_tooling)
 # not shipped: solet_cli/tests/contract_reconciliation_smoke.py requires repository history for its pinned fixture Git objects; a born clone is a git-archive extract with no .git (repository_hygiene)
+# not shipped: solet_cli/tests/contract_reconciliation_after_update_smoke.py requires repository history; it builds its journal with contract_reconciliation_smoke's _environment, whose pinned fixture Git objects a born clone has no .git to read (repository_hygiene)
 # not shipped: ananta/tests/llm/session_ledger/codex_cloud_backfill_smoke.py requires plugins/codex_cloud_session_source_plugin/src/codex_cloud_session_source_plugin; that plugin is in no capability bundle (unshipped_plugin_subject)
 # not shipped: solet_cli/tests/cold_host_matrix_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/cold_host_matrix_2_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
@@ -5181,6 +5182,11 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/update_plugin_transition_deferral_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin/resources/default_config.json; absent from macos_free_minimal and macos_samantha; its fixture copies that file from the repository into every target (cross_bundle_transition)
 # not shipped: solet_cli/tests/update_transition_bundle_candidates_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builds each bundle's candidate from seed_resolver, and the seed factory is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_stable_r48_predecessor_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it builds its candidate with update_transition_bundle_candidates_smoke's seed_resolver fixture, and the seed factory is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_setup_contract_advance_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/plain_clone_import_path_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_runtime_prereqs_preview_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_plugin_settled_preview_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/doctor_installer_pin_seed_tree_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 
 # LM Studio provisioning, singleton login and passive diagnostics
 plugins/github_midwife_plugin/tests/lm_studio_provisioning_smoke.py
@@ -5243,7 +5249,9 @@ plugins/github_midwife_plugin/tests/existing_install_operations_smoke.py
 # all-zero/all-f hex run, a bare TODO/FIXME/XXX/CHANGEME/PLACEHOLDER/EXAMPLE
 # token), with a narrow evidence-cited allowlist for the one verified,
 # deliberately-synthetic exception (iss_3272e5f6). A self-test proves the
-# scanner actually detects an injected, unallowlisted violation.
+# scanner actually detects an injected, unallowlisted violation. unt_f943227a (r64): the reviewed anchor table lists
+# every real stable supported_predecessors row as a pre_manager_seed anchor, in release order, and the catalog pins its
+# digest (RED on 7a6ca15f0: only the synthetic fab22b6f anchor, so no real seed clone could be imported).
 solet_cli/tests/shipped_predecessor_identity_smoke.py
 
 # WS5 Step 6 (existing-install doctor/resume/promotion, iss_4851c5c8 / chg_54bfee65):
@@ -5501,3 +5509,59 @@ solet_cli/tests/create_applied_edits_doctor_smoke.py
 # candidate's bytes and the ledger follows; a user line inside or outside the block and a mode change still block,
 # a candidate that leaves the block no anchor is refused hydration_block_uncarriable, and a refused or interrupted
 # fast-forward never loses the block. RED on master cfc64c45b (tracked_overlap_present for both populations).
+# iss_0a10e6db (r64): after a real create-origin update across a setup-contract digest move promotes, the create
+# record and its journal are pinned to the candidate's committed contract (backed up first), so v1 doctor, start
+# and status work; controls: a hand-edited contract still refuses, a setup-incomplete create is never re-pinned,
+# an unproven pin is left byte for byte; a crash between the two writes resumes; a solet promoted without the fix
+# is repaired by its next release update.
+# iss_eaf1a6c3 (r64): a setup-incomplete create whose checkout an update moved from its pinned contract A to B
+# reconciles through its declared A -> B bridge, the source read from the create release's committed blobs;
+# controls: a hand-edited moved checkout, committed bytes off the pin, no declared bridge and an absent create
+# release commit each refuse, an unmoved checkout never consults Git, and a stale source stage is rewritten to the
+# committed bytes. RED on master 7a6ca15f0.
+# unt_f943227a (r64): a pre-Manager plain clone at a listed seed imports and updates to promoted; a hand-merged one
+# (Dax's shape) is refused by inspect and import with a realign repair, and following that repair changes no working
+# file and reaches promoted; an unlisted commit, an edited working PROVENANCE.json and a development checkout stay
+# refused, each with a repair; every refusing classification has a repair; an SSH (or .git-less HTTPS) origin is the
+# canonical repository for inspect, update and doctor, while a different owner over SSH is refused. RED on 7a6ca15f0.
+# chg_04232fcc / iss_f510b5c9 (r64): the setup contract moves from 19350a8d to ce20096b when the
+# inference decision stops recommending lm_studio. Every published stable seed commit that records
+# 19350a8d (r55 1dedebb6 through r63 a5732c9f) resolves in one declared hop with no mapping, reset or
+# answer rewrite; a mid-setup journal (a verified stage probe and install_postgresql, LM Studio chosen)
+# keeps every status; the real reconcile-contract preview/apply succeeds for r63 a5732c9f; the two
+# contracts differ only at the four r64 flow paths; the five older sources still reach the active
+# contract; control: an unknown revision at 19350a8d is refused. RED before the manifest entries
+# ("no release-declared contract reconciliation matches this source identity"), GREEN after.
+# Offline, reads shipped files only.
+solet_cli/tests/contract_reconciliation_lm_studio_not_recommended_smoke.py
+# chg_04232fcc (r64): the real plan builder and wizard prompt renderer on a fixed macOS 26 and
+# macOS 27 reading still offer lm_studio for inference as supported, rank it past every recommended
+# option, pick no inference default, and accept an explicit lm_studio choice. RED against the
+# released 19350a8d bytes (--contracts), GREEN after. Offline, no host command runs.
+solet_cli/tests/lm_studio_inference_not_recommended_wizard_smoke.py
+# iss_e8e9b83a (r64): four tracked smokes were neither registered nor excluded, so the registration census
+# failed on base. Each passes offline under the gate environment (SOLET_NAME set, no live solet, model or
+# Postgres): F1 bridge dispatch contract; the model-capability reconcile and refresh selectors (fixture
+# readings only); and the schema-diff classification of an exact NOT NULL relaxation as additive.
+plugins/agent_messaging_plugin/tests/managed_dispatch_f1_bridge_smoke.py
+plugins/agent_messaging_plugin/tests/model_capability_reconcile_smoke.py
+plugins/agent_messaging_plugin/tests/model_capability_refresh_smoke.py
+plugins/postgres_state_management_plugin/tests/schema_diff_nullability_relaxation_smoke.py
+# iss_82a1b1eb / iss_210d69af (r64): the two existing-install smokes fixed this round. Both run on resolved
+# temporary directories with in-process fakes only, so they leave the iss_fb75bf89 exclusion register: the
+# manager CLI keeps its inspect/import/update verbs wired, and a Manager-created name imports as already managed.
+solet_cli/tests/existing_install_inspection_cli_smoke.py
+solet_cli/tests/import_v1_already_managed_smoke.py
+# iss_646b54b6 / iss_c9a7b626 (r64): the source update preview refuses claude_cli_missing (exact install command,
+# nothing written) before the forward-only source step; an imported clone with no coordination-hooks marketplace
+# gets it registered by the runtime stage (hydration's own render, one add, one install) and promotes; controls:
+# both present keeps both fingerprints, a same-named foreign marketplace is refused and left untouched.
+# iss_fa27466f (r64): an installed coordination-hooks plugin is current only when the cache matches, the hooks are
+# pinned and the receipt reads back; otherwise the runtime pins (only while bare), reinstalls and republishes.
+# Controls: a settled clone plans nothing and keeps its fingerprint; a foreign-interpreter pin never promotes.
+# iss_fa27466f (r64): solet doctor's seed-tree check admits the update's installer pin only at its exact bytes and
+# HEAD's mode; a foreign pin, a partial pin, an edited command and a mode change stay tracked_tree_deviation.
+# r64 (combined-battery FAIL 1): the claude CLI check also finds Claude Code's native install in $HOME/.local/bin, in
+# the source preview probe and the seed adapter's resolver alike, after PATH and the Homebrew bins. Controls: no
+# claude anywhere still refuses claude_cli_missing naming every searched directory, PATH still wins, both agree.
+solet_cli/tests/claude_native_location_smoke.py

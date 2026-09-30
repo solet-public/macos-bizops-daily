@@ -8,9 +8,15 @@ probe with the stable ``coding_agent_running`` reason.
 ``existing::migration.export_root_containment`` propagates an
 already-chosen export root to connectors that lack it and is probe-only when
 no root was ever chosen.  ``existing::runtime.plugin_cache_refresh`` compares
-the installed Claude plugin cache copy's hooks against the shipped hooks and
-reinstalls only on a non-empty diff.  The helpers at the bottom are shared
-with ``existing_install_operations``.
+the installed Claude plugin cache copy's hooks against the shipped hooks; the
+refresh is settled only when that diff is empty, the tracked hook manifest is
+pinned to ``<clone>/.venv/bin/python3``, and the coordination receipt reads
+back against the cache and the checkout (create's own probe predicates,
+iss_fa27466f).  Otherwise it pins a still-bare manifest, reinstalls when the
+cache is or will be stale, and republishes the receipt.  When the plugin is
+not visible at all it registers this clone's own marketplace first
+(``coordination_marketplace``, iss_c9a7b626).  The helpers at the bottom are shared with
+``existing_install_operations``.
 """
 
 from __future__ import annotations
@@ -24,10 +30,13 @@ from pathlib import Path
 from typing import cast
 
 from .coordination_hook_installation import hook_root_matches_expected
+from .coordination_marketplace import HOOK_MANIFEST, pin_action, pin_needed, receipt_action
+from .coordination_marketplace import register as register_marketplace
+from .coordination_marketplace import registration as marketplace_registration
 from .export_root_validation import BUSINESS_CONNECTOR_PLUGINS, CONFIG_KEY_EXPORT_ALLOWED_ROOTS, configure_export_root
 from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, evidence, planned_action, result
-from .setup_adapter_runtime import Runtime, resolve_executable
-from .setup_plugin_operations import plugin_list_rows, plugin_list_vector, plugin_row_visible
+from .setup_adapter_runtime import CommandOutcome, Runtime, executable_fallback_directories, resolve_executable
+from .setup_plugin_operations import _claude_receipt_is_current, _manifest_has_absolute_python, _patch_hook_manifest, _publish_claude_receipt, plugin_list_rows, plugin_row_visible, run_plugin_list
 
 STRUCTURED_OUTPUT_LIMIT = 64 * 1024
 _LEGACY_ENV = re.compile(r"^HOMUNCULUS_")
@@ -36,6 +45,12 @@ _LEGACY_ARG = "--homunculus"
 _LEGACY_WAKE = 'AGENT_WAKE_CLI="homunculus"'
 _NEW_WAKE = 'AGENT_WAKE_CLI="solet-bridge"'
 _SHIPPED_HOOKS = Path("plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks")
+#: iss_646b54b6: the update never installs the Claude CLI (install consent, rul_e45fb5b3); it names the command.
+REPAIR_CLAUDE_CLI = (
+    "The Claude Code CLI (`claude`) is not on PATH or in {directories}, and the update never installs it. "
+    "Install it yourself: `brew install --cask claude-code`. Confirm `command -v claude` prints a path in the shell you run "
+    "solet-manager from, then run `solet-manager update {name} --dry-run` again."
+)
 
 
 # --- existing::migration.solet_rename --------------------------------------------
@@ -279,48 +294,130 @@ class CacheFacts:
     visible: bool
     cache_root: Path | None
     current: bool
+    #: iss_c9a7b626 N4: why ``claude plugin list --json`` gave no rows (``None`` when it did); never read as "not visible".
+    list_failure: str | None = None
+    #: iss_fa27466f: every Python hook in the tracked manifest runs ``<clone>/.venv/bin/python3`` (create's probe predicate).
+    pinned: bool = False
+    #: iss_fa27466f: the coordination receipt reads back against this cache and the checkout (create's probe predicate).
+    received: bool = False
+
+    @property
+    def settled(self) -> bool:
+        return self.current and self.pinned and self.received
 
     def evidence(self) -> JsonObject:
-        return facts_evidence("cache.coordination_hooks", {"selector": self.selector, "visible": self.visible, "cache_root": str(self.cache_root) if self.cache_root else "none", "diff_empty": self.current}, verified=self.current)
+        return facts_evidence("cache.coordination_hooks", {"selector": self.selector, "visible": self.visible, "cache_root": str(self.cache_root) if self.cache_root else "none", "diff_empty": self.current, "hooks_pinned": self.pinned, "receipt_current": self.received}, verified=self.settled)
 
 
 def plugin_cache_refresh(request: AdapterRequest, runtime: Runtime) -> JsonObject:
     executable = resolve_executable(runtime, "claude")
     if executable is None:
-        return blocked(request, "claude_cli_missing", "Install the Claude CLI, then re-run.")
+        return blocked(request, "claude_cli_missing", REPAIR_CLAUDE_CLI.format(name=request.name, directories=", ".join(executable_fallback_directories(runtime))))
     facts = _cache_facts(request, runtime, executable)
+    if facts.list_failure is not None:
+        return blocked(request, "claude_plugin_list_failed", f"`claude plugin list --json` did not answer ({facts.list_failure}); the update never plans a registration off a failed read. Run it yourself, fix what it reports, then run `solet-manager update {request.name} --dry-run` again.")
     items = [facts.evidence()]
-    if request.phase == "probe":
-        if facts.current:
+    if facts.settled:
+        if request.phase == "probe":
             return result(request, status="verified", evidence_items=items)
-        if not facts.visible:
-            return blocked(request, "plugin_not_visible", f"{facts.selector} is not installed; run the coding-agent hydration step.")
-        actions = [planned_action(action_id="cache.reinstall", title=f"Uninstall and reinstall {facts.selector} so the cache copy matches the shipped hooks", mutation_kind="plugin_cache_write", target=str(facts.cache_root), evidence_ref="cache.coordination_hooks")]
-        return _pending_or_verified(request, items, False, "Refresh the plugin cache.", actions)
-    if facts.current:
         return result(request, status="applied", retry_safe=True, evidence_items=items)
-    return _cache_reinstall(request, runtime, facts, items)
+    if not facts.visible:
+        return _register_marketplace(request, runtime, facts, items)
+    return _settle(request, runtime, facts, items)
+
+
+def _settle(request: AdapterRequest, runtime: Runtime, facts: CacheFacts, items: list[JsonObject]) -> JsonObject:
+    """iss_fa27466f: visible but unsettled; pin a bare manifest, reinstall a stale (or about to be stale) cache, republish the receipt."""
+    pin = pin_needed(request)
+    refusal = _settle_refusal(request, facts, pin)
+    if refusal is not None:
+        return refusal
+    pinning = pin is True
+    # Pinning rewrites the tracked manifest, so the cache copy of it goes stale and is reinstalled too.
+    reinstall = pinning or not facts.current
+    if request.phase == "probe":
+        return _pending_or_verified(request, items, False, "Pin the hook interpreter, refresh the plugin cache and publish the coordination receipt.", _settle_actions(request, facts, pinning, reinstall))
+    failed = _apply_settle(request, runtime, facts, pinning, reinstall)
+    return failed if failed is not None else result(request, status="applied", retry_safe=True, evidence_items=items)
+
+
+def _settle_refusal(request: AdapterRequest, facts: CacheFacts, pin: bool | tuple[str, str]) -> JsonObject | None:
+    """An unreadable manifest, or one with no bare hook that binds another interpreter; never rewritten."""
+    if isinstance(pin, tuple):
+        return blocked(request, pin[0], pin[1])
+    if pin or facts.pinned:
+        return None
+    manifest = request.target / HOOK_MANIFEST
+    return blocked(request, "hook_interpreter_foreign", f"{manifest} binds its Python hooks to an interpreter other than {request.target / '.venv/bin/python3'}; the update never rewrites another interpreter's pin. Inspect `grep -n '\"command\"' {manifest}`, then run `solet-manager update {request.name} --dry-run` again.")
+
+
+def _settle_actions(request: AdapterRequest, facts: CacheFacts, pinning: bool, reinstall: bool) -> list[JsonObject]:
+    actions = [pin_action(request.target)] if pinning else []
+    if reinstall:
+        actions.append(planned_action(action_id="cache.reinstall", title=f"Uninstall and reinstall {facts.selector} so the cache copy matches the shipped hooks", mutation_kind="plugin_cache_write", target=str(facts.cache_root), evidence_ref="cache.coordination_hooks"))
+    actions.append(receipt_action(request.target))
+    return actions
+
+
+def _apply_settle(request: AdapterRequest, runtime: Runtime, facts: CacheFacts, pinning: bool, reinstall: bool) -> JsonObject | None:
+    """Create's order: pin, reinstall, publish; the first refusal, or ``None`` once the receipt is published."""
+    if pinning and (pin_error := _patch_hook_manifest(request.target / HOOK_MANIFEST, request.target, runtime)) is not None:
+        return blocked(request, "hook_manifest_invalid", pin_error)
+    refused = _cache_reinstall(request, runtime, facts) if reinstall else None
+    if refused is not None:
+        return refused
+    receipt_error = _publish_claude_receipt(request, runtime, facts.executable, request.name.replace("_", "-"), facts.selector)
+    if receipt_error is not None:
+        return blocked(request, "coordination_receipt_invalid", f"The coordination receipt was not published ({receipt_error}); inspect `claude plugin list`, then run `solet-manager update {request.name} --dry-run` again.")
+    return None
+
+
+def _register_marketplace(request: AdapterRequest, runtime: Runtime, facts: CacheFacts, items: list[JsonObject]) -> JsonObject:
+    """iss_c9a7b626: the plugin is not visible; register this clone's own marketplace and install, or refuse exactly."""
+    plan = marketplace_registration(request, runtime, facts.selector)
+    if plan.error_kind is not None:
+        return blocked(request, plan.error_kind, cast(str, plan.repair))
+    if request.phase == "probe":
+        return _pending_or_verified(request, items, False, f"Register this clone's marketplace and install {facts.selector}.", plan.actions(request.target))
+    failed = register_marketplace(request, runtime, facts.executable, plan)
+    if failed is not None:
+        return blocked(request, failed[0], f"A registration step failed ({failed[0]}: {failed[1]}); inspect `claude plugin marketplace list` and `claude plugin list`, then run `solet-manager update {request.name} --dry-run` again.")
+    return result(request, status="applied", retry_safe=True, evidence_items=items)
 
 
 def _cache_facts(request: AdapterRequest, runtime: Runtime, executable: str) -> CacheFacts:
     marketplace = request.name.replace("_", "-")
     selector = f"coordination-hooks@{marketplace}"
-    listed = runtime.run(plugin_list_vector("claude", marketplace, executable), timeout_seconds=10, output_limit=STRUCTURED_OUTPUT_LIMIT)
+    _vector, listed = run_plugin_list(runtime, "claude", marketplace, executable)
     rows = plugin_list_rows("claude", listed)
-    visible = rows is not None and any(plugin_row_visible("claude", row, selector) for row in rows)
+    if rows is None:
+        return CacheFacts(executable, selector, False, None, False, list_failure=_list_failure(listed))
+    visible = any(plugin_row_visible("claude", row, selector) for row in rows)
     cache_root = _cache_root(runtime, selector)
     current = visible and cache_root is not None and hook_root_matches_expected(cache_root / "hooks", request.target / _SHIPPED_HOOKS)
-    return CacheFacts(executable, selector, visible, cache_root, current)
+    pinned = _manifest_has_absolute_python(request.target / HOOK_MANIFEST, request.target)
+    received = current and _claude_receipt_is_current(request, runtime, executable, marketplace, selector)
+    return CacheFacts(executable, selector, visible, cache_root, current, pinned=pinned, received=received)
 
 
-def _cache_reinstall(request: AdapterRequest, runtime: Runtime, facts: CacheFacts, items: list[JsonObject]) -> JsonObject:
+def _list_failure(listed: CommandOutcome) -> str:
+    """Exit code, timeout/truncation and stderr of a ``plugin list`` that yielded no parseable rows."""
+    state = "timed out" if listed.timed_out else f"exit {listed.returncode}"
+    if listed.ok:
+        state += ", stdout truncated" if listed.stdout_truncated else ", stdout is not a JSON list"
+    stderr = listed.stderr.strip()[:400]
+    return f"{state}; stderr: {stderr!r}" if stderr else state
+
+
+def _cache_reinstall(request: AdapterRequest, runtime: Runtime, facts: CacheFacts) -> JsonObject | None:
+    """Uninstall and reinstall the plugin; the refusal, or ``None`` once the CLI reinstalled it."""
     removed = runtime.run((facts.executable, "plugin", "uninstall", facts.selector), timeout_seconds=request.timeout_seconds, cwd=request.target)
     if not removed.ok:
         return blocked(request, "claude_plugin_uninstall_failed", "The Claude CLI refused the uninstall; inspect its output.")
     installed = runtime.run((facts.executable, "plugin", "install", facts.selector), timeout_seconds=request.timeout_seconds, cwd=request.target)
     if not installed.ok:
         return blocked(request, "claude_plugin_install_failed", "The Claude CLI refused the reinstall; inspect its output.")
-    return result(request, status="applied", retry_safe=True, evidence_items=items)
+    return None
 
 
 def _cache_root(runtime: Runtime, selector: str) -> Path | None:

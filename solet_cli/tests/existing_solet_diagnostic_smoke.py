@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable
+from functools import partial
 from itertools import product
 from pathlib import Path
 
@@ -342,6 +343,76 @@ def _static_reader_checks() -> None:
             "non-UTF-8 artifact fails closed",
             observed=non_utf8_result.status,
         )
+    _static_reader_ancestor_checks()
+
+
+# The static reader pins every directory above the file it reads. These fixtures nest the artifact
+# three directories deep so each pinned ancestor level can be disturbed on its own.
+def _nested_artifact(root: Path, name: str) -> Path:
+    artifact = root / name / "outer" / "inner" / "schema.json"
+    artifact.parent.mkdir(parents=True)
+    _write_json(artifact, _projection_document())
+    return artifact
+
+
+# Read the artifact while `mutate` runs right after the reader first stats the regular file, so the
+# change lands between the open and the stability pass; the trigger must have run for the case to count.
+def _read_mutated(artifact: Path, mutate: Callable[[Path], None], label: str) -> DiagnosticCheck:
+    result, triggered = _with_regular_fstat_trigger(partial(_inspect_projection, artifact), partial(mutate, artifact))
+    _check(triggered, f"mutation trigger executed ({label})")
+    return result
+
+
+# Unrelated siblings in every ancestor: the only thing that changes is directory mtime/ctime/nlink.
+def _add_unrelated_entries(artifact: Path) -> None:
+    for ancestor in artifact.parents[:4]:
+        (ancestor / "unrelated.txt").write_bytes(b"unrelated")
+        (ancestor / "unrelated-dir").mkdir()
+
+
+# Rename the ancestor away and rebuild the same path with the same bytes: a new inode, same content.
+def _replace_ancestor(artifact: Path, level: int) -> None:
+    content, replaced = artifact.read_bytes(), artifact.parents[level - 1]
+    replaced.rename(replaced.with_name(replaced.name + "-moved"))
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(content)
+
+
+# Write the read file's own bytes back in place, then force a different mtime. Opened for append the
+# size, mtime and ctime move; opened for update only mtime and ctime move (the size is identical).
+def _modify_in_place(artifact: Path, mode: str) -> None:
+    content = artifact.read_bytes()
+    with artifact.open(mode) as handle:
+        handle.write(content)
+    os.utime(artifact, ns=(1, 1))
+
+
+def _static_reader_ancestor_checks() -> None:
+    """Only the read file keeps a full metadata compare; a path ancestor keeps its identity."""
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw).resolve()
+        # Unrelated entries in every pinned ancestor must not fail a read of the one file (the shared
+        # temp or parent directory case).
+        busy = _read_mutated(_nested_artifact(root, "busy"), _add_unrelated_entries, "unrelated ancestor entries")
+        _check(
+            busy.status is DiagnosticStatus.VERIFIED,
+            "unrelated entries appearing in pinned ancestor directories do not fail the read",
+            observed=busy.status,
+        )
+        # Controls: a replaced ancestor is a new inode, and the read file keeps the full compare.
+        controls = (
+            ("a replaced pinned parent directory", "swap-parent", partial(_replace_ancestor, level=1)),
+            ("a replaced pinned grandparent directory", "swap-grandparent", partial(_replace_ancestor, level=2)),
+            ("a pinned file appended in place", "appended", partial(_modify_in_place, mode="ab")),
+            ("a pinned file rewritten in place with identical size", "rewritten", partial(_modify_in_place, mode="r+b")),
+        )
+        for label, name, mutation in controls:
+            result = _read_mutated(_nested_artifact(root, name), mutation, label)
+            _control(
+                result.status is DiagnosticStatus.FAILED and "changed while it was inspected" in str(result.summary),
+                f"{label} still fails closed",
+                observed=(result.status, result.summary),
+            )
 
 
 def _process_projection_checks() -> None:

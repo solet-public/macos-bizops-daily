@@ -20,11 +20,13 @@ from .contract_reconciliation_receipts import (
 from .contracts import (
     ContractBundle,
     ContractReconciliation,
+    contract_digest,
     contract_filenames,
     load_contract_reconciliations,
     load_reconciliation_destination_bundle,
     target_contract_directory,
 )
+from .create_contract_advance import committed_contract_files
 from .errors import ContractError, ManagerError, ProbeDriftError, StateConflictError, StateError
 from .models import CommandResult, ExitCode, InstanceRecord, JsonValue
 from .paths import ManagerPaths
@@ -123,15 +125,8 @@ class ContractReconciliationManager:
         target = Path(record.target)
         _validate_pinned_identity(record, transaction, target)
         _validate_projection(transaction, target)
-        source_bundle = ContractBundle.load(
-            source_revision=transaction.flow_source_revision,
-            directory=target_contract_directory(target),
-            expected_digest=transaction.flow_contract_digest,
-            resume_compatibility=True,
-        )
-        destination_bundle = load_reconciliation_destination_bundle(
-            source_revision=transaction.flow_source_revision,
-            development_directory=self._contract_directory,
+        source_bundle, destination_bundle = _contract_bundles(
+            self._paths, record, transaction, target, self._contract_directory
         )
         reconciliation = _select_reconciliation(
             transaction,
@@ -333,6 +328,85 @@ def reconciliation_recovery_pending(paths: ManagerPaths, name: str) -> bool:
         return False
     _, state = _parse_receipt(raw, name)
     return state == "prepared"
+
+
+def _contract_bundles(
+    paths: ManagerPaths,
+    record: InstanceRecord,
+    transaction: Transaction,
+    target: Path,
+    development_directory: Path | None,
+) -> tuple[ContractBundle, ContractBundle]:
+    """The source and destination bundles; the source is the working tree only while it is still at the pin.
+
+    An update fast-forwards the checkout, so after a setup-contract move the working tree carries the candidate's
+    contract, not the pinned one (iss_eaf1a6c3).  The source is then the create release's committed contract,
+    loaded against the same pin, and the moved working tree must be exactly the destination.
+    """
+
+    working = _working_contract_digest(target)
+    if working is None or working == transaction.flow_contract_digest:
+        source_bundle = ContractBundle.load(
+            source_revision=transaction.flow_source_revision,
+            directory=target_contract_directory(target),
+            expected_digest=transaction.flow_contract_digest,
+            resume_compatibility=True,
+        )
+        return source_bundle, _destination_bundle(transaction, development_directory)
+    destination_bundle = _destination_bundle(transaction, development_directory)
+    _require(
+        working == destination_bundle.contract_digest,
+        ContractError(
+            "moved setup contract is not the reconciliation destination: "
+            f"recorded={transaction.flow_contract_digest}, working_tree={working}, "
+            f"destination={destination_bundle.contract_digest}",
+            repair=(
+                "Restore the managed target's contract files to the updated release's committed bytes; "
+                "reconciliation moves the pin only to the contract the checkout carries."
+            ),
+        ),
+    )
+    return _committed_source_bundle(paths, record, transaction, target), destination_bundle
+
+
+def _working_contract_digest(target: Path) -> str | None:
+    """The checkout's contract digest, or ``None`` when it cannot be hashed; the pinned load then reports why."""
+
+    try:
+        return contract_digest(target_contract_directory(target))
+    except ContractError:
+        return None
+
+
+def _destination_bundle(
+    transaction: Transaction, development_directory: Path | None
+) -> ContractBundle:
+    return load_reconciliation_destination_bundle(
+        source_revision=transaction.flow_source_revision,
+        development_directory=development_directory,
+    )
+
+
+def _committed_source_bundle(
+    paths: ManagerPaths,
+    record: InstanceRecord,
+    transaction: Transaction,
+    target: Path,
+) -> ContractBundle:
+    """Stage the create release's committed contract privately and load it against the pin; a mismatch refuses."""
+
+    stage = paths.cache_dir / "contract-reconciliation-source" / record.name
+    ensure_private_directory(stage)
+    for filename, value in committed_contract_files(
+        target, record.seed_commit, contract_filenames()
+    ).items():
+        atomic_replace_bytes(stage / filename, value, mode=0o600)
+    return ContractBundle.load(
+        source_revision=transaction.flow_source_revision,
+        directory=stage,
+        expected_digest=transaction.flow_contract_digest,
+        resume_compatibility=True,
+    )
 
 
 def _select_reconciliation(

@@ -100,6 +100,7 @@ from .models import (
     ObservedProvenanceIdentity,
     ReleaseIdentity,
 )
+from .origin_identity import only_names_repository
 from .paths import ManagerPaths, update_candidate_cache
 from .release_lock import seed_lock_from_fields
 from .seed_lock_parser import SeedLockFields
@@ -987,7 +988,7 @@ class _Execution:
             and facts.anchor_kind is InspectionAnchorKind.CURRENT_CHANNEL
             and facts.detached is ObservedBoolean.FALSE
             and facts.branch == branch
-            and facts.origins == (self.record.channel.canonical_repository,)
+            and only_names_repository(facts.origins, self.record.channel.canonical_repository)
         )
         if not exact:
             raise SourceTransitionIncompleteError(
@@ -1003,7 +1004,7 @@ class _Execution:
             self.last_observed = report.observed
         return report
 
-    def rebaseline_local_state(self, journal: dict[str, JsonValue], operation_id: str, declared: frozenset[str]) -> tuple[dict[str, JsonValue], dict[str, JsonValue]] | None:
+    def rebaseline_local_state(self, journal: dict[str, JsonValue], operation_id: str, declared: frozenset[str]) -> tuple[tuple[dict[str, JsonValue], ...], dict[str, JsonValue]] | None:
         """Section 6.6, the per-operation carve-out (see :func:`rebaseline_revision`); re-inspects the target first."""
         result = _inspect(self.request, self.record, self.descriptor.metadata)
         observed = observe_local_state(_target_path(self.record), result.facts)

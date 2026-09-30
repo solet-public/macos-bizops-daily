@@ -129,19 +129,29 @@ def _which(runtime: Runtime, target: str) -> str | None:
     return candidate
 
 
+def executable_fallback_directories(runtime: Runtime) -> tuple[str, ...]:
+    """The fixed directories tried after PATH, in order: the Homebrew bins, then ``$HOME/.local/bin``.
+
+    The last is where Claude Code's native installer puts ``claude``; it is based on the runtime's own home, the
+    invoking user's.  ``solet_manager.host_software.claude_search_directories`` searches the same directories."""
+
+    return (*_HOMEBREW_BIN_DIRECTORIES, str(runtime.home / ".local" / "bin"))
+
+
 def resolve_executable(runtime: Runtime, name: str) -> str | None:
     """Resolve one approved executable through the platform-owned lookup tool.
 
-    Falls back to the standard Homebrew bin directories when a bare lookup
-    fails, mirroring bootstrap_adapter.protocol.resolve_executable -- this
-    runtime's PATH is restricted the same way the pre-venv bootstrap
-    adapter's is, so a Homebrew-installed executable absent from PATH would
-    otherwise be misreported as unresolved even when it genuinely installed."""
+    Falls back to the standard Homebrew bin directories, then the user's
+    ``~/.local/bin``, when a bare lookup fails, mirroring
+    bootstrap_adapter.protocol.resolve_executable -- this runtime's PATH is
+    restricted the same way the pre-venv bootstrap adapter's is, so an
+    executable absent from PATH would otherwise be misreported as unresolved
+    even when it genuinely installed."""
 
     direct = _which(runtime, name)
     if direct is not None:
         return direct
-    for directory in _HOMEBREW_BIN_DIRECTORIES:
+    for directory in executable_fallback_directories(runtime):
         candidate = _which(runtime, f"{directory}/{name}")
         if candidate is not None:
             return candidate

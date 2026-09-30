@@ -25,10 +25,23 @@ A self-test (``_check_detects_unallowlisted_injection``) proves the scanner
 is live: it copies one shipped file into a temp directory, injects a fresh,
 unallowlisted placeholder UUID, and asserts the scan flags exactly that copy
 while leaving the real shipped tree byte-identical and unaffected.
+
+``_anchor_parity_failures`` binds the Manager's reviewed anchor table to the
+flow's ``supported_predecessors``, EVERY row: the whole anchor list (every kind
+and channel) must equal, in order, one ``pre_manager_seed`` stable anchor per
+flow row carrying that row's exact commit, tree, provenance and stamp, named
+``legacy_anchor_id`` for a legacy row and ``stable-seed-<commit[:12]>``
+otherwise; and the catalog must pin the table's digest. Without a real row a
+plain clone at that seed is ``source_identity_unproven`` and cannot be imported
+at all (the pre-Manager plain-clone dead end, unt_f943227a). Its self-test runs
+the mutants a digest re-pin cannot hide: M8 (the legacy row's commit altered),
+M9 (an extra ``legacy_provenance`` anchor) and a dropped real row; each must
+fail.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Iterator
@@ -154,9 +167,84 @@ def _check_detects_unallowlisted_injection() -> None:
     _check(source.read_bytes() == original_bytes, "the real shipped file was never touched by the injection test")
 
 
+def _expected_anchor(row: dict[str, Any]) -> dict[str, Any]:
+    legacy = row["legacy_anchor_id"]
+    return {
+        "anchor_id": legacy if legacy is not None else "stable-seed-" + row["commit"][:12],
+        "anchor_kind": "pre_manager_seed",
+        "channel_id": "stable",
+        "repository": row["repository"],
+        "commit": row["commit"],
+        "tree_hash": row["tree"],
+        "provenance_sha256": row["provenance_sha256"],
+        "seed_id": row["seed_id"],
+        "origin_id": row["origin_id"],
+        "manifest_sha256": row["manifest_sha256"],
+        "channel_relation": "fast_forward",
+        "transition_paths": [],
+    }
+
+
+_METADATA = Path("solet_cli") / "src" / "solet_manager" / "released_metadata"
+_ANCHORS = _METADATA / "existing_install_inspection_anchors.v1.json"
+_CATALOG = _METADATA / "existing_install_inspection_catalog.v1.json"
+_FLOW = Path("plugins") / "github_midwife_plugin" / "knowledge_base" / "existing_install_flow.json"
+
+
+def _anchor_parity_failures(root: Path) -> list[str]:
+    anchors_raw = (root / _ANCHORS).read_bytes()
+    anchors: list[dict[str, Any]] = json.loads(anchors_raw)["anchors"]
+    expected = [_expected_anchor(row) for row in json.loads((root / _FLOW).read_text(encoding="utf-8"))["supported_predecessors"]]
+    failures: list[str] = []
+    if anchors != expected:
+        failures.append("the anchor table is not exactly one anchor per supported_predecessors row, in order; expected:\n" + json.dumps(expected, indent=2))
+    pinned = {row["channel_id"]: row["anchor_table_sha256"] for row in json.loads((root / _CATALOG).read_text(encoding="utf-8"))["channels"]}
+    if pinned.get("stable") != hashlib.sha256(anchors_raw).hexdigest():
+        failures.append("the catalog does not pin the anchor table's exact digest")
+    return failures
+
+
+def _mutated_root(tmp: Path, name: str, mutate: Any) -> Path:
+    """A copy of the three bound files with ``mutate`` applied to the anchor rows and the digest re-pinned."""
+    root = tmp / name
+    for relative in (_ANCHORS, _CATALOG, _FLOW):
+        (root / relative).parent.mkdir(parents=True, exist_ok=True)
+        (root / relative).write_bytes((_ROOT / relative).read_bytes())
+    document = json.loads((root / _ANCHORS).read_bytes())
+    mutate(document["anchors"])
+    raw = (json.dumps(document, indent=2) + "\n").encode()
+    (root / _ANCHORS).write_bytes(raw)
+    catalog = json.loads((root / _CATALOG).read_bytes())
+    catalog["channels"][0]["anchor_table_sha256"] = hashlib.sha256(raw).hexdigest()
+    (root / _CATALOG).write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+    return root
+
+
+def _m8_alter_legacy_commit(rows: list[dict[str, Any]]) -> None:
+    rows[0]["commit"] = "1" + rows[0]["commit"][1:]
+
+
+def _m9_extra_legacy_provenance(rows: list[dict[str, Any]]) -> None:
+    rows.append({**rows[0], "anchor_id": "stable-legacy-extra", "anchor_kind": "legacy_provenance", "channel_relation": "legacy_bridge_required", "provenance_sha256": None})
+
+
+def _drop_real_row(rows: list[dict[str, Any]]) -> None:
+    rows.pop()
+
+
+def _check_anchor_table_lists_every_supported_predecessor() -> None:
+    failures = _anchor_parity_failures(_ROOT)
+    _check(not failures, "; ".join(failures))
+    with TemporaryDirectory() as tmp:
+        for name, mutate in (("M8", _m8_alter_legacy_commit), ("M9", _m9_extra_legacy_provenance), ("dropped_real_row", _drop_real_row)):
+            mutated = _anchor_parity_failures(_mutated_root(Path(tmp), name, mutate))
+            _check(mutated and all("digest" not in failure for failure in mutated), f"{name}: a re-pinned mutant fails parity on its rows: {mutated}")
+
+
 def main() -> int:
     _check_detects_unallowlisted_injection()
     _check_shipped_tree_is_clean_or_allowlisted()
+    _check_anchor_table_lists_every_supported_predecessor()
     print(f"shipped_predecessor_identity_smoke OK: {_checks} checks passed")
     return 0
 

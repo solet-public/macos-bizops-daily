@@ -8,7 +8,7 @@ Article Role: operations_runbook
 
 Article Tags: planning-stage:solet-lifecycle, evidence-category:operations-runbook, domain:local-solet, domain:client-deployment, consumer_profile:both
 
-Embedding Description: Agent-facing runbook for applying a newer seed release to an ALREADY-LIVE seed-born solet without losing its state, now led by the Solet Manager path — install the Manager from its Homebrew tap, classify the clone with `solet-manager inspect`, enroll it once with `solet-manager import`, then for every release run `solet-manager update --dry-run` to read the preview (which lists the genesis-written files and untracked genesis paths it will preserve, the exact fast-forward, the dependency, migration, hydration and lifecycle operations it will perform) and `--yes --approval-fingerprint` to apply it through the final doctor and promotion, with `solet-manager doctor` as the read-only oracle and `solet-manager reconcile` as the one answer to a terminal update — including the exact refusal vocabulary (`history_diverged`, `tracked_overlap_present`, `staged_changes_present`, `tracked_shape_changed`, `executed_code_modified`, `git_metadata_present`, `host_requirement_missing`, `source_identity_unproven`) and what each exit code means, the six steps that stay manual and why (the target `AGENTS.md`/`CLAUDE.md` hydration block and launchers, the first-time export-root answer, quitting Claude Code before the rename migration can rewrite `~/.claude.json`, relaunching open clients and re-arming watchers, adding a release-added plugin to the profile manifest, connector three-read and feedback-item checks), how an adopter learns a new re-mint exists (the formula upgrade plus the GitHub release subscription, re-pointed when the seed moves homes), and the legacy manual procedure retained verbatim as recovery for clones the Manager classifies as not importable (diverged history, development checkout) or for an instance the operator chooses to repair by hand.
+Embedding Description: Agent-facing runbook for applying a newer seed release to an ALREADY-LIVE seed-born solet without losing its state, now led by the Solet Manager path — install the Manager from its Homebrew tap, classify the clone with `solet-manager inspect`, enroll it once with `solet-manager import`, then for every release run `solet-manager update --dry-run` to read the preview (which lists the genesis-written files and untracked genesis paths it will preserve, the exact fast-forward, the dependency, migration, hydration and lifecycle operations it will perform) and `--yes --approval-fingerprint` to apply it through the final doctor and promotion, with `solet-manager doctor` as the read-only oracle and `solet-manager reconcile` as the one answer to a terminal update — including the exact refusal vocabulary (`history_diverged`, `tracked_overlap_present`, `staged_changes_present`, `tracked_shape_changed`, `executed_code_modified`, `git_metadata_present`, `host_requirement_missing`, `claude_cli_missing`, `source_identity_unproven`) and what each exit code means, the six steps that stay manual and why (the target `AGENTS.md`/`CLAUDE.md` hydration block and launchers, the first-time export-root answer, quitting Claude Code before the rename migration can rewrite `~/.claude.json`, relaunching open clients and re-arming watchers, adding a release-added plugin to the profile manifest, connector three-read and feedback-item checks), how an adopter learns a new re-mint exists (the formula upgrade plus the GitHub release subscription, re-pointed when the seed moves homes), and the legacy manual procedure retained verbatim as recovery for clones the Manager classifies as not importable (diverged history, development checkout) or for an instance the operator chooses to repair by hand.
 
 > **Status (2026-09-19, existing-solet import/update Step 7):** the Manager
 > path (Part A) is the update procedure. The manual procedure this document
@@ -151,6 +151,41 @@ These are `solet-manager` verbs. `solet --help` does not list `import`, `update`
 or this `inspect`, and `solet update` / `solet import` refuse with a pointer to
 the `solet-manager` command. `solet inspect` is a different, active probe.
 
+**A pre-Manager plain clone (a `git clone` of the seed, not `solet create`), r64.**
+The Manager proves a plain clone only at a seed commit it lists: the
+channel's own release, or a stable seed in its reviewed anchor table (every
+`supported_predecessors` row, r43 `8207c151` through r63 `a5732c9f`).
+`git -C <clone> rev-parse HEAD` tells you which case you have:
+
+1. HEAD is a listed seed commit: run the six commands below unchanged.
+   `inspect` answers `pre_manager_seed_clone` or `local_changes_present`
+   with `allow`, and `update` runs every migration from that seed.
+2. HEAD is your own commit on top of a listed seed (a local commit, or a
+   hand `git merge` of a newer seed, as on Dax): `inspect` answers
+   `source_identity_unproven`, and `import --dry-run` refuses
+   `import_not_allowed`. Both results carry a `repair` that names the
+   newest listed seed in HEAD's history. Follow it exactly. It never
+   changes a working file:
+   - back up the directory;
+   - run the repair's one command, as printed: `git -C <clone> branch
+     solet-pre-import-<HEAD[:12]> <HEAD> && git -C <clone> reset --mixed
+     <seed> && git -C <clone> status --short`. It keeps your commit on a
+     branch named for it, and stops before the reset if that branch cannot
+     be created. The reset moves HEAD and the index only. The status then
+     lists what your commits changed: edited files as `M`, added files as
+     `??`. The path is already shell-quoted;
+   - run the six commands below.
+   Do not fast-forward the clone to the channel release by hand. The
+   Manager would then see a zero-delta update (`verify_preview_ready`): it
+   still probes every migration, but removes none of the knowledge articles
+   the skipped releases dropped.
+3. No listed seed is HEAD or in its history (another repository, a fork, a
+   development checkout): not importable. Re-birth.
+
+An `origin` of `git@github.com:solet-public/macos-bizops.git` (SSH), or the
+HTTPS URL with or without `.git`, is the canonical repository. The Manager
+never fetches from `origin`, so SSH needs no keys and is never rewritten.
+
 ```bash
 HOMEBREW_NO_INSTALL_UPGRADE=1 brew install python@3.13 solet-public/tap/solet   # once; an 'already installed' line for python@3.13 is expected; for every later release run: brew tab --installed-on-request python@3.13 && brew upgrade solet
 solet-manager inspect --target <clone> --channel stable   # classify; exit 3 attention_required is the normal answer for a real clone
@@ -216,8 +251,90 @@ added inside or outside the block, or a mode change, is still
 | `executed_code_modified` | an edit under `bootstrap.py`, `bootstrap_adapter/`, an editable-installed distribution or a roster plugin, other than the installer's own interpreter pin | `git diff -- <path>` in the clone shows the local edit: undo only that edit (keep the installer's interpreter pin in a hook manifest) or move the change out of the tree, then preview again; the Manager will not execute a modified target |
 | `git_metadata_present` | `.gitattributes`/`.gitmodules` anywhere, or an edited tracked root `.gitignore` | remove it; it changes how the fast-forward writes files |
 | `preserved_surface_in_transition` | the candidate ships something under `profile/` | seed-side regression; file feedback, do not repair the clone |
-| `source_identity_unproven` | `origin` names a URL the descriptor does not declare as an allowed migration | Part C, Step 2a (manual re-point) |
-| `host_requirement_missing` / `host_requirement_unknown` | the host lacks Python 3.13 (`data.host` names the row) | `brew install python@3.13`, then preview again |
+| `source_identity_unproven` | `origin` names a URL the descriptor does not declare as an allowed migration (the SSH `git@github.com:` spelling of the canonical repository is canonical, r64) | Part C, Step 2a (manual re-point) |
+| `host_requirement_missing` / `host_requirement_unknown` | the host lacks Python 3.13, or a host probe could not run (`data.host` names the row) | `brew install python@3.13`, then preview again |
+| `claude_cli_missing` | the Claude Code CLI is not on the Manager's `PATH` or in `/opt/homebrew/bin`, `/usr/local/bin` or `$HOME/.local/bin` (Claude Code's native install directory; `data.host` row `claude_cli_present`), and the refusal names each directory searched. The runtime stage's plugin-cache refresh needs it, and the update never installs it | `brew install --cask claude-code` (a native install in `$HOME/.local/bin` already counts), check that `command -v claude` prints a path in the shell you run `solet-manager` from, then preview again |
+
+**The runtime preview registers a missing coordination-hooks marketplace and
+installs the plugin the way `solet create` does** (r64, `iss_c9a7b626`,
+`iss_0744a64a`). A clone that never ran the coding-agent hydration step has no
+marketplace file (.claude-plugin/marketplace.json, ignored by Git) and no Claude
+marketplace under its name, so `coordination-hooks@<name>` is not installed.
+When the clone ships its own `coordination-hooks` plugin, the runtime preview
+plans these actions on `plugin_cache_refresh`, in this order, each covered by
+the runtime fingerprint:
+
+- `cache.render_marketplace` renders the file from the hydration template,
+  only when it is absent.
+- `claude.patch_hook_interpreter` binds every bare `python3` hook in the
+  tracked coordination-hook manifest
+  `plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/hooks.json`
+  to `<clone>/.venv/bin/python3`. This is create's own interpreter pin, done
+  only when a hook is still bare.
+- `cache.register_marketplace` runs `claude plugin marketplace add <clone>`,
+  only when the name is not registered. Create adds it every time; the update
+  does not.
+- `cache.install_coordination_hooks` runs
+  `claude plugin install coordination-hooks@<name>`.
+- `claude.publish_coordination_receipt` publishes create's receipt at
+  profile/data/coordination-hooks/claude/installation.v1.json (not in Git).
+
+The pin is a content-only change to a tracked file. The final doctor and every
+later update admit it as the installer's pin, the same as on a hydrated solet.
+A pin to any other interpreter is refused as `executed_code_modified`. A second
+update plans none of these actions. To check the result afterwards, in the
+clone:
+
+- `grep -c '"command": "python3"' plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/hooks.json`
+  prints `0`.
+- `ls profile/data/coordination-hooks/claude/installation.v1.json` finds the
+  receipt.
+- Compared with `git status --short` before the update, the only new line is
+  ` M plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/hooks.json`.
+
+**An installed plugin counts as current only when it is pinned and has a
+current receipt** (r64, `iss_fa27466f`). `plugin_cache_refresh` verifies an
+installed `coordination-hooks@<name>` only when three things hold. The plugin
+cache matches the clone's hooks. The tracked `hooks.json` binds every Python
+hook to `<clone>/.venv/bin/python3`. The receipt reads back against both the
+cache and the checkout. When any of the three fails, the runtime preview plans
+these actions, in this order, each covered by the runtime fingerprint:
+
+- `claude.patch_hook_interpreter`, only while a hook is still bare.
+- `cache.reinstall` runs `claude plugin uninstall` and then
+  `claude plugin install`. It runs when the cache is stale, or when the pin has
+  just rewritten `hooks.json`.
+- `claude.publish_coordination_receipt`.
+
+Three cases need this. A plugin installed by hand with
+`claude plugin marketplace add` and `claude plugin install` is never pinned. A
+release that changes a shipped hook file makes every solet's receipt stale. A
+receipt publish can fail on an earlier run. The three checks above confirm the
+result, and a second update plans nothing. The update never rewrites a
+`hooks.json` that binds another interpreter; it refuses it as
+`hook_interpreter_foreign` (table below). Afterwards, `solet doctor` on a
+created solet verifies its seed tree and lists the pinned `hooks.json` under
+`accepted_manager_edits`. It admits the file only while its bytes are exactly
+the installer pin of the committed file and its mode is unchanged. Any other
+change to it still warns `tracked_tree_deviation`.
+
+A known consequence, not fixed in r64: a later release that edits `hooks.json`
+refuses as `tracked_overlap_present` on these solets, as it already does on
+hydrated ones (`iss_c1a7df20`). Follow the pinned-manifest repair in the table
+above. The runtime preview refuses (`runtime_plan_blocked`, the reason under
+`data.blocked`) instead of overwriting anything or writing outside the clone in
+these cases:
+
+| Reason | Meaning | Repair |
+|---|---|---|
+| `marketplace_name_foreign` | a Claude marketplace with this solet's name is registered from another directory or from a non-directory source | inspect `claude plugin marketplace list`; if that registration is stale, `claude plugin marketplace remove <name>`, then preview again |
+| `marketplace_clone_registered_under_other_name` | this clone is already registered under a different marketplace name | `claude plugin marketplace remove <other name>`, then preview again |
+| `marketplace_manifest_foreign` | the clone's marketplace file exists but does not declare this name with `coordination-hooks` from the clone's own plugin, or it is a directory or not UTF-8 | move it aside (`mv <file> <file>.bak`), then preview again |
+| `marketplace_path_outside_clone` | the clone's `.claude-plugin` directory or its marketplace file is a symlink | replace the symlink with a real directory, then preview again |
+| `marketplace_registry_unreadable` | `~/.claude/plugins/known_marketplaces.json` is not a readable UTF-8 JSON object | inspect `claude plugin marketplace list`, repair the file, then preview again |
+| `claude_plugin_list_failed` | `claude plugin list --json` exited non-zero, timed out, or printed no JSON list (the repair quotes its exit code and stderr) | run it yourself, fix what it reports, then preview again |
+| `hook_manifest_invalid` | the tracked coordination-hook manifest is not readable hook JSON | inspect `git diff -- <manifest>`, then preview again |
+| `hook_interpreter_foreign` | the tracked coordination-hook manifest has no bare `python3` hook, but its Python hooks run an interpreter other than `<clone>/.venv/bin/python3` | inspect `grep -n '"command"' <manifest>` and `git diff -- <manifest>`, then preview again |
 
 **Exit codes.** `0` — `preview_ready`, `imported`, `source_advanced`,
 `promoted`, `verified`: proceed. `3` — `awaiting_user`/`attention_required`/
@@ -322,7 +439,7 @@ the healthy state, not an error.
   marked block, backed up like the rest, and the files already in `client/`
   are not touched. Without that ignore rule the update plan would refuse
   the fleet file and stop the update for every solet (design section 6.3).
-- Step 6.1 plugin cache → `plugin_cache_refresh` (diff-based;
+- Step 6.1 plugin cache → `plugin_cache_refresh` (cache diff, hook pin and receipt;
   `plugin_cache_current` in doctor section 11).
 - Step 6.4 KB re-install → `runtime.knowledge_reinstall` for every
   `knowledge_removals` entry, then `knowledge_negative_search_<kb>` is a

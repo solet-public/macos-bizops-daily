@@ -15,7 +15,7 @@ from .create_origin_enrollment import (
     require_create_origin_target,
     require_update_eligible_create_origin,
 )
-from .errors import ManagedIdentityDriftError
+from .errors import ImportNotAllowedError, ManagedIdentityDriftError
 from .existing_install_inspection import (
     ChannelInspectionIdentity,
     ExistingInstallInspectionRequest,
@@ -23,6 +23,7 @@ from .existing_install_inspection import (
     InspectionEffectTracker,
     InstalledInspectionMetadata,
     InstalledInspectionMetadataLoader,
+    import_refusal_repair,
     inspect_existing_install,
     load_installed_inspection_metadata,
 )
@@ -271,8 +272,10 @@ def preview_import(
     request: ImportRequest, *, installed_loader: InstalledInspectionMetadataLoader | None = None
 ) -> ImportPreview:
     inspected = inspect_for_import(request, installed_loader=installed_loader)
-    if inspected.result.classification.import_disposition != "allow":
-        raise ValueError("import_not_allowed")
+    repair = import_refusal_repair(inspected.result)
+    if repair is not None:
+        kind = inspected.result.classification.installation_class.value
+        raise ImportNotAllowedError(f"Import refused: the target is classified {kind}.", repair=repair)
     return preview_from_inspection(request, inspected)
 
 

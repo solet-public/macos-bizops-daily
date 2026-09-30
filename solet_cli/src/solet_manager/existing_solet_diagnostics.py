@@ -621,7 +621,7 @@ def _pinned_entries_are_stable(entries: list[_PinnedEntry]) -> bool:
     # descriptor-relative lstat proves its directory entry was not substituted.
     for entry in entries:
         current = os.fstat(entry.descriptor)
-        if not _stable_metadata(entry.metadata, current):
+        if not _entry_is_stable(entry, current):
             return False
         if entry.parent_descriptor is None or entry.name is None:
             continue
@@ -630,9 +630,21 @@ def _pinned_entries_are_stable(entries: list[_PinnedEntry]) -> bool:
             dir_fd=entry.parent_descriptor,
             follow_symlinks=False,
         )
-        if not _stable_metadata(entry.metadata, current_path):
+        if not _entry_is_stable(entry, current_path):
             return False
     return True
+
+
+def _entry_is_stable(entry: _PinnedEntry, current: os.stat_result) -> bool:
+    # A pinned directory is only a path ancestor of the one file read: no
+    # directory is enumerated, so its contents are not inspected content. Its
+    # mtime, ctime and link count move whenever any unrelated sibling appears
+    # (a shared temp or parent directory), so it must keep only its identity
+    # (device, inode, type); a replaced directory still differs by inode. The
+    # regular file whose bytes are inspected keeps the full metadata compare.
+    if stat.S_ISDIR(entry.metadata.st_mode):
+        return _same_identity(entry.metadata, current)
+    return _stable_metadata(entry.metadata, current)
 
 
 def _same_identity(left: os.stat_result, right: os.stat_result) -> bool:

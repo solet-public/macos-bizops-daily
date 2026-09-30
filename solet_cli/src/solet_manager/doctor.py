@@ -30,6 +30,7 @@ from .doctor_seed_integrity_census import collect_seed_integrity_advisories
 from .doctor_terminal_return_keys import collect_terminal_return_key_advisories
 from .doctor_vintage_census import collect_doctor_advisories
 from .errors import StateConflictError
+from .installer_pins import worktree_installer_pins
 from .journal_rollup import _FINAL_STAGE_STATUSES
 from .maintenance_inventory import read_maintenance_inventory_v2
 from .models import CommandResult, ExitCode, InstanceRecord, JsonValue
@@ -66,7 +67,8 @@ class InstallationDoctor:
                 target,
             )
             seed_record = current_seed_record(self.paths, record)
-            accepted = accepted_edit_paths(self.paths, name=name, target=target, create_operation_id=transaction.operation_id)
+            # iss_fa27466f: the update's installer pin is admitted by its bytes, never recorded in the create's ledger.
+            accepted = accepted_edit_paths(self.paths, name=name, target=target, create_operation_id=transaction.operation_id) | worktree_installer_pins(target)
             seed_tree_verification = accept_applied_edits(verify_seed_tree(target, seed_record.seed_tree_hash), accepted)
             transaction, checks = run_completion_probes(
                 bundle,

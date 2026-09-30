@@ -159,17 +159,7 @@ def _rendered_files(request: AdapterRequest) -> dict[Path, tuple[str, int]]:
         )
     rendered: dict[Path, tuple[str, int]] = {}
     for template_name, (destination, mode) in mapping.items():
-        if template_name.endswith(".json.template"):
-            content = _render_json(_TEMPLATES / template_name, values)
-        else:
-            content = _render(_TEMPLATES / template_name, shell_values)
-            if not values["{{GIT_CONTROLLER_NAME}}"]:
-                content = "\n".join(
-                    line for line in content.splitlines() if "GIT_CONTROLLER_NAME=" not in line
-                ) + "\n"
-            if template_name in _STAMPED_SHELL_TEMPLATES:
-                content = _stamped(content, template_name)
-        rendered[destination] = (content, mode)
+        rendered[destination] = (_render_template(template_name, values, shell_values), mode)
     for runner_file in AGENT_INSTRUCTION_FILES:
         destination = request.target / runner_file
         managed = render_agent_instructions(
@@ -179,6 +169,25 @@ def _rendered_files(request: AdapterRequest) -> dict[Path, tuple[str, int]]:
         )
         rendered[destination] = (merge_agent_block(read_file(destination), managed), 0o644)
     return rendered
+
+
+def render_claude_marketplace(marketplace: str) -> str:
+    """The ``.claude-plugin/marketplace.json`` hydration writes; the update's registration reuses it (iss_c9a7b626)."""
+    values = {"{{MARKETPLACE_NAME}}": marketplace, "{{GIT_CONTROLLER_NAME}}": ""}
+    return _render_template("marketplace_json.template", values, values)
+
+
+def _render_template(template_name: str, values: dict[str, str], shell_values: dict[str, str]) -> str:
+    if template_name.endswith(".json.template"):
+        return _render_json(_TEMPLATES / template_name, values)
+    content = _render(_TEMPLATES / template_name, shell_values)
+    if not values["{{GIT_CONTROLLER_NAME}}"]:
+        content = "\n".join(
+            line for line in content.splitlines() if "GIT_CONTROLLER_NAME=" not in line
+        ) + "\n"
+    if template_name in _STAMPED_SHELL_TEMPLATES:
+        content = _stamped(content, template_name)
+    return content
 
 
 def _render(template: Path, values: dict[str, str]) -> str:

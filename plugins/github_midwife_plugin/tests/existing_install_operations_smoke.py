@@ -14,7 +14,8 @@ carries the transition bundle and templates.  Legs:
   already-migrated fixture is verified by probe with byte-identical files;
   "Claude Code running" blocks with ``coding_agent_running``;
 - export-root containment is probe-only when unset;
-- the plugin cache refresh compares the cache copy against shipped hooks;
+- the plugin cache refresh compares the cache copy against shipped hooks, and is current only when the hooks are
+  pinned and the receipt reads back (iss_fa27466f);
 - the bootstrap dependency route accepts a declared closure, plans exactly the
   missing declared pieces (never a present one), and applies only those;
 - the seed validator accepts ``existing::`` refs only under the
@@ -38,6 +39,7 @@ _PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 _REPO = _PLUGIN_ROOT.parents[1]
 sys.path[:0] = [str(_PLUGIN_ROOT / "src"), str(_REPO)]
 from github_midwife_plugin import existing_install_operations as ops  # noqa: E402
+from github_midwife_plugin import setup_plugin_operations  # noqa: E402
 from github_midwife_plugin.autostart import render_launchagent_plist  # noqa: E402
 from github_midwife_plugin.managed_render import marker_lines, sha256_bytes  # noqa: E402
 from github_midwife_plugin.setup_adapter import dispatch_request  # noqa: E402
@@ -693,17 +695,36 @@ def _check_plugin_cache(target: Path, runtime: FakeRuntime) -> None:
     ref = "existing::runtime.plugin_cache_refresh"
     cache = runtime.home / ".claude" / "plugins" / "cache" / _NAME / "coordination-hooks" / "1.0.0"
     (cache / "hooks").mkdir(parents=True)
-    for name in ("coordination_owner.py", "heartbeat_report_alive.py", "rotation_due_watch.py", "wake_waiter.py", "hooks.json"):
-        (cache / "hooks" / name).write_bytes((target / "plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks" / name).read_bytes())
+    (target / ".venv/bin").mkdir(parents=True, exist_ok=True)
+    (target / ".venv/bin/python3").write_text("fixture")
     (runtime.home / ".claude" / "plugins" / "installed_plugins.json").write_text(json.dumps({"plugins": {f"coordination-hooks@{_NAME}": [{"installPath": str(cache)}]}}))
+    _copy_hooks(target, cache)
+    bare = cast(dict[str, Any], dispatch_request(_request(target, ref), runtime))
+    _check((bare["checkpoint_status"], [action["id"] for action in bare["planned_actions"]]) == ("pending", ["claude.patch_hook_interpreter", "cache.reinstall", "claude.publish_coordination_receipt"]), "iss_fa27466f: a matching cache copy of bare hooks with no receipt is not current")
+    _settle_as_create(target, runtime, cache)
     current = cast(dict[str, Any], dispatch_request(_request(target, ref, purpose="post_apply"), runtime))
-    _check(current["checkpoint_status"] == "verified", "matching cache copy verifies")
+    _check(current["checkpoint_status"] == "verified", "a matching, pinned and received cache copy verifies")
     (cache / "hooks" / "wake_waiter.py").write_bytes(b"# stale\n")
     stale = cast(dict[str, Any], dispatch_request(_request(target, ref), runtime))
-    _check((stale["checkpoint_status"], stale["planned_actions"][0]["id"]) == ("pending", "cache.reinstall"), "diff-based check plans the refresh")
+    _check((stale["checkpoint_status"], [action["id"] for action in stale["planned_actions"]]) == ("pending", ["cache.reinstall", "claude.publish_coordination_receipt"]), "diff-based check plans the refresh and the republish")
     refreshed = cast(dict[str, Any], dispatch_request(_request(target, ref, phase="apply"), runtime))
     vectors = [argv[2] for argv in runtime.commands if argv[:2] == ("/fixture/bin/claude", "plugin") and argv[2] in {"uninstall", "install"}]
-    _check((refreshed["checkpoint_status"], vectors) == ("applied", ["uninstall", "install"]), "refresh is uninstall then install")
+    # This fake install copies nothing, so the receipt publish reads the stale cache back and refuses, never publishes.
+    _check((refreshed["checkpoint_status"], refreshed.get("error_kind"), vectors) == ("blocked", "coordination_receipt_invalid", ["uninstall", "install"]), "refresh is uninstall then install, then a receipt only over the cache it reads back")
+
+
+def _copy_hooks(target: Path, cache: Path) -> None:
+    for name in ("coordination_owner.py", "heartbeat_report_alive.py", "rotation_due_watch.py", "wake_waiter.py", "hooks.json"):
+        (cache / "hooks" / name).write_bytes((target / "plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks" / name).read_bytes())
+
+
+def _settle_as_create(target: Path, runtime: FakeRuntime, cache: Path) -> None:
+    """Create's pin, a cache copy of the pinned hooks, and create's receipt."""
+    manifest = target / "plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/hooks.json"
+    _check(setup_plugin_operations._patch_hook_manifest(manifest, target, cast(Any, runtime)) is None, "fixture: create's pin applies")  # noqa: SLF001
+    _copy_hooks(target, cache)
+    published = setup_plugin_operations._publish_claude_receipt(_request(target, "existing::runtime.plugin_cache_refresh", phase="apply"), cast(Any, runtime), "/fixture/bin/claude", _NAME, f"coordination-hooks@{_NAME}")  # noqa: SLF001
+    _check(published is None, f"fixture: create's receipt publishes: {published}")
 
 
 def _check_dependency_route(root: Path) -> None:

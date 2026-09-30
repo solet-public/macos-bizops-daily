@@ -384,7 +384,7 @@
           },
           "lm_studio": {
             "label": "LM Studio",
-            "description": "Optional local OpenAI-compatible endpoint; not recommended (Core AI or llama.cpp are).",
+            "description": "Current recommended local OpenAI-compatible endpoint.",
             "availability": "supported",
             "implications": {
               "cost": "No per-call fee; consumes local compute.",
@@ -496,7 +496,8 @@
       "recommended_option_refs": [
         "none",
         "apple_foundation_models",
-        "llama_cpp"
+        "llama_cpp",
+        "lm_studio"
       ],
       "option_source": {
         "mode": "static",
@@ -572,7 +573,7 @@
           },
           "lm_studio": {
             "label": "LM Studio",
-            "description": "Optional local inference endpoint; not the default (Apple Foundation Models on macOS 27 and llama.cpp on macOS 26 are).",
+            "description": "Current supported local inference implementation.",
             "availability": "supported",
             "implications": {
               "cost": "No per-call fee; significant local compute and memory may be required.",
@@ -2749,7 +2750,7 @@
     },
     "default_inference_plugin": {
       "name": "Default local inference",
-      "description": "OpenAI-compatible local inference client; serves the llama.cpp summaries server on macOS 26 and LM Studio when that is selected.",
+      "description": "Current LM Studio-oriented inference implementation.",
       "installation_policy": "install_when_selected",
       "configuration_timing": "user_choice",
       "documentation_status": "partial",

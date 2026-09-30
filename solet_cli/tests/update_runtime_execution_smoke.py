@@ -38,6 +38,12 @@ seams.  Legs:
   ``.gitignore`` shipped in the candidate tree does not change the verdict;
 - ``single_color_required`` overrides a visible router; a roster plugin absent
   from the candidate blocks before any write;
+- the per-operation re-baseline admits the running solet's own
+  ``knowledge_bases/<plugin>`` creation only under ``runtime_reconciling`` and
+  only in its exact shape (iss_d22db98a): the same creation under any other
+  status, a wrong, absolute, out-of-tree, nested or name-mismatched target,
+  and a tracked path replaced by a correct-target link are all
+  ``preservation_violated``;
 - the whole suite runs under the fail-on-call database spy.
 """
 
@@ -146,7 +152,9 @@ def _assert_runtime_advanced(fixture: Fixture, fingerprint: str) -> None:
         "autostart_reconcile": "verified",
         "lifecycle_restart_single_color": "verified",
         "runtime_readiness": "verified",
-        "plugin_cache_refresh": "verified_by_probe",
+        # iss_fa27466f: the fixture's installed plugin has bare hooks and no receipt, so the refresh pins, reinstalls
+        # and publishes the receipt instead of verifying by probe.
+        "plugin_cache_refresh": "verified",
     }
     _check(statuses == expected_statuses, f"operation rows: {statuses}")
     executed = cast(list[str], applied.data["target_actions_executed"])
@@ -176,7 +184,10 @@ def _assert_axes_published(fixture: Fixture, operation_id: str) -> None:
 
 def _assert_hydrated(fixture: Fixture) -> None:
     _assert_markers(fixture)
-    _check(git(fixture.target, "status", "--porcelain", "--untracked-files=all") == "", "tracked tree is CLEAN; no ?? entry under the target after hydration")
+    porcelain = git(fixture.target, "status", "--porcelain", "--untracked-files=all")
+    # iss_fa27466f: the refresh pins the bare hooks, so the installer's pin is the one tracked modification (``git`` strips).
+    pin = "M plugins/github_midwife_plugin/claude_plugin/coordination-hooks/hooks/hooks.json"
+    _check(porcelain == pin, f"the tracked tree carries only the installer pin; no ?? entry under the target after hydration: {porcelain!r}")
     record = fixture.record()
     operation_id = cast(str, fixture.journal()["operation_id"])
     root = backup_root(fixture.paths, record.instance_id, operation_id)
@@ -578,7 +589,7 @@ def _carve_admitted(root: Path, mutate: Any, *, exclude: str = "client/\n", decl
     """
     target = _carve_target(root)
     before = observe_local_state(target, _carve_facts(target))
-    journal = cast(Any, {"local_state": {"current": before.snapshot()}})
+    journal = cast(Any, {"status": "hydration_applying", "local_state": {"current": before.snapshot()}})
     with (target / ".git" / "info" / "exclude").open("a", encoding="utf-8") as stream:
         stream.write(exclude)
     mutate(target)
@@ -616,6 +627,87 @@ def _assert_ignore_carve_out_is_narrow(root: Path) -> None:
     with (other / ".git" / "info" / "exclude").open("a", encoding="utf-8") as stream:
         stream.write("client/\n")
     _check(paths_ignored_by_declared_exclude(other, frozenset({CLONE_EXCLUDE_RELATIVE}), [*vanished, "client/gone.zsh", "notes.txt"], before.state, before) == frozenset(vanished), "unchanged paths the ignore file covers are admitted; a path the journal never held and an unignored path are not")
+
+
+_KB_PLUGINS = ("newkb", "other", "tracked_kb")
+
+
+def _kb_target(root: Path) -> Path:
+    """A committed clone with a tracked ``knowledge_bases/tracked_kb``, plugin KB directories, and ``plugins/escape`` linking outside the tree."""
+    target = root
+    (target / "knowledge_bases").mkdir(parents=True)
+    subprocess.run(("git", "init", "--quiet", str(target)), check=True)
+    (target / "README").write_text("r\n", encoding="utf-8")
+    (target / "knowledge_bases" / "tracked_kb").write_text("tracked regular\n", encoding="utf-8")
+    subprocess.run(("git", "-C", str(target), "add", "README", "knowledge_bases/tracked_kb"), check=True)
+    subprocess.run(("git", "-C", str(target), "-c", "user.name=x", "-c", "user.email=x@example.invalid", "commit", "--quiet", "-m", "i"), check=True)
+    for name in _KB_PLUGINS:
+        (target / "plugins" / name / "knowledge_base").mkdir(parents=True)
+        (target / "plugins" / name / "knowledge_base" / "a.md").write_text("kb\n", encoding="utf-8")
+    outside = root.parent / f"{root.name}-outside" / "knowledge_base"
+    outside.mkdir(parents=True)
+    (outside / "a.md").write_text("kb\n", encoding="utf-8")
+    (target / "plugins" / "escape").symlink_to(outside.parent)
+    return target
+
+
+def _kb_link(name: str, stored: str) -> Any:
+    def create(target: Path) -> None:
+        link = target / "knowledge_bases" / name
+        link.parent.mkdir(parents=True, exist_ok=True)
+        if link.is_symlink() or link.exists():
+            link.unlink()
+        link.symlink_to(stored.format(target=target))
+
+    return create
+
+
+def _kb_rebaseline(root: Path, create: Any, status: str) -> tuple[dict[str, Any], ...] | str:
+    """The re-baseline's outcome for ``create`` made during an operation's window: its revisions, or the refusal message."""
+    target = _kb_target(root)
+    before = observe_local_state(target, _carve_facts(target))
+    journal = cast(Any, {"status": status, "local_state": {"current": before.snapshot()}})
+    create(target)
+    after = observe_local_state(target, _carve_facts(target))
+    try:
+        outcome = rebaseline_revision(journal, after, before, "op_x", frozenset(), "fixture", target)
+    except UpdateFailedError as exc:
+        _check(exc.error_kind == "preservation_violated", f"the refusal is preservation_violated: {exc.error_kind}")
+        return str(exc)
+    _check(outcome is not None, "an admitted creation still moves current")
+    return cast(tuple[dict[str, Any], ...], cast(Any, outcome)[0])
+
+
+_KB_EXACT = _kb_link("newkb", "../plugins/newkb/knowledge_base")
+#: Shapes the solet's ``_create_kb_symlink`` never writes, each with the path the refusal must name.
+_KB_FOREIGN_SHAPES = {
+    "wrong_target": ("knowledge_bases/newkb", _kb_link("newkb", "../plugins/other/knowledge_base")),
+    "absolute_target": ("knowledge_bases/newkb", _kb_link("newkb", "{target}/plugins/newkb/knowledge_base")),
+    "out_of_tree": ("knowledge_bases/escape", _kb_link("escape", "../plugins/escape/knowledge_base")),
+    "nested": ("knowledge_bases/sub/newkb", _kb_link("sub/newkb", "../../plugins/newkb/knowledge_base")),
+    "name_mismatch": ("knowledge_bases/foo", _kb_link("foo", "../plugins/newkb/knowledge_base")),
+    "tracked_replaced": ("knowledge_bases/tracked_kb", _kb_link("tracked_kb", "../plugins/tracked_kb/knowledge_base")),
+}
+
+
+def _assert_kb_service_write_is_narrow(root: Path) -> None:
+    """iss_d22db98a: the re-baseline admits the solet's own B7 creation only under runtime_reconciling and only in its exact shape."""
+    _assert_kb_exact_admitted(root / "exact")
+    for status in ("dependencies_applying", "migrations_applying", "hydration_applying", "lifecycle_applying"):
+        refused = _kb_rebaseline(root / f"status_{status}", _KB_EXACT, status)
+        _check(isinstance(refused, str) and "op_x" in refused and "knowledge_bases/newkb" in refused, f"the exact creation under {status} is preservation_violated naming it: {refused}")
+    for label, (path, create) in _KB_FOREIGN_SHAPES.items():
+        refused = _kb_rebaseline(root / label, create, "runtime_reconciling")
+        _check(isinstance(refused, str) and path in refused, f"{label} under runtime_reconciling is preservation_violated naming {path}: {refused}")
+
+
+def _assert_kb_exact_admitted(root: Path) -> None:
+    """Control: the exact creation under runtime_reconciling is one service_writes revision, and no operation revision claims it."""
+    admitted = _kb_rebaseline(root, _KB_EXACT, "runtime_reconciling")
+    _check(not isinstance(admitted, str) and [row.get("stage") for row in admitted] == ["runtime_reconcile"], f"control: the exact creation under runtime_reconciling is one service_writes revision: {admitted}")
+    rows = cast(tuple[dict[str, Any], ...], admitted)
+    additions = rows[0]["service_writes"]["committed_additions"]
+    _check([item["path"] for item in additions] == ["knowledge_bases/newkb"] and not any("paths" in row for row in rows), f"control: it names the link and no operation revision claims it: {rows}")
 
 
 def _assert_fleet_crash_resume(root: Path) -> None:
@@ -679,6 +771,7 @@ def main() -> int:
         _assert_feedback_skill_refresh(root / "skill")
         _assert_fleet_launcher_refresh(root / "fleet")
         _assert_ignore_carve_out_is_narrow(root / "carve")
+        _assert_kb_service_write_is_narrow(root / "kb_service_write")
         _assert_fleet_crash_resume(root / "crash_resume")
         _assert_strategy_selection(root / "strategy")
     _check(subprocess.run(("git", "--version"), capture_output=True, check=False).returncode == 0, "git present")
