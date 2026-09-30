@@ -2,6 +2,66 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-29 — r62: a stable publish names its own predecessor row and resumes after its own push; a swap keeps the live bridge port; shipped text names the real embedding and inference defaults
+
+**Solet Manager manager-v0.1.0-r62.**
+
+The release factory (origin-only; it never ships in a seed) no longer leaves the
+previous stable head's `supported_predecessors` row to be worked out by hand
+each cut (`iss_16d3aa5a`). Nothing changes on an installed solet or in the
+Manager.
+
+- **A stable publish emits its own head's row.** A `publish_release` run to
+  `solet-public/macos-bizops` that reaches state `completed` records
+  `stages.record.outputs.supported_predecessor_row` in `release_run_status`:
+  the eight `existing_install_flow.json` fields (`repository`, `commit`,
+  `tree`, `provenance_sha256`, `seed_id`, `origin_id`, `manifest_sha256`,
+  `legacy_anchor_id: null`) for the commit it pushed. Any other seed target
+  records `null` there.
+- **The next stable cut names the exact missing row.** When the live stable
+  head is not listed, the run still refuses at stage `predecessor` with
+  `stable_head_not_supported_predecessor`, and now `refusal.details.supported_predecessor_row`
+  and the message carry that head's row, ready to add to
+  `plugins/github_midwife_plugin/knowledge_base/existing_install_flow.json`.
+- **A head the factory cannot vouch for gets no row.** A head whose
+  `PROVENANCE.json` is missing, is not canonical strict v1, has a `seed_id` that
+  does not re-derive from its own fields, or was minted under another origin is
+  still refused, with `refusal.details.row_withheld_because` naming the reason
+  and no `supported_predecessor_row` key.
+- **A stable run resumes after its own push.** A stable `publish_release` run
+  that crashed at `tag_seed`, `tap_commit`, `manager_release`,
+  `verify_published` or `record` now completes when resumed with its `run_id`
+  (`iss_5826b9ea`). Stage `predecessor` reports `outputs.resumed: true` with
+  its original `remote_head_before` when the live head is exactly the run's
+  own `pushed_commit_sha`. Before, it re-read that commit and refused it as an
+  unlisted head. Any other live head is still checked and refused when
+  unlisted.
+- **The row is not injected into the seed.** The published seed's files stay
+  byte-identical to its `Assembled-Ref` source commit, so the row still lands
+  in source through a reviewed lane before the next stable cut.
+
+- **The architecture guide names the real embedding and inference bindings.** Its
+  two `Current implementation` lines no longer name `openai_embeddings_plugin` or
+  `default_inference_plugin` as the current implementation. They now say what the
+  profiles bind: `macos-free-solet` and `macos-samantha-solet` bind
+  `coreai_embeddings_plugin`, `macos-bizops` binds it on macOS 27 and binds
+  `openai_embeddings_plugin` to its own llama.cpp server on macOS 26. Inference is
+  `macos_inference_plugin` on `macos-bizops` at macOS 27, `default_inference_plugin` on
+  `macos-bizops` at macOS 26 (llama.cpp) and on `macos-samantha-solet` (existing local
+  inference), and vacant on `macos-free-solet` (`iss_ba94a96d`). No binding or
+  operation changed. Check: no line of the
+  architecture guide's service-architecture page starts `**Current implementation**:` with `openai_embeddings_plugin` or
+  `default_inference_plugin`, and
+  `python3 plugins/github_midwife_plugin/tests/embedding_default_doc_truth_smoke.py`
+  exits 0.
+- **The `local` profile template header is true.** It no longer claims to be what the
+  solet runs as or that every plugin in the tree is loaded (`iss_aecf8d6a`). Check:
+  the header of the `local` profile template contains neither
+  `Every plugin in the tree is loaded` nor `This is what <name> runs as`; the smoke
+  named above enforces it.
+
+- A blue-green swap candidate no longer deletes the live router's bridge-port file during its start-up scrub, so `solet-bridge` calls no longer fail with 'Is the solet running?' during a swap (iss_dec2b606). Check: during a swap, `solet-bridge health` keeps answering; after a crash with no router, the stale bridge-port file is still removed.
+
 ## 2026-09-29 — r61: the Manager no longer forces a `python@3.13` upgrade
 
 **Solet Manager manager-v0.1.0-r61.** This is a full seed build for

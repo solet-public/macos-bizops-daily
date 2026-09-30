@@ -104,6 +104,7 @@ plugins/macos_self_deployment_plugin/tests/prepare_readiness_restore_race_smoke.
 plugins/macos_self_deployment_plugin/tests/router_socket_ownership_smoke.py
 plugins/macos_self_deployment_plugin/tests/readiness_arming_smoke.py
 plugins/macos_self_deployment_plugin/tests/stray_cold_start_guard_smoke.py
+plugins/macos_self_deployment_plugin/tests/candidate_runtime_scrub_liveness_smoke.py
 # r38 C2: router authority is the only release boundary for deferred local
 # inference work; a merely registered inactive color cannot start it.
 plugins/macos_self_deployment_plugin/tests/cold_boot_post_registration_release_smoke.py
@@ -4483,6 +4484,8 @@ solet_cli/tests/manager_version_agreement_smoke.py
 # release_runs + release_locks schema and store discipline. The born-async job
 # adapter (dispatch → queued row → worker → status on the job, the orphan
 # sweep on first poll) is its sibling smoke. Both share tests/_release_fakes.py.
+# The stable seed home's supported_predecessors rows (iss_933eff4e, r62 iss_16d3aa5a /
+# iss_5826b9ea / iss_47c98723), split from release_run_smoke for the MI gate.
 
 # reproduce_release (2026-09-19, chg_505884b2, design §7.5(d)): customer
 # report -> exact local rebuild. Resolution (release_tag XOR attestation,
@@ -5393,6 +5396,7 @@ solet_cli/tests/lm_studio_served_deadline_smoke.py
 plugins/agent_messaging_plugin/tests/peer_route_event_loop_offload_smoke.py
 plugins/github_midwife_plugin/tests/apple_native_fresh_profile_smoke.py
 plugins/github_midwife_plugin/tests/apple_setup_flow_smoke.py
+plugins/github_midwife_plugin/tests/embedding_default_doc_truth_smoke.py
 plugins/github_midwife_plugin/tests/asset_root_materialize_smoke.py
 plugins/github_midwife_plugin/tests/apple_coreai_acquisition_smoke.py
 

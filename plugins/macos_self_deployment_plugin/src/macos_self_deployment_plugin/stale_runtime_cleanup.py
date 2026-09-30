@@ -24,10 +24,17 @@ from typing import Final
 
 logger = logging.getLogger(__name__)
 
+# The router owns this one file: a blue-green swap candidate reaches the scrub
+# while the router and the OTHER colour are live, so it is kept when the router
+# still owns it (see ``_router_owns_bridge_port``).  The other three have no
+# reader or writer in the enabled tree, or name no listener at all, so they are
+# scrubbed unconditionally as before.
+_BRIDGE_PORT_TEMPLATE: Final[str] = "{name}.bridge.port"
+
 _STALE_FILENAME_TEMPLATES: Final[tuple[str, ...]] = (
     "{name}.sock",
     "{name}.rest.port",
-    "{name}.bridge.port",
+    _BRIDGE_PORT_TEMPLATE,
     # Slice 4 cross-color drain sentinel — see launch.py:391-404 docstring.
     "{name}.draining",
 )
@@ -42,17 +49,44 @@ def runtime_dir() -> Path:
 
 
 def cleanup_stale_runtime_files(solet_name: str) -> None:
-    """Remove runtime files left by a non-graceful prior the solet or router exit."""
+    """Remove runtime files left by a non-graceful prior the solet or router exit.
+
+    ``<name>.bridge.port`` is the one exception while its router is live.  A
+    blue-green swap candidate reaches this scrub with the router and the other
+    colour up, and ``solet-bridge call`` reads the file once per invocation, so
+    unlinking it makes a call in the gap fail with ``SoletNotRunningError`` until
+    the restore below (or the router's 5s bridge-port watchdog) rewrites it.  A
+    cold start with no router still ends with the file absent.
+    """
     base = runtime_dir()
     for template in _STALE_FILENAME_TEMPLATES:
         stale = base / template.format(name=solet_name)
-        if stale.exists() or stale.is_symlink():
-            try:
-                stale.unlink()
-            except OSError as exc:
-                logger.warning("Could not remove stale %s: %s", stale, exc)
-                continue
-            logger.info("Removed stale runtime file: %s", stale)
+        if not (stale.exists() or stale.is_symlink()):
+            continue
+        if template == _BRIDGE_PORT_TEMPLATE and _router_owns_bridge_port(solet_name):
+            logger.info("Kept runtime file, the live router owns it: %s", stale)
+            continue
+        try:
+            stale.unlink()
+        except OSError as exc:
+            logger.warning("Could not remove stale %s: %s", stale, exc)
+            continue
+        logger.info("Removed stale runtime file: %s", stale)
+
+
+def _router_owns_bridge_port(solet_name: str) -> bool:
+    """True iff the router's mgmt socket answers and it published the file's port.
+
+    The bridge pointer belongs to the router, so liveness is the router's
+    identity, not whether something listens on the named port: a crashed
+    router's stale pointer can name a port a foreign process has since bound.
+    """
+    base = runtime_dir()
+    bridge_port = _read_port_file(base / f"{solet_name}.bridge.port")
+    router_port = _read_port_file(base / f"{solet_name}.router.port")
+    if bridge_port is None or bridge_port != router_port:
+        return False
+    return router_mgmt_status(base / f"{solet_name}.router.sock") is not None
 
 
 def restore_router_owned_bridge_port_file_if_router_live(solet_name: str) -> bool:
