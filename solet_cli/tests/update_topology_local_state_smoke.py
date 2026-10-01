@@ -305,7 +305,7 @@ def _assert_journal_revisions(root: Path) -> None:
 
 
 _RETIRED_NAMES = ("tracked_state_present", "_EXECUTED_CODE_PREFIXES", "DISJOINT_LOCAL_TRACKED_CHANGES")
-_STEP7_REASONS = {"executed_code_modified", "git_metadata_present", "host_requirement_missing", "host_requirement_unknown", "hydration_block_uncarriable", "instance_requirement_missing", "local_state_unobserved", "preservation_violated", "preserved_surface_in_transition", "service_offline_before_transition", "staged_changes_present", "tracked_overlap_present", "tracked_shape_changed"}
+_STEP7_REASONS = {"colour_outside_launchagent", "executed_code_modified", "git_metadata_present", "host_requirement_missing", "host_requirement_unknown", "hydration_block_uncarriable", "instance_requirement_missing", "local_state_unobserved", "preservation_violated", "preserved_surface_in_transition", "service_offline_before_transition", "staged_changes_present", "tracked_overlap_present", "tracked_shape_changed"}
 
 
 def _manager_sources() -> dict[str, str]:

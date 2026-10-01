@@ -26,6 +26,9 @@ _SECRET_KEY = re.compile(
     r"(?:password|passwd|secret|token|api[_-]?key|private[_-]?key|credential)",
     re.IGNORECASE,
 )
+#: ``result()`` cuts a ``repair`` here, without a marker, so a remedy written last is the part a long text loses.
+#: The Manager accepts 2048 (``adapter_protocol``); this seed-side cut is what an operator reads (iss_67d2597e).
+REPAIR_LIMIT = 512
 CREATE_FLOW_ID = "macos.repository_setup"
 EXISTING_INSTALL_FLOW_ID = "existing-install"
 EXISTING_INSTALL_REF_PREFIX = "existing::"
@@ -367,7 +370,7 @@ def result(
         "discovered_candidates": cast(JsonValue, discovered),
         "evidence": cast(JsonValue, [] if evidence_items is None else evidence_items),
         "reason": cast(JsonValue, reason),
-        "repair": None if repair is None else repair[:512],
+        "repair": None if repair is None else repair[:REPAIR_LIMIT],
     }
     return response
 

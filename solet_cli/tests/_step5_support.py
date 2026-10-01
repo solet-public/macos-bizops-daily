@@ -129,7 +129,8 @@ class FakeHost:
         if self.ps_fails:
             raise OSError("process table unavailable")
         rows = self.processes if self.processes is not None else [{"pid": self.pids[0], "lstart": "Fri Sep 18 12:00:00 2026", "command": "{TARGET}/.venv/bin/python3 -m ananta.cli --app-home {TARGET}/profile"}]
-        lines = [f"{row['pid']} {row['lstart']} {str(row['command']).replace('{TARGET}', str(self.target))}" for row in rows]
+        # ``"launchd"`` names whichever pid the LaunchAgent has now, so a table written before a restart stays true after it.
+        lines = [f"{self.pids[0] if row['pid'] == 'launchd' else row['pid']} {row['lstart']} {str(row['command']).replace('{TARGET}', str(self.target))}" for row in rows]
         return subprocess.CompletedProcess(("/bin/ps",), 0, "\n".join(lines) + "\n", "")
 
     def run_security(self, service: str, account: str) -> subprocess.CompletedProcess[str]:
@@ -354,11 +355,11 @@ def git(repo: Path, *args: str) -> str:
     return completed.stdout.strip()
 
 
-def _stamp(source_commit: str, manifest: str) -> tuple[bytes, str]:
+def _stamp(source_commit: str, manifest: str, bundle: str) -> tuple[bytes, str]:
     seed_id = str(uuid.uuid5(uuid.UUID(ORIGIN_ID), f"{source_commit}:{manifest}::"))
     stamp = {
         "ancestry": [],
-        "bundle": {"name": "macos-bizops", "platform": "local"},
+        "bundle": {"name": bundle, "platform": "local"},
         "lineage": [],
         "manifest_sha256": manifest,
         "origin_id": ORIGIN_ID,
@@ -371,8 +372,8 @@ def _stamp(source_commit: str, manifest: str) -> tuple[bytes, str]:
     return (json.dumps(stamp, indent=2, sort_keys=True) + "\n").encode(), seed_id
 
 
-def seal(repo: Path, source_commit: str, manifest: str, tag: str, files: dict[str, str | bytes]) -> Release:
-    provenance, seed_id = _stamp(source_commit, manifest)
+def seal(repo: Path, source_commit: str, manifest: str, tag: str, files: dict[str, str | bytes], *, bundle: str = "macos-bizops") -> Release:
+    provenance, seed_id = _stamp(source_commit, manifest, bundle)
     (repo / "PROVENANCE.json").write_bytes(provenance)
     for name, content in files.items():
         path = repo / name
@@ -532,7 +533,24 @@ def candidate_tree_files(files: dict[str, bytes], *, extra: dict[str, str | byte
     return tree
 
 
+def _bundle_identity(candidate: Release) -> tuple[str, str]:
+    """The sealed bundle name and the release profile it selects (the seed lock carries both).
+
+    An unknown bundle keeps its own name.  A release whose provenance is not a bundle stamp (a raw or empty
+    provenance, as some smokes seal) names no bundle, as production identity reads it, so the fixtures'
+    historic default stands.
+    """
+    from github_midwife_plugin.profile_identity import PROFILE_TEMPLATE_BY_BUNDLE  # noqa: PLC0415
+
+    try:
+        name = cast(str, json.loads(candidate.provenance)["bundle"]["name"])
+    except (ValueError, KeyError, TypeError):
+        return "macos-bizops", "macos-bizops"
+    return name, PROFILE_TEMPLATE_BY_BUNDLE.get(name, name)
+
+
 def descriptor(candidate: Release, contract: str) -> bytes:
+    bundle_name, profile = _bundle_identity(candidate)
     value = {
         "schema_version": 3,
         "channel_id": "stable",
@@ -541,14 +559,14 @@ def descriptor(candidate: Release, contract: str) -> bytes:
         "commit": candidate.commit,
         "tree_hash": candidate.tree,
         "archive_sha256": "f" * 64,
-        "profile": "macos-bizops",
+        "profile": profile,
         "provenance": {
             "schema_version": 1,
             "provenance_sha256": hashlib.sha256(candidate.provenance).hexdigest(),
             "seed_id": candidate.seed_id,
             "origin_id": ORIGIN_ID,
             "manifest_sha256": candidate.manifest,
-            "bundle_name": "macos-bizops",
+            "bundle_name": bundle_name,
             "platform": "local",
             "source_commit": candidate.source_commit,
             "source_date": "2026-09-16T00:00:00+00:00",
@@ -560,6 +578,7 @@ def descriptor(candidate: Release, contract: str) -> bytes:
 
 
 def installed(candidate: Release, raw: bytes, contract: str) -> InstalledUpdateDescriptor:
+    profile = _bundle_identity(candidate)[1]
     digest = "sha256:" + hashlib.sha256(raw).hexdigest()
     identity = ChannelInspectionIdentity(
         "stable",
@@ -567,7 +586,7 @@ def installed(candidate: Release, raw: bytes, contract: str) -> InstalledUpdateD
         candidate.tag,
         candidate.commit,
         candidate.tree,
-        "macos-bizops",
+        profile,
         hashlib.sha256(candidate.provenance).hexdigest(),
         candidate.seed_id,
         ORIGIN_ID,
@@ -685,7 +704,7 @@ def _target_path(root: Path, router: bool) -> Path:
     return root / "releases" / "current" / "target" if router else root / "target"
 
 
-def build_fixture(root: Path, *, document: Callable[[Release], dict[str, Any]] | None = None, router: bool = False, roster: tuple[str, ...] = ("github_midwife_plugin",), legacy_plist: bool = True, host: FakeHost | None = None, extra_candidate_files: dict[str, str | bytes] | None = None, truthful: bool = False, at_candidate: bool = False, baseline_extra: dict[str, str | bytes] | None = None, candidate_removals: tuple[str, ...] = ()) -> Fixture:
+def build_fixture(root: Path, *, document: Callable[[Release], dict[str, Any]] | None = None, router: bool = False, roster: tuple[str, ...] = ("github_midwife_plugin",), legacy_plist: bool = True, host: FakeHost | None = None, extra_candidate_files: dict[str, str | bytes] | None = None, truthful: bool = False, at_candidate: bool = False, baseline_extra: dict[str, str | bytes] | None = None, candidate_removals: tuple[str, ...] = (), bundle: str = "macos-bizops") -> Fixture:
     """``at_candidate=True`` (Step 6, F-ZD-1) clones the target already AT the candidate release and enrols it there."""
     root.mkdir(parents=True, exist_ok=True)
     source = root / "source"
@@ -699,13 +718,13 @@ def build_fixture(root: Path, *, document: Callable[[Release], dict[str, Any]] |
     baseline_tree[ADAPTER_MODULE] = (_ROOT / ADAPTER_MODULE).read_bytes()
     if baseline_extra:
         baseline_tree.update(baseline_extra)
-    baseline = seal(source, "a" * 40, "b" * 64, "r1", baseline_tree)
+    baseline = seal(source, "a" * 40, "b" * 64, "r1", baseline_tree, bundle=bundle)
     document_value = bundle_document(baseline) if document is None else document(baseline)
     files = bundle_files(document_value)
     contract = bundle_digest(files)
     for removed in candidate_removals:
         (source / removed).unlink()
-    candidate = seal(source, "c" * 40, "d" * 64, "r2", candidate_tree_files(files, extra=extra_candidate_files))
+    candidate = seal(source, "c" * 40, "d" * 64, "r2", candidate_tree_files(files, extra=extra_candidate_files), bundle=bundle)
     target = _target_path(root, router)
     _clone(source, target)
     enrolled = candidate if at_candidate else baseline

@@ -34,8 +34,8 @@ from .coordination_marketplace import HOOK_MANIFEST, pin_action, pin_needed, rec
 from .coordination_marketplace import register as register_marketplace
 from .coordination_marketplace import registration as marketplace_registration
 from .export_root_validation import BUSINESS_CONNECTOR_PLUGINS, CONFIG_KEY_EXPORT_ALLOWED_ROOTS, configure_export_root
-from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, evidence, planned_action, result
-from .setup_adapter_runtime import CommandOutcome, Runtime, executable_fallback_directories, resolve_executable
+from .setup_adapter_contract import REPAIR_LIMIT, AdapterRequest, JsonObject, JsonValue, evidence, planned_action, result
+from .setup_adapter_runtime import CommandOutcome, Runtime, describe_outcome, executable_fallback_directories, resolve_executable
 from .setup_plugin_operations import _claude_receipt_is_current, _manifest_has_absolute_python, _patch_hook_manifest, _publish_claude_receipt, plugin_list_rows, plugin_row_visible, run_plugin_list
 
 STRUCTURED_OUTPUT_LIMIT = 64 * 1024
@@ -84,8 +84,8 @@ def migration_solet_rename(request: AdapterRequest, runtime: Runtime) -> JsonObj
         return _pending_or_verified(request, items, plan.empty, "Apply the rename migration.", _rename_actions(request, runtime, plan))
     if plan.empty:
         return result(request, status="applied", retry_safe=True, evidence_items=items)
-    if plan.claude_json_servers and _claude_code_running(runtime) is not False:
-        return blocked(request, "coding_agent_running", "A Claude Code process is running (or its state could not be determined); it rewrites ~/.claude.json on exit. Quit Claude Code, then re-run --yes.")
+    if plan.claude_json_servers and (running := _claude_code_running(runtime)) is not False:
+        return blocked(request, "coding_agent_running", _coding_agent_repair(running))
     _apply_plist_renames(runtime, plan)
     _apply_text_renames(request, runtime, plan)
     if plan.claude_json_servers:
@@ -221,13 +221,22 @@ def _apply_claude_json(runtime: Runtime, servers: tuple[str, ...]) -> None:
     runtime.atomic_write(path, json.dumps(data, indent=2, ensure_ascii=False), mode=file_mode(path, 0o600))
 
 
-def _claude_code_running(runtime: Runtime) -> bool | None:
+def _claude_code_running(runtime: Runtime) -> bool | str:
+    """``True``/``False`` when ``pgrep`` answered; otherwise why it could not (iss_67d2597e)."""
     outcome = runtime.run(("/usr/bin/pgrep", "-x", "claude"), timeout_seconds=10)
-    if outcome.executable_missing or outcome.timed_out:
-        return None
-    if outcome.returncode == 0:
-        return True
-    return False if outcome.returncode == 1 else None
+    if outcome.executable_missing:
+        return "pgrep missing"
+    if outcome.timed_out:
+        return "pgrep timed out"
+    if outcome.returncode in (0, 1):
+        return outcome.returncode == 0
+    return f"pgrep exited {outcome.returncode}"
+
+
+def _coding_agent_repair(running: bool | str) -> str:
+    if isinstance(running, str):
+        return f"Claude Code's state could not be determined ({running}); it rewrites ~/.claude.json on exit if it is running. Check for a running Claude Code yourself and quit it, then re-run --yes."
+    return "A Claude Code process is running; it rewrites ~/.claude.json on exit. Quit Claude Code, then re-run --yes."
 
 
 # --- existing::migration.export_root_containment ----------------------------------------
@@ -239,6 +248,8 @@ class ExportRootFacts:
     installed: tuple[str, ...]
     distinct: tuple[str, ...]
     missing: tuple[str, ...]
+    #: Each installed connector with the roots it holds, in ``installed`` order (iss_67d2597e).
+    roots: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @property
     def chosen_root(self) -> str | None:
@@ -259,7 +270,7 @@ def migration_export_root_containment(request: AdapterRequest, runtime: Runtime)
         items = [facts_evidence("migration.export_root_containment", observed, verified=True)]
         return result(request, status="applied" if request.phase == "apply" else "verified", evidence_items=items)
     if len(facts.distinct) > 1:
-        return blocked(request, "export_root_ambiguous", "Installed connectors disagree about the export root; reconcile profile/config/plugins by hand.")
+        return blocked(request, "export_root_ambiguous", _export_root_repair(request, facts))
     items = [facts_evidence("migration.export_root_containment", facts.facts(), verified=not facts.missing)]
     if request.phase == "probe":
         actions = [planned_action(action_id=f"export_root.{plugin}", title=f"Propagate the export root to {plugin}", mutation_kind="file_write", target=str(facts.config_dir / f"{plugin}.json"), evidence_ref="migration.export_root_containment") for plugin in facts.missing]
@@ -275,7 +286,19 @@ def _export_root_facts(request: AdapterRequest) -> ExportRootFacts:
     roots = {plugin: _connector_roots(config_dir / f"{plugin}.json") for plugin in installed}
     distinct = tuple(sorted({root for values in roots.values() for root in values}))
     missing = tuple(plugin for plugin, values in roots.items() if not values)
-    return ExportRootFacts(config_dir, installed, distinct, missing)
+    return ExportRootFacts(config_dir, installed, distinct, missing, tuple((plugin, tuple(values)) for plugin, values in roots.items()))
+
+
+def _export_root_repair(request: AdapterRequest, facts: ExportRootFacts) -> str:
+    """The refusal names every connector and the roots it holds; when that does not fit ``REPAIR_LIMIT`` each entry is ellipsized, never dropped."""
+    head = "Installed connectors disagree about the export root: "
+    tail = f". Edit export_allowed_roots in this clone's profile/config/plugins/<plugin>.json so every connector holds one root, then run solet-manager update {request.name} --dry-run again."
+    budget = REPAIR_LIMIT - len(head) - len(tail)
+    entries = [f"{plugin}={', '.join(values) or '(none)'}" for plugin, values in facts.roots]
+    if len("; ".join(entries)) > budget:
+        share = max(budget // len(entries) - 2, 2)
+        entries = [entry if len(entry) <= share else f"{entry[: share - 1]}…" for entry in entries]
+    return f"{head}{'; '.join(entries)}{tail}"
 
 
 def _connector_roots(config_path: Path) -> list[str]:
@@ -402,21 +425,22 @@ def _cache_facts(request: AdapterRequest, runtime: Runtime, executable: str) -> 
 
 def _list_failure(listed: CommandOutcome) -> str:
     """Exit code, timeout/truncation and stderr of a ``plugin list`` that yielded no parseable rows."""
-    state = "timed out" if listed.timed_out else f"exit {listed.returncode}"
+    state = describe_outcome(listed)
     if listed.ok:
-        state += ", stdout truncated" if listed.stdout_truncated else ", stdout is not a JSON list"
-    stderr = listed.stderr.strip()[:400]
-    return f"{state}; stderr: {stderr!r}" if stderr else state
+        suffix = ", stdout truncated" if listed.stdout_truncated else ", stdout is not a JSON list"
+        head, separator, stderr = state.partition("; stderr: ")
+        state = f"{head}{suffix}{separator}{stderr}"
+    return state
 
 
 def _cache_reinstall(request: AdapterRequest, runtime: Runtime, facts: CacheFacts) -> JsonObject | None:
     """Uninstall and reinstall the plugin; the refusal, or ``None`` once the CLI reinstalled it."""
     removed = runtime.run((facts.executable, "plugin", "uninstall", facts.selector), timeout_seconds=request.timeout_seconds, cwd=request.target)
     if not removed.ok:
-        return blocked(request, "claude_plugin_uninstall_failed", "The Claude CLI refused the uninstall; inspect its output.")
+        return blocked(request, "claude_plugin_uninstall_failed", f"The Claude CLI refused the uninstall ({describe_outcome(removed)}); inspect `claude plugin list`, then run `solet-manager update {request.name} --dry-run` again.")
     installed = runtime.run((facts.executable, "plugin", "install", facts.selector), timeout_seconds=request.timeout_seconds, cwd=request.target)
     if not installed.ok:
-        return blocked(request, "claude_plugin_install_failed", "The Claude CLI refused the reinstall; inspect its output.")
+        return blocked(request, "claude_plugin_install_failed", f"The Claude CLI refused the reinstall ({describe_outcome(installed)}); inspect `claude plugin list`, then run `solet-manager update {request.name} --dry-run` again.")
     return None
 
 

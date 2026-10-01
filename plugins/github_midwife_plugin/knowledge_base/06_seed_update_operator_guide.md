@@ -86,7 +86,11 @@ you'd rather do it.
 - Once a solet has been updated, check it with `solet-manager doctor
   <name>`. The older `solet status <name>` may keep showing `blocked`, and
   `solet doctor <name>` may refuse with a contract error; neither changes
-  anything on your machine (iss_0a10e6db).
+  anything on your machine (iss_0a10e6db). A solet you imported, rather
+  than created, is not known to `solet status`, `solet start` or
+  `solet doctor`: they refuse with `instance_imported` and name
+  `solet-manager doctor <name>`; start it through launchd
+  (`launchctl kickstart -k gui/$(id -u)/local.solet.<name>`).
 - You'll need a terminal window and about 10 minutes, most of which is
   waiting.
 
@@ -347,7 +351,19 @@ move.
 
 If you edited your LM Studio embedding settings by hand, the update will not
 overwrite them. It leaves that part as it is and says so; ask your agent to
-walk you through the choice.
+walk you through the choice. Changing only the timeout, or adding a key of
+your own, does not stop the switch: the update compares the endpoint and the
+model.
+
+If your solet is already on r64 and `solet-manager doctor` still says
+"Embeddings keep using LM Studio on this solet's profile", update to r65. Its
+`update --dry-run` on r64 says `already_current`, and re-running it cannot
+change that. The r65 update identifies your solet's profile from its
+provenance instead of the `profile_name` label, so it plans the switch. If
+`solet-manager doctor` instead says it cannot identify this solet's profile,
+follow the repair it prints (set `profile_name` in the profile's manifest.yaml
+to the profile the solet was born from, or restore `PROVENANCE.json`), then run
+`solet-manager update <name>` again.
 
 ## What changed in this release — you can now run a small fleet of sessions from this solet (2026-08-10 update)
 

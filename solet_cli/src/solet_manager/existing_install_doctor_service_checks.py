@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 from typing import cast
 
+from .colour_census import COLOUR_OUTSIDE_LAUNCHAGENT, colour_command_suffix, colour_pids, read_process_rows, recovery_command
 from .errors import AdapterError, AdapterProtocolError, ManagerError, StateConflictError
 from .existing_install_adapters import ATTEST_PROCESS_KEY, KNOWLEDGE_SEARCH_PROCESS_KEY
 from .existing_install_doctor_probe import DoctorProbe, artifact_check, artifact_facts, check, not_applicable, operation_by_ref, probe_status, unbound_reason, unknown, verdict
@@ -196,33 +197,42 @@ def _expected_release_id(probe: DoctorProbe) -> str | None:
 
 
 def _process_rows(probe: DoctorProbe) -> list[tuple[int, str, str]] | None:
-    try:
-        completed = probe.seams.run_ps(30)
-    except OSError:
-        return None
+    rows = read_process_rows(probe.seams.run_ps)
     probe.invoked_vectors.append("manager_host:ps")
-    if completed.returncode != 0:
-        return None
-    rows: list[tuple[int, str, str]] = []
-    for line in completed.stdout.splitlines():
-        parts = line.strip().split(None, 6)
-        if len(parts) < 7 or not parts[0].isdigit():
-            continue
-        rows.append((int(parts[0]), " ".join(parts[1:6]), parts[6]))
     return rows
 
 
 def _process_identity(probe: DoctorProbe) -> DiagnosticCheck:
     pid = probe.pid_observed
+    rows = _process_rows(probe)
+    outside = _colours_outside_launchd(probe, rows, pid)
+    if outside:
+        return _colour_outside_check(probe, pid, outside)
+    if rows is None:
+        # Without the table a dormant job cannot be told from a colour serving outside it, and bootstrapping a second colour is the wrong repair for the latter.
+        dormant = pid is None or pid <= 0
+        summary = "The process table could not be read, so a dormant LaunchAgent cannot be told from a colour serving outside it." if dormant else "The process table could not be read."
+        return unknown("runtime_process_identity", summary, "manager_host", reason="service_offline")
     if pid is None or pid <= 0:
         return check("runtime_process_identity", DiagnosticStatus.FAILED, "launchd reports no running process for the instance.", "manager_host", reason="launchagent_not_running", repair="bootstrap_launchagent", observed=pid)
-    rows = _process_rows(probe)
-    if rows is None:
-        return unknown("runtime_process_identity", "The process table could not be read.", "manager_host", reason="service_offline")
     command = next((command for row_pid, _, command in rows if row_pid == pid), None)
     before = _pid_before(probe)
     ok, reason = _process_identity_verdict(probe, command, pid, before)
     return verdict("runtime_process_identity", ok, "The launchd pid runs the target's own interpreter and postdates the restart.", "manager_host", reason=reason, observed={"pid": pid, "command": command, "pid_before": before}, expected=f"{probe.target}/.venv/", repair="restart_launchagent")
+
+
+def _colours_outside_launchd(probe: DoctorProbe, rows: list[tuple[int, str, str]] | None, pid: int | None) -> tuple[int, ...]:
+    """iss_75b87670: the target's colours other than the LaunchAgent's own pid (none when the table cannot be read)."""
+    if rows is None:
+        return ()
+    return tuple(item for item in colour_pids(rows, probe.target) if item != pid)
+
+
+def _colour_outside_check(probe: DoctorProbe, pid: int | None, outside: tuple[int, ...]) -> DiagnosticCheck:
+    label = probe.record.service_identity.launchagent_label
+    command = recovery_command(probe.seams.uid, label, outside)
+    summary = f"pid {', '.join(str(item) for item in outside)} runs the target's code outside the LaunchAgent; hand serving back to launchd with `{command}`."
+    return check("runtime_process_identity", DiagnosticStatus.FAILED, summary, "manager_host", reason=COLOUR_OUTSIDE_LAUNCHAGENT, repair="hand_serving_back_to_launchagent", observed={"launchd_pid": pid, "colour_pids": list(outside)})
 
 
 def _process_identity_verdict(probe: DoctorProbe, command: str | None, pid: int, before: int | None) -> tuple[bool, str]:
@@ -255,7 +265,7 @@ def _target_launch_vector(probe: DoctorProbe, label: str, interpreter: Path, app
 
 def _target_process_command(command: str, interpreter: Path, app_home: Path) -> bool:
     """Accept the exact venv launch or its macOS framework process display."""
-    suffix = f" -m ananta.cli --app-home {app_home}"
+    suffix = colour_command_suffix(app_home)
     if not command.endswith(suffix):
         return False
     try:

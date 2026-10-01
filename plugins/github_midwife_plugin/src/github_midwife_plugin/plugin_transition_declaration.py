@@ -18,9 +18,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, cast
 
+from .profile_identity import PROFILE_TEMPLATE_BY_BUNDLE
 from .setup_adapter_contract import JsonObject, JsonValue
 
 __all__ = [
@@ -50,7 +51,7 @@ _MIGRATION_ID = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$")
 _PROFILE = re.compile(r"^[a-z][a-z0-9-]{1,63}$")
 
 type Kind = Literal["replace", "add", "retire"]
-type State = Literal["not_applicable", "unsupported", "done", "eligible", "partial", "conflict", "host_unsupported"]
+type State = Literal["not_applicable", "unsupported", "done", "cleanup", "eligible", "partial", "conflict", "host_unsupported"]
 
 
 class DeclarationError(ValueError):
@@ -103,18 +104,44 @@ class PluginConfig:
 
 @dataclass(frozen=True, slots=True)
 class Observation:
-    """The managed subset of one target's profile config, read once."""
+    """The managed subset of one target's profile config, read once.
+
+    ``profile`` is the release profile the solet was identified as (from its sealed
+    provenance, see ``profile_identity``); ``None`` with a ``profile_problem`` when it
+    could not be.  ``manifest_profile`` is the ``profile_name`` label as written, for evidence only.
+    """
 
     profile: str | None
     roster: tuple[str, ...]
     bindings: dict[str, str]
     configs: dict[str, PluginConfig]
+    manifest_profile: str | None = None
+    profile_problem: str | None = None
+
+
+_CONFIG_REPAIR = "restore the config"
+_ROSTER_REPAIR = "put the plugin roster and service bindings back the way the release set them (profile/config/manifest.yaml and service_bindings.json)"
+_LEFTOVER_REPAIR = "bind those services to another plugin or remove the old plugin from the roster by hand (profile/config/manifest.yaml and service_bindings.json)"
+_RELEASE_PROFILES = sorted(set(PROFILE_TEMPLATE_BY_BUNDLE.values()))
+_PROFILE_REPAIR = (
+    "set profile_name in profile/config/manifest.yaml to the profile this solet was born from "
+    f"({', '.join(_RELEASE_PROFILES[:-1])} or {_RELEASE_PROFILES[-1]}), or restore PROVENANCE.json"
+)
 
 
 @dataclass(frozen=True, slots=True)
 class Classification:
+    """One transition's state; ``repair`` is what an owner does about an open ``conflict`` (the kind decides it).
+
+    ``running`` is the plugin the transition's service is bound to in the observation this was classified on
+    (``None``: unbound, or no service).  Every owner sentence that says where the service runs is built from it,
+    never from the state's name.
+    """
+
     state: State
     detail: str
+    repair: str = _CONFIG_REPAIR
+    running: str | None = None
 
 
 # --- parsing ---------------------------------------------------------------------
@@ -249,10 +276,12 @@ def classify(transition: Transition, observation: Observation, rendered: str | N
     the release cannot render it, or the kind has no replacement).
     """
     if transition.kind == "replace":
-        return _classify_replace(transition, observation, rendered)
-    if transition.kind == "add":
-        return _classify_add(transition, observation, rendered)
-    return _classify_retire(transition, observation)
+        state = _classify_replace(transition, observation, rendered)
+    elif transition.kind == "add":
+        state = _classify_add(transition, observation, rendered)
+    else:
+        state = _classify_retire(transition, observation)
+    return replace(state, running=None if transition.service is None else observation.bindings.get(transition.service))
 
 
 def _classify_replace(transition: Transition, observation: Observation, rendered: str | None) -> Classification:
@@ -260,39 +289,78 @@ def _classify_replace(transition: Transition, observation: Observation, rendered
     target = cast(TargetPlugin, transition.target)
     service = cast(str, transition.service)
     roster = observation.roster
-    bound_source = _bound(observation, source.plugin)
-    bound_target = _bound(observation, target.plugin)
-    if source.plugin not in roster and target.plugin in roster and bound_target == [service] and not bound_source:
-        return Classification("done", f"{service} is served by {target.plugin}")
+    if _served_by_replacement(transition, observation):
+        return _classify_served(transition, observation)
     if source.plugin not in roster:
         return Classification("not_applicable", f"{source.plugin} is not in the roster")
-    if observation.profile not in transition.profiles:
-        return Classification("unsupported", f"profile {observation.profile!r} has no declared {transition.migration_id} transition")
+    gated = _profile_gate(transition, observation, "unsupported")
+    if gated is not None:
+        return gated
     refusal = _replace_refusal(transition, observation, rendered)
     if refusal is not None:
-        return Classification("conflict", refusal)
+        return refusal
     if target.plugin not in roster:
         return Classification("eligible", f"{service}: {source.plugin} -> {target.plugin}")
     return Classification("partial", f"{service}: an interrupted {source.plugin} -> {target.plugin} write")
 
 
-def _replace_refusal(transition: Transition, observation: Observation, rendered: str | None) -> str | None:
+def _served_by_replacement(transition: Transition, observation: Observation) -> bool:
+    """The replacement is on the roster and is what the service is bound to, whatever else the roster still lists."""
+    target = cast(TargetPlugin, transition.target)
+    return target.plugin in observation.roster and _bound(observation, target.plugin) == [transition.service]
+
+
+def _classify_served(transition: Transition, observation: Observation) -> Classification:
+    """The service runs on the replacement: ``done``, unless the old plugin is still listed.
+
+    A still-listed old plugin bound to no service is ``cleanup``: the update plans exactly the roster
+    removal that ends a replace, because the platform loads every listed plugin and an old embeddings
+    plugin still qualifies against LM Studio at each boot.  One still bound to another service is kept and
+    reported as a ``conflict`` (a leftover), never removed or silently ignored.
+    """
+    source = cast(SourcePlugin, transition.source)
+    target = cast(TargetPlugin, transition.target)
+    note = f"{transition.service} is served by {target.plugin}"
+    if source.plugin not in observation.roster:
+        return Classification("done", note)
+    listed = f"{note}; {source.plugin} is still listed"
+    gated = _profile_gate(transition, observation, "done")
+    if gated is not None:
+        return gated if gated.state == "conflict" else Classification("done", listed)
+    if observation.roster.count(source.plugin) != 1 or observation.roster.count(target.plugin) != 1:
+        return Classification("conflict", "the roster repeats a transition plugin", _ROSTER_REPAIR)
+    bound = _bound(observation, source.plugin)
+    if bound:
+        return Classification("conflict", f"{listed} and still bound to {', '.join(bound)}; it is kept, not removed", _LEFTOVER_REPAIR)
+    return Classification("cleanup", f"{listed} and unused")
+
+
+def _profile_gate(transition: Transition, observation: Observation, excluded: State) -> Classification | None:
+    """A solet whose profile the release cannot identify is a conflict; one whose identified profile is not declared is ``excluded``."""
+    if observation.profile_problem is not None:
+        return Classification("conflict", observation.profile_problem, _PROFILE_REPAIR)
+    if observation.profile in transition.profiles:
+        return None
+    return Classification(excluded, f"profile {observation.profile!r} has no declared {transition.migration_id} transition")
+
+
+def _replace_refusal(transition: Transition, observation: Observation, rendered: str | None) -> Classification | None:
     source = cast(SourcePlugin, transition.source)
     target = cast(TargetPlugin, transition.target)
     service = cast(str, transition.service)
     roster = observation.roster
     if roster.count(source.plugin) != 1 or roster.count(target.plugin) > 1:
-        return "the roster repeats a transition plugin"
+        return Classification("conflict", "the roster repeats a transition plugin", _ROSTER_REPAIR)
     config_refusal = _source_config_refusal(source, observation) or _target_config_refusal(target, observation, rendered)
     if config_refusal is not None:
-        return config_refusal
+        return Classification("conflict", config_refusal)
     bindings = (_bound(observation, source.plugin), _bound(observation, target.plugin))
     if target.plugin not in roster:
-        return None if bindings == ([service], []) else f"{source.plugin} is not bound to exactly {service}"
+        return None if bindings == ([service], []) else Classification("conflict", f"{source.plugin} is not bound to exactly {service}", _ROSTER_REPAIR)
     adjacent = roster.index(target.plugin) == roster.index(source.plugin) + 1
     if adjacent and bindings in (([service], []), ([], [service])):
         return None
-    return f"{target.plugin} is already in the roster in a state this transition did not write"
+    return Classification("conflict", f"{target.plugin} is already in the roster in a state this transition did not write", _ROSTER_REPAIR)
 
 
 def _source_config_refusal(source: SourcePlugin, observation: Observation) -> str | None:
@@ -321,12 +389,13 @@ def _classify_add(transition: Transition, observation: Observation, rendered: st
     service = transition.service
     if target.plugin in observation.roster and (service is None or observation.bindings.get(service) == target.plugin):
         return Classification("done", f"{target.plugin} is in the roster")
-    if observation.profile not in transition.profiles:
-        return Classification("not_applicable", f"profile {observation.profile!r} is not declared")
+    gated = _profile_gate(transition, observation, "not_applicable")
+    if gated is not None:
+        return gated
     if target.plugin in observation.roster:
-        return Classification("conflict", f"{target.plugin} is in the roster but {service} is bound elsewhere")
+        return Classification("conflict", f"{target.plugin} is in the roster but {service} is bound elsewhere", _ROSTER_REPAIR)
     if service is not None and service in observation.bindings:
-        return Classification("conflict", f"{service} is already bound to {observation.bindings[service]}")
+        return Classification("conflict", f"{service} is already bound to {observation.bindings[service]}", _ROSTER_REPAIR)
     refusal = _target_config_refusal(target, observation, rendered)
     if refusal is not None:
         return Classification("conflict", refusal)
@@ -337,11 +406,12 @@ def _classify_retire(transition: Transition, observation: Observation) -> Classi
     source = cast(SourcePlugin, transition.source)
     if source.plugin not in observation.roster:
         return Classification("done", f"{source.plugin} is not in the roster")
-    if observation.profile not in transition.profiles:
-        return Classification("unsupported", f"profile {observation.profile!r} has no declared {transition.migration_id} transition")
+    gated = _profile_gate(transition, observation, "unsupported")
+    if gated is not None:
+        return gated
     bound = _bound(observation, source.plugin)
     if bound:
-        return Classification("conflict", f"{source.plugin} still serves {', '.join(bound)}")
+        return Classification("conflict", f"{source.plugin} still serves {', '.join(bound)}", _ROSTER_REPAIR)
     refusal = _source_config_refusal(source, observation)
     if refusal is not None:
         return Classification("conflict", refusal)
@@ -360,23 +430,43 @@ _LEFT_AS_IS = "LM Studio and its models are left exactly as they were"
 def owner_sentence(transition: Transition, state: Classification) -> str:
     """The one owner-facing sentence for a transition in ``state``: what is true now, never the finished outcome early.
 
-    Every sentence that still involves the old plugin says the solet still uses it
-    (B4: a Samantha owner must not read that summaries left LM Studio), and none
-    ever implies LM Studio or its models are removed (rul_ef0363a2).  An open switch
-    happens with the next release's update: an update at the release a verified
-    solet already runs is ``already_current`` and changes nothing (iss_e3b3e159);
-    only an update that left the switch pending is finished by re-running it.
+    Where the service runs is read from the binding the state was classified on (``state.running``), never
+    from the state's name: a conflict or a host refusal can sit on a service that already runs on the
+    replacement (a leftover bound elsewhere, an unidentified profile).  Every sentence that still involves
+    the old plugin says the solet still uses it only when the service is bound to it (B4: a Samantha owner
+    must not read that summaries left LM Studio), and none ever implies LM Studio or its models are removed
+    (rul_ef0363a2).  An open switch happens with the next release's update: an update at the release a
+    verified solet already runs is ``already_current`` and changes nothing (iss_e3b3e159); only an update
+    that left the switch pending is finished by re-running it.
     """
     label = transition.service_label
     replacement = transition.replacement_label
     old = "LM Studio"
+    now = _now(transition, state)
+    on_source = _runs_on_source(transition, state)
     sentences: dict[str, str] = {
         "done": f"{label.capitalize()} run on {replacement}.{' ' + transition.done_note if transition.done_note else ''} {_LEFT_AS_IS}; the solet simply stops using them for {label}.",
-        "eligible": f"{label.capitalize()} still use {old}. This Mac supports Apple-native; the solet switches {label} to {replacement} with the next release's update (or when an update that left the switch pending is re-run). {old} stays in use until then.",
+        "cleanup": f"{label.capitalize()} run on {replacement}.{' ' + transition.done_note if transition.done_note else ''} The unused {transition.source.plugin if transition.source else 'old plugin'} entry is still in the plugin roster; the next update removes it. {_LEFT_AS_IS}.",
+        "eligible": f"{label.capitalize()} {'still use ' + old if on_source else now}. This Mac supports Apple-native; the solet switches {label} to {replacement} with the next release's update (or when an update that left the switch pending is re-run). {old + ' stays in use until then' if on_source else 'Nothing changes until then'}.",
         "partial": f"A switch of {label} to {replacement} was interrupted; the next update finishes it, and {label} keep working meanwhile.",
-        "conflict": f"{label.capitalize()} stay on {old} because its settings differ from the release defaults ({state.detail}). {_LEFT_AS_IS}.",
-        "host_unsupported": f"{state.detail[0].upper()}{state.detail[1:]}. The solet keeps using {old} for {label}; {_LEFT_AS_IS}.",
-        "unsupported": f"{label.capitalize()} keep using {old} on this solet's profile; keep {old} installed and running.",
-        "not_applicable": f"Nothing to switch: this solet does not use {old} for {label}.",
+        "conflict": f"{label.capitalize()} {now}: {state.detail}. {_LEFT_AS_IS}.",
+        "host_unsupported": f"{state.detail[0].upper()}{state.detail[1:]}. {'The solet keeps using ' + old + ' for ' + label if on_source else label.capitalize() + ' ' + now}; {_LEFT_AS_IS}.",
+        "unsupported": f"{label.capitalize()} keep using {old} on this solet's profile; keep {old} installed and running." if on_source else f"{label.capitalize()} {now}; this solet's profile has no switch declared for them.",
+        "not_applicable": f"Nothing to switch: this solet does not use {old} for {label}." if not on_source else f"Nothing to switch: {label} are bound to {old}, which is not in the plugin roster.",
     }
     return sentences[state.state]
+
+
+def _runs_on_source(transition: Transition, state: Classification) -> bool:
+    return transition.source is not None and state.running == transition.source.plugin
+
+
+def _now(transition: Transition, state: Classification) -> str:
+    """Where the service runs now, as a predicate after its plural label: from the binding, in the owner's terms."""
+    if transition.target is not None and state.running == transition.target.plugin:
+        return f"run on {transition.replacement_label}"
+    if _runs_on_source(transition, state):
+        return "stay on LM Studio"
+    if state.running is None:
+        return "have no bound plugin"
+    return f"run on {state.running}"

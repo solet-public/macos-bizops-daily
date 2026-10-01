@@ -507,8 +507,10 @@ class ManagedArtifactState:
     stamped_digest: str | None
     template_digest: str
     expected_sha256: str | None
+    current_sha256: str | None
     conflict: str | None
     operation_id: str
+    adopt_diff: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)

@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from .colour_census import read_colour_census, recovery_command
 from .cutover_fingerprint import cutover_fingerprint
 from .cutover_receipts import CutoverTerms, new_reconciliation_id, terminal_receipt_digest
 from .errors import (
@@ -321,7 +322,28 @@ def _require_single_color_serving(execution: RuntimeExecution, plan: RuntimePlan
     before = _pid_before(row)
     if before is not None and before == pid:
         raise UpdateFailedError("launchagent_start_failed", "the LaunchAgent still reports the pre-restart process", repair=f"Inspect launchd; {_reconcile(execution)}")
-    execution._record(LIFECYCLE_RESTART_ID, "manager", None, status="verified", note={"pid_after": pid, "interpreter_root": execution.record.target.canonical_path})  # noqa: SLF001
+    census = _require_sole_colour(execution, plan, pid)
+    execution._record(LIFECYCLE_RESTART_ID, "manager", None, status="verified", note={"pid_after": pid, "colour_pids": list(census), "interpreter_root": execution.record.target.canonical_path})  # noqa: SLF001
+
+
+def _require_sole_colour(execution: RuntimeExecution, plan: RuntimePlan, pid: int) -> tuple[int, ...]:
+    """iss_75b87670: the launchd pid must be the only colour of the target; another colour means the old code may still serve.
+
+    A colour activates only when the router has no active colour, so a colour that survived outside launchd keeps serving
+    the old release behind a healthy bridge.  The census is read once, after launchd reports a fresh pid.
+    """
+    census = read_colour_census(execution.context.seams.run_ps, Path(execution.record.target.canonical_path))
+    if census is None:
+        raise UpdateFailedError("runtime_candidate_not_serving", "the process table could not be read, so the restarted LaunchAgent cannot be shown to be the only colour serving", repair=f"Inspect `ps`; {_reconcile(execution)}")
+    if census != (pid,):
+        outside = ", ".join(str(item) for item in census if item != pid) or "none"
+        label = plan.lifecycle.launchagent_label
+        raise UpdateFailedError(
+            "runtime_candidate_not_serving",
+            f"after the restart the LaunchAgent runs pid {pid} but the target's colours are {list(census)}; pid {outside} outside launchd may still serve the old release",
+            repair=f"Hand serving back to launchd with `{recovery_command(execution.context.seams.uid, label, tuple(item for item in census if item != pid))}`; {_reconcile(execution)}",
+        )
+    return census
 
 
 # --- post-runtime reconcile stage (section 7.6) --------------------------------------------

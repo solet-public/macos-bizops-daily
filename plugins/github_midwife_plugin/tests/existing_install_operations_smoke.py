@@ -328,10 +328,10 @@ def _check_whole_file_and_plist(root: Path) -> None:
     _check(_state(legacy, "instance_launchagent_plist")["state"] == "legacy_matched", "genesis-era unstamped plist recognised")
     plist.write_bytes(rendered.replace(b"<true/>", b"<false/>", 1))
     modified = _probe(target, runtime, ref, "instance_launchagent_plist")
-    _check(modified["error_kind"] == "managed_file_locally_modified", "stamped plist with edited bytes is locally modified")
+    _check((modified["checkpoint_status"], _state(modified, "instance_launchagent_plist")["state"], _state(modified, "instance_launchagent_plist")["action"]) == ("pending", "locally_modified", "render_whole"), "a stamped legacy_direct plist with edited bytes is adopted (iss_d1f3371b)")
     plist.write_bytes(b"<plist/>\n")
     unknown = _probe(target, runtime, ref, "instance_launchagent_plist")
-    _check(unknown["error_kind"] == "managed_block_unknown_origin", "unstamped unknown plist blocks")
+    _check(unknown["error_kind"] == "managed_block_unknown_origin", "an unparseable plist still blocks")
     # wrong kind through the hydration handler, and an unplanned destination
     wrong = cast(dict[str, Any], dispatch_request(_request(target, "existing::hydration.reconcile", inputs=_inputs(runtime, target, "instance_launchagent_plist")), runtime))
     _check(wrong["error_kind"] == "adapter_protocol_error", "the plist is not a hydration.reconcile artifact")

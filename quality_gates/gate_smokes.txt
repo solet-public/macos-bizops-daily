@@ -5173,12 +5173,14 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/update_resume_pinned_predecessor_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports update_legacy_direct_runtime_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/doctor_promoted_seed_identity_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_hydration_block_carry_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_plist_adopt_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: quality_gates/tests/smoke_contract_lint_gate_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it calls checkout_only_consistency_violations directly to prove the repo-level contract-lint gate, which is in no capability bundle (fixture_build_tooling)
 # not shipped: ananta/tests/core/orchestration/selected_inference_startup_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin; absent from macos_free_minimal and macos_samantha, which ship default_inference_plugin instead (iss_76ae2d4d, cross_bundle_transition)
 # not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
 # not shipped: plugins/macos_inference_plugin/tests/legacy_plugin_coexistence_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
 # not shipped: plugins/github_midwife_plugin/tests/profile_install_vendor_find_links_smoke.py requires repository history (its RED fixture reads one pinned pre-fix commit's blob via `git show`); a born clone is a git-archive extract with no .git (repository_hygiene)
 # not shipped: plugins/github_midwife_plugin/tests/plugin_transition_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin/resources/default_config.json; absent from macos_free_minimal and macos_samantha; its fixture copies that file from the repository into every target (cross_bundle_transition)
+# not shipped: plugins/github_midwife_plugin/tests/plugin_transition_identity_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin/resources/default_config.json; absent from macos_free_minimal and macos_samantha; it builds its fixtures with plugin_transition_smoke, which copies that file from the repository into every target (cross_bundle_transition)
 # not shipped: solet_cli/tests/update_plugin_transition_deferral_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin/resources/default_config.json; absent from macos_free_minimal and macos_samantha; its fixture copies that file from the repository into every target (cross_bundle_transition)
 # not shipped: solet_cli/tests/update_transition_bundle_candidates_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builds each bundle's candidate from seed_resolver, and the seed factory is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_stable_r48_predecessor_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it builds its candidate with update_transition_bundle_candidates_smoke's seed_resolver fixture, and the seed factory is in no capability bundle (fixture_build_tooling)
@@ -5187,6 +5189,7 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/update_runtime_prereqs_preview_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_plugin_settled_preview_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/doctor_installer_pin_seed_tree_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_single_colour_census_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 
 # LM Studio provisioning, singleton login and passive diagnostics
 plugins/github_midwife_plugin/tests/lm_studio_provisioning_smoke.py
@@ -5219,6 +5222,9 @@ solet_cli/tests/update_inventory_publication_smoke.py
 # Existing-Solet Step-4 `solet-manager update` argument contract and closed error/exit projection.
 solet_cli/tests/update_cli_smoke.py
 
+# iss_33637918 / iss_2d4061a9: a name owned by the other registry is refused with the right verb before any state write (fixture-free; real registry and inventory writers).
+solet_cli/tests/registry_owner_refusal_smoke.py
+
 # `solet` points existing-solet verbs at `solet-manager`; `solet inspect` states it is an active probe (iss_a047d26c, iss_389fda4c).
 solet_cli/tests/solet_cli_manager_pointer_smoke.py
 
@@ -5242,6 +5248,7 @@ solet_cli/tests/update_runtime_execution_smoke.py
 solet_cli/tests/update_backup_action_keying_smoke.py
 solet_cli/tests/existing_install_router_cutover_smoke.py
 plugins/github_midwife_plugin/tests/existing_install_operations_smoke.py
+plugins/github_midwife_plugin/tests/existing_install_repair_text_smoke.py
 
 # Every shipped contract/flow JSON or YAML under plugins/*/knowledge_base/ and
 # solet_cli/src/solet_manager/released_metadata/ scanned for a placeholder
@@ -5324,6 +5331,7 @@ solet_cli/tests/existing_install_router_failure_sweep_applies_2_smoke.py
 # are the release lane's, not registered here).
 solet_cli/tests/existing_install_classification_coverage_smoke.py
 solet_cli/tests/update_topology_local_state_smoke.py
+solet_cli/tests/update_local_state_drift_report_smoke.py
 
 # Release-identity comparator (publish_release design section 7.4, chg_4e7e460a,
 # closes iss_670801d4 + the consumption half of iss_da99a951, 2026-09-19): the
@@ -5552,6 +5560,8 @@ plugins/postgres_state_management_plugin/tests/schema_diff_nullability_relaxatio
 # manager CLI keeps its inspect/import/update verbs wired, and a Manager-created name imports as already managed.
 solet_cli/tests/existing_install_inspection_cli_smoke.py
 solet_cli/tests/import_v1_already_managed_smoke.py
+# iss_6a27a24b (r65): an import result's message agrees with its status (imported / already_managed), never "not yet enabled".
+solet_cli/tests/import_result_message_smoke.py
 # iss_646b54b6 / iss_c9a7b626 (r64): the source update preview refuses claude_cli_missing (exact install command,
 # nothing written) before the forward-only source step; an imported clone with no coordination-hooks marketplace
 # gets it registered by the runtime stage (hydration's own render, one add, one install) and promotes; controls:
@@ -5565,3 +5575,20 @@ solet_cli/tests/import_v1_already_managed_smoke.py
 # the source preview probe and the seed adapter's resolver alike, after PATH and the Homebrew bins. Controls: no
 # claude anywhere still refuses claude_cli_missing naming every searched directory, PATH still wins, both agree.
 solet_cli/tests/claude_native_location_smoke.py
+# iss_75b87670 (r65, Dax Part 57 section 57.1, public #84): the single-colour proof reads the colour census (the
+# process table), not only the LaunchAgent pid. A dormant job beside a serving sidecar, or an idle launchd colour
+# beside one, is colour_outside_launchagent (naming the pid and the one recovery command) instead of
+# service_offline_before_transition; a colour left outside launchd after the restart is runtime_candidate_not_serving
+# and publishes nothing; the doctor reports the same state. Controls: a lone launchd colour still promotes, an
+# offline service stays offline, another solet's colours and an unreadable table are handled.
+# iss_d1f3371b (r65, Dax Part 57 section 57.2, public #85): a hand-made LaunchAgent plist (this solet's own label and legacy_direct
+# launch, a narrower PATH) no longer stops update; the runtime preview lists it unknown_origin/render_whole with the digest of the bytes it
+# replaces and a bounded diff, the approved update backs it up, writes the stamped render and promotes; a plist edited between preview and
+# apply is refused probe_drift by the approval fingerprint, and one edited after approval by the hydration stage, with nothing written;
+# another label and a materialized_supervisor plist still stop the update; the unstamped historical render and the stamped current plist
+# behave as before. RED on master 7ddbdfe0b (managed_block_unknown_origin blocks the preview).
+# iss_d1f3371b (r65): the seed-side half of adopting a hand-made LaunchAgent plist, on the same fake runtime as
+# existing_install_operations_smoke: Dax's plist probes pending unknown_origin/render_whole with its digest and a bounded diff, the apply writes
+# the stamped render; a supervisor plist and another label still block with the repair naming the runbook step; the diff is bounded to 80 lines
+# of 200 characters and redacts secret-named values; plist-shaped bytes in a non-plist artifact are never adopted. RED on master 7ddbdfe0b.
+plugins/github_midwife_plugin/tests/existing_install_plist_adopt_smoke.py

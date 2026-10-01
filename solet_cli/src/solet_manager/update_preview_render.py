@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import cast
 
+from .colour_census import COLOUR_OUTSIDE_LAUNCHAGENT, colour_outside_guidance
 from .errors import HostRequirementError, SourceTransitionIncompleteError, UpdateBlockedError
 from .models import ActiveOperation, CommandResult, ExitCode, InstanceInventoryRecordV2, JsonValue
 from .paths import ManagerPaths, update_candidate_cache
@@ -127,7 +128,7 @@ def _preview_data(probe: UpdateProbe, paths: ManagerPaths) -> dict[str, JsonValu
         # iss_f89ab692: each file whose create hydration block the planned ``target.carry_hydration_block`` merges onto the
         # candidate's bytes -- the basis that attested the block and the digests before and after (bound by the fingerprint).
         "hydration_carry": probe.hydration.rows(),
-        "planned_actions": list(probe.planned_actions),
+        "planned_actions": _rendered_planned_actions(probe),
         "source_mode": probe.source_mode,
         "candidate_ref": candidate.candidate_ref,
         "operation_id": probe.operation_id,
@@ -143,11 +144,20 @@ def _preview_data(probe: UpdateProbe, paths: ManagerPaths) -> dict[str, JsonValu
     }
 
 
+def _already_current(probe: UpdateProbe) -> bool:
+    return "already_current" in probe.reasons and probe.source_mode == "advance"
+
+
+def _rendered_planned_actions(probe: UpdateProbe) -> list[JsonValue]:
+    """iss_69dfc6ec: an already_current preview does nothing, so it lists nothing; the probe keeps the real list."""
+    return [] if _already_current(probe) else [*probe.planned_actions]
+
+
 def _preview_result(probe: UpdateProbe, paths: ManagerPaths) -> CommandResult:
     data = _preview_data(probe, paths)
     if probe.source_mode == "verify" and probe.fingerprint is not None:
         return CommandResult(PREVIEW_KIND, VERIFY_PREVIEW_STATUS, VERIFY_PREVIEW_MESSAGE.format(tag=probe.candidate.fields.release_tag), ExitCode.OK, data=data)
-    if "already_current" in probe.reasons and probe.source_mode == "advance":
+    if _already_current(probe):
         return CommandResult(PREVIEW_KIND, "already_current", "Enrolled source already equals the installed channel release.", ExitCode.OK, data=data)
     if probe.fingerprint is None:
         return CommandResult(
@@ -287,15 +297,10 @@ def _runtime_preview(request: UpdateRequest, record: InstanceInventoryRecordV2, 
         return CommandResult(PREVIEW_KIND, "runtime_resume_pending", "A runtime plan is approved and in flight; re-run --yes with its recorded runtime fingerprint to resume.", ExitCode.HUMAN_ACTION, "update_in_progress", "Resume with `--yes --approval-fingerprint <recorded runtime fingerprint>`.", data=data)
     if plan.fingerprint is None:
         contradiction = any(reason in {"failed"} for _, reason in plan.blocked)
-        return CommandResult(
-            PREVIEW_KIND,
-            "awaiting_user",
-            "Runtime preview is blocked before any target write.",
-            ExitCode.FAILED if contradiction else ExitCode.HUMAN_ACTION,
-            "runtime_plan_blocked",
-            "Resolve every listed reason, then preview again.",
-            data=data,
-        )
+        message, repair = "Runtime preview is blocked before any target write.", "Resolve every listed reason, then preview again."
+        if plan.lifecycle.unproven_reason == COLOUR_OUTSIDE_LAUNCHAGENT:
+            message, repair = colour_outside_guidance(context.seams.uid, plan.lifecycle.launchagent_label, cast(dict[str, JsonValue], plan.lifecycle.pre_transition))
+        return CommandResult(PREVIEW_KIND, "awaiting_user", message, ExitCode.FAILED if contradiction else ExitCode.HUMAN_ACTION, "runtime_plan_blocked", repair, data=data)
     return CommandResult(PREVIEW_KIND, "runtime_preview_ready", "Runtime preview completed; approve with --yes --approval-fingerprint <runtime fingerprint>.", ExitCode.OK, data=data)
 
 

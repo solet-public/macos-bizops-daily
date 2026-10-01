@@ -418,6 +418,8 @@ _HOMEBREW_BIN_DIRECTORIES = (
     "/opt/homebrew/bin",
     "/usr/local/bin",
 )
+# Claude Code's native installer puts ``claude`` here, which a launchd job's or solet session's PATH lacks (iss_26fdde33).
+_NATIVE_BIN_RELATIVE = Path(".local") / "bin"
 
 
 def _brew_candidate_works(runtime: AdapterRuntime, candidate: str) -> bool:
@@ -437,11 +439,12 @@ def resolve_brew_executable(runtime: AdapterRuntime) -> str | None:
 
 
 def resolve_executable(runtime: AdapterRuntime, executable_name: str) -> str | None:
-    """Resolve an executable through PATH, then standard Homebrew bin directories."""
+    """Resolve an executable through PATH, the standard Homebrew bin directories, then ``$HOME/.local/bin``."""
 
+    directories = (*_HOMEBREW_BIN_DIRECTORIES, str(Path.home() / _NATIVE_BIN_RELATIVE))
     candidates = (
         runtime.which(executable_name),
-        *(runtime.which(f"{directory}/{executable_name}") for directory in _HOMEBREW_BIN_DIRECTORIES),
+        *(runtime.which(f"{directory}/{executable_name}") for directory in directories),
     )
     for candidate in candidates:
         if candidate is not None and Path(candidate).is_absolute():

@@ -29,6 +29,7 @@ from .errors import (
     ManagerError,
 )
 from .identity_reconciliation import IdentityReconciliationManager
+from .imported_refusal import refuse_imported
 from .lifecycle import LifecycleManager
 from .models import MANAGER_VERSION, CommandResult, ExitCode
 from .paths import ManagerPaths
@@ -218,6 +219,7 @@ def run(argv: Sequence[str] | None = None) -> CommandResult:
     if args.command in {"inspect", "release-proof"}:
         return _run_read_only_command(args)
     paths = ManagerPaths.resolve(explicit_home=args.home)
+    refuse_imported(paths, args.command, getattr(args, "name", None))
     if args.command in {"list", "list-seeds"}:
         return _run_inventory_command(args, paths)
     if args.command == "status":

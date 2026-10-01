@@ -27,6 +27,7 @@ from solet_setup_contracts import canonical_sha256
 
 from .adapter_protocol import EXISTING_INSTALL_FLOW_ID, OperationRequest, OperationResult
 from .base_python import resolve_base_python
+from .colour_census import COLOUR_OUTSIDE_LAUNCHAGENT, ProcessTableReader, read_colour_census
 from .cutover_fingerprint import cutover_fingerprint
 from .cutover_receipts import CutoverTerms
 from .errors import AdapterError, AdapterProtocolError, SourceError, UpdateBlockedError
@@ -63,6 +64,7 @@ from .models import (
 )
 from .reconciliation_request import ReconciliationOutcome, build_reconciliation_envelope
 from .target_git import GitLayout, run_target_git
+from .update_adopt_diff import adopt_diffs
 from .update_candidate import UpdateCandidate
 from .update_clone_exclude import planned_exclude_covers
 
@@ -157,7 +159,6 @@ type ReconciliationInvoker = Callable[[ExistingInstallAdapterRegistry, dict[str,
 type BridgeInvoker = Callable[[ExistingInstallAdapterRegistry, str, dict[str, JsonValue], str, int], dict[str, JsonValue]]
 type HealthReader = Callable[[ExistingInstallAdapterRegistry, int], dict[str, JsonValue]]
 type LaunchctlRunner = Callable[[ExistingInstallAdapterRegistry, str, tuple[str, ...], int], subprocess.CompletedProcess[str]]
-type ProcessTableReader = Callable[[int], subprocess.CompletedProcess[str]]
 type KeychainMetadataReader = Callable[[str, str], subprocess.CompletedProcess[str]]
 type BasePythonResolver = Callable[[], Path | None]
 type WhichResolver = Callable[[str], str | None]
@@ -505,6 +506,7 @@ def runtime_fingerprint(plan: RuntimePlan, context: PlanContext) -> str:
                 "template_digest": item.template_digest,
                 "action": item.action,
                 "expected_sha256": item.expected_sha256,
+                "current_sha256": item.current_sha256,
             }
             for item in plan.managed_artifacts
         ],
@@ -801,6 +803,7 @@ def artifact_states(
 ) -> tuple[ManagedArtifactState, ...]:
     """Decode the seed's per-artifact evidence into the closed three-way state rows."""
     by_id = {artifact.artifact_id: (artifact, destination) for artifact, destination in artifacts}
+    diffs = adopt_diffs(result, tuple(by_id))
     states: list[ManagedArtifactState] = []
     for item in result.evidence:
         evidence_id = str(item["id"])
@@ -816,6 +819,7 @@ def artifact_states(
         conflict = facts.get("conflict", "none")
         stamped = facts.get("stamped_digest", "none")
         expected = facts.get("expected_sha256", "none")
+        current = facts.get("current_sha256", "none")
         states.append(
             ManagedArtifactState(
                 artifact_id,
@@ -826,8 +830,10 @@ def artifact_states(
                 None if stamped == "none" else stamped,
                 artifact.template_digest,
                 None if expected == "none" else expected,
+                None if current == "none" else current,
                 None if conflict == "none" else conflict,
                 operation.operation_id,
+                diffs.get(artifact_id, ()),
             )
         )
     return tuple(states)
@@ -874,12 +880,17 @@ def _lifecycle(context: PlanContext, artifact_states: tuple[ManagedArtifactState
 def _single_color_observation(context: PlanContext, facts: _LifecycleFacts) -> tuple[LifecycleObservation, int]:
     """Section 7.3: observe the service before fixing the single-colour strategy.
 
-    A label that is not loaded, a pid of 0, or a health other than ``healthy``
-    is ``unproven(service_offline_before_transition)``: an update is not the
+    A label that is not loaded, or a health other than ``healthy``, is
+    ``unproven(service_offline_before_transition)``: an update is not the
     repair path for a dead service (the runbook's own Step 1 rule), and a
     ``bootstrap`` of a broken service would otherwise publish ``needs_attention``
-    for a pre-existing condition.  The observation is journaled with the plan
-    and its pid is the ``pid_before`` the post-restart check compares against.
+    for a pre-existing condition.  A healthy service is single-colour only when
+    the colour census (the process table) is exactly the launchd pid: a dormant
+    job beside a serving sidecar, or an idle launchd colour beside one, is
+    ``unproven(colour_outside_launchagent)`` because the restart would replace
+    a process that is not serving (iss_75b87670).  The observation is journaled
+    with the plan; its pid is the ``pid_before`` the post-restart check compares
+    against and its ``colour_pids`` the census the restart starts from.
     """
     printed = context.seams.launchctl(context.registry, "print", (f"gui/{context.seams.uid}/{facts.label}",), 30)
     loaded = printed.returncode == 0
@@ -888,10 +899,24 @@ def _single_color_observation(context: PlanContext, facts: _LifecycleFacts) -> t
         health = str(context.seams.read_health(context.registry, 30).get("status", ""))
     except (AdapterError, AdapterProtocolError):
         health = "unreachable"
-    observation: dict[str, JsonValue] = {"loaded": loaded, "pid": pid, "health": health}
-    if not loaded or not pid or health != "healthy":
-        return _unproven(facts.label, facts.plist_path, facts.plist_expected, facts.modules, facts.budget, "service_offline_before_transition", observation), 2
-    return LifecycleObservation("single_color_restart", facts.topology, facts.label, str(facts.plist_path), facts.plist_expected, None, None, False, facts.modules, facts.budget, None, False, None, None, None, observation), 2
+    census = read_colour_census(context.seams.run_ps, Path(context.record.target.canonical_path))
+    observation: dict[str, JsonValue] = {"loaded": loaded, "pid": pid, "health": health, "colour_pids": None if census is None else list(census)}
+    reason = _single_color_refusal(loaded, pid, health, census)
+    if reason is not None:
+        return _unproven(facts.label, facts.plist_path, facts.plist_expected, facts.modules, facts.budget, reason, observation), 3
+    return LifecycleObservation("single_color_restart", facts.topology, facts.label, str(facts.plist_path), facts.plist_expected, None, None, False, facts.modules, facts.budget, None, False, None, None, None, observation), 3
+
+
+def _single_color_refusal(loaded: bool, pid: int | None, health: str, census: tuple[int, ...] | None) -> str | None:
+    """The reason a single-colour restart is unproven, or ``None`` when launchd's pid is the one colour serving."""
+    if not loaded or health != "healthy":
+        return "service_offline_before_transition"
+    if census is None:
+        return "lifecycle_strategy_unproven"
+    if not pid:
+        # A dormant job with no colour anywhere is an offline service; one with colours is served from outside launchd.
+        return COLOUR_OUTSIDE_LAUNCHAGENT if census else "service_offline_before_transition"
+    return None if census == (pid,) else COLOUR_OUTSIDE_LAUNCHAGENT
 
 
 def _printed_pid(stdout: str) -> int | None:

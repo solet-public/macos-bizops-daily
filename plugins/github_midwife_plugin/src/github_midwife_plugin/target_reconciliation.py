@@ -29,10 +29,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
+from xml.parsers.expat import ExpatError
 
 __all__ = [
     "FLOW_ID",
     "OPERATION_REF",
+    "PLIST_PARSE_ERRORS",
     "LaunchTopology",
     "TargetReconciliationError",
     "TargetReconciliationRequest",
@@ -368,11 +370,19 @@ def plist_label(plist_path: Path) -> str:
     return label if isinstance(label, str) else ""
 
 
+#: Every way ``plistlib.load`` rejects bytes it cannot read, so an unreadable plist is an empty one and never an exception.  Enumerated from
+#: plistlib's source (``InvalidFileException``, and the ``OverflowError``/``ValueError``/``TypeError`` its binary reader folds into it) and from a
+#: 60,000-mutation fuzz of XML and binary plists: expat's ``ExpatError`` (truncated XML, a mismatched tag), ``ValueError`` (a bad ``<integer>``,
+#: ``<real>`` or base64, a key with no value, invalid UTF-8; ``binascii.Error`` and ``UnicodeDecodeError`` are subclasses), ``AttributeError`` (a bad
+#: ``<date>``), ``LookupError`` (an unknown encoding; ``IndexError`` and ``KeyError`` are subclasses), ``OverflowError`` and ``RecursionError``.
+PLIST_PARSE_ERRORS: Final[tuple[type[Exception], ...]] = (OSError, plistlib.InvalidFileException, ExpatError, ValueError, AttributeError, OverflowError, TypeError, LookupError, RecursionError)
+
+
 def _parsed_plist(plist_path: Path) -> dict[str, object]:
     try:
         with plist_path.open("rb") as stream:
             parsed = plistlib.load(stream)
-    except (OSError, plistlib.InvalidFileException):
+    except PLIST_PARSE_ERRORS:
         return {}
     return parsed if isinstance(parsed, dict) else {}
 

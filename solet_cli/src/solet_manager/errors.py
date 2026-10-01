@@ -198,6 +198,13 @@ class InstanceUnmanagedV2Error(ManagerError):
     exit_code = 3
 
 
+class InstanceImportedError(ManagerError):
+    """The name is an imported instance; the v1 verbs do not apply."""
+
+    error_kind = "instance_imported"
+    exit_code = 3
+
+
 class AbandonRefusedError(StateConflictError):
     """The journal is past the boundary at which abandon or retirement is legal."""
 
@@ -213,6 +220,7 @@ class BackupMissingError(StateConflictError):
 # Every stable Step 7 reason code the design names (sections 6-7), so a test can prove the set is closed.
 # The Step-4 "tracked state present" reason is retired: no landed path produces it after section 6.2.
 STEP7_REASON_CODES = (
+    "colour_outside_launchagent",
     "executed_code_modified",
     "git_metadata_present",
     "host_requirement_missing",
@@ -236,6 +244,7 @@ STEP6_REASON_CODES = (
     "candidate_copy_missing",
     "doctor_interrupted",
     "forward_only_migration_incomplete",
+    "instance_imported",
     "instance_unmanaged_v2",
     "knowledge_removal_not_applied",
     "merge_interrupted",

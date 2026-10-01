@@ -45,6 +45,7 @@ from solet_manager.maintenance_inventory import (  # noqa: E402
 from solet_manager.models import (  # noqa: E402
     ActiveOperation,
     ChannelIdentity,
+    CommandResult,
     ContractIdentities,
     FilesystemIdentity,
     InstanceInventoryRecordV2,
@@ -329,6 +330,11 @@ def _assert_hostile_config_refused(fixture: Fixture) -> None:
     _git(fixture.target, "config", "--unset", "core.fsmonitor")
 
 
+def _assert_blocked_preview_keeps_actions(blocked: CommandResult) -> None:
+    """iss_69dfc6ec control: only an already_current preview blanks its actions; a blocked one keeps listing them."""
+    assert blocked.data["planned_actions"] == list(PLANNED_ACTIONS), blocked.data["planned_actions"]
+
+
 def _assert_ignored_collision_refused(fixture: Fixture, fingerprint: str) -> None:
     inventory_before = fixture.paths.maintenance_inventory_path.read_bytes()
     local_cfg = fixture.target / "local.cfg"
@@ -339,6 +345,7 @@ def _assert_ignored_collision_refused(fixture: Fixture, fingerprint: str) -> Non
     assert collided.exit_code == 3
     assert {"reason": "untracked_destination_collision", "path": "local.cfg"} in cast(list[JsonValue], collided.data["collisions"])
     assert collided.data["approval_fingerprint"] is None
+    _assert_blocked_preview_keeps_actions(collided)
     _expect(ProbeDriftError, lambda: apply_update(fixture.request, fingerprint), "collided target applied")
     assert local_cfg.read_text() == "operator local\n"
     assert _git(fixture.target, "rev-parse", "HEAD") == fixture.baseline.commit

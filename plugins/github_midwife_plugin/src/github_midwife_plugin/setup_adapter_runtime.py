@@ -73,6 +73,41 @@ class CommandOutcome:
         return self.returncode == 0 and not self.timed_out
 
 
+# Every rule the Manager's ``adapter_validation.public_string`` enforces on an envelope's ``repair`` (iss_67d2597e), and what holds it here:
+#  1. a non-empty ``str`` of at most 2048 characters: ``result()`` cuts a repair at ``REPAIR_LIMIT`` (512) and the texts built here are never empty;
+#  2. no secret-shaped text (``_SECRET_PATTERNS``, mirrored by ``_SECRET_SHAPED``), or the whole envelope is refused;
+#  3. within ``STREAM_LIMIT_BYTES`` (8192) once redacted: 200 characters of stderr stay far below it;
+#  4. no ``FORMULA_MARKER`` ("/Cellar/solet/"), which a CLI naming a solet keg path would put in stderr.
+_SECRET_SHAPED = (
+    re.compile(r"(?i)(password|secret|token|authorization|oauth[_ -]?code|private[_ -]?key)\s*[:=]\s*\S+"),
+    re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/-]+"),
+)
+_FORMULA_MARKER = "/Cellar/solet/"
+#: Small enough that a repair built around it still ends inside ``REPAIR_LIMIT`` with its remedy intact.
+_STDERR_DESCRIPTION_LIMIT = 200
+_NEUTRALIZE_PASSES = 8
+
+
+def _neutralize(text: str) -> str:
+    """``text`` with every secret-shaped run and formula-keg path replaced, stable under a second pass (what the Manager re-checks)."""
+    for _ in range(_NEUTRALIZE_PASSES):
+        cleaned = text
+        for pattern in _SECRET_SHAPED:
+            cleaned = pattern.sub("[redacted]", cleaned)
+        cleaned = cleaned.replace(_FORMULA_MARKER, "[keg path]")
+        if cleaned == text:
+            return text
+        text = cleaned
+    return "[withheld]"
+
+
+def describe_outcome(outcome: CommandOutcome) -> str:
+    """How a command ended, for a repair text: its exit code (or that it timed out), then its stderr, neutralized for the Manager's validator and capped."""
+    state = "timed out" if outcome.timed_out else "executable missing" if outcome.executable_missing else f"exit {outcome.returncode}"
+    stderr = " ".join(outcome.stderr.split())[:_STDERR_DESCRIPTION_LIMIT]
+    return _neutralize(f"{state}; stderr: {stderr!r}" if stderr else state)
+
+
 @dataclass(frozen=True, slots=True)
 class HomebrewAcquisition:
     """One reviewed Homebrew root and the only dependency closure it may add."""
@@ -436,4 +471,4 @@ def read_json_object(path: Path) -> JsonObject | None:
     return cast(JsonObject, raw)
 
 
-__all__ = ["CommandOutcome", "Runtime", "SystemRuntime", "read_json_object"]
+__all__ = ["CommandOutcome", "Runtime", "SystemRuntime", "describe_outcome", "read_json_object"]

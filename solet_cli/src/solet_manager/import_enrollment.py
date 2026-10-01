@@ -130,6 +130,13 @@ class ImportPreview:
         )
 
 
+# iss_6a27a24b: one message per status `_enroll_import_locked` returns; an unknown status is a KeyError, never a wrong sentence.
+_RESULT_MESSAGES = {
+    "imported": "Existing Solet import completed; the instance is now enrolled with the Manager.",
+    "already_managed": "Existing Solet is already managed by the Manager; its enrollment is recorded and verified.",
+}
+
+
 @dataclass(frozen=True, slots=True)
 class ImportEnrollmentResult:
     preview: ImportPreview
@@ -141,7 +148,7 @@ class ImportEnrollmentResult:
         return CommandResult(
             "existing_install_import",
             self.status,
-            "Existing Solet import is not yet enabled for target mutation.",
+            _RESULT_MESSAGES[self.status],
             ExitCode.OK,
             data={
                 "instance_id": self.managed_instance_id or self.preview.instance_id,

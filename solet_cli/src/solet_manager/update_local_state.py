@@ -20,6 +20,7 @@ commit-time twin for ``--yes``.
 from __future__ import annotations
 
 import os
+import shlex
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,6 +53,14 @@ _IN_FLIGHT_ROW_STATUSES = frozenset({"applying", "applied"})
 _SERVICE_WRITE_STAGE_BY_STATUS = {"runtime_reconciling": "runtime_reconcile"}
 #: The clone's local ignore file, relative to the target: the one in-``.git`` path an operation may declare.
 CLONE_EXCLUDE_RELATIVE = ".git/info/exclude"
+#: The pseudo-path ``compare`` names when the committed commitment differs and no entry can be blamed.
+_COMMITMENT_MISMATCH = "commitment_mismatch"
+#: Drifted paths a refusal lists; the rest are counted, so the envelope stays bounded (iss_46de4f1d).
+_DRIFT_LISTING_LIMIT = 20
+REPAIR_READ_ONLY_WINDOW = (
+    "Do not reset; the local state was fingerprinted when you approved the source stage, so from `source_advanced` until the runtime `--yes` finishes "
+    "the checkout is read-only for you. Put each path back as listed, then resume:"
+)
 
 
 def host_preflight(seams: RuntimeSeams, target: Path) -> dict[str, JsonValue]:
@@ -125,32 +134,74 @@ def verify_local_state(target: Path, facts: ExistingInstallFacts, journal: dict[
     # not a violation, and the executor journals them when the row verifies.
     declared_in_flight = in_flight_declared_targets(journal, target)
     in_flight = declared_in_flight | paths_ignored_by_declared_exclude(target, declared_in_flight, delta.hard, current, last_observed)
-    _require_tracked_unchanged(current, observed, tuple(path for path in delta.tracked if path not in in_flight))
+    tracked_drift = tuple(path for path in delta.tracked if path not in in_flight)
     allowance = cast(str, journal["status"]) in _SERVICE_WRITE_STATUSES
-    additions = _service_write_additions(target, current, observed, tuple(path for path in delta.committed if path not in in_flight), allowance)
+    additions, committed_drift = _service_write_additions(target, current, observed, tuple(path for path in delta.committed if path not in in_flight), allowance)
+    if tracked_drift or committed_drift:
+        raise _drift_refusal(target, current, observed, tracked_drift, committed_drift)
     pending = tuple(sorted(set(delta.hard) & in_flight))
     return LocalStateReport(observed, delta, additions, pending)
 
 
-def _require_tracked_unchanged(current: LocalState, observed: ObservedLocalState, violations: tuple[str, ...]) -> None:
-    if not violations:
-        return
-    path = violations[0]
-    expected = next((digest for item, digest, _ in current.preserved_tracked_paths if item == path), None)
-    observed_digest = next((entry.digest for entry in observed.tracked if entry.path == path), None)
-    raise SourceTransitionIncompleteError(f"preserved tracked path {path} no longer matches the recorded local state (expected_sha256={expected}, observed_sha256={observed_digest})", repair="Do not reset; inspect the target and resume once its local bytes match the commitment.")
-
-
-def _service_write_additions(target: Path, current: LocalState, observed: ObservedLocalState, changed: tuple[str, ...], allowance: bool) -> tuple[dict[str, JsonValue], ...]:
+def _service_write_additions(target: Path, current: LocalState, observed: ObservedLocalState, changed: tuple[str, ...], allowance: bool) -> tuple[tuple[dict[str, JsonValue], ...], tuple[str, ...]]:
+    """The admitted B7 creations among ``changed``, and every path that is not one (the drift the caller refuses)."""
     previous_paths = frozenset(row[0] for row in current.committed_inventory)
     additions: list[dict[str, JsonValue]] = []
+    refused: list[str] = []
     for path in changed:
         digest = allowed_service_write(target, path, previous_paths) if allowance else None
         if digest is None:
-            raise SourceTransitionIncompleteError(f"committed local state changed at {path} (inventory_changed)", repair="Do not reset; inspect the target and resume once its untracked local state matches the commitment.")
+            refused.append(path)
+            continue
         entry = next(item for item in observed.committed if item.path == path)
         additions.append({"path": entry.path, "kind": entry.kind, "mode": entry.mode, "size": entry.size, "target_digest": digest})
-    return tuple(additions)
+    return tuple(additions), tuple(refused)
+
+
+@dataclass(frozen=True, slots=True)
+class _Drift:
+    """One drifted path: the lead phrase older releases printed, its sub-case, and the repair that fits it."""
+
+    lead: str
+    sub_case: str
+    repair: str
+
+
+def _drift_refusal(target: Path, current: LocalState, observed: ObservedLocalState, tracked: tuple[str, ...], committed: tuple[str, ...]) -> SourceTransitionIncompleteError:
+    """iss_46de4f1d (public #87): one refusal naming every drifted path with its sub-case and repair; the check itself is unchanged."""
+    paths = (*((path, True) for path in tracked), *((path, False) for path in committed))
+    shown = tuple(_tracked_drift(target, current, observed, path) if is_tracked else _committed_drift(target, current, path) for path, is_tracked in paths[:_DRIFT_LISTING_LIMIT])
+    more = f" (+{len(paths) - _DRIFT_LISTING_LIMIT} more, run `git -C {shlex.quote(str(target))} status`)" if len(paths) > _DRIFT_LISTING_LIMIT else ""
+    message = "; ".join(f"{item.lead}: {item.sub_case}" if item.sub_case else item.lead for item in shown) + more
+    listing = " ".join(item.repair for item in shown)
+    return SourceTransitionIncompleteError(message, repair=f"{REPAIR_READ_ONLY_WINDOW} {listing}{more}")
+
+
+def _tracked_drift(target: Path, current: LocalState, observed: ObservedLocalState, path: str) -> _Drift:
+    expected = next((digest for item, digest, _ in current.preserved_tracked_paths if item == path), None)
+    observed_digest = next((entry.digest for entry in observed.tracked if entry.path == path), None)
+    lead = f"preserved tracked path {path} no longer matches the recorded local state (expected_sha256={expected}, observed_sha256={observed_digest})"
+    if expected is None:
+        return _Drift(lead, "tracked at the new HEAD, not a preserved edit", _restore_repair(target, path))
+    return _Drift(lead, "a preserved local edit changed again", f"{path}: put back the bytes the commitment recorded (sha256 {expected}); never restore it from HEAD, that discards the edit.")
+
+
+def _committed_drift(target: Path, current: LocalState, path: str) -> _Drift:
+    lead = f"committed local state changed at {path} (inventory_changed)"
+    if path == _COMMITMENT_MISMATCH:
+        return _Drift(lead, "", "inspect the target and resume once its untracked local state matches the commitment.")
+    if not os.path.lexists(target / path):
+        return _Drift(lead, "in the approved inventory, now missing", f"{path}: put it back where it was.")
+    if run_target_git(("-C", str(target), "cat-file", "-e", f"HEAD:{path}")).returncode == 0:
+        return _Drift(lead, "now tracked at the new HEAD", _restore_repair(target, path))
+    approved = next((row for row in current.committed_inventory if row[0] == path), None)
+    if approved is not None:
+        return _Drift(lead, "in the approved inventory, changed since", f"{path}: put it back exactly as approved (kind {approved[1]}, mode {approved[2]}, size {approved[3]}).")
+    return _Drift(lead, "untracked local-only file, move it out again", f"{path}: move it out of the checkout again (`mv {shlex.quote(path)} <scratch>`).")
+
+
+def _restore_repair(target: Path, path: str) -> str:
+    return f"{path}: move your copy aside, then `git -C {shlex.quote(str(target))} restore -- {shlex.quote(path)}` takes HEAD's bytes."
 
 
 def rebaseline_revision(journal: dict[str, JsonValue], observed: ObservedLocalState, last_observed: ObservedLocalState | None, operation_id: str, declared: frozenset[str], name: str, target: Path) -> tuple[tuple[dict[str, JsonValue], ...], dict[str, JsonValue]] | None:

@@ -49,6 +49,7 @@ from .plugin_transition_declaration import (
     owner_sentence,
     parse_declaration,
 )
+from .profile_identity import PROFILE_TEMPLATE_BY_BUNDLE, ProvenanceError, declared_profile
 from .setup_adapter_contract import AdapterRequest, JsonObject, planned_action, result
 from .setup_adapter_runtime import Runtime
 
@@ -76,7 +77,7 @@ _PROOF_TIMEOUT_SECONDS = 120
 _WRITE_RESERVE_SECONDS = 30
 _MIN_CHILD_SECONDS = 10
 _clock: Callable[[], float] = time.monotonic
-_OPEN_STATES = frozenset({"eligible", "partial", "conflict"})
+_OPEN_STATES = frozenset({"eligible", "partial", "cleanup", "conflict"})
 _RENDERERS: dict[str, Callable[[Path], str | None]] = {
     "coreai_embeddings": coreai_config_text,
     "apple_inference": apple_inference_config_text,
@@ -225,9 +226,32 @@ def observe(target: Path) -> Observation:
     bindings_raw = _load_json_object(target / _BINDINGS, "service_bindings_unreadable")
     if not all(isinstance(value, str) for value in bindings_raw.values()):
         raise ObservationError("service_bindings_invalid", "profile/config/service_bindings.json binds a non-string value; repair it, then re-preview.")
-    profile = manifest.get("profile_name")
+    label = manifest.get("profile_name")
+    manifest_profile = label if isinstance(label, str) else None
+    profile, profile_problem = _identify_profile(target, manifest_profile)
     configs = {path.stem: _plugin_config(path) for path in sorted((target / _PLUGIN_CONFIGS).glob("*.json"))}
-    return Observation(profile if isinstance(profile, str) else None, tuple(cast(list[str], raw_plugins)), cast(dict[str, str], bindings_raw), configs)
+    return Observation(profile, tuple(cast(list[str], raw_plugins)), cast(dict[str, str], bindings_raw), configs, manifest_profile, profile_problem)
+
+
+def _identify_profile(target: Path, manifest_profile: str | None) -> tuple[str | None, str | None]:
+    """The release profile this solet is, or why it cannot be told (rul_dedd310a: one resolver, no fact-guessing).
+
+    The manifest's ``profile_name`` is only a label (templates renamed it, ``apply_manifest`` resets
+    it to ``local``).  The sealed ``PROVENANCE.json`` bundle is the identity; a provenance-less tree
+    falls back to the label, but only when it is one of this release's profile names (a yaml in
+    profile_templates that is no profile, such as a model catalog, does not count).  An
+    unreadable or unknown provenance is never ignored, and neither is a label that names no profile.
+    """
+    cannot = f"cannot identify this solet's profile (profile_name {manifest_profile!r})"
+    try:
+        declared = declared_profile(target)
+    except ProvenanceError as exc:
+        return None, f"{cannot}: {str(exc).partition(': ')[0]}"
+    if declared is not None:
+        return declared, None
+    if manifest_profile in PROFILE_TEMPLATE_BY_BUNDLE.values():
+        return manifest_profile, None
+    return None, f"{cannot}: it is no release profile and PROVENANCE.json names no bundle"
 
 
 def _require_regular(path: Path, code: str) -> str:
@@ -279,7 +303,7 @@ def _classify(transition: Transition, observation: Observation, target: Path, ga
     state = classify(transition, observation, _rendered(transition, target))
     refusal = _host_refusal(transition, gate)
     if refusal is not None and state.state in {"eligible", "conflict"}:
-        return Classification("host_unsupported", refusal)
+        return Classification("host_unsupported", refusal, running=state.running)
     return state
 
 
@@ -308,6 +332,8 @@ def _planned_actions(target: Path, transition: Transition, state: Classification
     evidence_ref = f"plugin_transition.{transition.migration_id}"
     if state.state == "conflict":
         return [planned_action(action_id=f"{prefix}.refuse", title=f"Refuse {transition.migration_id} and keep the current plugin: {state.detail}", mutation_kind="none", target="$TARGET/profile/config", evidence_ref=evidence_ref)]
+    if state.state == "cleanup":
+        return [planned_action(action_id=f"{prefix}.roster", title=_roster_title(transition, cleanup=True), mutation_kind="file_write", target=str(target / _MANIFEST), evidence_ref=evidence_ref)]
     actions: list[JsonObject] = []
     replacement = transition.target
     # The list must not depend on what apply is about to change: the Manager keys each
@@ -324,9 +350,11 @@ def _planned_actions(target: Path, transition: Transition, state: Classification
     return actions
 
 
-def _roster_title(transition: Transition) -> str:
+def _roster_title(transition: Transition, *, cleanup: bool = False) -> str:
     source = transition.source.plugin if transition.source is not None else None
     replacement = transition.target.plugin if transition.target is not None else None
+    if cleanup and source is not None:
+        return f"Remove the unused {source} from the plugin roster ({replacement} already serves {transition.service})"
     if source is not None and replacement is not None:
         return f"Replace {source} with {replacement} in the plugin roster"
     return f"Add {replacement} to the plugin roster" if replacement is not None else f"Remove {source} from the plugin roster"
@@ -357,28 +385,56 @@ class Deadline:
 
 def _apply(request: AdapterRequest, runtime: Runtime, declaration: Declaration, items: list[JsonObject], gate: HostGate) -> JsonObject:
     deferrals: list[Deferral] = []
+    refused: set[tuple[str, str]] = set()
     deadline = Deadline.for_request(request)
     for transition in declaration.transitions:
         state = _classify(transition, observe(request.target), request.target, gate)
         if state.state not in _OPEN_STATES:
             continue
         if state.state == "conflict":
-            deferrals.append(Deferral(transition.migration_id, "plugin_transition_conflict", f"{transition.migration_id} refused: {state.detail}. The current plugin stays active; restore the config, then re-run `solet-manager update {request.name}`."))
+            deferrals.append(Deferral(transition.migration_id, "plugin_transition_conflict", _conflict_repair(transition, state, request.name, repeat=(state.detail, state.repair) in refused)))
+            refused.add((state.detail, state.repair))
             continue
-        readiness = _make_ready(transition, request, runtime, gate, deadline)
-        items.append(facts_evidence(f"plugin_transition.{transition.migration_id}.readiness", {"ready": readiness.ready, "code": readiness.code, "detail": readiness.detail}, verified=readiness.ready))
-        if not readiness.ready:
-            _revert_partial(transition, request, runtime)
-            deferrals.append(Deferral(transition.migration_id, "plugin_transition_pending", _pending_repair(transition, readiness, request.name)))
-            continue
-        _write_forward(transition, request, runtime)
+        if state.state == "cleanup":
+            _roster_remove(request.target, runtime, cast(SourcePlugin, transition.source).plugin)
+        else:
+            deferred = _switch(transition, request, runtime, gate, deadline, items)
+            if deferred is not None:
+                deferrals.append(deferred)
+                continue
         final = _classify(transition, observe(request.target), request.target, gate)
         if final.state != "done":
-            return result(request, status="failed", error_kind="plugin_transition_write_unverified", retry_safe=False, exit_code=None, evidence_items=items, repair=f"{transition.migration_id} wrote its files but reads back as {final.state} ({final.detail}); keep the Manager backups and run `solet-manager doctor {request.name}`.")
+            return _write_unverified(request, items, transition, final)
+    return _apply_result(request, items, deferrals)
+
+
+def _apply_result(request: AdapterRequest, items: list[JsonObject], deferrals: list[Deferral]) -> JsonObject:
     if not deferrals:
         return result(request, status="applied", retry_safe=True, evidence_items=items)
     kind = "plugin_transition_pending" if any(item.error_kind == "plugin_transition_pending" for item in deferrals) else "plugin_transition_conflict"
     return result(request, status="pending", error_kind=kind, retry_safe=True, exit_code=None, evidence_items=items, repair=" ".join(item.repair for item in deferrals))
+
+
+def _switch(transition: Transition, request: AdapterRequest, runtime: Runtime, gate: HostGate, deadline: Deadline, items: list[JsonObject]) -> Deferral | None:
+    """Prove the replacement ready, then write the switch; a replacement not ready writes nothing (an interrupted write is put back) and defers."""
+    readiness = _make_ready(transition, request, runtime, gate, deadline)
+    items.append(facts_evidence(f"plugin_transition.{transition.migration_id}.readiness", {"ready": readiness.ready, "code": readiness.code, "detail": readiness.detail}, verified=readiness.ready))
+    if not readiness.ready:
+        _revert_partial(transition, request, runtime)
+        return Deferral(transition.migration_id, "plugin_transition_pending", _pending_repair(transition, readiness, request.name))
+    _write_forward(transition, request, runtime)
+    return None
+
+
+def _write_unverified(request: AdapterRequest, items: list[JsonObject], transition: Transition, final: Classification) -> JsonObject:
+    return result(request, status="failed", error_kind="plugin_transition_write_unverified", retry_safe=False, exit_code=None, evidence_items=items, repair=f"{transition.migration_id} wrote its files but reads back as {final.state} ({final.detail}); keep the Manager backups and run `solet-manager doctor {request.name}`.")
+
+
+def _conflict_repair(transition: Transition, state: Classification, name: str, *, repeat: bool) -> str:
+    """The repair for a refused transition; a cause an earlier transition already named is not said twice (the result caps ``repair`` at 512 characters)."""
+    if repeat:
+        return f"{transition.migration_id} refused for the same reason."
+    return f"{transition.migration_id} refused: {state.detail}. The current plugin stays active; {state.repair}, then re-run `solet-manager update {name}`."
 
 
 def _pending_repair(transition: Transition, readiness: Readiness, name: str) -> str:
@@ -540,7 +596,7 @@ def _mode(path: Path) -> int:
 
 
 def _summary_evidence(declaration: Declaration, observation: Observation, gate: HostGate) -> JsonObject:
-    facts: dict[str, str | int | bool] = {"declaration_sha256": declaration.sha256, "profile": observation.profile or "unknown", "transitions": len(declaration.transitions)}
+    facts: dict[str, str | int | bool] = {"declaration_sha256": declaration.sha256, "profile": observation.profile or "unknown", "manifest_profile_name": observation.manifest_profile or "unknown", "transitions": len(declaration.transitions)}
     if gate.version is not None:
         facts["host_macos"] = gate.version
     return facts_evidence("plugin_transitions", facts, verified=True)

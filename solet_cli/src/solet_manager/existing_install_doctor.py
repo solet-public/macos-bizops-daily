@@ -258,7 +258,11 @@ def _load_record(paths: ManagerPaths, name: str) -> InstanceInventoryRecordV2:
     if paths.registry_path.exists() and InstanceRegistry(paths.registry_path).get(name) is not None:
         raise InstanceUnmanagedV2Error(
             f"{name!r} is a v1 create instance",
-            repair=f"Run `solet doctor {name}`; `solet-manager update {name} --dry-run` enrolls it for updates.",
+            repair=(
+                f"Run `solet doctor {name}` now. `solet-manager doctor {name}` applies after the first approved update: "
+                f"`solet-manager update {name} --dry-run` shows the plan (it enrolls nothing), and "
+                "`--yes --approval-fingerprint <fingerprint>` enrolls it and advances it."
+            ),
         )
     raise InstanceUnmanagedError(f"no v2 inventory record is named {name!r}", repair=f"Run `solet-manager import {name} --target <path> --channel <channel> --dry-run`.")
 

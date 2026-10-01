@@ -214,9 +214,17 @@ def _assert_crash_retry(root: Path) -> None:
                 assert str(error) == "simulated crash"
             else:
                 raise AssertionError("crash injection missed")
-        enrollment.enroll_import(request, preview.fingerprint)
+        resumed = enrollment.enroll_import(request, preview.fingerprint)
+        _assert_already_managed_message(resumed, f"resumed prepared journal after {seam}")
         assert load_update_record(UpdateRequest("fixture", paths)).active_operation is None
         assert paths.registry_path.read_bytes() == v1_before
+
+
+def _assert_already_managed_message(result: enrollment.ImportEnrollmentResult, path: str) -> None:
+    """iss_6a27a24b: every already_managed path says the enrollment is recorded and verified, never that nothing changed."""
+    rendered = result.to_command_result()
+    expected = "Existing Solet is already managed by the Manager; its enrollment is recorded and verified."
+    assert (result.status, rendered.status, rendered.message) == ("already_managed", "already_managed", expected), (path, rendered.message)
 
 
 def _assert_preview_reads_enrollment(request: ImportRequest) -> None:
@@ -253,7 +261,7 @@ def _assert_enrollment() -> None:
             _assert_crash_retry(root)
             preview = enrollment.preview_import(request)
             result = enrollment.enroll_import(request, preview.fingerprint)
-            assert result.status == "already_managed"
+            _assert_already_managed_message(result, "v1_match tail")
             rendered = result.to_command_result().data
             assert rendered["management_origin"] == "create"
             assert rendered["instance_id"] == "fixture"
@@ -264,7 +272,8 @@ def _assert_enrollment() -> None:
             assert record.source_release.commit == "a" * 40
             assert record.runtime_release is None and record.verified_release is None
             inventory_before = paths.maintenance_inventory_path.read_bytes()
-            enrollment.enroll_import(request, preview.fingerprint)
+            early = enrollment.enroll_import(request, preview.fingerprint)
+            _assert_already_managed_message(early, "early return on a finalized enrollment")
             assert paths.maintenance_inventory_path.read_bytes() == inventory_before
         finally:
             enrollment.inspect_existing_install = original

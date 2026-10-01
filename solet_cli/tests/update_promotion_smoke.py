@@ -124,8 +124,9 @@ def _assert_doctor_incomplete_then_promote(root: Path) -> None:
     fixture = build_fixture(root, host=host)
     advance_to_source_advanced(fixture)
     fingerprint = runtime_fingerprint(fixture)
-    # After the restart the fixture's process table names a foreign interpreter once, then the target's own.
-    host.processes = [{"pid": 4343, "lstart": "Fri Sep 18 12:00:00 2026", "command": "/usr/bin/python3 -m other"}]
+    # The launchd colour runs a foreign interpreter once, then the target's own.  It still runs the target's argv, so it is the
+    # one colour of the target (the census counts colours, not interpreters) and the doctor is what rejects the interpreter.
+    host.processes = [{"pid": "launchd", "lstart": "Fri Sep 18 12:00:00 2026", "command": "/usr/bin/python3 -m ananta.cli --app-home {TARGET}/profile"}]
     first = apply_update(fixture.request, fingerprint)
     _check((first.status, first.exit_code, _status(fixture)) == ("doctor_incomplete", 1, "doctor_incomplete"), f"first doctor run fails on the service check: {first.status} {first.exit_code}")
     record = fixture.record()
@@ -168,6 +169,7 @@ def _assert_zero_delta_promotion(root: Path) -> None:
     _assert_promoted(fixture, "F-ZD-1")
     again = preview_update_instance(fixture.request)
     _check((again.status, again.exit_code, again.data["approval_fingerprint"]) == ("already_current", 0, None), "a second --dry-run is already_current with no fingerprint")
+    _check(again.data["planned_actions"] == [], f"an already_current preview plans nothing: {again.data['planned_actions']}")
 
 
 def _assert_verify_preview(fixture: Fixture) -> str:

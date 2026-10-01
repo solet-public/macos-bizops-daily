@@ -95,7 +95,15 @@ def _single_artifact_inputs(inputs: dict[str, JsonValue], artifact_id: str) -> d
     return one
 
 
+def _require_reviewed_adoption(state: ManagedArtifactState, plan: RuntimePlan) -> None:
+    """An adoption runs only over the bytes whose diff the approval showed; a plan journaled before r65 showed none, so it adopts nothing."""
+    approved = next(item for item in plan.managed_artifacts if item.artifact_id == state.artifact_id)
+    if state.adopt_diff and state.current_sha256 != approved.current_sha256:
+        raise UpdateBlockedError("probe_drift", f"managed artifact {state.artifact_id} at {state.destination} changed between approval and apply; nothing was written", repair="Inspect the file, then preview again.")
+
+
 def _write_artifact(execution: RuntimeExecution, operation: RuntimeOperation, one: dict[str, JsonValue], state: ManagedArtifactState, plan: RuntimePlan) -> str:
+    _require_reviewed_adoption(state, plan)
     destination = Path(state.destination)
     backup = write_backup(execution.paths, execution.record.instance_id, execution.operation_id, state.artifact_id, destination)
     execution._record(operation.operation_id, "manager", None, status=None, note={"artifact_id": state.artifact_id, "backup": backup.to_dict()})  # noqa: SLF001

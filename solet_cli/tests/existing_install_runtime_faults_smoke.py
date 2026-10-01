@@ -100,7 +100,7 @@ def _assert_stale_processes(root: Path) -> None:
     advance_to_source_advanced(fixture)
     fingerprint = runtime_fingerprint(fixture)
     fixture.host.processes = [
-        {"pid": 4343, "lstart": "Fri Sep 18 12:00:00 2026", "command": "{TARGET}/.venv/bin/python3 -m ananta.cli --app-home {TARGET}/profile"},
+        {"pid": "launchd", "lstart": "Fri Sep 18 12:00:00 2026", "command": "{TARGET}/.venv/bin/python3 -m ananta.cli --app-home {TARGET}/profile"},
         {"pid": 9001, "lstart": "Mon Jan  1 00:00:00 2024", "command": "{TARGET}/.venv/bin/solet-bridge call x"},
         {"pid": 9002, "lstart": "Mon Jan  1 00:00:00 2024", "command": "{TARGET}/.venv/bin/solet-bridge watch"},
     ]

@@ -58,6 +58,9 @@ from .command_launcher import (
 from .credential_seed import CredentialSeedError, seed_db_password
 from .git_init import GitInitError, git_init_worktree
 from .manifest_marker import build_marker_payload, write_marker
+from .profile_identity import PROFILE_TEMPLATE_BY_BUNDLE as _PROFILE_TEMPLATE_BY_BUNDLE
+from .profile_identity import PROVENANCE_FILENAME as _PROVENANCE_FILENAME
+from .profile_identity import ProvenanceError, declared_bundle_name
 from .profile_implementations import IMPLEMENTATION_DECISIONS
 from .profile_install import ProfileInstallError, install_profile_allowlist, load_plugin_allowlist
 from .router_install import RouterInstallError, RouterInstallResult, install_router_at_birth
@@ -76,14 +79,8 @@ _OPERATION_REF_ENV_VAR = "SOLET_OPERATION_REF"
 _FULL_GENESIS_OPERATION_REF = "genesis::solet.run"
 _AUTOSTART_INSTALL_OPERATION_REF = "genesis::autostart.install"
 _STALE_VAULT_PRECHECK_ARGUMENT = "--check-vault-stale-state"
-_PROVENANCE_FILENAME = "PROVENANCE.json"
 _COREAI_ASSET_PENDING_STATUS = "deferred_coreai_asset_pending"
 _LLAMA_CPP_CONFIG_PENDING_STATUS = "deferred_llama_cpp_config_pending"
-_PROFILE_TEMPLATE_BY_BUNDLE = {
-    "macos_free_minimal": "macos-free-solet",
-    "macos-bizops": "macos-bizops",
-    "macos_samantha": "macos-samantha-solet",
-}
 
 
 #: No implementation decisions: genesis installs the template's roster as written.
@@ -117,21 +114,10 @@ def _resolve_kb_root(clone_root: Path) -> Path:
 
 
 def _declared_bundle_name(clone_root: Path) -> str | None:
-    provenance_path = clone_root / _PROVENANCE_FILENAME
-    if not provenance_path.is_file():
-        return None
     try:
-        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise GenesisError(f"{_PROVENANCE_FILENAME} is not valid JSON: {exc}") from exc
-    if not isinstance(provenance, dict):
-        raise GenesisError(f"{_PROVENANCE_FILENAME} must contain a JSON object")
-
-    bundle = provenance.get("bundle")
-    if not isinstance(bundle, dict):
-        return None
-    bundle_name = bundle.get("name")
-    return bundle_name.strip() if isinstance(bundle_name, str) and bundle_name.strip() else None
+        return declared_bundle_name(clone_root)
+    except ProvenanceError as exc:
+        raise GenesisError(str(exc)) from exc
 
 
 def resolve_profile_name(

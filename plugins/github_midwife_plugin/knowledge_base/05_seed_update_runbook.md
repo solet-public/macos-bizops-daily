@@ -8,7 +8,7 @@ Article Role: operations_runbook
 
 Article Tags: planning-stage:solet-lifecycle, evidence-category:operations-runbook, domain:local-solet, domain:client-deployment, consumer_profile:both
 
-Embedding Description: Agent-facing runbook for applying a newer seed release to an ALREADY-LIVE seed-born solet without losing its state, now led by the Solet Manager path — install the Manager from its Homebrew tap, classify the clone with `solet-manager inspect`, enroll it once with `solet-manager import`, then for every release run `solet-manager update --dry-run` to read the preview (which lists the genesis-written files and untracked genesis paths it will preserve, the exact fast-forward, the dependency, migration, hydration and lifecycle operations it will perform) and `--yes --approval-fingerprint` to apply it through the final doctor and promotion, with `solet-manager doctor` as the read-only oracle and `solet-manager reconcile` as the one answer to a terminal update — including the exact refusal vocabulary (`history_diverged`, `tracked_overlap_present`, `staged_changes_present`, `tracked_shape_changed`, `executed_code_modified`, `git_metadata_present`, `host_requirement_missing`, `claude_cli_missing`, `source_identity_unproven`) and what each exit code means, the six steps that stay manual and why (the target `AGENTS.md`/`CLAUDE.md` hydration block and launchers, the first-time export-root answer, quitting Claude Code before the rename migration can rewrite `~/.claude.json`, relaunching open clients and re-arming watchers, adding a release-added plugin to the profile manifest, connector three-read and feedback-item checks), how an adopter learns a new re-mint exists (the formula upgrade plus the GitHub release subscription, re-pointed when the seed moves homes), and the legacy manual procedure retained verbatim as recovery for clones the Manager classifies as not importable (diverged history, development checkout) or for an instance the operator chooses to repair by hand.
+Embedding Description: Agent-facing runbook for applying a newer seed release to an ALREADY-LIVE seed-born solet without losing its state, now led by the Solet Manager path — install the Manager from its Homebrew tap, classify the clone with `solet-manager inspect`, enroll it once with `solet-manager import`, then for every release run `solet-manager update --dry-run` to read the preview (which lists the genesis-written files and untracked genesis paths it will preserve, the exact fast-forward, the dependency, migration, hydration and lifecycle operations it will perform) and `--yes --approval-fingerprint` to apply it through the final doctor and promotion, with `solet-manager doctor` as the read-only oracle and `solet-manager reconcile` as the one answer to a terminal update — including the exact refusal vocabulary (`history_diverged`, `tracked_overlap_present`, `staged_changes_present`, `tracked_shape_changed`, `executed_code_modified`, `git_metadata_present`, `host_requirement_missing`, `claude_cli_missing`, `source_identity_unproven`, and, after `source_advanced`, `source_transition_incomplete` with its per-path sub-cases) and what each exit code means, the six steps that stay manual and why (the target `AGENTS.md`/`CLAUDE.md` hydration block and launchers, the first-time export-root answer, quitting Claude Code before the rename migration can rewrite `~/.claude.json`, relaunching open clients and re-arming watchers, adding a release-added plugin to the profile manifest, connector three-read and feedback-item checks), how an adopter learns a new re-mint exists (the formula upgrade plus the GitHub release subscription, re-pointed when the seed moves homes), and the legacy manual procedure retained verbatim as recovery for clones the Manager classifies as not importable (diverged history, development checkout) or for an instance the operator chooses to repair by hand.
 
 > **Status (2026-09-19, existing-solet import/update Step 7):** the Manager
 > path (Part A) is the update procedure. The manual procedure this document
@@ -199,11 +199,23 @@ solet-manager update <name> --yes --approval-fingerprint <runtime fingerprint>  
 solet-manager doctor <name>                               # exit 0 verified: the update is over
 ```
 
+A solet made by `solet create` and not yet updated is answered `instance_unmanaged_v2` by
+`solet-manager doctor <name>` until its first approved update enrolls it (`update --dry-run`
+enrolls nothing); check it with `solet doctor <name>` meanwhile (r65, `iss_2d4061a9`).
+
 The update is over only when the journal reads `promoted` and the
 inventory row is `verified`; `update --yes` continues past the runtime
 stages through the final doctor and promotion in the same invocation, and
 tells you the readiness result itself — there is no separate "restart and
 wait".
+
+**From `source_advanced` until the runtime-stage `--yes` finishes, the
+checkout is read-only for you.** The Manager fingerprinted your untracked and
+modified files when you approved the source stage, and it checks that
+fingerprint again on every later step. Do not move files you displaced for the
+source stage back into the clone in this window; put them back only after the
+update reports `promoted`. A file moved back earlier is refused as
+`source_transition_incomplete` (row in the table below).
 
 **What the preview discloses, and what it refuses.** The `local_state`
 group of the source preview lists three things a real clone always carries:
@@ -217,7 +229,9 @@ touch), *committed local state* (the untracked `.gitignore`, `.solet/`,
 `knowledge_bases/*` symlinks, `client/` — paths the update commits to leave
 byte-identical, verified after every operation), and the *preserved
 surface* (`profile/**`, disclosed with kind, mode and size, never digested,
-never committed). None of these is a refusal.
+never committed). None of these is a refusal while it is unchanged; the
+Manager fingerprints them when you approve the source stage, and a change made
+after `source_advanced` is `source_transition_incomplete` (table below).
 
 The two hook manifests sit under a roster plugin, an executed-code root, so
 the Manager admits them only as the installer wrote them: every bare
@@ -254,6 +268,8 @@ added inside or outside the block, or a mode change, is still
 | `source_identity_unproven` | `origin` names a URL the descriptor does not declare as an allowed migration (the SSH `git@github.com:` spelling of the canonical repository is canonical, r64) | Part C, Step 2a (manual re-point) |
 | `host_requirement_missing` / `host_requirement_unknown` | the host lacks Python 3.13, or a host probe could not run (`data.host` names the row) | `brew install python@3.13`, then preview again |
 | `claude_cli_missing` | the Claude Code CLI is not on the Manager's `PATH` or in `/opt/homebrew/bin`, `/usr/local/bin` or `$HOME/.local/bin` (Claude Code's native install directory; `data.host` row `claude_cli_present`), and the refusal names each directory searched. The runtime stage's plugin-cache refresh needs it, and the update never installs it | `brew install --cask claude-code` (a native install in `$HOME/.local/bin` already counts), check that `command -v claude` prints a path in the shell you run `solet-manager` from, then preview again |
+| `instance_imported` | `solet status`, `start`, `doctor`, `attest` or a `reconcile-*` verb was given the name of an imported solet; those verbs read only `solet create` records (r65, `iss_33637918`). Nothing is written | `solet-manager doctor <name>` (`solet-manager update <name> --dry-run` for updates). The Manager has no start verb: start an imported solet through launchd, `launchctl kickstart -k gui/$(id -u)/local.solet.<name>`, then `<name> health` |
+| `source_transition_incomplete` (changed local state; an `error_kind` with exit 3 on a re-entry after `source_advanced`, not a row of `data.topology.reasons`) | a file you put back or changed after approving the source stage no longer matches the local state the Manager fingerprinted then. The message lists every such path with its sub-case and the repair gives one line per path | per path, then preview again: an *untracked local-only file* leaves the checkout again (`mv <path> <scratch>`); a path *now tracked at the new HEAD* is restored from HEAD (move your copy aside, then `git -C <clone> restore -- <path>`); a *preserved local edit that changed again* gets the recorded bytes put back (never `git restore`, which discards the edit); a path *now missing* is put back where it was; a path *changed since approval* is put back as approved. The check is strict on purpose: a file restored to its pre-approval state is still refused. If a line names a path you did not touch, stop and report it |
 
 **The runtime preview registers a missing coordination-hooks marketplace and
 installs the plugin the way `solet create` does** (r64, `iss_c9a7b626`,
@@ -318,6 +334,13 @@ created solet verifies its seed tree and lists the pinned `hooks.json` under
 the installer pin of the committed file and its mode is unchanged. Any other
 change to it still warns `tracked_tree_deviation`.
 
+At `--yes`, a refused `claude plugin uninstall`, `claude plugin install` or
+`claude plugin marketplace add` stops as `claude_plugin_uninstall_failed`,
+`claude_plugin_install_failed` or `claude_marketplace_add_failed`. The repair
+quotes the exit code (or the timeout) and the CLI's stderr, secret-shaped text
+and solet keg paths removed, and capped at 200 characters; run the named command yourself, fix what
+it reports, then preview again.
+
 A known consequence, not fixed in r64: a later release that edits `hooks.json`
 refuses as `tracked_overlap_present` on these solets, as it already does on
 hydrated ones (`iss_c1a7df20`). Follow the pinned-manifest repair in the table
@@ -333,6 +356,7 @@ these cases:
 | `marketplace_path_outside_clone` | the clone's `.claude-plugin` directory or its marketplace file is a symlink | replace the symlink with a real directory, then preview again |
 | `marketplace_registry_unreadable` | `~/.claude/plugins/known_marketplaces.json` is not a readable UTF-8 JSON object | inspect `claude plugin marketplace list`, repair the file, then preview again |
 | `claude_plugin_list_failed` | `claude plugin list --json` exited non-zero, timed out, or printed no JSON list (the repair quotes its exit code and stderr) | run it yourself, fix what it reports, then preview again |
+| `export_root_ambiguous` | installed business connectors hold different `export_allowed_roots`; the repair lists each connector with the roots it holds (`none` held prints `(none)`; a long listing is shortened with `…`, never dropped) | edit `export_allowed_roots` in `profile/config/plugins/<plugin>.json` until every connector holds the one root you choose, then preview again (Step 4a) |
 | `hook_manifest_invalid` | the tracked coordination-hook manifest is not readable hook JSON | inspect `git diff -- <manifest>`, then preview again |
 | `hook_interpreter_foreign` | the tracked coordination-hook manifest has no bare `python3` hook, but its Python hooks run an interpreter other than `<clone>/.venv/bin/python3` | inspect `grep -n '"command"' <manifest>` and `git diff -- <manifest>`, then preview again |
 
@@ -377,7 +401,8 @@ the healthy state, not an error.
   availability). "Hydration-generated files showing as modified is normal"
   becomes: the Manager lists them as preserved local modifications and the
   untracked genesis files as committed local state, and refuses only the
-  table above.
+  table above. A local file moved back after `source_advanced` is the
+  `source_transition_incomplete` row.
 - Step 2 pull → `update --dry-run`, review, `--yes`: the exact candidate
   fast-forward; `history_diverged` and `tracked_overlap_present` are the
   refusals, with paths.
@@ -391,15 +416,29 @@ the healthy state, not an error.
   migration; pass `--backup-checkpoint`), which also backfills the plist
   log redirection through `autostart_reconcile` and rewrites the
   `HOMUNCULUS_*` keys in `~/.claude.json` when no Claude Code process is
-  running — while one runs it returns `blocked coding_agent_running` with
-  "Quit Claude Code, then re-run --yes".
+  running — while one runs, or when `pgrep` could not say (missing, timed
+  out, unexpected exit; the text names which), it returns
+  `blocked coding_agent_running` with "Quit Claude Code, then re-run --yes".
 - Step 4 restart and wait → `lifecycle.restart_single_color` for a
   `legacy_direct` LaunchAgent (every solet `solet create` makes, whether or
   not the router plugin is on its roster) and `lifecycle.cutover` only for a
   materialized supervisor release behind the router; readiness is
   `bridge_health_healthy` within the bundle's budget. A release the old preflight cannot install is
   expressed by the candidate bundle declaring `single_color_required`; you
-  no longer need to know that exception.
+  no longer need to know that exception. On a `legacy_direct` solet the restart
+  is single-colour even when the router plugin has served blue-green swaps
+  inside the running solet. Before it, the preview reads the process table and
+  proves single-colour only when the LaunchAgent's pid is the one colour
+  serving the target's `--app-home`. `colour_outside_launchagent` means a colour
+  serves outside launchd (after an in-process swap the LaunchAgent job is
+  dormant, or has respawned an idle colour); the preview names the pid and
+  prints the one command that hands serving back to launchd,
+  `kill <pid> && launchctl kickstart -k gui/<uid>/<label>`. Run it once,
+  then preview again. After the restart, a colour left outside launchd refuses
+  `runtime_candidate_not_serving` and publishes nothing, and `solet-manager doctor`
+  reports the same state as `colour_outside_launchagent`.
+  `service_offline_before_transition` now means the service is really
+  offline, or its LaunchAgent job is not loaded.
 - Step 4a export root → `migration_export_root_containment` propagates an
   already-configured root to newly installed connectors (first-time answer:
   Part B).
@@ -439,6 +478,30 @@ the healthy state, not an error.
   marked block, backed up like the rest, and the files already in `client/`
   are not touched. Without that ignore rule the update plan would refuse
   the fleet file and stop the update for every solet (design section 6.3).
+  **The instance LaunchAgent plist is adopted when it is yours** (r65,
+  `iss_d1f3371b`, seed issue #85). A plist that matches no release's render, a
+  hand-made or hand-edited one, used to stop the update with
+  `managed_block_unknown_origin` and no way forward. The Manager now plans
+  `render_whole` for it when three things hold: it parses, its `Label` is
+  `local.solet.<name>`, and it launches `ananta.cli` directly (`legacy_direct`).
+  The preview row carries `current_sha256` (the bytes the update will replace,
+  which the approval binds) and `adopt_diff`: at most 80 lines of at most 200
+  characters, from the current file to the release's render. It compares the two
+  plists' parsed values, written out the same way with their keys sorted, so a
+  difference in key order, indentation or comments is not shown; every value
+  under a secret-named key, and any string or data value equal to one, reads
+  `[REDACTED]` however the file spells it (a secret reused as a dictionary key
+  or re-encoded as other data is shown as it is); a Homebrew keg path in a line
+  reads `[keg path]` with the rest of the `PATH` intact; and a plist that cannot
+  be parsed gets one line saying the diff was withheld. Read the diff before you approve;
+  a setting you tuned by hand, such as a narrower or wider `PATH`, is replaced
+  by the render's, so note it and re-apply it after the update has promoted if you need it.
+  The Manager backs the file up before it writes, and a plist edited between the
+  preview and the apply is refused as `probe_drift` with nothing written. A plist
+  with another label or a materialized-supervisor plist (`releases/current` in its
+  launch; `iss_5c2598a7`) still stops the update with `managed_block_unknown_origin`
+  (or `managed_file_locally_modified` when it carries a stamp); Part C Step 5,
+  "The instance LaunchAgent plist", says what to do for each.
 - Step 6.1 plugin cache → `plugin_cache_refresh` (cache diff, hook pin and receipt;
   `plugin_cache_current` in doctor section 11).
 - Step 6.4 KB re-install → `runtime.knowledge_reinstall` for every
@@ -468,6 +531,26 @@ before the apply, like every `backup_required` migration.
 
 What the transition guarantees:
 
+- **The profile comes from the solet's provenance, not its label (r65,
+  iss_eb626338).** `profile_name` in the profile's manifest.yaml is only a
+  label: templates renamed it several times and a blue-green deploy or plugin
+  add resets it to `local`. The handler reads the sealed `PROVENANCE.json`
+  bundle instead (`macos-bizops`, `macos_free_minimal`, `macos_samantha`). It
+  falls back to the manifest label only for a tree with no provenance, and
+  only when the label names a profile template this release ships. A solet it
+  cannot identify (an unknown provenance bundle, unreadable provenance, or no
+  provenance and a label that is no profile) reports `conflict`: the preview
+  lists `…refuse`, the update promotes at `needs_attention` with
+  `plugin_transition_conflict`, and the doctor row says `cannot identify this
+  solet's profile (profile_name '<label>')`. The repair is to set
+  `profile_name` to `macos-bizops`, `macos-free-solet` or
+  `macos-samantha-solet`, whichever the solet was born from, or to restore
+  `PROVENANCE.json`, then re-run `solet-manager update <name>`. It is never
+  `verified`. The doctor row carries both `profile` and
+  `manifest_profile_name`, so a mismatch is visible. On r64, a solet with a
+  non-profile label promoted `verified` with nothing planned and the doctor
+  said "keep using LM Studio on this solet's profile"; re-running r64 cannot
+  change that (`already_current`), so such a solet takes the r65 update.
 - **Only where the host can run it.** Each replacement names a host profile
   in the flow's `host_profiles` (`apple_embeddings` for Core AI, `apple_fm`
   for Apple FM; both macOS 27 on arm64 in r52), measured with `sw_vers` and
@@ -492,11 +575,32 @@ What the transition guarantees:
   again: it selects `verify` mode at the same release and retries only what
   is still pending.
 - **Edited configuration is refused, not overwritten.** The embedding
-  transition matches the predecessor config exactly; the inference
-  transition matches on `base_url` only (setup chose the model). A solet
-  whose old config was edited reports `conflict`; the row defers with
+  transition matches the predecessor config on `base_url` and `model` (r65;
+  r52 to r64 required every key, so a `timeout_seconds` edit or an extra key
+  blocked the switch); the inference transition matches on `base_url` only
+  (setup chose the model). A solet whose old config differs on a matched
+  field reports `conflict`, naming the field; the row defers with
   `plugin_transition_conflict`, and the preview names the refusal. Restore
-  the shipped config or move the binding by hand.
+  the shipped value or move the binding by hand. A roster or binding
+  conflict says so in its own words and its repair is about the roster, not
+  the config. Where a sentence says a service runs (conflict, host refusal,
+  unsupported, not applicable) it reads the service's actual binding: a
+  service already bound to its replacement says it runs there, even when
+  the row is a conflict (iss_da49cd98).
+- **Done means bound, and an unused old plugin is cleaned up (r65,
+  iss_b3ccbf3b).** The owner sentence says the service runs on the replacement
+  as soon as the replacement is in the roster and is what the service is bound
+  to. The transition reads `done` once the old plugin is also off the roster.
+  If the old plugin is still listed and bound to no service (a crash after the
+  binding moved, or a binding switched by hand), it reads `cleanup`: the
+  preview and the update plan exactly the roster removal of the old plugin, a
+  normal managed write with its backup, and nothing is proven or downloaded.
+  This is not cosmetic: the platform loads every listed plugin, and a listed
+  `openai_embeddings_plugin` still qualifies against LM Studio at every boot,
+  whatever the binding says. If the old plugin is still bound to another
+  service, it is kept and the transition reports a leftover conflict naming
+  that service (`plugin_transition_conflict`, with the repair to rebind it or
+  remove it by hand); it is never removed silently or ignored.
 - **Everything else is preserved.** Extra plugins keep their roster place,
   the old plugin's config file stays on disk (inert), and `profile/data` is
   untouched. LM Studio and its models are left exactly as they were: no
@@ -506,8 +610,12 @@ What the transition guarantees:
 - **Interruptions resume.** Every intermediate write state boots (the new
   plugin enters the roster before the binding moves). A resumed update
   completes the transition, or reverts it to the predecessor bytes when the
-  replacement is no longer ready. A repeat apply is a byte-identical no-op,
-  and an already-Apple-native solet verifies with no plan.
+  replacement is no longer ready. A crash after the binding moved leaves the
+  replacement bound with the old plugin still listed: that reads `cleanup`
+  (see above), and the resume removes the old roster entry whether or not the
+  replacement would prove ready now, ending at the same bytes as an
+  uninterrupted update. A repeat apply is a byte-identical no-op, and an
+  already-Apple-native solet verifies with no plan.
 
 The final doctor reports the transitions as the advisory
 `plugin_transitions` row in the plugin-roster section. A pending transition
@@ -531,8 +639,10 @@ is given with the step so the next release can close it deliberately.
    update left alone.
 2. **The first-time export/workspace root answer** (Part C Step 4a). No CLI
    carrier for the answer exists; `migration_export_root_containment`
-   blocks with `export_root_ambiguous` or `none` and that text, and
-   propagates once a root is configured.
+   only reports `operator_action_required` while no root is configured,
+   propagates once one is, and blocks with `export_root_ambiguous` when
+   connectors hold different roots (the repair names each connector and its
+   roots).
 3. **Quitting Claude Code before `migration_solet_rename` can rewrite
    `~/.claude.json`.** The Manager never kills a process; doctor section 11
    `stale_target_processes` names the pid. The `--scan-stale` review of Part
@@ -855,6 +965,13 @@ empty on a clone that ships at least one business-connector plugin — an empty 
 none of the connector plugin directories were found under `<clone>/plugins/`, which is worth
 a second look, not a silent pass.
 
+If `solet-manager update <name> --dry-run` later refuses `export_root_ambiguous`,
+connectors disagree. The repair lists every installed connector with the roots
+it holds (`salesforce_plugin=/a, /b; jira_plugin=/a`; a connector holding none
+prints `(none)`). Edit `export_allowed_roots` in
+`profile/config/plugins/<plugin>.json` until every connector holds the one root
+you chose, then run the preview again.
+
 ## Step 5 — re-run the hydration steps the release changed
 
 Updates that only change platform code end here. Updates that change the
@@ -954,6 +1071,57 @@ the operator chose in Step 4a.` Replace the first and keep the second.
    `grep -c '_tmux_host_for_<name>' <clone>/client/<name>-fleet.zsh` prints
    at least `2`. Tell the operator to open a new terminal: a shell that
    already sourced the old file keeps the old functions.
+
+*The instance LaunchAgent plist* (r65), for a Manager before r65 whose runtime
+preview stopped on `instance_launchagent_plist` with
+`managed_block_unknown_origin`, and for a plist the r65 Manager refuses because
+its `Label` is not `local.solet.<name>` or it does not launch `ananta.cli`
+directly. The r65 Manager does steps 2 to 5 itself for a plist it adopts. With `<plist>` for
+`~/Library/LaunchAgents/local.solet.<name>.plist`:
+
+1. Read the file: `plutil -p <plist>`, and go by what it shows.
+   - `Label` is `local.solet.<name>` and `ProgramArguments` runs
+     `<clone>/.venv/bin/python3 -m ananta.cli`: it is your own launch; go on to
+     step 2.
+   - `Label` is another value but `ProgramArguments` runs this clone: the file
+     carries a wrong label. Back it up (step 4), then
+     `plutil -replace Label -string local.solet.<name> <plist>` and
+     `plutil -lint <plist>`, and preview again; an r65 Manager then adopts it. With
+     a Manager before r65 the preview still stops there: skip the `plutil` edit
+     and continue with step 2, which replaces the file whole.
+   - `Label` is `local.solet.<name>` but `ProgramArguments` runs another clone:
+     the r65 Manager adopts this plist like any other of your own launch, and its
+     diff shows both clone paths. Approve only if re-pointing the service at this
+     clone is what you mean; if the other clone is meant to keep it, do not
+     approve and do not replace it by hand (next bullet).
+   - `Label` is another solet's, or `ProgramArguments` runs another solet: the
+     file belongs to that solet. Do not replace it. Find which plist the service
+     really loads with `launchctl print gui/$(id -u)/local.solet.<name>`, and ask
+     the operator before you move a file that is not this solet's.
+   - `ProgramArguments` runs under `releases/current`: a supervisor plist
+     (`iss_5c2598a7`). No step here replaces it. Leave it as it is and finish this
+     update with the other manual steps of Part C.
+   - `plutil -p` prints an error or no `ProgramArguments`: `plutil -lint <plist>`
+     names what is damaged. The file is yours to replace: go on to step 2, and
+     the backup in step 4 keeps the damaged bytes.
+2. Render the release's plist to a scratch file, from the clone's own template:
+   `cd <clone> && .venv/bin/python3 -c 'import sys; from pathlib import Path; from github_midwife_plugin.autostart import render_launchagent_plist; sys.stdout.buffer.write(render_launchagent_plist(sys.argv[1], Path(sys.argv[2]), Path.home(), template_text=None, stamp=None, stamped=True))' <name> <clone> > "$TMPDIR/local.solet.<name>.plist.render"`.
+3. Read every difference: `diff -u <plist> "$TMPDIR/local.solet.<name>.plist.render"`.
+   Key order and indentation differences are cosmetic. A changed `PATH`, an
+   added environment variable or another `WorkingDirectory` is a setting you
+   chose or lost; decide which side is right before you go on.
+4. Back the file up: `cp -n <plist> <plist>.pre-r65-<YYYYMMDD>`, adding
+   `-HHMMSS` if that name exists; never overwrite a backup.
+5. Write the render: `cp "$TMPDIR/local.solet.<name>.plist.render" <plist>`, then
+   `plutil -lint <plist>` must print `OK`. Do not edit the file after this: an
+   edit makes it a stamped plist that no longer matches its render, which a
+   Manager before r65 stops on (`managed_file_locally_modified`) and step 6 would
+   no longer list as `stamped_current`. A setting you decided to keep in step 3
+   is applied after the update has promoted; from r65 the next update shows it as
+   a diff before it is replaced again.
+6. Preview again: `solet-manager update <name> --dry-run` lists
+   `instance_launchagent_plist` as `stamped_current`, and the update's restart
+   loads the new file.
 
 A release that ADDS a plugin needs one more route. Step 3's editable install
 puts the new code in the venv, but the pull never touches the clone's

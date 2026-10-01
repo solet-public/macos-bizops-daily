@@ -28,7 +28,7 @@ _SOURCE = _MIDWIFE / "src"
 if str(_SOURCE) not in sys.path:
     sys.path.insert(0, str(_SOURCE))
 
-from github_midwife_plugin import apple_setup_adapter
+from github_midwife_plugin import apple_setup_adapter, profile_identity
 from github_midwife_plugin.config_materialize import materialize_profile
 from github_midwife_plugin.genesis import (
     _PROFILE_TEMPLATE_BY_BUNDLE,
@@ -301,6 +301,8 @@ def main() -> None:
         blockers.extend(_check_profile(profile_name, inference_plugin))
         print(f"{profile_name}: roster, bindings and address book checked; runnable inputs measured")
 
+    if _PROFILE_TEMPLATE_BY_BUNDLE is not profile_identity.PROFILE_TEMPLATE_BY_BUNDLE:
+        blockers.append("genesis re-declares its bundle-to-profile map; it must be the profile_identity map the update handler reads, or birth and update identify a solet differently")
     if not (_REPO / "plugins" / _NEW / "plugin.yaml").is_file():
         blockers.append("Core AI provider source is absent from this isolated candidate; compose its frozen source")
     if "macos_inference_plugin" in _shipped_inference_providers() and not (

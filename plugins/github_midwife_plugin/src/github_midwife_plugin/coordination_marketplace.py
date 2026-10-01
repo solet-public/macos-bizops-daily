@@ -30,7 +30,7 @@ from solet_setup_contracts.hook_interpreter_pin import HookManifestError, instan
 
 from .coordination_hook_installation import receipt_path
 from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, planned_action
-from .setup_adapter_runtime import Runtime
+from .setup_adapter_runtime import Runtime, describe_outcome
 from .setup_plugin_operations import _patch_hook_manifest, _publish_claude_receipt
 from .setup_shell_operations import render_claude_marketplace
 
@@ -164,10 +164,10 @@ def register(request: AdapterRequest, runtime: Runtime, executable: str, plan: R
     if plan.add_marketplace:
         added = runtime.run((executable, "plugin", "marketplace", "add", str(request.target)), timeout_seconds=request.timeout_seconds, cwd=request.target)
         if not added.ok:
-            return "claude_marketplace_add_failed", "the Claude CLI refused `claude plugin marketplace add`"
+            return "claude_marketplace_add_failed", f"the Claude CLI refused `claude plugin marketplace add` ({describe_outcome(added)})"
     installed = runtime.run((executable, "plugin", "install", plan.selector), timeout_seconds=request.timeout_seconds, cwd=request.target)
     if not installed.ok:
-        return "claude_plugin_install_failed", "the Claude CLI refused `claude plugin install`"
+        return "claude_plugin_install_failed", f"the Claude CLI refused `claude plugin install` ({describe_outcome(installed)})"
     receipt_error = _publish_claude_receipt(request, runtime, executable, plan.marketplace, plan.selector)
     return None if receipt_error is None else ("coordination_receipt_invalid", receipt_error)
 

@@ -15,7 +15,11 @@ This module owns the dispatch table and the managed-artifact three-way engine
 honours: a destination the Manager plan did not name is refused
 (``preserved_surface_write_refused``), and a managed block or rendered file
 whose local bytes match neither the previous nor the candidate render is a
-conflict, never a side to pick.  The one exception is a ``rendered_whole``
+conflict, never a side to pick.  Two exceptions.  A ``launchd_plist`` is Manager-owned
+(``manager_generated_whole``): one that parses, carries this solet's own label and launches
+``ananta.cli`` directly (``legacy_direct``) is adopted, because its replacement is shown with a
+bounded diff, bound into the approval by the digest of the bytes it replaces, and backed up by the
+Manager before the write, so it is not a side picked silently; any other plist still blocks.  The other is a ``rendered_whole``
 file (a user-scope file such as the ``/feedback`` skill): it is only ever
 refreshed, so a missing one is not created and an edited one is reported in its
 state row (``locally_modified`` or ``unknown_origin``) and left in place without
@@ -26,9 +30,11 @@ refreshed above that line only.
 
 from __future__ import annotations
 
+import difflib
 import json
+import plistlib
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -63,6 +69,7 @@ from .managed_render import (
 )
 from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, evidence, planned_action, result
 from .setup_adapter_runtime import Runtime
+from .target_reconciliation import PLIST_PARSE_ERRORS, LaunchTopology, detect_topology, plist_label
 
 type Handler = Callable[[AdapterRequest, Runtime], JsonObject]
 
@@ -141,6 +148,7 @@ class ArtifactState:
     conflict: str | None
     new_content: str | None
     mode: int
+    adopt_diff: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,10 +199,10 @@ def _declared_states(context: _Context, declared: dict[str, ArtifactDeclaration]
 
 
 def _artifact_probe(request: AdapterRequest, states: list[ArtifactState]) -> JsonObject:
-    items = [_artifact_evidence(state) for state in states]
+    items = _probe_evidence(states)
     conflict = next((state for state in states if state.conflict is not None), None)
     if conflict is not None:
-        return result(request, status="blocked", error_kind=conflict.conflict, retry_safe=True, evidence_items=items, repair=f"Managed artifact {conflict.artifact_id} at {conflict.destination}: {conflict.conflict}. Re-run hydration for it by hand or remove the block; it is never rewritten silently.")
+        return result(request, status="blocked", error_kind=conflict.conflict, retry_safe=True, evidence_items=items, repair=_conflict_repair(conflict))
     stale = [state for state in states if state.action != "none"]
     if not stale:
         return result(request, status="verified", evidence_items=items)
@@ -202,6 +210,20 @@ def _artifact_probe(request: AdapterRequest, states: list[ArtifactState]) -> Jso
         return result(request, status="blocked", error_kind="managed_artifact_stale", retry_safe=True, evidence_items=items, repair=f"{stale[0].artifact_id} still needs {stale[0].action}.")
     actions = [planned_action(action_id=f"hydrate.{state.artifact_id}", title=f"{state.action} for managed artifact {state.artifact_id}", mutation_kind="file_write", target=state.destination, evidence_ref=f"artifact.{state.artifact_id}") for state in stale]
     return result(request, status="pending", actions=actions, evidence_items=items, repair="Approve the exact managed-artifact writes shown.")
+
+
+def _probe_evidence(states: list[ArtifactState]) -> list[JsonObject]:
+    """One state row per artifact, then one ``adopt_diff.`` row per adopted file; that id is not ``artifact.``-prefixed, which the Manager decodes as a state row."""
+    return [*(_artifact_evidence(state) for state in states), *(_adopt_diff_evidence(state) for state in states if state.adopt_diff is not None)]
+
+
+def _conflict_repair(state: ArtifactState) -> str:
+    if state.kind == "launchd_plist":
+        return (
+            f"The LaunchAgent plist at {state.destination} is not a legacy_direct plist for this solet (its Label is not local.solet.<name>, it does not launch ananta.cli directly, or it does not parse), so the update will not replace it. "
+            "Replace it by hand: see the seed update runbook, Part C Step 5."
+        )
+    return f"Managed artifact {state.artifact_id} at {state.destination}: {state.conflict}. Re-run hydration for it by hand or remove the block; it is never rewritten silently."
 
 
 def _artifact_apply(request: AdapterRequest, runtime: Runtime, states: list[ArtifactState]) -> JsonObject:
@@ -237,6 +259,18 @@ def _artifact_evidence(state: ArtifactState) -> JsonObject:
     )
 
 
+def _adopt_diff_evidence(state: ArtifactState) -> JsonObject:
+    return evidence(
+        evidence_id=f"adopt_diff.{state.artifact_id}",
+        kind="managed_artifact_adopt_diff",
+        status="pending",
+        summary=f"replacing the unrecognised {state.artifact_id} with the release's render changes these lines",
+        observed=[f"{index:03d}={line}" for index, line in enumerate(cast(str, state.adopt_diff).split("\n"))],
+        expected="the release's stamped render",
+        source=state.destination,
+    )
+
+
 def _artifact_state(artifact: ArtifactDeclaration, destination: str, context: _Context) -> ArtifactState:
     path = Path(destination)
     existing = read_text(path)
@@ -256,9 +290,9 @@ class _Outcome:
         self.mode = mode
         self.current_digest = None if existing is None else sha256_text(existing)
 
-    def state(self, state: str, action: str, stamped: str | None, conflict: str | None, new_content: str | None) -> ArtifactState:
+    def state(self, state: str, action: str, stamped: str | None, conflict: str | None, new_content: str | None, *, adopt_diff: str | None = None) -> ArtifactState:
         expected = sha256_text(new_content) if new_content is not None else (self.current_digest or sha256_text(""))
-        return ArtifactState(self.artifact.artifact_id, self.artifact.kind, self.destination, state, action, stamped, self.current_digest, expected, conflict, new_content, self.mode)
+        return ArtifactState(self.artifact.artifact_id, self.artifact.kind, self.destination, state, action, stamped, self.current_digest, expected, conflict, new_content, self.mode, adopt_diff)
 
 
 def _managed_block_state(artifact: ArtifactDeclaration, destination: str, existing: str | None, mode: int, context: _Context) -> ArtifactState:
@@ -395,7 +429,7 @@ def _stamped_whole_state(outcome: _Outcome, existing: str, stamped: str, candida
     previous = _template_bytes_by_digest(artifact, stamped, context)
     if previous is not None and existing == _whole_render(artifact, previous, stamped, context, stamped=True):
         return outcome.state("stamped_previous", "render_whole", stamped, None, candidate)
-    return outcome.state("locally_modified", "none", stamped, _edit_conflict(artifact, "managed_file_locally_modified"), None)
+    return _unmatched_whole_state(outcome, "locally_modified", stamped, "managed_file_locally_modified", candidate, context)
 
 
 def _unstamped_whole_state(outcome: _Outcome, existing: str, candidate: str, context: _Context) -> ArtifactState:
@@ -404,7 +438,125 @@ def _unstamped_whole_state(outcome: _Outcome, existing: str, candidate: str, con
         previous = _template_bytes_by_digest(artifact, digest, context)
         if previous is not None and existing == _whole_render(artifact, previous, digest, context, stamped=False):
             return outcome.state("legacy_matched", "render_whole", None, None, candidate)
-    return outcome.state("unknown_origin", "none", None, _edit_conflict(artifact, "managed_block_unknown_origin"), None)
+    return _unmatched_whole_state(outcome, "unknown_origin", None, "managed_block_unknown_origin", candidate, context)
+
+
+def _unmatched_whole_state(outcome: _Outcome, state: str, stamped: str | None, reason: str, candidate: str, context: _Context) -> ArtifactState:
+    """A whole file that matches no known render: an adoptable plist is replaced with its diff shown, anything else is a conflict."""
+    if _adoptable_plist(outcome, context.request.name):
+        return outcome.state(state, "render_whole", stamped, None, candidate, adopt_diff=_adopt_diff(cast(str, outcome.existing), candidate))
+    return outcome.state(state, "none", stamped, _edit_conflict(outcome.artifact, reason), None)
+
+
+def _adoptable_plist(outcome: _Outcome, name: str) -> bool:
+    """A plist this solet owns: the Label is this solet's own and it launches ``ananta.cli`` directly.
+
+    A plist for another label, a materialized supervisor (``iss_5c2598a7``) or one that does not parse is never adopted:
+    replacing it would hand the operator's launch to a render they did not write or move the solet off its topology.
+    """
+    if outcome.artifact.kind != "launchd_plist":
+        return False
+    path = Path(outcome.destination)
+    return plist_label(path) == f"local.solet.{name}" and detect_topology(path) == LaunchTopology.LEGACY_DIRECT
+
+
+_ADOPT_DIFF_LINES = 80
+_ADOPT_DIFF_COLUMNS = 200
+
+
+def _adopt_diff(existing: str, candidate: str) -> str:
+    """The diff from the plist on disk to the candidate render, at most 80 lines of at most 200 characters, secret values redacted.
+
+    It compares the parsed plists, not their bytes: each is parsed, every value under a secret-named key (and every value that repeats one) becomes
+    ``[REDACTED]``, and the two are written back out canonically (XML, keys sorted).  However the file spells a value, entities, CDATA or tag
+    whitespace included, the secret is gone before any text exists; layout, key order and comments are no change.  A plist that cannot be parsed gets
+    no diff at all, and the adopt decision does not depend on this text.
+    """
+    try:
+        trees = [plistlib.loads(text.encode("utf-8")) for text in (existing, candidate)]
+        secrets = {value for tree in trees for value in _values_under_secret_keys(tree, secret=False)}
+        texts = [plistlib.dumps(cast(dict[str, object], _redacted(tree, secrets, secret=False)), fmt=plistlib.FMT_XML, sort_keys=True).decode("utf-8") for tree in trees]
+    except PLIST_PARSE_ERRORS:
+        return "diff withheld: the plist could not be parsed, so no part of it is shown; compare the file with the candidate by hand"
+    lines = list(difflib.unified_diff(_redacted_lines(texts[0]), _redacted_lines(texts[1]), "current", "candidate", lineterm="", n=1))
+    if not lines:
+        return "the plists hold the same values; they differ only in layout, key order or comments"
+    kept = [line[:_ADOPT_DIFF_COLUMNS] for line in lines[:_ADOPT_DIFF_LINES]]
+    if len(lines) > _ADOPT_DIFF_LINES:
+        kept.append(f"... {len(lines) - _ADOPT_DIFF_LINES} more diff lines not shown")
+    return "\n".join(kept)
+
+
+#: Names whose value the diff never carries.  The house conventions, ``setup_adapter_contract._SECRET_KEY`` (seed evidence) and
+#: ``solet_manager.adapter_validation._SECRET_PATTERNS`` (Manager evidence), name password, secret, token, api key, private key and credential; this set
+#: also names a passphrase, authorization and ``DSN``, and a whole-word ``PASS``, ``PAT`` or ``KEY`` (``DB_PASS``, ``GH_PAT``, ``STRIPE_KEY``; not ``PATH``,
+#: ``KEYBOARD`` or ``KEYCHAIN``).
+_SECRET_PLIST_KEY = re.compile(
+    r"(?i)password|passwd|passphrase|secret|token|api[_-]?key|private[_-]?key|credential|authorization|dsn|(?<![a-z0-9])(?:pass|pat|key)(?![a-z0-9])"
+)
+#: Every rule the Manager's ``adapter_validation.public_string`` enforces on each line of an evidence ``observed`` array (``public_value``), and what
+#: holds it here:
+#:  1. a non-empty ``str`` of at most 4096 characters, the items unique: a line is cut at 200 characters and arrives as ``NNN=<line>``;
+#:  2. no secret-shaped text (``_SECRET_PATTERNS``, mirrored by ``_SECRET_PLIST_TEXT``), or the whole envelope is refused: replaced below;
+#:  3. at most 8192 bytes once redacted: 200 characters of at most 4 bytes each are 800;
+#:  4. no ``FORMULA_MARKER`` ("/Cellar/solet/"), which a PATH through a Homebrew keg carries: replaced by ``[keg path]`` below, and the rest of the
+#:     line stays readable.
+#: A refusal there raises out of the whole preview, so the seed never hands the Manager a line that breaks one.  The seed does not import the Manager.
+_SECRET_PLIST_TEXT = re.compile(r"(?i)(?:password|secret|token|authorization|oauth[_ -]?code|private[_ -]?key)\s*[:=]\s*\S+|bearer\s+[A-Za-z0-9._~+/-]+")
+_FORMULA_MARKER = "/Cellar/solet/"
+_NEUTRALIZE_PASSES = 8
+_MIN_CONTAINED_SECRET = 6
+_REDACTED = "[REDACTED]"
+
+
+def _values_under_secret_keys(node: object, *, secret: bool) -> Iterator[str | bytes]:
+    """Every string or ``<data>`` value under a key named like a secret, at any depth: the values a diff must not carry."""
+    if isinstance(node, dict):
+        for key, value in cast(dict[object, object], node).items():
+            yield from _values_under_secret_keys(value, secret=secret or _SECRET_PLIST_KEY.search(str(key)) is not None)
+    elif isinstance(node, list):
+        for item in cast(list[object], node):
+            yield from _values_under_secret_keys(item, secret=secret)
+    elif secret and isinstance(node, str | bytes) and node:
+        yield node
+
+
+def _redacted(node: object, secrets: set[str | bytes], *, secret: bool) -> object:
+    """The plist tree with every value under a secret-named key, and every string or data value equal to a collected secret, replaced.
+
+    Out of scope, deliberately: a secret reused as a dict key, or re-encoded (base64 data for a string secret, a string for a data secret); the diff
+    shows those as they are.
+    """
+    if secret:
+        return _REDACTED
+    if isinstance(node, dict):
+        return {key: _redacted(value, secrets, secret=_SECRET_PLIST_KEY.search(str(key)) is not None) for key, value in cast(dict[str, object], node).items()}
+    if isinstance(node, list):
+        return [_redacted(item, secrets, secret=False) for item in cast(list[object], node)]
+    if isinstance(node, str | bytes) and _repeats_secret(node, secrets):
+        return _REDACTED
+    return node
+
+
+def _repeats_secret(value: str | bytes, secrets: set[str | bytes]) -> bool:
+    """Whether a value under a plain key equals a secret found under a secret-named key (any length), or a string holds one of at least 6 characters."""
+    if value in secrets:
+        return True
+    return isinstance(value, str) and any(isinstance(secret, str) and len(secret) >= _MIN_CONTAINED_SECRET and secret in value for secret in secrets)
+
+
+def _redacted_lines(text: str) -> list[str]:
+    return [_neutralized(line) for line in text.splitlines()]
+
+
+def _neutralized(line: str) -> str:
+    """``line`` with every secret-shaped run and formula-keg path replaced, stable under a second pass (what the Manager re-checks)."""
+    for _ in range(_NEUTRALIZE_PASSES):
+        cleaned = _SECRET_PLIST_TEXT.sub(_REDACTED, line).replace(_FORMULA_MARKER, "[keg path]")
+        if cleaned == line:
+            return line
+        line = cleaned
+    return "[withheld]"
 
 
 def _edit_conflict(artifact: ArtifactDeclaration, reason: str) -> str | None:

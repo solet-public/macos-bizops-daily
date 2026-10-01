@@ -2,6 +2,122 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-09-30 — r65: `solet-manager import` and a no-change `update --dry-run` report what they did; a solet create finds Claude Code's native install; the external-app `issue_list` refuses the retired `track` filter
+
+**Solet Manager manager-v0.1.0-r65.**
+
+To take this release, upgrade the Manager, then update the solet:
+
+1. `brew update && brew tab --installed-on-request python@3.13 && brew upgrade solet`, then `brew list --versions solet`. It prints `solet <release>_<formula revision>`, taken from the `solet-0.1.0-r<release>` archive name. The release part must be `65` or later.
+2. `solet-manager update <name> --dry-run`. Apply the plan with `solet-manager update <name> --yes --approval-fingerprint <fingerprint>`, using the fingerprint that dry run printed. Repeat both steps until the result is `promoted`.
+
+- **Two `solet-manager` results no longer say the opposite of their own status.** `solet-manager import` answered
+  `Existing Solet import is not yet enabled for target mutation.` for every result, including the `imported` and
+  `already_managed` ones it returns after import has written its Manager record (`iss_6a27a24b`). It now says
+  `Existing Solet import completed; the instance is now enrolled with the Manager.` for `imported` and
+  `Existing Solet is already managed by the Manager; its enrollment is recorded and verified.` for `already_managed`. A second
+  `solet-manager update <name> --dry-run` that reports `already_current` listed three `planned_actions` (acquire, fetch,
+  fast-forward) beside a `null` approval fingerprint (`iss_69dfc6ec`). It now lists none. A preview that is blocked
+  (`awaiting_user`) still lists the actions it would plan, and the approval fingerprint and the update journal are
+  unchanged. Check: `python3 solet_cli/tests/import_result_message_smoke.py` and
+  `python3 solet_cli/tests/update_promotion_smoke.py` exit 0.
+- **A solet create no longer plans a second, Homebrew `claude` when Claude Code's native install is already there.**
+  Claude Code's native installer puts `claude` in `$HOME/.local/bin`. The create path's executable lookup searched PATH,
+  `/opt/homebrew/bin` and `/usr/local/bin` only, so on a launchd job or solet session without that directory on PATH it
+  found nothing and planned `brew install --cask claude-code` (`iss_26fdde33`). It now searches `$HOME/.local/bin` last,
+  in the same order as the Manager's update preview and the seed adapter, and a single smoke holds all three equal.
+  Check: `python3 solet_cli/tests/claude_native_location_smoke.py` exits 0.
+- **The external-app `issue_list` refuses the retired `track` filter, and its smoke no longer prints the child
+  environment when it fails.** A request carrying `track` is refused as `external_app.unknown_filter_key` before any
+  argument list is built, and the committed example config no longer ships a track vocabulary (`iss_f750a59b`). The
+  smoke's failure messages no longer print the child process environment or the database DSN, and a guard fails if
+  they do (`iss_0a7cb185`). This was already landed on master at the start of r65.
+
+- **`solet status`, `start`, `doctor`, `attest` and `reconcile-*` no longer say "managed instance does not exist" or "review `solet create`" for a solet you imported, and `solet-manager doctor` no longer claims `update --dry-run` enrolls a create instance.** An imported solet has only a Manager inventory row, which the `solet` commands never read (`iss_33637918`, `iss_2d4061a9`, `iss_a6eabfbd`); they now refuse with `instance_imported` before writing anything and name `solet-manager doctor <name>`, and `start` names the launchd command that starts it, because the Manager has no start verb. The `instance_unmanaged_v2` repair for a create instance now says `update --dry-run` shows the plan and enrolls nothing, and the approved `--yes` enrolls. Check: `python3 solet_cli/tests/registry_owner_refusal_smoke.py` exits 0.
+
+- **The `export_root_ambiguous` refusal names the connectors that disagree, and a failed Claude CLI step says how it failed.**
+  When installed connectors held different `export_allowed_roots`, the update refused with one fixed sentence and no
+  connector name, so the operator had to read every connector's config by hand (`iss_67d2597e`, public #86). The repair
+  now lists each installed connector with the roots it holds (`salesforce_plugin=/a, /b; jira_plugin=/a`; a connector
+  with none prints `(none)`), names the files to edit, and is shortened with `…` to fit the 512-character limit of a
+  repair, never by dropping a connector. The same class is closed in four more places where the update had the outcome
+  in hand and dropped it: a refused `claude plugin uninstall`, `claude plugin install` or `claude plugin marketplace
+  add` now reports the exit code (or the timeout) and the CLI's stderr, with secret-shaped text and solet keg paths
+  removed, because the Manager refuses a repair that carries them, and at most 200 characters kept; and `coding_agent_running` now says when `pgrep` could not tell (missing, timed out, unexpected
+  exit) instead of saying a Claude Code process is running. Nothing about which step refuses, its `error_kind` or its
+  exit code changed. Check: `python3 plugins/github_midwife_plugin/tests/existing_install_repair_text_smoke.py` exits 0.
+- **`source_transition_incomplete` for changed local state names every changed path, what kind of change it is, and how to
+  put it right.** After `source_advanced`, the Manager checks the untracked and modified files it fingerprinted when
+  you approved the source stage. It refused at the first changed path and gave one generic repair, so an adopter who had
+  moved displaced files back found the next one only after fixing the first (`iss_46de4f1d`, public #87). The message
+  now lists every changed path (the first 20, then a count) with the same lead phrase as before plus its sub-case: an
+  untracked local-only file leaves the checkout again (`mv`), a path now tracked at the new HEAD is restored from HEAD
+  (`git restore`), a path now missing is put back, and a preserved edit that changed again gets the recorded bytes put
+  back and is never told to `git restore`. The repair says that from `source_advanced` until the runtime-stage `--yes`
+  the checkout is read-only for you, and the update runbook now says so after the source-stage command. The check
+  itself is unchanged: every condition that refused before still refuses, nothing that passed refuses, and the status,
+  `error_kind` and exit code are the same. A file restored to its pre-approval state is still refused. Check:
+  `python3 solet_cli/tests/update_local_state_drift_report_smoke.py` exits 0.
+
+- **A solet that ran an in-process swap is no longer reported "offline", and an update no longer reports `promoted` while
+  the old code still serves.** After a blue-green swap inside the running solet, the serving colour is a detached process
+  and the LaunchAgent job is dormant, or has respawned an idle colour. The update's single-colour proof read only the
+  LaunchAgent's pid, so a healthy solet came back `service_offline_before_transition` (`iss_75b87670`, public #84), and a
+  restart beside a serving sidecar could publish `promoted` while the sidecar kept answering with the old release. The proof
+  now reads the process table: the target's colours are the pids running `-m ananta.cli --app-home <target>/profile`, and
+  single-colour is proven only when that set is exactly the LaunchAgent's pid. Otherwise the preview is blocked as
+  `colour_outside_launchagent`, names the pid that serves outside launchd, and prints the one command that hands serving
+  back to launchd (`kill <pid> && launchctl kickstart -k gui/<uid>/<label>`); run it once and preview again. After the
+  restart, a colour left outside launchd refuses as `runtime_candidate_not_serving` and publishes nothing. `solet-manager
+  doctor` reports the same state as `colour_outside_launchagent` instead of telling you to bootstrap a second colour.
+  A service that is really offline is still `service_offline_before_transition`, another solet's colours are ignored, and
+  a process table that cannot be read leaves the plan unproven. The Manager still starts and stops only its own restart:
+  it never kills a colour it did not start, and the zero-downtime router cutover for this launch is not part of r65.
+  Check: `python3 solet_cli/tests/update_single_colour_census_smoke.py` exits 0.
+
+- **A solet whose `profile_name` label is not a release profile name now moves embeddings to Core AI and summaries
+  to Apple Foundation Models on its next update, and a solet the release cannot identify says so.** The update took the
+  solet's profile from the `profile_name:` line of the profile's manifest.yaml. That line is a label, not an
+  identity: templates renamed it several times, and a blue-green deploy or plugin add resets it to `local`. A solet with
+  any other label was treated as having no declared plugin transition, so the r64 update promoted it `verified`, planned
+  nothing, and `solet-manager doctor` read "Embeddings keep using LM Studio on this solet's profile" (`iss_eb626338`, public
+  #75 and #78). The update now identifies the profile from the solet's sealed `PROVENANCE.json` bundle. It falls back to
+  the manifest label only for a tree with no provenance, and only when that label names a profile template this release
+  ships. A solet it still cannot identify, for example a provenance bundle this release does not know, is refused the
+  same way as an edited config: the preview lists the refusal, the update promotes with the switch deferred at
+  `needs_attention`, and `solet-manager doctor` says `cannot identify this solet's profile (profile_name 'local')`
+  with the repair, set `profile_name` to the profile the solet was born from or restore `PROVENANCE.json`. It is never
+  reported `verified`. The Samantha profile still keeps summaries on LM Studio. A solet already promoted on r64 needs this
+  release's update, not a re-run of r64: an update from a verified release is an advance, which re-probes the transition
+  from scratch. Check: `python3 plugins/github_midwife_plugin/tests/plugin_transition_smoke.py` and
+  `python3 solet_cli/tests/update_transition_bundle_candidates_smoke.py` exit 0.
+- **A replaced plugin reads as served once its replacement is bound, the unused old plugin is removed from the roster, and a
+  conflict's wording fits its cause.** A solet whose `inference_service` was already bound to `macos_inference_plugin`
+  while `default_inference_plugin` was still on the roster was read as `unsupported` or `conflict`, and the doctor printed
+  "Summaries keep using LM Studio" or "A switch of summaries ... was interrupted", both false (`iss_b3ccbf3b`, public #75).
+  It now says "Summaries run on Apple Foundation Models", and the update removes the unused `default_inference_plugin`
+  roster entry (a normal managed write with its backup) when that plugin is bound to no service. The platform loads every
+  listed plugin, so a leftover is not cosmetic: a crash after the binding moved leaves `openai_embeddings_plugin`
+  listed, still qualifying against LM Studio at every boot, so the next update removes it. An old plugin still
+  bound to another service is kept and reported as a conflict, never removed. Every
+  conflict used to say "its settings differ from the release defaults" and "restore the config"; a roster or profile
+  conflict now names its own cause and repair, and its first words come from what the service is actually bound to: a
+  service already bound to its replacement reads "Summaries run on Apple Foundation Models: ...", never "stay on LM Studio"
+  (`iss_da49cd98`). The embeddings declaration now matches the old plugin's `base_url` and
+  `model` only, so a `timeout_seconds` edit or an extra key no longer blocks the switch, and a different endpoint or model
+  is still refused and deferred. Check: `python3 plugins/github_midwife_plugin/tests/plugin_transition_smoke.py` exits 0.
+
+- **A hand-made or hand-edited instance LaunchAgent plist no longer stops the update.** An instance LaunchAgent plist that matches no release's render (hand-made or hand-edited, `iss_d1f3371b`, seed issue #85) used to stop
+  the runtime preview with `instance_launchagent_plist` `unknown_origin` and `managed_block_unknown_origin`, and the update had no way past it. The
+  preview now shows it as `unknown_origin` with `render_whole` and a diff of at most 80 lines, and the approved update backs it up and replaces it. The diff compares the two plists' parsed values with their keys sorted, so key order, indentation and comments are not shown; every value under a secret-named key, such as a token, a password or a `*_KEY`, and any string or data value equal to one, shows as `[REDACTED]`
+  however the file spells it, a Homebrew keg path in a line reads `[keg path]` (the Manager refuses evidence that names one), and a plist that cannot be parsed shows no diff at all.
+  The approval binds the digest of the bytes it replaces, so a plist changed between the preview and the apply is refused as `probe_drift` with
+  nothing written. A plist for another label or a materialized-supervisor plist still stops the update, and the seed's repair for it now
+  names runbook Part C Step 5 instead of a hydration verb a plist does not have. Read the diff before you approve: a setting you tuned by hand, such as
+  `PATH`, is replaced by the render's. An update that an earlier Manager began and left on disk is finished by r65, but it never adopts a
+  plist its plan did not show. A preview approved under r64 must be previewed again: the fingerprint changed, so `--yes` refuses it as `probe_drift`
+  and says to run `--dry-run` again, with nothing written. Check: `python3 solet_cli/tests/update_plist_adopt_smoke.py` exits 0.
+
 ## 2026-09-30 — r64: a solet cloned from a stable seed before the Manager can be imported and updated to a working solet; `solet doctor` and `solet start` keep working after a setup-contract change
 
 **Solet Manager manager-v0.1.0-r64.**
@@ -14,7 +130,7 @@ To take this release, upgrade the Manager, then update the solet:
 - **`solet doctor` no longer fails with "Static artifact changed while it was inspected" when unrelated files appear in a
   parent directory.** The static-artifact reader pinned every directory above the file it reads and compared each one's
   modification time, change time and link count before and after the read, so any other process creating a file in a
-  shared ancestor, such as the temporary directory, made the check report a change (`iss_239f6d19`). A pinned ancestor
+  shared ancestor, such as the temporary directory, made the check report a change (`iss_695a82ac`). A pinned ancestor
   directory now has to keep its device, inode and type, so a directory that is replaced still fails; the file that is
   read keeps the full metadata comparison, so a file modified in place still fails. Check:
   `python3 solet_cli/tests/existing_solet_diagnostic_smoke.py` exits 0.
