@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import plistlib
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -12,6 +11,7 @@ from pathlib import Path
 from typing import cast
 
 from .existing_solet_diagnostics import DiagnosticCheck, DiagnosticStatus
+from .launch_topology import parse_plist
 from .models import JsonValue
 
 type ModelReader = Callable[[], dict[str, str] | None]
@@ -99,8 +99,10 @@ def _login_valid(home: Path) -> bool | None:
     try:
         if path.is_symlink() or helper.is_symlink() or path.stat().st_size > 65536:
             return None
-        plist = plistlib.loads(path.read_bytes())
-    except (OSError, ValueError, plistlib.InvalidFileException):
+        plist = parse_plist(path.read_bytes())
+    except OSError:
+        return None
+    if plist is None:
         return None
     return plist.get("Label") == _LABEL and plist.get("ProgramArguments") == ["/bin/sh", str(helper)] and plist.get("RunAtLoad") is True
 

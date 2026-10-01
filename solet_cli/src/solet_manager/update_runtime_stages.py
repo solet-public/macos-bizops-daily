@@ -95,17 +95,21 @@ def _single_artifact_inputs(inputs: dict[str, JsonValue], artifact_id: str) -> d
     return one
 
 
-def _require_reviewed_adoption(state: ManagedArtifactState, plan: RuntimePlan) -> None:
-    """An adoption runs only over the bytes whose diff the approval showed; a plan journaled before r65 showed none, so it adopts nothing."""
+def _require_reviewed_adoption(state: ManagedArtifactState, plan: RuntimePlan, digest: str | None) -> None:
+    """An adoption runs only over the bytes whose diff the approval showed; a plan journaled before r65 showed none, so it adopts nothing.
+
+    ``digest`` is the digest of the bytes about to be replaced: the pre-apply probe's, and again the backup's, so a file that changed after the probe and before the backup stops the write.
+    """
     approved = next(item for item in plan.managed_artifacts if item.artifact_id == state.artifact_id)
-    if state.adopt_diff and state.current_sha256 != approved.current_sha256:
+    if state.adopt_diff and digest != approved.current_sha256:
         raise UpdateBlockedError("probe_drift", f"managed artifact {state.artifact_id} at {state.destination} changed between approval and apply; nothing was written", repair="Inspect the file, then preview again.")
 
 
 def _write_artifact(execution: RuntimeExecution, operation: RuntimeOperation, one: dict[str, JsonValue], state: ManagedArtifactState, plan: RuntimePlan) -> str:
-    _require_reviewed_adoption(state, plan)
+    _require_reviewed_adoption(state, plan, state.current_sha256)
     destination = Path(state.destination)
     backup = write_backup(execution.paths, execution.record.instance_id, execution.operation_id, state.artifact_id, destination)
+    _require_reviewed_adoption(state, plan, backup.sha256)
     execution._record(operation.operation_id, "manager", None, status=None, note={"artifact_id": state.artifact_id, "backup": backup.to_dict()})  # noqa: SLF001
     applied = execution._apply(operation, one)  # noqa: SLF001
     if applied.checkpoint_status is not CheckpointStatus.APPLIED:

@@ -270,7 +270,7 @@ def _coreai_config_state(target: Path, world: FakeWorld, reference: str) -> None
         assert _status(setup_adapter.dispatch_request(_request(target, reference, "apply"), world)) == "applied"
     config = target / "profile/config/plugins/coreai_embeddings_plugin.json"
     data = json.loads(config.read_text())
-    assert data == {"asset_root": str(target / "profile/data/model-assets"), "compute_preference": "gpu"}
+    assert data == {"asset_root": str(target / "profile/data/model-assets"), "compute_preference": "cpu"}
     assert _status(apple.embedding_config_valid(_request(target, "setup::apple.embedding_config_valid"), world)) == "verified"
     config.write_text('{"asset_root":"/wrong", "compute_preference":"gpu"}')
     assert _status(setup_adapter.dispatch_request(_request(target, reference, "apply"), world)) == "blocked"

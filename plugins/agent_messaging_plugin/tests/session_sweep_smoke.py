@@ -1782,9 +1782,11 @@ def test_retire_session_crash_mid_retire_is_redrivable() -> None:
             )
             result = retire_session(state, agent_instance_id="agi-crash", directed_by="operator:none")
             _check(
-                result == {"already_retired": False, "dependencies_fired": 1},
+                result["already_retired"] is False
+                and result["dependencies_fired"] == 1
+                and result["host_action"] == "not_attempted",
                 f"re-running retire_session finishes the job: fires the pending edge and "
-                f"completes the transition (got {result!r})",
+                f"completes the transition without re-attempting the host (got {result!r})",
             )
             _check(
                 read_managed_session(state, "agi-crash")["lifecycle_state"] == LIFECYCLE_RETIRED,

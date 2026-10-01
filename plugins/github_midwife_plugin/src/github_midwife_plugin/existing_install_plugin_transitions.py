@@ -50,7 +50,7 @@ from .plugin_transition_declaration import (
     parse_declaration,
 )
 from .profile_identity import PROFILE_TEMPLATE_BY_BUNDLE, ProvenanceError, declared_profile
-from .setup_adapter_contract import AdapterRequest, JsonObject, planned_action, result
+from .setup_adapter_contract import AdapterRequest, JsonObject, planned_action, public_text, result
 from .setup_adapter_runtime import Runtime
 
 __all__ = ["DECLARATION_PATH", "migration_plugin_transition", "observe"]
@@ -610,5 +610,5 @@ def _transition_evidence(transition: Transition, state: Classification) -> JsonO
     if isinstance(transition.target, TargetPlugin):
         facts["to"] = transition.target.plugin
     item = facts_evidence(f"plugin_transition.{transition.migration_id}", facts, verified=state.state not in _OPEN_STATES)
-    item["summary"] = owner_sentence(transition, state)[:512]
+    item["summary"] = public_text(owner_sentence(transition, state), 512)
     return item

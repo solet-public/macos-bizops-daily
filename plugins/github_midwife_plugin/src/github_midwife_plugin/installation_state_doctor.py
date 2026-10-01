@@ -27,6 +27,7 @@ from .setup_adapter_contract import (
     JsonObject,
     JsonValue,
     evidence,
+    public_text,
     result,
 )
 from .setup_adapter_runtime import CommandOutcome, Runtime, read_json_object
@@ -674,10 +675,11 @@ def _knowledge_probe_result(
     base = nonempty_process_probe(request, outcome, "knowledge_retrieval")
     evidence_items = base.get("evidence")
     if isinstance(evidence_items, list) and evidence_items and isinstance(evidence_items[0], dict):
-        evidence_items[0]["summary"] = (
+        evidence_items[0]["summary"] = public_text(
             f"knowledge retrieval verified after {attempts} measured indexing readiness poll(s)"
             if state == "nonempty"
-            else f"knowledge retrieval remained empty through {attempts} measured indexing readiness poll(s)"
+            else f"knowledge retrieval remained empty through {attempts} measured indexing readiness poll(s)",
+            512,
         )
     return base
 

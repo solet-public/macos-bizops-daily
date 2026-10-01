@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import operator
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -20,6 +22,7 @@ _ASSET_MANIFEST = Path(
     "plugins/coreai_embeddings_plugin/src/coreai_embeddings_plugin/assets/distribution_manifest.json"
 )
 _ASSET_MANIFEST_SHA256 = "8b732f8d83177b2ac18efffef0897789cdfd0fb48bcee08cfe8c98fe7bc7fd74"
+_COMPUTE_PREFERENCES = ("cpu", "gpu")
 _COREAI_CONFIG = Path("profile/config/plugins/coreai_embeddings_plugin.json")
 _INFERENCE_CONFIG = Path("profile/config/plugins/macos_inference_plugin.json")
 _INFERENCE_SOURCE = Path(
@@ -220,7 +223,7 @@ def _acquire(request: AdapterRequest, opener: UrlOpener | None) -> JsonObject:
 def coreai_config_text(target: Path) -> str:
     value = {
         "asset_root": str(target / _ASSET_ROOT),
-        "compute_preference": "gpu",
+        "compute_preference": "cpu",
     }
     return json.dumps(value, indent=2, sort_keys=True) + "\n"
 
@@ -241,7 +244,14 @@ def apple_inference_config_text(target: Path) -> str | None:
     return content
 
 
-def _config_result(request: AdapterRequest, runtime: Runtime, path: Path, desired: str) -> JsonObject:
+def coreai_config_matches(current: object, desired: object) -> bool:
+    """Core AI config equality, except that an installed ``gpu`` preference stays valid (iss_f3e65e52): only the seed's default moved to ``cpu``."""
+    if not isinstance(current, dict) or not isinstance(desired, dict):
+        return False
+    return {**current, "compute_preference": None} == {**desired, "compute_preference": None} and current.get("compute_preference") in _COMPUTE_PREFERENCES
+
+
+def _config_result(request: AdapterRequest, runtime: Runtime, path: Path, desired: str, accepts: Callable[[object, object], bool] = operator.eq) -> JsonObject:
     if path.is_symlink():
         return _blocked(request, "apple_config_conflict", "Refuse a symbolic-link plugin config; repair the target and re-preview.")
     if path.exists():
@@ -250,7 +260,7 @@ def _config_result(request: AdapterRequest, runtime: Runtime, path: Path, desire
         except (OSError, UnicodeError):
             return _blocked(request, "apple_config_conflict", "Existing plugin config is unreadable; repair and re-preview.")
         try:
-            matches = json.loads(current) == json.loads(desired)
+            matches = accepts(json.loads(current), json.loads(desired))
         except json.JSONDecodeError:
             matches = False
         if not matches:
@@ -278,7 +288,7 @@ def _config_result(request: AdapterRequest, runtime: Runtime, path: Path, desire
 def configure_coreai_embeddings(request: AdapterRequest, runtime: Runtime) -> JsonObject:
     if _pinned_asset_error(request.target) is not None:
         return asset_verified(request, runtime)
-    return _config_result(request, runtime, request.target / _COREAI_CONFIG, coreai_config_text(request.target))
+    return _config_result(request, runtime, request.target / _COREAI_CONFIG, coreai_config_text(request.target), coreai_config_matches)
 
 
 def embedding_config_valid(request: AdapterRequest, runtime: Runtime) -> JsonObject:
@@ -287,7 +297,7 @@ def embedding_config_valid(request: AdapterRequest, runtime: Runtime) -> JsonObj
     path = request.target / _COREAI_CONFIG
     if not path.is_file() or path.is_symlink():
         return _blocked(request, "coreai_config_missing", "Materialize the reviewed absolute Core AI asset_root config, then retry.")
-    return _config_result(request, runtime, path, coreai_config_text(request.target))
+    return _config_result(request, runtime, path, coreai_config_text(request.target), coreai_config_matches)
 
 
 def configure_apple_inference(request: AdapterRequest, runtime: Runtime) -> JsonObject:

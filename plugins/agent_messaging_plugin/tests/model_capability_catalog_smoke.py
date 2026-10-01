@@ -156,7 +156,7 @@ def test_selector_refuses_until_accepted_then_serves() -> None:
     _accept_all(state, measured_at=_NOW - timedelta(hours=1))
     picked = verbs.select_dispatch_tier(_typed(state), params, now=_NOW)
     _check(picked["selected"]["model"] == "gpt-5.6-sol" and picked["selected"]["effort"] == "medium", "review kind, score 38: sol medium (39, $0.50) beats terra xhigh (38, $0.63)")
-    _check(picked["excluded"]["quota_unknown"] > 0, "unknown flat-rate quota cells are excluded and counted")
+    _check("quota_unknown" not in picked["excluded"], "unknown flat-rate quota cells are no longer an exclusion class")
     _check(picked["policy_version"] == "model-dispatch-policy-v3", "policy version reported when a kind was consulted")
     _check(picked["catalog_run_id"] == "mcr-test-accepted", "the accepting run id rides the answer")
     _check(

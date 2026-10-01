@@ -27,7 +27,43 @@ distinguishable from an empty string.
 from __future__ import annotations
 
 import dataclasses
+from datetime import UTC, datetime
 from typing import Any
+
+
+class InvalidInboxCursorError(ValueError):
+    """A malformed instance cursor; ``code`` is the stable failure code."""
+
+    def __init__(self, cursor: str, message: str) -> None:
+        super().__init__(message)
+        self.code = f"invalid_{cursor}"
+
+
+def parse_since_cursor(raw: object) -> datetime | None:
+    """The forward ``since`` cursor as a datetime, ``None`` when absent or empty.
+
+    One parser for every surface that accepts ``since``. A malformed value
+    raises rather than restarting from the newest page: a broken cursor means
+    the caller's paging is wrong, and silently re-reading would turn that into
+    an unbounded re-read.
+
+    ``created_at`` is stored as naive UTC, so an offset-bearing value (``Z``,
+    ``+00:00``) is converted to naive UTC here: handed to a timestamp column as
+    an aware datetime it would be compared in the database session's timezone.
+    """
+    if raw is None or raw == "":
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(raw))
+    except ValueError as exc:
+        raise InvalidInboxCursorError(
+            "since",
+            "'since' must be an ISO-8601 datetime (the previous forward "
+            f"page's next_since_created_at): {exc}",
+        ) from exc
+    if parsed.tzinfo is None:
+        return parsed
+    return parsed.astimezone(UTC).replace(tzinfo=None)
 
 
 def serialize_message(message: Any) -> dict[str, Any]:
@@ -64,8 +100,12 @@ def serialize_peer_inbox_page(
     """Render a ``PeerInbox`` page, both sections, with their two cursors.
 
     ``instance_exhausted`` is the instance section's progress signal. It means
-    exhausted under the existing newest-first timestamp cursor only; that legacy
-    cursor can skip equal-``created_at`` rows at a page boundary, so it is not
+    exhausted under the instance cursor the request used: the newest-first
+    backward ``after`` cursor (echo ``next_after_created_at``), or the forward
+    oldest-first ``since`` cursor (echo ``next_since_created_at``). Exactly one
+    of the two ``next_*`` keys is populated per page, so a forward page never
+    offers a backward cursor to misuse. The legacy ``after`` cursor can skip
+    equal-``created_at`` rows at a page boundary, so it is not
     a claim of globally lossless observation. The role section (``role_entries`` + ``next_role_cursor``) is emitted
     ADDITIVELY; the instance section keys are byte-for-byte unchanged.
     ``role_section_status`` / ``role_section_error`` carry the v10 Q1
@@ -86,6 +126,11 @@ def serialize_peer_inbox_page(
         "next_after_created_at": (
             page.next_after_created_at.isoformat()
             if page.next_after_created_at is not None
+            else None
+        ),
+        "next_since_created_at": (
+            page.next_since_created_at.isoformat()
+            if page.next_since_created_at is not None
             else None
         ),
         "instance_exhausted": page.instance_exhausted,

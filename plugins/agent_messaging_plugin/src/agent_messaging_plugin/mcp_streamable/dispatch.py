@@ -56,7 +56,9 @@ from ..peer_dispatch import (
     dispatch_role_send,
 )
 from ..peer_inbox_view import (
-    serialize_peer_inbox_page as _serialize_peer_inbox_page,
+    InvalidInboxCursorError,
+    parse_since_cursor,
+    serialize_peer_inbox_page,
 )
 from ..peer_list_view import (
     serialize_peer_list as _serialize_peer_list,
@@ -801,6 +803,16 @@ def _tool_peer_send_by_name(
     return outcome.to_payload()
 
 
+def _peer_inbox_since(raw: object) -> datetime | None:
+    """The ``since`` argument as a datetime; a bad value is an invalid-params error."""
+    if raw is not None and not isinstance(raw, str):
+        raise JsonRpcError(_INVALID_PARAMS, "peer_inbox.since must be a string")
+    try:
+        return parse_since_cursor(raw)
+    except InvalidInboxCursorError as exc:
+        raise JsonRpcError(_INVALID_PARAMS, f"peer_inbox.{exc}") from exc
+
+
 def _tool_peer_inbox(
     arguments: dict[str, Any],
     *,
@@ -817,6 +829,7 @@ def _tool_peer_inbox(
                 _INVALID_PARAMS,
                 f"peer_inbox.after is not a valid ISO-8601 datetime: {exc}",
             ) from exc
+    since_dt = _peer_inbox_since(arguments.get("since"))
     limit_raw = arguments.get("limit", 50)
     if not isinstance(limit_raw, int) or limit_raw <= 0:
         raise JsonRpcError(
@@ -836,6 +849,7 @@ def _tool_peer_inbox(
             recipient_agent_instance_id=session.agent_instance_id,
             recipient_agent_session_id=session.agent_session_id,
             after_created_at=after_dt,
+            since_created_at=since_dt,
             limit=max(1, min(limit_raw, 100)),
             # A4 (2026-08-04): include_important retired from the tool schema
             # -- the catch-up view is the only meaningful one now that
@@ -849,7 +863,7 @@ def _tool_peer_inbox(
         ),
     )
     context.peer_registry.touch_binding(session.agent_instance_id)
-    return _serialize_peer_inbox_page(page, session.agent_instance_id)
+    return serialize_peer_inbox_page(page, session.agent_instance_id)
 
 
 _TOOL_HANDLERS: Final[dict[str, Any]] = {

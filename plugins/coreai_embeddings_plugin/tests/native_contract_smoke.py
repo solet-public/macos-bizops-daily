@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "plugins" / "coreai_embeddings_plugin" / "src"))
 import numpy as np  # noqa: E402
 from coreai_embeddings_plugin.contracts import EmbeddingError  # noqa: E402
 from coreai_embeddings_plugin.native import NativeModel  # noqa: E402
+from coreai_embeddings_plugin.plugin import CoreAIEmbeddingsPlugin  # noqa: E402
 from coreai_embeddings_plugin.tokenization import EncodedInput  # noqa: E402
 
 
@@ -34,6 +35,15 @@ class NativeTests(unittest.TestCase):
                 with patch("coreai_embeddings_plugin.native.importlib.import_module", return_value=sdk):
                     with self.assertRaises(EmbeddingError):
                         asyncio.run(native.embed(EncodedInput(256, [1]*256, [1]*256)))
+
+    def test_every_default_is_cpu(self) -> None:
+        """iss_f3e65e52: GPU inference leaks one IOSurface per embed, so CPU is the default everywhere."""
+        plugin = CoreAIEmbeddingsPlugin({"asset_root": "/fixture"})
+        self.assertEqual(plugin._settings(), (Path("/fixture"), "cpu"))
+        self.assertEqual(plugin.get_config_schema()["properties"]["compute_preference"]["default"], "cpu")  # type: ignore[index]
+        manifest = (ROOT / "plugins" / "coreai_embeddings_plugin" / "plugin.yaml").read_text(encoding="utf-8")
+        self.assertRegex(manifest, r"compute_preference:\n\s+type: string\n\s+default: cpu\n")
+        self.assertEqual(CoreAIEmbeddingsPlugin({"asset_root": "/fixture", "compute_preference": "gpu"})._settings()[1], "gpu")
 
     def test_gpu_load_failure_falls_back_to_cpu(self) -> None:
         model = MagicMock()

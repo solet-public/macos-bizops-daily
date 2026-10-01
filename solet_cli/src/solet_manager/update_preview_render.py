@@ -317,7 +317,7 @@ def _blocked_runtime_preview(exc: UpdateBlockedError, journal: dict[str, JsonVal
         data={
             "operation_id": journal["operation_id"],
             "journal_status": journal["status"],
-            "blocked": [{"subject": "plan", "reason": exc.error_kind}],
+            "blocked": [{"subject": "plan", "reason": exc.error_kind, "repair": exc.repair}],
             "runtime_approval_fingerprint": None,
             "recorded_runtime_approval_fingerprint": None if approval is None else cast(dict[str, JsonValue], approval)["fingerprint"],
             "preservation": {"target_byte_writes": 0, "manager_state_writes": 0},

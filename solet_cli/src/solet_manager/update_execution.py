@@ -53,7 +53,6 @@ from .errors import (
     OperationInProgressError,
     ProbeDriftError,
     SourceError,
-    SourceTransitionIncompleteError,
     StateConflictError,
     StateError,
     TransitionContractMismatchError,
@@ -65,14 +64,11 @@ from .existing_install_inspection import (
     ExistingInstallContractIdentity,
     ExistingInstallInspectionRequest,
     ExistingInstallInspectionResult,
-    InspectionAnchorKind,
     InspectionBoundaryViolation,
     InspectionEffectTracker,
     InspectionPreservationFacts,
     InspectionProbe,
-    InspectionStatus,
     InstalledInspectionMetadata,
-    ObservedBoolean,
     PreservationEffect,
     inspect_existing_install,
 )
@@ -100,7 +96,6 @@ from .models import (
     ObservedProvenanceIdentity,
     ReleaseIdentity,
 )
-from .origin_identity import only_names_repository
 from .paths import ManagerPaths, update_candidate_cache
 from .release_lock import seed_lock_from_fields
 from .seed_lock_parser import SeedLockFields
@@ -127,6 +122,7 @@ from .update_preview import (
     preview_update,
 )
 from .update_reduction import is_ancestor, reduce_update
+from .update_release_identity import release_identity_mismatches, release_identity_refusal
 from .update_runtime_execution import RuntimeExecution
 from .update_runtime_plan import PlanContext, RuntimeSeams
 from .update_topology import (
@@ -980,21 +976,10 @@ class _Execution:
         facts = result.facts
         fields = self.candidate.fields
         current_journal = self.journal if journal is None else journal
-        branch = cast(dict[str, JsonValue], current_journal["baseline"])["branch"]
-        exact = (
-            facts.head_commit == fields.commit
-            and facts.head_tree == fields.tree_hash
-            and facts.identity_status is InspectionStatus.VERIFIED
-            and facts.anchor_kind is InspectionAnchorKind.CURRENT_CHANNEL
-            and facts.detached is ObservedBoolean.FALSE
-            and facts.branch == branch
-            and only_names_repository(facts.origins, self.record.channel.canonical_repository)
-        )
-        if not exact:
-            raise SourceTransitionIncompleteError(
-                "target is not at the exact candidate release identity",
-                repair="Do not reset; inspect the target and resume once its bytes match the approved candidate.",
-            )
+        branch = cast(str | None, cast(dict[str, JsonValue], current_journal["baseline"])["branch"])
+        mismatches = release_identity_mismatches(facts, commit=fields.commit, tree=fields.tree_hash, branch=branch, canonical_repository=self.record.channel.canonical_repository)
+        if mismatches:
+            raise release_identity_refusal(mismatches, target=_target_path(self.record), name=self.record.name, branch=branch)
         self.local_state_report = self._local_state_matches(result, current_journal)
         return result
 

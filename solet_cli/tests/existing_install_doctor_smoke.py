@@ -39,7 +39,7 @@ from solet_manager.doctor_journal import read_doctor_journal  # noqa: E402
 from solet_manager.errors import ManagerError  # noqa: E402
 from solet_manager.existing_install_doctor import run_doctor  # noqa: E402
 from solet_manager.existing_install_doctor_probe import artifact_check  # noqa: E402
-from solet_manager.existing_solet_diagnostics import DiagnosticStatus  # noqa: E402
+from solet_manager.existing_solet_diagnostics import DiagnosticCheck, DiagnosticStatus  # noqa: E402
 from solet_manager.models import CommandResult  # noqa: E402
 from solet_manager.rendering import render_human, render_json  # noqa: E402
 from solet_manager.update_execution import apply_update, preview_update_instance  # noqa: E402
@@ -223,8 +223,16 @@ def _assert_terminal_and_pointer_pending(root: Path) -> None:
 # --- F-DOC-1 / F-DOC-4 ----------------------------------------------------------------------------------
 
 
+#: Variants whose launchd pid runs a command that is not the target's argv at all, the plist and the pid recheck being valid.
+_FOREIGN_COMMANDS = {"foreign_command": "/usr/bin/python3 -m other"}
+
+
 def _identity_case(root: Path, variant: str) -> DiagnosticStatus:
-    """R5-style venv symlinks with a framework Python.app process display."""
+    return _identity_check(root, variant).status
+
+
+def _identity_check(root: Path, variant: str) -> DiagnosticCheck:
+    """R5-style venv symlinks with a framework Python.app process display; the doctor's ``runtime_process_identity`` check for ``variant``."""
     root = root.resolve()
     target = root / "target"
     home = root / "home"
@@ -254,6 +262,7 @@ def _identity_case(root: Path, variant: str) -> DiagnosticStatus:
         command = f"{venv_python} -m ananta.cli --app-home {target / 'profile'}"
     if variant == "wrong_app_home":
         command = f"{venv_python} -m ananta.cli --app-home {root / 'other' / 'profile'}"
+    command = _FOREIGN_COMMANDS.get(variant, command)
     row_pid = 9999 if variant == "other_pid" else 3268
     recheck_pid = 3269 if variant == "pid_race" else 3268
 
@@ -271,7 +280,7 @@ def _identity_case(root: Path, variant: str) -> DiagnosticStatus:
     seams = SimpleNamespace(home=home, uid=501, launchctl=launchctl, run_ps=run_ps)
     record = SimpleNamespace(service_identity=SimpleNamespace(launchagent_label=label))
     probe = SimpleNamespace(target=target, seams=seams, record=record, registry=None, pid_observed=service_checks._parse_pid(launchctl(None, "print", (), 30).stdout), journal=None, invoked_vectors=[])
-    return service_checks._process_identity(probe).status  # noqa: SLF001 -- focused production seam
+    return service_checks._process_identity(probe)  # noqa: SLF001 -- focused production seam
 
 
 def _real_shape_base(*, top_state: str | None, duplicate_state: str | None = None) -> list[str]:
@@ -421,6 +430,22 @@ def _assert_process_identity_regressions(root: Path) -> None:
     _check(_identity_case(root / "real_shape_duplicate_state", "real_shape_duplicate_state") is DiagnosticStatus.FAILED, "real-shape duplicate top-level state lines refuse")
 
 
+def _assert_process_outside_target_by_command(root: Path) -> None:
+    """iss_55306d03: the doctor's own refusal when the launchd pid runs a command that is not the target's argv, with every other identity guard passing.
+
+    ``update_promotion_smoke`` cannot reach this branch through a promotion any more (the colour census refuses a table without the target's argv
+    after the restart, before the doctor runs), so it is pinned here, on the check itself: a plist that launches the target's venv, one launchd pid
+    that ``ps`` shows running ``/usr/bin/python3 -m other``.  The control proves the command alone is what refuses: the same fixture with the
+    command test answering yes verifies, so neither the launch vector, the pid recheck, nor the census claimed it.
+    """
+    refused = _identity_check(root / "foreign_command", "foreign_command")
+    _check((refused.status, refused.reason_code, refused.repair_code) == (DiagnosticStatus.FAILED, "runtime_process_outside_target", "restart_launchagent"), f"a launchd pid whose command is not the target's argv fails runtime_process_identity as runtime_process_outside_target, repair restart ({refused.status}, {refused.reason_code}, {refused.repair_code})")
+    _check(cast(dict[str, Any], refused.observed)["command"] == "/usr/bin/python3 -m other", "the check reports the command it measured")
+    with patch.object(service_checks, "_target_process_command", return_value=True):
+        control = _identity_check(root / "foreign_command_control", "foreign_command")
+    _check(control.status is DiagnosticStatus.VERIFIED, f"control: with the command test answering yes the same fixture verifies, so the command mismatch alone refuses ({control.status}, {control.reason_code})")
+
+
 def _assert_exit_codes(root: Path) -> None:
     fixture = build_fixture(root)
     run_to_promoted(fixture)
@@ -539,6 +564,7 @@ def main() -> int:
         _assert_terminal_and_pointer_pending(root / "terminal")
         _assert_exit_codes(root / "exits")
         _assert_process_identity_regressions(root / "identity")
+        _assert_process_outside_target_by_command(root / "outside-command")
         _assert_router_offline(root / "router")
         _assert_rendering(root / "render")
     print(f"existing_install_doctor_smoke OK: {_CHECKS} checks passed")

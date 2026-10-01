@@ -448,15 +448,18 @@ TOOLS: Final[list[Tool]] = [
                 "Returns the durable catch-up view of every message addressed to",
                 "you -- delivery is a transport property now, not a sender-declared",
                 "one, so there is no silent-vs-notified split to filter on here.",
-                "Use an `after` timestamp when polling during an active incident so",
-                "old history does not flood the context window.",
                 "",
                 "Spans every peer thread targeting you, regardless of which bridge owns",
-                "the thread. The instance section is oldest-first; page by echoing the",
-                "previous page's next_after_created_at and stop only when",
-                "instance_exhausted is true. Omit after only for the first page, not a",
-                "full inbox. This signal applies to the existing timestamp-only cursor",
-                "and does not claim duplicate-timestamp rows are globally lossless.",
+                "the thread. The instance section has two cursors that run in opposite",
+                "directions and cannot be combined. With no cursor it returns the",
+                "NEWEST messages, newest-first. `after` walks BACKWARD: messages OLDER",
+                "than the timestamp, newest-first; echo the page's next_after_created_at",
+                "and stop when instance_exhausted is true. `since` reads FORWARD:",
+                "messages strictly NEWER than the timestamp, oldest-first; echo the",
+                "page's next_since_created_at and stop when instance_exhausted is true.",
+                "To poll for what is new since a time, use `since`, never `after`. Both",
+                "are timestamp-only cursors, so instance_exhausted does not claim",
+                "duplicate-timestamp rows are globally lossless.",
                 "",
                 "Reading the inbox does NOT obligate you to reply.",
             ],
@@ -466,7 +469,19 @@ TOOLS: Final[list[Tool]] = [
             "properties": {
                 "after": {
                     "type": "string",
-                    "description": "ISO-8601 forward cursor; omit only for the first page.",
+                    "description": (
+                        "ISO-8601 BACKWARD cursor: returns messages OLDER than "
+                        "it, newest-first. Echo next_after_created_at. Not "
+                        "'since T' -- use `since` for that. Excludes `since`."
+                    ),
+                },
+                "since": {
+                    "type": "string",
+                    "description": (
+                        "ISO-8601 FORWARD cursor: returns messages strictly "
+                        "NEWER than it, oldest-first. Echo "
+                        "next_since_created_at. Excludes `after`."
+                    ),
                 },
                 "limit": {
                     "type": "integer",
@@ -725,6 +740,7 @@ async def _tool_peer_inbox(fw: Forwarder, a: dict[str, Any]) -> dict[str, Any]:
     # unconditional. Always True; never read from the caller.
     return await fw.peer_inbox(
         after=a.get("after"),
+        since=a.get("since"),
         limit=a.get("limit"),
         include_important=True,
         role_after=a.get("role_after"),

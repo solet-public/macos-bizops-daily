@@ -1,0 +1,19 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::retract_allowance_pool_reading",
+  "display_name": "Delete a recorded subscription usage allowance reading",
+  "description": "iss_c6fbf9ae. Deletes the recorded reading of one allowance pool, identified by profile_id and pool_id, so the pool reads unknown again and select_dispatch_tier no longer counts it, whatever the reading said. Use it when a reading was wrong or the operator withdraws it. It deletes the row outright and does not touch the shipped profile. A pool with no recorded reading is refused with reading_not_found.",
+  "embedding_description": "Removing a previously entered subscription usage percentage for one plan window because it was wrong or withdrawn, so that window is treated as unknown again and no longer excludes the models it covers.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Allowance reading retracted",
+    "result_type": "retract_allowance_pool_reading_result",
+    "result_description": "profile_id, pool_id, retracted (rows deleted, 1).",
+    "presentation_guidance": "Say which pool no longer has a reading and that it excludes nothing until a new reading is recorded.",
+    "output_action_guidance": "Record a corrected reading with record_allowance_pool_reading, or leave the pool unknown."
+  },
+  "error_processor_customizations": {
+    "action_context": "One hard delete of the allowance_pool_reading row for the pool, through the state interface. Not retryable.",
+    "error_interpretation": "reading_not_found: no reading is recorded for that profile_id and pool_id, so nothing was deleted. parameter_invalid: profile_id or pool_id is blank. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "Check the pool ids with read_allowance_pool_readings. A reading_not_found means the pool already reads unknown."
+  }
+}

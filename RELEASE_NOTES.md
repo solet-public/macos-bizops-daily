@@ -2,6 +2,146 @@
 
 Newest release first. Earlier releases follow below the divider.
 
+## 2026-10-01 — r67: one slow Core AI embedding batch no longer leaves a solet's embeddings dead until a reload
+
+**Solet Manager manager-v0.1.0-r67.**
+
+- **A Core AI native call over 120 seconds no longer kills embeddings for the rest of the process.** The Core AI runtime ran a whole
+  `generate_embeddings` batch as one native operation under a 120-second bound. On CPU, the default since r65, one embedding takes 0.13 s at
+  the 256-token bucket and 6.4 s at the 2048-token bucket (measured on an idle M3 Ultra, macOS 27.0), so the ledger drain's sixteen full
+  chunks already took about 100 s and a loaded host passed 120 s. The runtime then poisoned itself and the plugin stayed unavailable: knowledge
+  search, `upsert_memory_by_tag` and the session-ledger event drain all failed with "Core AI operation exceeded 120 seconds" until
+  `reload_plugin_config` (`iss_a457a147`). Each input is now its own bounded operation, so a batch of any size never nears the bound, and a call
+  that really hangs, in an embed or in a token count, is reported as `coreai_embeddings.operation_timeout` while the plugin prepares a new runtime
+  once and logs it, so the next call is served. If that preparation fails, including by timing out itself, the plugin stays unavailable with that
+  error, later calls report it at once and none prepares again, until a reload. A token count on another thread still waits for a whole batch,
+  because the plugin lock spans it (`iss_3b47dcc9`). A failed native call is still loud and still leaves the plugin unavailable with its own error.
+  Check: `python3 plugins/coreai_embeddings_plugin/tests/timeout_recovery_smoke.py` exits 0.
+
+This changes the Core AI plugin the seed ships, so an installed solet takes it with the update that carries r67.
+
+## 2026-09-30 — r66: four test gaps from the r65 reviews are pinned, and the seed stops carrying a fixture only an excluded smoke reads
+
+**Solet Manager manager-v0.1.0-r66.**
+
+- **The seed no longer carries a frozen copy of the r64 plan codec.** The journals fixture folder held that copy, and a note explaining it,
+  for one reader only: the plist-adopt update smoke, which the seed already excluded. Both shipped to every solet with nothing to run
+  them (`iss_b8792816`). Both are now in `seed_manifest.yaml` `exclude_paths` beside that smoke. The folder's `README.md` and
+  `bizopsb15_v1_pre_r12.json` still ship, because `journal_migration_smoke.py` still reads the JSON, and the README now describes only
+  it. Check: `python3 plugins/seed_factory_plugin/tests/source_shipped_smoke_contract_smoke.py` prints `rows=0`, `rows=2`, `rows=0` for
+  `macos-bizops`, `macos_free_minimal` and `macos_samantha` as before, and one fewer `shipped_files` for each.
+- **Three smokes now pin behaviour the r65 reviews found unpinned.** No product behaviour changes.
+  `existing_install_plist_adopt_smoke.py` carries an uppercase `Bearer` header and an uppercase `--TOKEN=` argument, so dropping the
+  case-insensitive flag from the plist diff's secret-text filter fails it (`iss_84f5cf51`). `import_v1_already_managed_smoke.py`
+  imports a directory the Manager never created, kills the import after its journal is written, and expects the rerun to say
+  `already_managed`; an uninterrupted import of the same kind must say `imported` (`iss_71fa9729`). `existing_install_doctor_smoke.py`
+  checks `runtime_process_identity` alone for a launchd pid whose command is not the target's argv, and that the command test is
+  the only thing refusing it (`iss_55306d03`). Check: `python3 plugins/github_midwife_plugin/tests/existing_install_plist_adopt_smoke.py`,
+  `python3 solet_cli/tests/import_v1_already_managed_smoke.py` and `python3 solet_cli/tests/existing_install_doctor_smoke.py` exit 0.
+
+This change is in the development checkout only. It does not change an installed solet, so there is no Manager upgrade or update step.
+
+- **A Claude session started without `--remote-control` now says so at session start.** Operator ruling `rul_4beb0d0a`:
+  every Claude session starts with Remote Control, so the whole fleet is visible on the operator's phone. The fleet
+  launcher and the tmux host already passed the flag, but a session started by hand (a bare `claude --model ...`, or
+  `claude` by full path) did not, and four such sessions were invisible until fixed by hand (`iss_3084ad1c`). The
+  checkout's `SessionStart` hook `remote_control_guard`, wired in the checkout's tracked Claude project settings (so
+  every worktree runs it, and the clone setup script reports it as already set), inspects the arguments of its own
+  Claude process and, when the flag is absent, tells the session (and shows the person at the terminal) to run
+  `/remote-control <its name>`. It warns and never refuses a session, gives up quietly after about a second, and
+  print-mode runs (`claude -p`) are exempt.
+  Check: `python3 .claude/hooks/tests/remote_control_guard_smoke.py` exits 0.
+
+- **`peer_inbox` can answer "what is new since T", and its tool text no longer calls a backward cursor a forward one.**
+  The instance section's `after` cursor has walked backward, newest-first, since 2026-09-03: it returns messages older
+  than the timestamp. The MCP tool text still described it as a forward, oldest-first cursor, so a caller polling with
+  `after=<last time I looked>` was handed history it had already handled, newest first (`iss_17aefd54`). `after` is
+  unchanged, and every surface's text now says which way it runs. A new `since` cursor reads forward: messages strictly
+  newer than the timestamp, oldest-first, with the page's `next_since_created_at` to echo and `instance_exhausted`
+  true when nothing newer remains. A page carries only the cursor for its own direction, a time written with `Z` or
+  an offset means the same instant as the stored UTC time, and naming both `after` and `since` is refused. The role
+  section is unchanged: `role_after` is its own cursor and was already documented newest-first. `since` is accepted by
+  the `peer_inbox` process, the MCP tool and the localhost route. Check:
+  `python3 plugins/agent_messaging_plugin/tests/peer_inbox_since_cursor_smoke.py` and
+  `python3 plugins/agent_messaging_plugin/tests/peer_inbox_since_surfaces_smoke.py` exit 0.
+- **`retire_session` and `terminate_session` no longer return `completed` as if the process were gone.** A lane started by
+  hand is hosted as `operator`, and the operator host driver cannot stop a process it did not start, so retiring it moved
+  the ledger row and nothing else: the process kept running and `peer_list` kept listing it, while the verb answered
+  `completed` (`iss_7ee6fb98`, twenty lanes on 2026-09-30). That refusal to kill a process the ledger never started is
+  unchanged. The result now says what happened: `host_action` is `terminated` (the driver ended the process),
+  `none_available` (only the ledger moved; `host_remedy` carries the driver's own instruction) or `not_attempted` (the
+  row was already terminal). `retire_session` also returns `not_done`, one sentence per thing that retire left undone, and
+  `peer_registration` when the lane still holds a live peer binding; an empty `not_done` means it left nothing undone, so
+  retiring a lane an earlier terminate or the sweep already tore down is not an open item. The close-out checklist
+  now reads a non-empty `not_done` as an open item. Check:
+  `python3 plugins/agent_messaging_plugin/tests/retire_session_honest_status_smoke.py` exits 0.
+
+- **A plist `plistlib` cannot read no longer crashes the Manager or the seed.** `plistlib.loads` rejects bad input with more than the two
+  exception types the Manager's readers caught: `ExpatError` (truncated or mismatched XML), `ValueError` (a bad `<integer>` or `<real>`, a key with
+  no value, invalid UTF-8), `AttributeError` (a bad `<date>`), `LookupError`, `OverflowError`, `TypeError` and `RecursionError`. A hand-corrupted
+  `~/Library/LaunchAgents/local.solet.<name>.plist` raised out of `solet-manager update <name> --dry-run` before any artifact was probed
+  (`iss_92735a39`). The Manager's launch-topology reader, the LM Studio login check and the doctor's launch-vector check, and the seed's rename
+  migration, now read every such plist as "not a plist": the update blocks with `managed_block_unknown_origin` and a repair, and the file is not
+  touched. The Manager's list of those errors is a twin of the seed's `PLIST_PARSE_ERRORS` (the Manager never imports seed code), and a smoke holds
+  the two equal and fails if any `plistlib` read in the Manager, the seed's migrations or `migrate_to_solet.py` is not inside a handler that
+  catches them. The rename migration re-reads every plist before it rewrites the first, so one that stops parsing between the probe and the apply
+  stops the rename as `probe_drift` with nothing written, and `migrate_to_solet.py` refuses loudly there too.
+  Check: `python3 solet_cli/tests/launch_topology_plist_robustness_smoke.py` and
+  `python3 plugins/github_midwife_plugin/tests/existing_install_plist_robustness_smoke.py` exit 0.
+- **A managed file that is not UTF-8, such as a binary plist, blocks the update instead of raising `UnicodeDecodeError`.** A LaunchAgent plist
+  converted with `plutil -convert binary1`, a non-UTF-8 `~/.zshrc` or a non-UTF-8 `root_manifest.yaml` aborted every seed probe that read it
+  (`iss_68bc97bb`). `read_text` now raises one typed error, and the seed's handler table turns it, for every existing-install operation (so also the export-root
+  connector configs, `installed_plugins.json` and `~/.claude.json`), into a blocked result, `managed_block_unknown_origin`, whose repair names the
+  file and, for a plist, `plutil -convert xml1`. A file that is not
+  text is never read as absent and never rewritten. The update runbook says so in Part C, Step 5. The Manager's own read of the operator's plugin roster
+  (the profile's manifest file) had the same shape: bytes that are not UTF-8 raised out of the preview, and now stop it as
+  `profile_manifest_unreadable` with its repair.
+- **The runtime preview shows the seed's repair text for each blocked operation.** A blocked plist showed only its reason code under
+  `data.blocked` (`iss_285b99b1`); each row is now `{subject, reason, repair}` with the repair the seed gave for that blocked or failed operation (`null` when it gave none). The
+  fingerprint is unchanged: a blocked plan is never approved. Check: `python3 solet_cli/tests/update_plist_robustness_smoke.py` exits 0.
+- **An adopted plist is checked against the approval a second time, after the backup is taken.** The stage compared the digest of the bytes it
+  probed with the approved one, then backed the file up. A file that changed in between was backed up and replaced without a second look
+  (`iss_c97969cb`). The digest of the bytes the backup holds is now compared with the approved one before the render is written; a mismatch is
+  `probe_drift`, nothing is written over the file, and the backup stays as evidence. For the two to be comparable the seed now digests the raw
+  bytes of a managed file, as the backup does, not the newline-translated text it decides on, so a valid plist with CRLF line endings is still
+  adopted.
+
+- **An update that stops with `source_transition_incomplete` because the target is not at the exact candidate release identity now says which of
+  the seven facts failed, what was measured, and what it must be.** The refusal printed one fixed sentence and one fixed repair for any of
+  `head_commit`, `head_tree`, `identity_status`, `anchor_kind`, `detached`, `branch` and `origins`, so the operator could not tell a moved HEAD from
+  a second `origin` remote (`iss_414f2f74`, Problem `wgr_a737ee5b`). The message keeps its opening phrase and now continues with one clause per failed
+  fact, for example `head_commit is <measured>, expected <approved>; origins is 2 (<url>, <url>), expected exactly one, naming <canonical url>`. The
+  repair keeps `Do not reset` and adds one sentence for each cause present: HEAD off the approved bytes, a sealed identity that no longer verifies
+  (read it with `solet-manager doctor <name>`), HEAD detached or on another branch (a `git switch` to the branch the update started on), or an `origin`
+  that is not exactly one remote naming the canonical repository. A credential in an origin URL (including a password that contains `@`), secret-shaped text, a Homebrew keg path and an
+  overlong value are never printed raw, and the finished message and repair are neutralised as a whole, not only value by value. A detached HEAD gets one
+  repair sentence, not a second one for the branch. The same conditions refuse, with the same `error_kind` (`source_transition_incomplete`) and exit code 3; a
+  smoke breaks every one of the 128 combinations of the seven facts, and every value of each enum fact, and compares each with the old single condition. Check:
+  `python3 solet_cli/tests/update_release_identity_refusal_smoke.py` exits 0.
+
+- **A keg path, secret-shaped text or an oversize string in a seed adapter's text no longer makes the Manager refuse the whole result.**
+  The Manager's `public_string` refuses a whole adapter result when any text in it holds a Homebrew keg path (`/Cellar/solet/`), text shaped
+  like a secret, or is empty or over its field's limit. Two r65 lanes each shipped text that did, and only review caught it
+  (`iss_67472e3f`). A third producer did too and nothing had caught it: a failed command's stderr diagnostic kept the label and
+  separator of a redacted value (`password=<redacted>`), which the Manager still refuses; it now reads `password [redacted]`.
+  Every text the seed adapters report (a repair, evidence, a planned action, a model candidate) now passes one helper,
+  `setup_adapter_contract.public_text`, with a twin in `bootstrap_adapter` that a smoke holds equal. It replaces `[REDACTED]` for
+  secret-shaped text (an uppercase `BEARER` or `--TOKEN=` included, and an `Authorization: Bearer <token>` header now loses its token as well as its
+  label), `[keg path]` for a keg path, and `[empty]` for an empty text, and it cuts an oversize text behind a marker. It replaces the two private
+  helpers r65 added. It shows no secret that either r65 helper hid, measured by a smoke that compares it with both over 1176 label, separator and
+  shape combinations, a doubled and a tripled `Bearer` prefix among the shapes (it hides 420 that the runtime helper showed and 588 that the operations
+  helper showed; that is a measured count over those combinations, not a proof for every text). The redaction marker in a `describe_outcome` repair text changes from `[redacted]` to `[REDACTED]`,
+  and a leg proves a run of `bearer` words cannot make either pattern slow (150k characters in under 10 ms). The bootstrap adapter's
+  `_coding_tool_route` planned action now goes through `planned_action()` instead of a hand-built dict. Check: `python3 plugins/github_midwife_plugin/tests/seed_public_text_gate_smoke.py` exits 0. It drives every producer
+  with that hostile text through the Manager's real result parser, and fails if a producer builds a candidate, evidence, a planned action or a repair itself without the helper, or if the two helpers drift apart.
+- **A long repair is cut in the middle with a marker, not silently at 512 characters.** The adapter cut every repair at 512 characters with
+  no marker, so a remedy written last, such as the command an operator is told to run, was the part a long path or CLI message
+  removed (`iss_49f37c32`). A repair over 512 characters now keeps its beginning and its end around
+  `[... <length> characters, middle cut ...]`, and the evidence summary, source and status and the planned-action text are cut the same way at
+  their own limits. A repair that fits is unchanged. The bootstrap adapter, which never cut a repair, now holds one to the Manager's 2048.
+  Check: the same smoke, which proves every statically known repair template, `REPAIR_CLAUDE_CLI`, `claude_plugin_list_failed` and the
+  marketplace refusals keep the text they end with.
+
 ## 2026-09-30 — r65: `solet-manager import` and a no-change `update --dry-run` report what they did; a solet create finds Claude Code's native install; the external-app `issue_list` refuses the retired `track` filter
 
 **Solet Manager manager-v0.1.0-r65.**
@@ -11,6 +151,9 @@ To take this release, upgrade the Manager, then update the solet:
 1. `brew update && brew tab --installed-on-request python@3.13 && brew upgrade solet`, then `brew list --versions solet`. It prints `solet <release>_<formula revision>`, taken from the `solet-0.1.0-r<release>` archive name. The release part must be `65` or later.
 2. `solet-manager update <name> --dry-run`. Apply the plan with `solet-manager update <name> --yes --approval-fingerprint <fingerprint>`, using the fingerprint that dry run printed. Repeat both steps until the result is `promoted`.
 
+- **Core AI embeddings run on CPU until a recycled GPU worker lands.** Core AI's GPU inference leaks one IOSurface per embed call and only process exit frees it; after about 16.3k GPU embeds in one process the next allocation hits an uncatchable Swift `fatalError` (SIGTRAP) that killed a live host solet twice (`iss_f3e65e52`). A solet that moves onto `coreai_embeddings_plugin` re-indexes its knowledge base, which can pass 16k embeds in minutes. The three macOS profile templates, a fresh setup, the `openai_to_coreai` update and the plugin's own default now write or use `compute_preference: cpu` (about 8 embeds/s against about 100/s on GPU, with no leak); `gpu` is still accepted. A solet that already has `gpu` keeps it and is not refused by `solet doctor` or an update; to move it, set `"compute_preference": "cpu"` in the solet's Core AI plugin config file and restart. Check: `python3 plugins/coreai_embeddings_plugin/tests/native_contract_smoke.py`, `python3 plugins/github_midwife_plugin/tests/apple_setup_flow_smoke.py`, `python3 plugins/github_midwife_plugin/tests/apple_native_fresh_profile_smoke.py` and `python3 plugins/github_midwife_plugin/tests/plugin_transition_smoke.py` exit 0.
+
+- **A solet on stable r64 can update to r65.** The r65 update flow listed stable seeds r43 through r63 as supported predecessors and not the r64 stable head `92321d42`, so a solet on r64 was refused with `predecessor_unsupported`. That head is now a supported predecessor and an anchor in the Manager's reviewed table, so a solet or a pre-Manager plain clone at r64 imports and updates to r65.
 - **Two `solet-manager` results no longer say the opposite of their own status.** `solet-manager import` answered
   `Existing Solet import is not yet enabled for target mutation.` for every result, including the `imported` and
   `already_managed` ones it returns after import has written its Manager record (`iss_6a27a24b`). It now says

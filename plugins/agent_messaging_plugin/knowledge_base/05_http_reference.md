@@ -204,16 +204,21 @@ POST /api/v1/bridge/{bridge_id}/peer/send_by_name
   # binding — the envelope is durable and replays on that holder's next
   # attach via the surviving role-replay path.
 
-GET  /api/v1/bridge/{bridge_id}/peer/inbox?after=<recent-ISO-time>
+GET  /api/v1/bridge/{bridge_id}/peer/inbox?since=<recent-ISO-time>
+  # Two instance cursors, opposite directions, never both: since=T returns
+  # messages strictly newer than T, oldest-first (echo next_since_created_at);
+  # after=T walks backward, messages older than T, newest-first (echo
+  # next_after_created_at). No cursor returns the newest page, newest-first.
   resp: { "entries": [ {sender_agent_id, sender_agent_instance_id,
                         sender_session_label, message, ...}, ... ],
           "role_entries": [ {sender_agent_id, sender_agent_instance_id,
                               sender_session_label, message, ...}, ... ],
-          "next_after_created_at": "...",
+          "next_after_created_at": null,   # set only on a non-since page
+          "next_since_created_at": "...",  # set only on a since page
           "instance_exhausted": false,
           "next_role_cursor": "..." }
-  # Instance mail is exhausted only when instance_exhausted is true under its
-  # existing forward timestamp cursor; equal-timestamp tie safety is not implied.
+  # Instance mail is exhausted only when instance_exhausted is true under the
+  # timestamp cursor the request used; equal-timestamp tie safety is not implied.
 ```
 
 See `03_inter_agent_messaging.md` for the delivery

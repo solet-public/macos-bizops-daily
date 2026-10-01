@@ -182,6 +182,8 @@ _LEAK_LAYOUTS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (_ENCODED_DATA[:20],),
     ),
     ("secret-shaped text under a plain key", "<key>CMDLINE</key><string>run --token=PLAINKEY-TOKEN-99 now</string>", ("PLAINKEY-TOKEN-99",)),
+    ("an uppercase Bearer header under a plain key", "<key>HEADER</key><string>Bearer UPPER-BEARER-55</string>", ("UPPER-BEARER-55",)),
+    ("an uppercase --TOKEN= argument under a plain key", "<key>CMDLINE</key><string>run --TOKEN=UPPER-TOKEN-66 now</string>", ("UPPER-TOKEN-66",)),
     ("a 3-character CDATA secret", "<key>HF_TOKEN</key><string><![CDATA[a<b]]></string>", ("CDATA", "a<b")),
     ("a short secret repeated under a plain key", "<key>HF_TOKEN</key><string>a&lt;b</string>\n        <key>ECHO</key><string>a&#60;b</string>", ("a&lt;b", "a&#60;b")),
 )
@@ -242,6 +244,8 @@ _WIDE = "\U0001f600" * 2100  # 2100 characters, 8400 bytes: inside the 4096-char
 _EVIDENCE_CASES: tuple[tuple[str, str, str, str, str], ...] = (
     ("Dax's Homebrew keg PATH", _KEG_PATH, "", _KEG_PATH, "[keg path]0.1.0_64/libexec/bin"),
     ("a secret-shaped plain argument", "/usr/bin:/bin", "<key>EXTRA_ARGS</key><string>run --token=PLAIN-ARG-SECRET-7 now</string>", "run --token=PLAIN-ARG-SECRET-7 now", "<key>EXTRA_ARGS</key>"),
+    ("an uppercase Bearer header", "/usr/bin:/bin", "<key>HEADER</key><string>Bearer UPPER-BEARER-77</string>", "Bearer UPPER-BEARER-77", "<key>HEADER</key>"),
+    ("an uppercase --TOKEN= argument", "/usr/bin:/bin", "<key>EXTRA_ARGS</key><string>run --TOKEN=UPPER-TOKEN-88 now</string>", "run --TOKEN=UPPER-TOKEN-88 now", "<key>EXTRA_ARGS</key>"),
     ("the byte-bound worst case", "/usr/bin:/bin", f"<key>BIG</key><string>{_WIDE}</string>", _WIDE, "<key>BIG</key>"),
 )
 
@@ -262,7 +266,7 @@ def _check_plist_adopt_diff_is_valid_evidence(root: Path) -> None:
             accepted = False
         _check(accepted, f"{label}: every adopt_diff line passes the Manager's real public_string")
         diff = "\n".join(_diff_lines(probe))
-        _check(kept in diff and "/Cellar/solet/" not in diff and "PLAIN-ARG-SECRET-7" not in diff, f"{label}: the diff stays readable ({kept!r}) and carries no refused text")
+        _check(kept in diff and "/Cellar/solet/" not in diff and "PLAIN-ARG-SECRET-7" not in diff and "UPPER-BEARER-77" not in diff and "UPPER-TOKEN-88" not in diff, f"{label}: the diff stays readable ({kept!r}) and carries no refused text")
 
 
 def _check_plist_adopt_diff_is_of_values(root: Path) -> None:

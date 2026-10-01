@@ -62,6 +62,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from macos_self_deployment_plugin.constants import AUTOSTART_LOG_DIR_DEFAULT
 
@@ -215,12 +216,18 @@ def _is_solet_owned(payload: dict[str, object]) -> bool:
     )
 
 
+def _read_plist(path: Path, qualifier: str) -> dict[str, Any]:
+    """The plist's contents, or a loud refusal for any file ``plistlib`` cannot read, at planning and again at apply."""
+    try:
+        payload: dict[str, Any] = plistlib.loads(path.read_bytes())
+    except Exception as exc:  # noqa: BLE001 — refuse loudly
+        raise SystemExit(f"REFUSING: cannot parse {path}{qualifier}: {exc}") from exc
+    return payload
+
+
 def _plan_one_plist(path: Path) -> PlistPlan | None:
     """Plan a single plist's migration; ``None`` when it needs nothing."""
-    try:
-        payload = plistlib.loads(path.read_bytes())
-    except Exception as exc:  # noqa: BLE001 — refuse loudly below
-        raise SystemExit(f"REFUSING: cannot parse {path}: {exc}") from exc
+    payload = _read_plist(path, "")
     if not _is_solet_owned(payload):
         return None
     label = str(payload.get("Label", ""))
@@ -267,7 +274,7 @@ def plan_plists() -> list[PlistPlan]:
 
 
 def apply_plist(plan: PlistPlan) -> None:
-    payload = plistlib.loads(plan.old_path.read_bytes())
+    payload = _read_plist(plan.old_path, " (it parsed when it was planned)")
     payload["Label"] = plan.new_label
     env = payload.get("EnvironmentVariables")
     if env:

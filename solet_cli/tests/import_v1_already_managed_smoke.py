@@ -17,6 +17,7 @@ import solet_manager.import_enrollment as enrollment  # noqa: E402
 from import_enrollment_rerun_smoke import _inspection  # noqa: E402
 from solet_manager.errors import ManagedIdentityDriftError, OperationInProgressError  # noqa: E402
 from solet_manager.import_enrollment import ImportRequest  # noqa: E402
+from solet_manager.maintenance_inventory import read_maintenance_inventory_v2  # noqa: E402
 from solet_manager.models import CheckpointStatus, InstanceRecord, TransactionStatus  # noqa: E402
 from solet_manager.paths import ManagerPaths  # noqa: E402
 from solet_manager.registry import InstanceRegistry  # noqa: E402
@@ -220,6 +221,54 @@ def _assert_crash_retry(root: Path) -> None:
         assert paths.registry_path.read_bytes() == v1_before
 
 
+def _non_v1_request(root: Path, name: str) -> ImportRequest:
+    """An import of a directory the Manager never created: no registry row, so no v1 match can answer for the result."""
+    target = root / name
+    target.mkdir()
+    paths = ManagerPaths(root / (name + "config"), root / (name + "state"), root / (name + "cache"))
+    for directory in (paths.config_dir, paths.state_dir, paths.cache_dir):
+        directory.mkdir(mode=0o700)
+    return ImportRequest("fixture", target, "stable", paths)
+
+
+def _assert_non_v1_resumed_journal(root: Path) -> None:
+    """iss_71fa9729: the resumed-journal tail alone makes a non-v1 import report ``already_managed``.
+
+    Every other leg starts from a v1 create-origin record, whose match reports ``already_managed`` whatever the journal says, so the
+    ``already_managed`` flag ``_write_prepared_import_journal`` returns for a resumed journal was never the only reason.  Here the
+    registry holds no row: an uninterrupted import is ``imported`` (the control), and one killed at each seam after the journal was
+    written and then rerun is ``already_managed``, finalized, with one inventory row and no active operation.
+    """
+    root.mkdir()
+    control = _non_v1_request(root, "control")
+    preview = enrollment.preview_import(control)
+    imported = enrollment.enroll_import(control, preview.fingerprint)
+    assert (imported.status, imported.managed_instance_id) == ("imported", None), (imported.status, imported.managed_instance_id)
+    advance = enrollment._advance_journal
+    for seam in ("_publish_inventory", "_finalize_import", "_advance_journal"):
+        request = _non_v1_request(root, seam + "-non-v1")
+        preview = enrollment.preview_import(request)
+
+        def crash_after_verified(preview: enrollment.ImportPreview, stage_id: str, status: str, code: str) -> None:
+            advance(preview, stage_id, status, code)
+            if status == "verified":
+                raise RuntimeError("simulated crash")
+
+        effect = crash_after_verified if seam == "_advance_journal" else RuntimeError("simulated crash")
+        with patch.object(enrollment, seam, side_effect=effect):
+            try:
+                enrollment.enroll_import(request, preview.fingerprint)
+            except RuntimeError as error:
+                assert str(error) == "simulated crash"
+            else:
+                raise AssertionError("crash injection missed")
+        resumed = enrollment.enroll_import(request, preview.fingerprint)
+        _assert_already_managed_message(resumed, f"non-v1 resumed prepared journal after {seam}")
+        assert resumed.managed_instance_id is None, (seam, resumed.managed_instance_id)
+        records = read_maintenance_inventory_v2(request.manager_paths.maintenance_inventory_path)
+        assert len(records) == 1 and records[0].active_operation is None, (seam, [record.active_operation for record in records])
+
+
 def _assert_already_managed_message(result: enrollment.ImportEnrollmentResult, path: str) -> None:
     """iss_6a27a24b: every already_managed path says the enrollment is recorded and verified, never that nothing changed."""
     rendered = result.to_command_result()
@@ -259,6 +308,7 @@ def _assert_enrollment() -> None:
             _assert_persisted_seed_drift(root)
             _assert_refusals(request, _transaction(target))
             _assert_crash_retry(root)
+            _assert_non_v1_resumed_journal(root / "non-v1")
             preview = enrollment.preview_import(request)
             result = enrollment.enroll_import(request, preview.fingerprint)
             _assert_already_managed_message(result, "v1_match tail")

@@ -26,9 +26,28 @@ _SECRET_KEY = re.compile(
     r"(?:password|passwd|secret|token|api[_-]?key|private[_-]?key|credential)",
     re.IGNORECASE,
 )
-#: ``result()`` cuts a ``repair`` here, without a marker, so a remedy written last is the part a long text loses.
-#: The Manager accepts 2048 (``adapter_protocol``); this seed-side cut is what an operator reads (iss_67d2597e).
+#: ``result()`` fits a ``repair`` into this many characters, cutting the middle behind a visible marker so the remedy a text ends with survives.
+#: The Manager accepts 2048 (``adapter_protocol``); this seed-side cut is what an operator reads (iss_67d2597e, iss_49f37c32).
 REPAIR_LIMIT = 512
+# Every rule the Manager's ``adapter_validation.public_string`` enforces on an envelope text, mirrored here because the seed never imports the Manager,
+# and what holds it: ``public_text`` below, applied by ``result``, ``evidence`` and ``planned_action`` and by every producer that builds an envelope
+# field itself (iss_67472e3f).  A text that breaks one makes the Manager refuse the WHOLE envelope.
+#  1. a non-empty ``str`` of at most the field's maximum characters: an empty text becomes ``[empty]``, a longer one is cut behind a visible marker;
+#  2. no secret-shaped text (the two ``_SECRET_SHAPED`` patterns: key=value first, absorbing any run of ``bearer`` words (a header that carries its prefix twice is real), so both ``Authorization: Bearer <token>`` and ``Bearer token=<secret>`` lose their secret; two plain patterns in either order leave one of them raw), replaced by ``[REDACTED]``;
+#  3. at most 8192 bytes once redacted: a text with a non-ASCII character is held to 2048 characters, which cannot exceed 8192 bytes at 4 bytes each;
+#  4. no ``/Cellar/solet/`` (a Homebrew keg path), replaced by ``[keg path]`` so the rest of the text stays readable.
+_SECRET_SHAPED = (
+    re.compile(r"(?i)(password|secret|token|authorization|oauth[_ -]?code|private[_ -]?key)\s*[:=]\s*(?:bearer\s+)*\S+"),
+    re.compile(r"(?i)bearer(?:\s+bearer)*\s+[A-Za-z0-9._~+/-]+"),
+)
+_FORMULA_MARKER = "/Cellar/solet/"
+_REDACTED = "[REDACTED]"
+_KEG_PATH = "[keg path]"
+_EMPTY = "[empty]"
+_WITHHELD = "[withheld]"
+_STABLE_PASSES = 8
+_WIDE_TEXT_LIMIT = 2048
+_TAIL_SHARE = 3  # of every 5 kept characters: the remedy is written last
 CREATE_FLOW_ID = "macos.repository_setup"
 EXISTING_INSTALL_FLOW_ID = "existing-install"
 EXISTING_INSTALL_REF_PREFIX = "existing::"
@@ -279,6 +298,52 @@ def _as_json_object(value: object) -> JsonObject:
     return cast(JsonObject, value)
 
 
+def neutralized(text: str) -> str:
+    """``text`` with every secret-shaped run and formula-keg path replaced, stable under a second pass (what the Manager re-checks)."""
+    for _ in range(_STABLE_PASSES):
+        cleaned = text
+        for pattern in _SECRET_SHAPED:
+            cleaned = pattern.sub(_REDACTED, cleaned)
+        cleaned = cleaned.replace(_FORMULA_MARKER, _KEG_PATH)
+        if cleaned == text:
+            return text
+        text = cleaned
+    return _WITHHELD
+
+
+def _fitted(text: str, limit: int) -> str:
+    """``text`` unchanged when it fits ``limit`` characters, else its head and its tail around a marker that says how long it was."""
+    if len(text) <= limit:
+        return text
+    marker = f" [... {len(text)} characters, middle cut ...] "
+    kept = limit - len(marker)
+    if kept < 2:
+        return text[:limit]
+    tail = kept * _TAIL_SHARE // 5
+    return text[: kept - tail] + marker + text[len(text) - tail :]
+
+
+def public_text(text: str, limit: int) -> str:
+    """``text`` as the Manager's ``public_string`` accepts it for a field of at most ``limit`` characters; a text that already does is returned as it is."""
+    current = text or _EMPTY
+    for _ in range(_STABLE_PASSES):
+        cleaned = neutralized(current)
+        cleaned = _fitted(cleaned, limit if cleaned.isascii() else min(limit, _WIDE_TEXT_LIMIT))
+        if cleaned == current:
+            return current
+        current = cleaned
+    return _WITHHELD
+
+
+def public_value(value: PublicEvidenceValue, limit: int) -> PublicEvidenceValue:
+    """An evidence ``observed``/``expected`` value with every string made public; a list keeps its order and drops the entries that became equal."""
+    if isinstance(value, str):
+        return public_text(value, limit)
+    if isinstance(value, list):
+        return list(dict.fromkeys(public_text(item, limit) for item in value))
+    return value
+
+
 def planned_action(
     *,
     action_id: str,
@@ -291,11 +356,11 @@ def planned_action(
 
     return {
         "id": action_id,
-        "title": title[:256],
+        "title": public_text(title, 256),
         "mutation_kind": mutation_kind,
-        "target": target[:512],
+        "target": public_text(target, 512),
         "requires_confirmation": True,
-        "condition_or_evidence_ref": evidence_ref[:256],
+        "condition_or_evidence_ref": public_text(evidence_ref, 256),
     }
 
 
@@ -312,15 +377,16 @@ def evidence(
 ) -> JsonObject:
     """Create bounded evidence without including command streams or secrets."""
 
-    digest_source = json.dumps(observed, sort_keys=True, separators=(",", ":"))
+    public_observed = public_value(observed, 4096)
+    digest_source = json.dumps(public_observed, sort_keys=True, separators=(",", ":"))
     response: JsonObject = {
         "id": evidence_id,
         "kind": kind,
-        "status": status,
-        "summary": summary[:512],
-        "observed": cast(JsonValue, observed),
-        "expected": cast(JsonValue, expected),
-        "source": source[:512],
+        "status": public_text(status, 512),
+        "summary": public_text(summary, 512),
+        "observed": cast(JsonValue, public_observed),
+        "expected": cast(JsonValue, public_value(expected, 4096)),
+        "source": public_text(source, 512),
         "digest": "sha256:" + hashlib.sha256(digest_source.encode()).hexdigest(),
         "captured_at": datetime.now(UTC).isoformat(),
         "sensitivity": sensitivity,
@@ -370,7 +436,7 @@ def result(
         "discovered_candidates": cast(JsonValue, discovered),
         "evidence": cast(JsonValue, [] if evidence_items is None else evidence_items),
         "reason": cast(JsonValue, reason),
-        "repair": None if repair is None else repair[:REPAIR_LIMIT],
+        "repair": None if repair is None else public_text(repair, REPAIR_LIMIT),
     }
     return response
 
@@ -391,7 +457,10 @@ __all__ = [
     "JsonScalar",
     "JsonValue",
     "evidence",
+    "neutralized",
     "planned_action",
     "public_string",
+    "public_text",
+    "public_value",
     "result",
 ]

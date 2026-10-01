@@ -228,6 +228,11 @@ TABLE_MODEL_CAPABILITY_CELL = "model_capability_cell"
 MODEL_CAPABILITY_CELL_ID_PREFIX = "mcc"
 TABLE_MODEL_CAPABILITY_REFRESH_RUN = "model_capability_refresh_run"
 MODEL_CAPABILITY_REFRESH_RUN_ID_PREFIX = "mcr"
+# iss_c6fbf9ae: operator-recorded allowance-pool readings, laid over the static
+# usage_economics profile so a flat-rate pool can have a current reading at
+# runtime. One row per (profile_id, pool_id); the reading is never inferred.
+TABLE_ALLOWANCE_POOL_READING = "allowance_pool_reading"
+ALLOWANCE_POOL_READING_ID_PREFIX = "apr"
 
 CELL_ACCEPTANCE_ACCEPTED = "accepted"
 CELL_ACCEPTANCE_PENDING_CROSSCHECK = "pending_crosscheck"
@@ -2861,6 +2866,36 @@ def get_model_capability_refresh_run_schema() -> TableSchema:
     )
 
 
+def get_allowance_pool_reading_schema() -> TableSchema:
+    """`allowance_pool_reading` — one explicit reading per flat-rate allowance pool (iss_c6fbf9ae).
+
+    Written only by ``record_allowance_pool_reading``; a row is applied by the
+    quota status only while now is before the earlier of ``next_reset_at`` and
+    ``expires_at``, and an expired row reads as unknown again.
+    """
+    return TableSchema(
+        table_name=TABLE_ALLOWANCE_POOL_READING,
+        description="Operator-recorded current reading of one flat-rate allowance pool, overlaid on the static usage profile.",
+        id_prefix=ALLOWANCE_POOL_READING_ID_PREFIX,
+        columns={
+            "profile_id": _text_column("usage_economics flat_rate_quota profile_id, e.g. anthropic-max-20x-2026-08-22."),
+            "pool_id": _text_column("allowance_pools pool_id within that profile."),
+            "native_unit": _text_column("The pool's native_unit; provider_reported_usage readings are percent of window, 0-100."),
+            "consumed": _real_column("Percent of the window consumed, 0-100."),
+            "remaining": _real_column("Percent of the window remaining, 0-100; consumed + remaining is 100."),
+            "as_of": _text_column("ISO-8601 UTC instant the reading was taken."),
+            "next_reset_at": _text_column("ISO-8601 UTC next reset of the window; null when only expires_at bounds the reading.", not_null=False),
+            "expires_at": _text_column("ISO-8601 UTC explicit expiry; null when only next_reset_at bounds the reading.", not_null=False),
+            "source": _text_column("Where the reading came from: an operator reading, or a ruling id."),
+            "recorded_by": _text_column("The actor that recorded the reading."),
+            "recorded_at": _text_column("ISO-8601 UTC instant the row was written."),
+        },
+        indexes=[
+            IndexDefinition(name="idx_allowance_pool_reading_key", columns=["profile_id", "pool_id"], unique=True),
+        ],
+    )
+
+
 def get_session_lifecycle_schema_definition() -> SchemaDefinition:
     """Wrap the D1 L0 schema deltas (§3.2-3.4 + the AMEND-4b cardinality row)
     for ``get_schema_definitions``. Same namespace as the rest of this plugin's
@@ -2869,7 +2904,7 @@ def get_session_lifecycle_schema_definition() -> SchemaDefinition:
     D1 is land-able alone)."""
     return SchemaDefinition(
         namespace=AGENT_ROLE_BINDING_NAMESPACE,
-        version="1.12.0",
+        version="1.13.0",
         description=(
             "Fleet session-management Phase B, D1 — L0 schema deltas. "
             "+1.1.0: session_context_status (maintenance-verbs M1). "
@@ -2886,7 +2921,9 @@ def get_session_lifecycle_schema_definition() -> SchemaDefinition:
             "Phase-B per-workstream progress records. +1.11.0: model capability "
             "catalog (observation, cell, refresh_run) for cost-aware dispatch. "
             "+1.12.0: nullable legacy managed-dispatch TTL storage for the F1 "
-            "blue/green compatibility bridge; current writers remain unchanged."
+            "blue/green compatibility bridge; current writers remain unchanged. "
+            "+1.13.0: allowance_pool_reading, an operator-recorded reading per "
+            "flat-rate allowance pool (iss_c6fbf9ae)."
         ),
         tables={
             TABLE_SESSION_ROLE_CLAIM: get_session_role_claim_schema(),
@@ -2911,12 +2948,14 @@ def get_session_lifecycle_schema_definition() -> SchemaDefinition:
             TABLE_MODEL_CAPABILITY_OBSERVATION: get_model_capability_observation_schema(),
             TABLE_MODEL_CAPABILITY_CELL: get_model_capability_cell_schema(),
             TABLE_MODEL_CAPABILITY_REFRESH_RUN: get_model_capability_refresh_run_schema(),
+            TABLE_ALLOWANCE_POOL_READING: get_allowance_pool_reading_schema(),
         },
     )
 
 
 __all__ = [
     "AGENT_ROLE_BINDING_ID_PREFIX",
+    "ALLOWANCE_POOL_READING_ID_PREFIX",
     "CAPTURE_SOURCE_HOOK_CLEAR",
     "CAPTURE_SOURCE_HOOK_RESUME",
     "CAPTURE_SOURCE_HOOK_STARTUP",
@@ -2976,6 +3015,7 @@ __all__ = [
     "TABLE_GAUGE_NOTICE_RECORD",
     "TABLE_FLEET_LIVENESS_RUN",
     "TABLE_FLEET_PROGRESS_RUN",
+    "TABLE_ALLOWANCE_POOL_READING",
     "TABLE_MODEL_CAPABILITY_CELL",
     "TABLE_MODEL_CAPABILITY_OBSERVATION",
     "TABLE_MODEL_CAPABILITY_REFRESH_RUN",
@@ -3001,6 +3041,7 @@ __all__ = [
     "get_gauge_notice_record_schema",
     "get_fleet_liveness_run_schema",
     "get_fleet_progress_run_schema",
+    "get_allowance_pool_reading_schema",
     "get_model_capability_cell_schema",
     "get_model_capability_observation_schema",
     "get_model_capability_refresh_run_schema",

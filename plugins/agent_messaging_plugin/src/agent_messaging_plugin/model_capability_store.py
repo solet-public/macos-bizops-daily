@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import math
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -599,6 +600,7 @@ def reconcile_and_write(
 
 _MANUAL_SOURCE_ID: Final[str] = "manual_record"
 _RUNTIME_PROVIDERS: Final[dict[str, str]] = {"claude_code": "anthropic", "codex": "openai"}
+KNOWN_RUNTIMES: Final[tuple[str, ...]] = tuple(sorted(_RUNTIME_PROVIDERS))
 _MAX_EXCERPT: Final[int] = 512
 
 
@@ -745,8 +747,13 @@ def _optional_float(raw: object) -> float | None:
     return float(raw)
 
 
-def selection_catalog(rows: list[dict[str, Any]]) -> tuple[CapabilityCell, ...]:
-    """Every scored cell as the pure selector wants it; unscored rows are dropped here, counted by the verb."""
+def selection_catalog(
+    rows: list[dict[str, Any]], weight_for: Callable[[str, str], float] | None = None,
+) -> tuple[CapabilityCell, ...]:
+    """Every scored cell as the pure selector wants it; unscored rows are dropped here, counted by the verb.
+
+    ``weight_for(runtime, model)`` is the plan's declared dispatch weight; without it every cell weighs 1.0.
+    """
     cells: list[CapabilityCell] = []
     for row in rows:
         score = _optional_float(row.get("capability_score"))
@@ -754,16 +761,19 @@ def selection_catalog(rows: list[dict[str, Any]]) -> tuple[CapabilityCell, ...]:
             continue
         measured_raw = row.get("measured_at")
         measured_at = _parse_stamp(measured_raw, "measured_at") if measured_raw else datetime.min.replace(tzinfo=UTC)
+        runtime = str(row.get("runtime", ""))
+        model = str(row.get("model", ""))
         cells.append(
             CapabilityCell(
-                runtime=str(row.get("runtime", "")),
-                model=str(row.get("model", "")),
+                runtime=runtime,
+                model=model,
                 effort=str(row.get("effort", "")),
                 capability_score=score,
                 cost_per_task_usd=_optional_float(row.get("cost_per_task_usd")),
                 relative_cost_multiplier=_optional_float(row.get("relative_cost_multiplier")),
                 measured_at=measured_at,
                 acceptance=str(row.get("acceptance", "")),
+                plan_weight=1.0 if weight_for is None else weight_for(runtime, model),
             ),
         )
     return tuple(cells)
@@ -797,6 +807,7 @@ def default_billing_objective(runtime: str | None, *, now: datetime, path: Path 
 
 __all__ = [
     "DEFAULT_STALENESS_WINDOW_HOURS",
+    "KNOWN_RUNTIMES",
     "MAX_CATALOG_ROWS",
     "SEED_PATH",
     "CatalogError",

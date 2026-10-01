@@ -36,18 +36,20 @@ import plistlib
 import re
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
 from typing import cast
 
 from .autostart import render_launchagent_plist
 from .existing_install_migrations import (
     STRUCTURED_OUTPUT_LIMIT,
+    NotTextError,
     blocked,
     file_mode,
     migration_export_root_containment,
     migration_solet_rename,
+    not_text_blocked,
     plugin_cache_refresh,
-    read_text,
 )
 from .existing_install_plugin_transitions import migration_plugin_transition
 from .managed_render import (
@@ -67,7 +69,7 @@ from .managed_render import (
     strip_marker_lines,
     zsh_quote,
 )
-from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, evidence, planned_action, result
+from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, evidence, neutralized, planned_action, result
 from .setup_adapter_runtime import Runtime
 from .target_reconciliation import PLIST_PARSE_ERRORS, LaunchTopology, detect_topology, plist_label
 
@@ -107,15 +109,31 @@ _PLIST_KINDS = frozenset({"launchd_plist"})
 
 
 def operation_handlers() -> dict[str, Handler]:
-    """The closed seed-side ``existing::`` handler table merged into ``setup_adapter``."""
+    """The closed seed-side ``existing::`` handler table merged into ``setup_adapter``; every handler blocks on a file that is not text."""
     return {
-        "existing::migration.solet_rename": migration_solet_rename,
-        "existing::migration.export_root_containment": migration_export_root_containment,
-        "existing::migration.plugin_transition": migration_plugin_transition,
-        "existing::hydration.reconcile": hydration_reconcile,
-        "existing::autostart.reconcile": autostart_reconcile,
-        "existing::runtime.plugin_cache_refresh": plugin_cache_refresh,
+        ref: _blocking_non_text(handler)
+        for ref, handler in {
+            "existing::migration.solet_rename": migration_solet_rename,
+            "existing::migration.export_root_containment": migration_export_root_containment,
+            "existing::migration.plugin_transition": migration_plugin_transition,
+            "existing::hydration.reconcile": hydration_reconcile,
+            "existing::autostart.reconcile": autostart_reconcile,
+            "existing::runtime.plugin_cache_refresh": plugin_cache_refresh,
+        }.items()
     }
+
+
+def _blocking_non_text(handler: Handler) -> Handler:
+    """A ``NotTextError`` out of any file the handler reads is a blocked result with a repair, never an exception out of the adapter (iss_68bc97bb)."""
+
+    @wraps(handler)
+    def guarded(request: AdapterRequest, runtime: Runtime) -> JsonObject:
+        try:
+            return handler(request, runtime)
+        except NotTextError as exc:
+            return not_text_blocked(request, exc)
+
+    return guarded
 
 
 # --- managed artifacts (sections 6.1-6.3) -------------------------------------------
@@ -271,32 +289,49 @@ def _adopt_diff_evidence(state: ArtifactState) -> JsonObject:
     )
 
 
+def _read_managed(path: Path) -> tuple[str | None, str | None]:
+    """The file's text, read the way ``read_text`` reads it (UTF-8, newlines translated), and the digest of the raw bytes it was decoded from.
+
+    The digest is of the bytes the update will replace, so the Manager's backup of them, which hashes raw bytes, agrees with it for a file with CRLF line
+    endings too; a digest of the translated text would not.  Both come from one read.
+    """
+    try:
+        raw = path.read_bytes()
+    except FileNotFoundError:
+        return None, None
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise NotTextError(path) from exc
+    return text.replace("\r\n", "\n").replace("\r", "\n"), sha256_bytes(raw)
+
+
 def _artifact_state(artifact: ArtifactDeclaration, destination: str, context: _Context) -> ArtifactState:
     path = Path(destination)
-    existing = read_text(path)
+    existing, digest = _read_managed(path)
     mode = file_mode(path, 0o644)
     if artifact.kind == "managed_block":
-        return _managed_block_state(artifact, destination, existing, mode, context)
-    return _whole_file_state(artifact, destination, existing, mode, context)
+        return _managed_block_state(artifact, destination, existing, digest, mode, context)
+    return _whole_file_state(artifact, destination, existing, digest, mode, context)
 
 
 class _Outcome:
     """Builds the closed ``ArtifactState`` rows for one artifact against its current bytes."""
 
-    def __init__(self, artifact: ArtifactDeclaration, destination: str, existing: str | None, mode: int) -> None:
+    def __init__(self, artifact: ArtifactDeclaration, destination: str, existing: str | None, digest: str | None, mode: int) -> None:
         self.artifact = artifact
         self.destination = destination
         self.existing = existing
         self.mode = mode
-        self.current_digest = None if existing is None else sha256_text(existing)
+        self.current_digest = digest
 
     def state(self, state: str, action: str, stamped: str | None, conflict: str | None, new_content: str | None, *, adopt_diff: str | None = None) -> ArtifactState:
         expected = sha256_text(new_content) if new_content is not None else (self.current_digest or sha256_text(""))
         return ArtifactState(self.artifact.artifact_id, self.artifact.kind, self.destination, state, action, stamped, self.current_digest, expected, conflict, new_content, self.mode, adopt_diff)
 
 
-def _managed_block_state(artifact: ArtifactDeclaration, destination: str, existing: str | None, mode: int, context: _Context) -> ArtifactState:
-    outcome = _Outcome(artifact, destination, existing, mode)
+def _managed_block_state(artifact: ArtifactDeclaration, destination: str, existing: str | None, digest: str | None, mode: int, context: _Context) -> ArtifactState:
+    outcome = _Outcome(artifact, destination, existing, digest, mode)
     begin_template, end_template = cast(str, artifact.marker_begin), cast(str, artifact.marker_end)
     candidate_body = _block_body(_template_bytes(context.request.target, artifact.template_ref), artifact, context.request)
     begin_line, end_line = marker_lines(begin_template, end_template, context.request.name, artifact.template_digest)
@@ -340,10 +375,10 @@ def _full_digest(match: BlockMatch, artifact: ArtifactDeclaration) -> str:
     return f"sha256:{digest8}"
 
 
-def _whole_file_state(artifact: ArtifactDeclaration, destination: str, existing: str | None, mode: int, context: _Context) -> ArtifactState:
+def _whole_file_state(artifact: ArtifactDeclaration, destination: str, existing: str | None, digest: str | None, mode: int, context: _Context) -> ArtifactState:
     if artifact.section_end is not None:
-        return _section_state(artifact, destination, existing, mode, context)
-    outcome = _Outcome(artifact, destination, existing, mode)
+        return _section_state(artifact, destination, existing, digest, mode, context)
+    outcome = _Outcome(artifact, destination, existing, digest, mode)
     candidate = _whole_render(artifact, _template_bytes(context.request.target, artifact.template_ref), artifact.template_digest, context, stamped=True)
     if existing is None:
         return _absent_whole_state(outcome, candidate)
@@ -358,7 +393,7 @@ def _whole_file_state(artifact: ArtifactDeclaration, destination: str, existing:
 _CONTROLLER_LINE = re.compile(r'^[ \t]*GIT_CONTROLLER_NAME="([^"\n]*)" \\$', re.MULTILINE)
 
 
-def _section_state(artifact: ArtifactDeclaration, destination: str, existing: str | None, mode: int, context: _Context) -> ArtifactState:
+def _section_state(artifact: ArtifactDeclaration, destination: str, existing: str | None, digest: str | None, mode: int, context: _Context) -> ArtifactState:
     """Refresh only the launcher section of a file the operator also writes into.
 
     The section is the text above the first line starting with ``section_end``; the operator's role functions
@@ -367,7 +402,7 @@ def _section_state(artifact: ArtifactDeclaration, destination: str, existing: st
     in that value still matches it.  A missing file is not created; a section that matches no known render, or
     that has lost its marker or its controller line, is reported and left in place without blocking the update.
     """
-    outcome = _Outcome(artifact, destination, existing, mode)
+    outcome = _Outcome(artifact, destination, existing, digest, mode)
     if existing is None:
         return outcome.state("absent", "none", None, None, None)
     split = _split_section(existing, cast(str, artifact.section_end))
@@ -494,17 +529,9 @@ def _adopt_diff(existing: str, candidate: str) -> str:
 _SECRET_PLIST_KEY = re.compile(
     r"(?i)password|passwd|passphrase|secret|token|api[_-]?key|private[_-]?key|credential|authorization|dsn|(?<![a-z0-9])(?:pass|pat|key)(?![a-z0-9])"
 )
-#: Every rule the Manager's ``adapter_validation.public_string`` enforces on each line of an evidence ``observed`` array (``public_value``), and what
-#: holds it here:
-#:  1. a non-empty ``str`` of at most 4096 characters, the items unique: a line is cut at 200 characters and arrives as ``NNN=<line>``;
-#:  2. no secret-shaped text (``_SECRET_PATTERNS``, mirrored by ``_SECRET_PLIST_TEXT``), or the whole envelope is refused: replaced below;
-#:  3. at most 8192 bytes once redacted: 200 characters of at most 4 bytes each are 800;
-#:  4. no ``FORMULA_MARKER`` ("/Cellar/solet/"), which a PATH through a Homebrew keg carries: replaced by ``[keg path]`` below, and the rest of the
-#:     line stays readable.
-#: A refusal there raises out of the whole preview, so the seed never hands the Manager a line that breaks one.  The seed does not import the Manager.
-_SECRET_PLIST_TEXT = re.compile(r"(?i)(?:password|secret|token|authorization|oauth[_ -]?code|private[_ -]?key)\s*[:=]\s*\S+|bearer\s+[A-Za-z0-9._~+/-]+")
-_FORMULA_MARKER = "/Cellar/solet/"
-_NEUTRALIZE_PASSES = 8
+#: A line of an evidence ``observed`` array is held to the Manager's ``public_string`` rules by ``setup_adapter_contract.neutralized`` below, which replaces a
+#: secret-shaped run with ``[REDACTED]`` and a Homebrew keg path with ``[keg path]`` and leaves the rest of the line readable (iss_67472e3f).  A refusal
+#: there raises out of the whole preview, so the seed never hands the Manager a line that breaks one.  The seed does not import the Manager.
 _MIN_CONTAINED_SECRET = 6
 _REDACTED = "[REDACTED]"
 
@@ -546,17 +573,7 @@ def _repeats_secret(value: str | bytes, secrets: set[str | bytes]) -> bool:
 
 
 def _redacted_lines(text: str) -> list[str]:
-    return [_neutralized(line) for line in text.splitlines()]
-
-
-def _neutralized(line: str) -> str:
-    """``line`` with every secret-shaped run and formula-keg path replaced, stable under a second pass (what the Manager re-checks)."""
-    for _ in range(_NEUTRALIZE_PASSES):
-        cleaned = _SECRET_PLIST_TEXT.sub(_REDACTED, line).replace(_FORMULA_MARKER, "[keg path]")
-        if cleaned == line:
-            return line
-        line = cleaned
-    return "[withheld]"
+    return [neutralized(line) for line in text.splitlines()]
 
 
 def _edit_conflict(artifact: ArtifactDeclaration, reason: str) -> str | None:

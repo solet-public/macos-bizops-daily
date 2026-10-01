@@ -1,0 +1,19 @@
+{
+  "process_key": "plugin::agent_messaging_plugin::record_allowance_pool_reading",
+  "display_name": "Record a current reading of a subscription usage allowance",
+  "description": "iss_c6fbf9ae. Writes one explicit reading of one flat-rate allowance pool, for example the rolling-five-hour, weekly-all-model or weekly-model-family pool of the anthropic-max-20x plan in the shipped usage_economics profile. The shipped profile can only say a pool is unknown, and an unknown pool excludes nothing: select_dispatch_tier selects Claude cells with no reading at all, so a reading here is optional. A reading that shows the pool exhausted (no percent remaining) excludes the cells it covers until it lapses. Give profile_id, pool_id, consumed or remaining as a percent of the window (0-100, as the provider's usage page reports it), as_of (when it was read, not in the future), next_reset_at or expires_at (the reading stops counting at the earlier), a source (an operator reading or a ruling id such as rul_1edbcfc7-c2a4-4176-96ae-c51c90df3a21) and recorded_by. Only provider_reported_usage pools take a reading. A second call for the same pool replaces the first. A reading is never inferred and has no default. After the effective expiry the reading no longer counts and select_dispatch_tier says so.",
+  "embedding_description": "Writing down how much of a subscription plan's rolling or weekly usage window has been used, as a percentage read off the provider's usage page, with when it was taken, when it lapses and who said so, so automated model selection skips a plan whose window is used up.",
+  "processor_policy_category": "edge",
+  "result_processor_customizations": {
+    "action_label": "Allowance reading recorded",
+    "result_type": "record_allowance_pool_reading_result",
+    "result_description": "profile_id, pool_id, consumed and remaining (percent of the window), as_of, next_reset_at, expires_at, effective_expiry (the earlier of the two), state (current), source, recorded_by, recorded_at.",
+    "presentation_guidance": "Name the pool, give percent consumed and remaining, say when the reading stops counting (effective_expiry) and who and what it came from. Say plainly that the reading was supplied, not measured by the solet.",
+    "output_action_guidance": "Record a reading only to tell the selector that a pool is used up: a Claude Sonnet cell is covered by rolling-five-hour, weekly-all-model and weekly-model-family, other Claude cells by the first two. Pass runtime to select_dispatch_tier to choose within one runtime. Record again before effective_expiry to keep an exhausted pool excluded, and use read_allowance_pool_readings to see what is current."
+  },
+  "error_processor_customizations": {
+    "action_context": "One read of the shipped usage_economics profile to validate the pool, then one upsert of the allowance_pool_reading row keyed by profile_id and pool_id, through the state interface. Not retryable.",
+    "error_interpretation": "parameter_invalid: profile_id is not a flat-rate profile or pool_id is not one of its pools; the pool's native unit is not provider_reported_usage; neither or inconsistent consumed and remaining, or a percent outside 0-100; as_of missing, without a timezone, or in the future; neither next_reset_at nor expires_at given, or one not after as_of and now; source or recorded_by blank. quota_state_unknown: the shipped profile cannot be loaded. state_service_unavailable: the state service is not bound.",
+    "recovery_guidance": "Fix the named parameter and call again; a refused call writes nothing. For a wrong pool, the error lists the pool ids the profile has. Never guess a percent: take it from the provider's usage page or the operator."
+  }
+}

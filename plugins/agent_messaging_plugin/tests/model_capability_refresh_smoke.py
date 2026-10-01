@@ -195,6 +195,14 @@ def test_detail_slugs_and_roster() -> None:
     _check(fetch._detail_slug(roster["claude-fable-5-1"], "high") == "claude-fable-5-1-high", "fable slugs carry no -with-fallback suffix")  # noqa: SLF001
     _check(fetch._detail_slug(roster["claude-haiku-4.5"], "non_reasoning") == "claude-4-5-haiku", "non_reasoning uses the bare slug")  # noqa: SLF001
     _check({"gpt-6-sol", "gpt-6-luna", "claude-opus-5-5"} <= set(roster), "GPT-6 Sol, GPT-6 Luna and Claude Opus 5.5 are on the roster")
+    _check("claude-sonnet-5-5" in roster, "Claude Sonnet 5.5 is on the roster (iss_30cc57d2)")
+    _check(fetch._detail_slug(roster["claude-sonnet-5-5"], "max") == "claude-sonnet-5-5", "sonnet 5.5 max uses the bare slug, verified live 2026-10-01")  # noqa: SLF001
+    _check(fetch._detail_slug(roster["claude-sonnet-5-5"], "high") == "claude-sonnet-5-5-high", "sonnet 5.5 other efforts append the effort")  # noqa: SLF001
+    sonnet_55 = fetch.parse_leaderboard_html(
+        _LEADERBOARD_FIXTURE.replace("Claude Sonnet 5 (max)", "Claude Sonnet 5.5 (max with fallback)"), fetched_at="2026-10-01T00:00:00+00:00",
+    )
+    sonnet_models = {(reading.model, reading.effort) for reading in sonnet_55}
+    _check(("claude-sonnet-5-5", "max") in sonnet_models and ("claude-sonnet-5", "max") not in sonnet_models, "a Claude Sonnet 5.5 row is never read as Claude Sonnet 5")
     opus_55 = fetch.parse_leaderboard_html(
         _LEADERBOARD_FIXTURE.replace("Claude Opus 5 (low)", "Claude Opus 5.5 (low with fallback)"), fetched_at="2026-09-22T00:00:00+00:00",
     )

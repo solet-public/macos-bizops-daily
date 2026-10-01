@@ -133,7 +133,8 @@ def _assert_teardown_error_records_terminal_outcome() -> None:
         lifecycle_verbs.lane_worktree_disposability = original_disposability  # type: ignore[assignment]
         lifecycle_verbs.remove_lane_worktree = original_remove  # type: ignore[assignment]
 
-    assert result == {"already_retired": False, "dependencies_fired": 0}, result
+    assert (result["already_retired"], result["dependencies_fired"]) == (False, 0), result
+    assert result["host_action"] == "none_available", result
     row = read_managed_session(state, "agi-d3-error")
     assert row["lifecycle_state"] == LIFECYCLE_RETIRED, row
     assert row["worktree_disposition"] == "retained_error", row
@@ -141,7 +142,8 @@ def _assert_teardown_error_records_terminal_outcome() -> None:
     # to an operator instead of being an inert write-only status.
     assert session_status(state, "agi-d3-error")["worktree_disposition"] == "retained_error"
     replay = retire_session(state, agent_instance_id="agi-d3-error", directed_by="operator:none")
-    assert replay == {"already_retired": True, "dependencies_fired": 0}, replay
+    assert (replay["already_retired"], replay["dependencies_fired"]) == (True, 0), replay
+    assert replay["host_action"] == "not_attempted", replay
 
 
 def _assert_unprovisioned_row_never_resolves_a_repo_root() -> None:
@@ -162,7 +164,8 @@ def _assert_unprovisioned_row_never_resolves_a_repo_root() -> None:
         if prior_app_home is not None:
             os.environ["APP_HOME"] = prior_app_home
 
-    assert result == {"already_retired": False, "dependencies_fired": 0}, result
+    assert (result["already_retired"], result["dependencies_fired"]) == (False, 0), result
+    assert result["host_action"] == "none_available", result
     row = read_managed_session(state, "agi-d3-unprovisioned")
     assert row["lifecycle_state"] == LIFECYCLE_RETIRED, row
     assert row["worktree_disposition"] == "not_provisioned", row

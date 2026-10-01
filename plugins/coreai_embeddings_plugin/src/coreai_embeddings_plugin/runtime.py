@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, TypeVar
 from .cache_canary import CacheCanary, CanaryReport
 from .contracts import EmbeddingError, ErrorCode
 from .native import NativeModel
-from .tokenization import NomicTokenizer
+from .tokenization import EncodedInput, NomicTokenizer
 
 if TYPE_CHECKING:
     from .assets import InstalledAsset
@@ -49,7 +49,7 @@ class EmbeddingRuntime:
             except TimeoutError as exc:
                 self._failed = True
                 future.cancel()
-                raise EmbeddingError(ErrorCode.UNAVAILABLE, "Core AI operation exceeded 120 seconds") from exc
+                raise EmbeddingError(ErrorCode.TIMEOUT, "Core AI operation exceeded 120 seconds") from exc
 
     def prepare(self) -> None:
         """Verify assets, prove the compiled cache out of process, then load in process."""
@@ -96,14 +96,23 @@ class EmbeddingRuntime:
         return self._tokenizer.count(text)
 
     def generate(self, texts: list[str]) -> list[list[float]]:
-        """Validate all token lengths before producing any batch output."""
-        return self._call(lambda: self._generate(texts))
+        """Validate all token lengths before producing any batch output.
 
-    def _generate(self, texts: list[str]) -> list[list[float]]:
-        if self._runner is None or self._native is None or self._tokenizer is None:
+        Each input is its own native operation, so the 120-second bound applies to one embedding (6.4 s at the
+        2048-token bucket on CPU) and never to a batch (iss_a457a147): sixteen full chunks already took about 100 s.
+        """
+        encoded = self._call(lambda: self._encode(texts))
+        return [self._call(lambda item=item: self._embed(item)) for item in encoded]
+
+    def _encode(self, texts: list[str]) -> list[EncodedInput]:
+        if self._tokenizer is None:
             raise EmbeddingError(ErrorCode.UNAVAILABLE, "Runtime has not been prepared")
-        encoded = [self._tokenizer.encode(text) for text in texts]
-        return [self._runner.run(self._native.embed(item)) for item in encoded]
+        return [self._tokenizer.encode(text) for text in texts]
+
+    def _embed(self, item: EncodedInput) -> list[float]:
+        if self._runner is None or self._native is None:
+            raise EmbeddingError(ErrorCode.UNAVAILABLE, "Runtime has not been prepared")
+        return self._runner.run(self._native.embed(item))
 
     def diagnostics(self) -> dict[str, object]:
         """Distinguish configured preference from measured execution evidence."""

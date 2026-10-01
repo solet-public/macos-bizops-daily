@@ -79,6 +79,8 @@ from .peer_dispatch import (
     dispatch_role_send,
 )
 from .peer_inbox_view import (
+    InvalidInboxCursorError,
+    parse_since_cursor,
     serialize_peer_inbox_page,
 )
 from .peer_list_view import (
@@ -1217,6 +1219,7 @@ def _register_peer_routes(
         include_important: bool = True,
         role_after: str | None = None,
         observer: bool = False,
+        since: str | None = None,
     ) -> JSONResponse:
         bridge = bridge_manager.get(bridge_id)
         if bridge is None or bridge.closed:
@@ -1232,12 +1235,17 @@ def _register_peer_routes(
         except ValueError as exc:
             return _validation_error("invalid_after", str(exc))
         try:
+            since_dt = parse_since_cursor(since)
+        except InvalidInboxCursorError as exc:
+            return _validation_error(exc.code, str(exc))
+        try:
             page = agent_messaging_service.peer_inbox(
                 PeerInboxRequest(
                     recipient_agent_id=sender_binding.agent_id,
                     recipient_agent_instance_id=sender_binding.agent_instance_id,
                     recipient_agent_session_id=sender_binding.agent_session_id,
                     after_created_at=after_dt,
+                    since_created_at=since_dt,
                     limit=max(1, min(limit, 100)),
                     include_important=include_important,
                     # Opaque role-section cursor; the service validates it and

@@ -558,6 +558,7 @@ _EXPECTED_KEYS = {
     "recipient_agent_instance_id",
     "entries",
     "next_after_created_at",
+    "next_since_created_at",
     "instance_exhausted",
     "role_entries",
     "next_role_cursor",

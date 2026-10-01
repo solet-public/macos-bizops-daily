@@ -10,5 +10,5 @@ config:
     description: Absolute directory containing the verified Nomic asset installation
   compute_preference:
     type: string
-    default: gpu
-    description: GPU preference with explicit CPU fallback, or cpu for CPU-only execution
+    default: cpu
+    description: cpu (default, iss_f3e65e52) or gpu, which falls back to CPU if the load fails

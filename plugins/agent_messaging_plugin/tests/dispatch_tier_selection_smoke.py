@@ -148,7 +148,7 @@ def test_cheap_model_effort_is_exhausted_before_switching() -> None:
     _check(_named(picked.selected) == "gpt-5.6-luna@xhigh", "score 35: luna xhigh ($0.09) wins before any model switch")
 
 
-def test_exhausted_vendor_fails_over_and_unknown_quota_refuses() -> None:
+def test_exhausted_vendor_fails_over_and_unknown_quota_never_excludes() -> None:
     quotas = {cell.pair: "available" for cell in CATALOG}
     quotas[("codex", "gpt-5.6-luna")] = "exhausted"
     fallback = select_tier(
@@ -158,12 +158,21 @@ def test_exhausted_vendor_fails_over_and_unknown_quota_refuses() -> None:
     _check(_named(fallback.selected) == "gpt-5.6-sol@medium", "exhausted cheapest vendor/model falls back to next cheapest clearing cell")
     _check(fallback.excluded["quota_exhausted"] == 5, "all exhausted-model cells are counted")
     unknown = {cell.pair: "unknown" for cell in CATALOG}
+    unrestricted = select_tier(CATALOG, required_score=35, objective="metered_usd", now=_NOW, max_age=_WINDOW)
+    all_unknown = select_tier(
+        CATALOG, required_score=35, objective="metered_usd", now=_NOW, max_age=_WINDOW, quota_status_by_pair=unknown,
+    )
+    _check(
+        _named(all_unknown.selected) == _named(unrestricted.selected) and "quota_unknown" not in all_unknown.excluded,
+        "an unknown quota state excludes nothing: the answer is the unrestricted one",
+    )
+    exhausted = {cell.pair: "exhausted" for cell in CATALOG}
     _check(
         _code(lambda: select_tier(
             CATALOG, required_score=35, objective="metered_usd", now=_NOW, max_age=_WINDOW,
-            quota_status_by_pair=unknown,
-        )) == "quota_state_unknown",
-        "unknown quota state refuses rather than treating it as unlimited",
+            quota_status_by_pair=exhausted,
+        )) == "no_cell_clears_threshold",
+        "a catalog that is known exhausted everywhere still refuses",
     )
 
 
@@ -248,7 +257,7 @@ if __name__ == "__main__":
     test_operator_dominance_examples()
     test_ladder_shows_diminishing_returns()
     test_cheap_model_effort_is_exhausted_before_switching()
-    test_exhausted_vendor_fails_over_and_unknown_quota_refuses()
+    test_exhausted_vendor_fails_over_and_unknown_quota_never_excludes()
     test_objectives_and_margins()
     test_near_tie_prefers_lower_effort()
     test_refusals_are_distinct()

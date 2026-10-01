@@ -27,6 +27,71 @@ Request = dict[str, Any]
 Result = dict[str, Any]
 Executor = Callable[[object], Result]
 
+# The text rules the Manager's ``adapter_validation.public_string`` holds every envelope text to, enforced by ``public_text`` below for ``evidence``,
+# ``planned_action`` and ``result``.  A twin of ``github_midwife_plugin.setup_adapter_contract.public_text`` (this package never imports the plugin);
+# ``bootstrap_public_text_smoke`` drives both through the real validator and proves they agree (iss_67472e3f).
+_SECRET_SHAPED = (
+    re.compile(r"(?i)(password|secret|token|authorization|oauth[_ -]?code|private[_ -]?key)\s*[:=]\s*(?:bearer\s+)*\S+"),
+    re.compile(r"(?i)bearer(?:\s+bearer)*\s+[A-Za-z0-9._~+/-]+"),
+)
+_FORMULA_MARKER = "/Cellar/solet/"
+_REDACTED = "[REDACTED]"
+_KEG_PATH = "[keg path]"
+_EMPTY = "[empty]"
+_WITHHELD = "[withheld]"
+_STABLE_PASSES = 8
+_WIDE_TEXT_LIMIT = 2048
+_TAIL_SHARE = 3  # of every 5 kept characters: the remedy is written last
+#: This adapter never cut a repair; it now holds one to the Manager's own maximum.
+REPAIR_LIMIT = 2048
+
+
+def neutralized(text: str) -> str:
+    """``text`` with every secret-shaped run and formula-keg path replaced, stable under a second pass (what the Manager re-checks)."""
+    for _ in range(_STABLE_PASSES):
+        cleaned = text
+        for pattern in _SECRET_SHAPED:
+            cleaned = pattern.sub(_REDACTED, cleaned)
+        cleaned = cleaned.replace(_FORMULA_MARKER, _KEG_PATH)
+        if cleaned == text:
+            return text
+        text = cleaned
+    return _WITHHELD
+
+
+def _fitted(text: str, limit: int) -> str:
+    """``text`` unchanged when it fits ``limit`` characters, else its head and its tail around a marker that says how long it was."""
+    if len(text) <= limit:
+        return text
+    marker = f" [... {len(text)} characters, middle cut ...] "
+    kept = limit - len(marker)
+    if kept < 2:
+        return text[:limit]
+    tail = kept * _TAIL_SHARE // 5
+    return text[: kept - tail] + marker + text[len(text) - tail :]
+
+
+def public_text(text: str, limit: int) -> str:
+    """``text`` as the Manager's ``public_string`` accepts it for a field of at most ``limit`` characters; a text that already does is returned as it is."""
+    current = text or _EMPTY
+    for _ in range(_STABLE_PASSES):
+        cleaned = neutralized(current)
+        cleaned = _fitted(cleaned, limit if cleaned.isascii() else min(limit, _WIDE_TEXT_LIMIT))
+        if cleaned == current:
+            return current
+        current = cleaned
+    return _WITHHELD
+
+
+def _public_value(value: bool | int | float | str | list[str] | None, limit: int) -> bool | int | float | str | list[str] | None:
+    """An evidence ``observed``/``expected`` value with every string made public; a list keeps its order and drops the entries that became equal."""
+    if isinstance(value, str):
+        return public_text(value, limit)
+    if isinstance(value, list):
+        return list(dict.fromkeys(public_text(item, limit) for item in value))
+    return value
+
+
 CREATE_FLOW_ID = "macos.repository_setup"
 EXISTING_INSTALL_FLOW_ID = "existing-install"
 EXISTING_INSTALL_REF_PREFIX = "existing::"
@@ -252,15 +317,16 @@ def evidence(
     expected: bool | int | float | str | list[str] | None,
     source: str,
 ) -> dict[str, Any]:
-    canonical = json.dumps(observed, sort_keys=True, separators=(",", ":"))
+    public_observed = _public_value(observed, 4096)
+    canonical = json.dumps(public_observed, sort_keys=True, separators=(",", ":"))
     return {
         "id": evidence_id,
         "kind": kind,
-        "status": status,
-        "summary": summary[:512],
-        "observed": observed,
-        "expected": expected,
-        "source": source[:512],
+        "status": public_text(status, 512),
+        "summary": public_text(summary, 512),
+        "observed": public_observed,
+        "expected": _public_value(expected, 4096),
+        "source": public_text(source, 512),
         "digest": f"sha256:{hashlib.sha256(canonical.encode()).hexdigest()}",
         "captured_at": captured_at(runtime),
         "sensitivity": "public",
@@ -305,7 +371,7 @@ def result(
         "discovered_candidates": [],
         "evidence": list(evidence_items),
         "reason": reason,
-        "repair": repair,
+        "repair": None if repair is None else public_text(repair, REPAIR_LIMIT),
     }
 
 
@@ -379,11 +445,11 @@ def planned_action(
 ) -> dict[str, Any]:
     return {
         "id": action_id,
-        "title": title,
+        "title": public_text(title, 256),
         "mutation_kind": mutation_kind,
-        "target": target,
+        "target": public_text(target, 512),
         "requires_confirmation": True,
-        "condition_or_evidence_ref": evidence_ref,
+        "condition_or_evidence_ref": public_text(evidence_ref, 256),
     }
 
 

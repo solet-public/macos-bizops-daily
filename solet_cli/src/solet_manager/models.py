@@ -493,6 +493,8 @@ class RuntimeOperationPlan:
     public_inputs: dict[str, JsonValue]
     requires_confirmation: bool
     backup_checkpoint_id: str | None = None
+    #: The adapter's own repair text when its probe blocked or failed.  Display only: a blocked plan is never approved or journaled, so it is not in the fingerprint.
+    blocked_repair: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,9 +1,23 @@
 # Core AI Nomic embedding runtime
 
 The plugin implements the synchronous `EmbeddingServiceInterface` on macOS 27.
-Configure an absolute `asset_root` and `compute_preference` (`gpu`, the default,
-or `cpu`). Install the separately pinned asset through the asset acquisition
+Configure an absolute `asset_root` and `compute_preference` (`cpu`, the default,
+or `gpu`). Install the separately pinned asset through the asset acquisition
 API before preparation. Runtime preparation and inference never download assets.
+
+## Why the default is CPU (`iss_f3e65e52`)
+
+Core AI's GPU inference leaks one IOSurface per embed call, and only process exit
+frees it. After about 16.3k GPU embeds in one process the next output allocation
+hits a Swift `fatalError` (`NDArray+Pool.swift:77`, "Failed to allocate storage for
+NDArray ... ioSurface"), an uncatchable SIGTRAP that kills the host process. A
+re-index of a moved knowledge base can pass 16k embeds in minutes. CPU compute does
+not leak, at about 8 embeds/s against about 100/s on GPU. Every default and every
+config the seed writes (the three macOS profile templates, the fresh-setup and
+`openai_to_coreai` transition renders, this plugin's defaults) is therefore `cpu`
+until a recycled GPU worker lands (`iss_f531e57f`). `gpu` stays an accepted value,
+and an install that already has `gpu` is still valid: the doctor and the transition
+classifier accept either value. An update does not rewrite an existing `gpu` config.
 
 ## Lifecycle and failures
 
@@ -95,10 +109,34 @@ also use raw text. The runtime never adds or strips these prefixes.
 ## Native execution
 
 A single worker owns the async Core AI runtime so synchronous service calls also
-work from callers with an active event loop. Calls are serialized. A native
-operation exceeding 120 seconds poisons that runtime; repair/preparation creates
-a new instance. Cancellation cannot forcibly interrupt an already executing
-native call; its worker releases resources once the call returns.
+work from callers with an active event loop. Calls are serialized. Every native
+operation has a 120-second bound, and the operation is one input: `generate`
+tokenizes the whole batch first, so an over-long input still fails the batch before
+any output, then embeds each input as its own operation. A batch of any size
+therefore never nears the bound. Measured on CPU (M3 Ultra, macOS 27.0, idle):
+0.13 s per embedding at the 256-token bucket, 0.43 s at 512, 1.6 s at 1024 and
+6.4 s at 2048. Before r67 the whole batch was one operation, and the ledger drain's
+sixteen full 2048-token chunks (`EVENT_MAX_CHUNKS`) took about 100 s, so a loaded
+host passed 120 s (`iss_a457a147`). The runtime releases its own lock between inputs,
+but the plugin holds its lock for the whole `generate_embeddings` batch and a token
+count takes the same lock, so a count from another thread still waits for the whole
+batch (`iss_3b47dcc9`).
+
+A native operation that really exceeds the bound is reported as
+`coreai_embeddings.operation_timeout` and poisons that runtime instance, because its
+worker is still inside the call. The plugin then prepares a new runtime once,
+logged as "Core AI native call timed out ... preparing a new runtime once" and, when
+that succeeds, "Core AI runtime prepared again after a timed-out native call".
+The call that timed out is reported and is not retried; the next call is served. This
+applies to a timeout in `generate_embeddings` and in a token count. If the new
+preparation fails, including by timing out itself, the plugin stays unavailable with
+that error: later calls report it at once and none prepares again, until
+`reload_plugin_config` or another preparation. Before r67 the plugin stayed
+unavailable for every consumer until `reload_plugin_config`, after one timeout.
+Cancellation cannot forcibly interrupt an already executing native call; the
+abandoned worker releases its resources once the call returns. A failed native call
+(a `RuntimeError`, an unavailable error or invalid output) is not a timeout and still leaves the plugin
+unavailable with its own error.
 
 GPU load or execution RuntimeError triggers a logged CPU-only retry. Diagnostics
 separate configured preference, selected preference, and observed compute unit.

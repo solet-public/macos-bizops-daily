@@ -16,7 +16,7 @@ from ananta.error_handling import AnantaError
 from ananta.services.embedding_service import EmbeddingService
 
 from .installation_doctor import _boolean_probe, _command_probe, _evidence, blocked
-from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, public_string, result
+from .setup_adapter_contract import AdapterRequest, JsonObject, JsonValue, public_string, public_text, result
 from .setup_adapter_runtime import Runtime, read_json_object
 
 __all__ = ("_platform_embedding_dimension",)
@@ -204,8 +204,8 @@ def _candidate(
         }
     return {
         "decision_id": decision_id,
-        "value": model_id[:256],
-        "label": model_id[:256],
+        "value": public_text(model_id, 256),
+        "label": public_text(model_id, 256),
         "recommendation_rank": rank,
         "metadata": metadata,
     }

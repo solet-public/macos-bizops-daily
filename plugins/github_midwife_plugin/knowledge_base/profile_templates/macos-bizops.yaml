@@ -128,7 +128,7 @@ plugin_config_overrides:
   # the models setup stage installs and verifies assets in the same directory.
   coreai_embeddings_plugin:
     asset_root: ${SOLET_APP_HOME}/data/model-assets
-    compute_preference: gpu
+    compute_preference: cpu
   # Per-solet role isolation (same as the free profile — see that file's
   # comment for the full rationale).
   postgres_state_management_plugin:

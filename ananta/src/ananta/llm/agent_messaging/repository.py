@@ -84,6 +84,23 @@ class ThreadStatusUpdate:
     set_closed_at: bool = False
 
 
+def _peer_message_filters(
+    silent_only: bool, since_created_at: datetime | None,
+) -> dict[str, object]:
+    """Per-thread message filters for a peer inbox read.
+
+    ``since`` becomes the strict ``gt`` range on ``created_at`` (the forward
+    read); the backward ``after`` cursor is not a filter, it is the keyset
+    ``after`` of the ordered query.
+    """
+    filters: dict[str, object] = {"role": MessageRole.ORIGINATOR.value}
+    if silent_only:
+        filters["important"] = False
+    if since_created_at is not None:
+        filters["created_at"] = {"op": "gt", "value": since_created_at}
+    return filters
+
+
 class AgentMessagingRepository:
     """SQL-backed persistence for agent threads and messages."""
 
@@ -199,6 +216,7 @@ class AgentMessagingRepository:
         after_created_at: datetime | None,
         limit: int,
         silent_only: bool = True,
+        since_created_at: datetime | None = None,
     ) -> tuple[list[AgentMessageRow], bool]:
         """Return originator peer messages addressed to a specific caller.
 
@@ -223,9 +241,90 @@ class AgentMessagingRepository:
         mark IMPORTANT. Public ``peer_inbox`` now passes ``silent_only=False``
         by default so the inbox works as a durable catch-up view; callers that
         want intentional silent-only status checks opt into this filter.
+
+        Two directions, never both: ``after_created_at`` walks BACKWARD
+        (newest-first, rows older than the timestamp); ``since_created_at``
+        reads FORWARD (oldest-first, rows strictly newer than it, through the
+        ``gt`` range filter, so the boundary row is never re-read; it is a
+        timestamp-only cursor, so a page boundary inside a group of rows with
+        the same ``created_at`` skips the rest of that group). Both set is a
+        caller bug and raises ``ValueError``.
         """
+        if after_created_at is not None and since_created_at is not None:
+            raise ValueError("after_created_at and since_created_at are opposite directions")
         capped = max(1, min(limit, _MAX_LIST_LIMIT))
         lookahead_limit = capped + 1
+        thread_ids = self._peer_inbox_thread_ids(
+            recipient_agent_id, recipient_agent_instance_id, recipient_agent_session_id,
+        )
+        if not thread_ids:
+            return [], True
+
+        # R3b (SQL-lockdown): per-thread query_ordered + Python k-way merge.
+        # SCALAR filters per thread, NOT a `thread_id = ANY(...)` list filter:
+        # = ANY lives only in the postgres provider, so a list filter is
+        # unfaithful to the in-memory query_ordered backend (Option A; see
+        # playbook §9). Peer-thread count per instance is ~1. limit=capped
+        # (<=100) per thread is k-way-merge-sufficient (any global top-capped
+        # row is in its own thread's top-capped). The `important` column (GAP-2)
+        # replaces the raw metadata->>'important' predicate. Both inbox
+        # sections are newest-first: a cursor-less read must surface pending
+        # work rather than strand it behind a historical prefix. The
+        # timestamp-only direct cursor deliberately retains its existing
+        # duplicate-``created_at`` limitation; the empty-id sentinel skips the
+        # equal-timestamp group while walking backward. The forward ``since``
+        # read is the one oldest-first exception and is timestamp-only too: its
+        # ``gt`` filter never re-reads the boundary row, but a page boundary
+        # inside a group of rows sharing one ``created_at`` skips the rest of
+        # that group on the next page, so it is not globally lossless either.
+        # query_ordered implicitly excludes is_deleted=1 (the raw SQL did not) —
+        # a no-op today (core__agent_message has no soft-delete write path,
+        # grep-confirmed), matching the R2 thread-read reconciliation. STILL a
+        # no-op after GAU-06 (2026-08-19) added the ONLY delete path this table
+        # has: rotation self-notice retention hard-deletes (soft_delete=False),
+        # so it removes rows outright rather than parking them behind the flag
+        # this filter would have to skip. See the table's own description in
+        # schema.py for the scope of that exception. The
+        # migration smoke pins this exclusion so a future message-soft-delete
+        # path can't silently drop peer-inbox rows undetected.
+        filters = _peer_message_filters(silent_only, since_created_at)
+        after: list[object] | None = (
+            [after_created_at, ""]
+            if after_created_at is not None
+            else None
+        )
+        forward = since_created_at is not None
+        direction = "asc" if forward else "desc"
+        merged: list[AgentMessageRow] = []
+        for thread_id in thread_ids:
+            query: dict[str, object] = {
+                "table": TABLE_AGENT_MESSAGE,
+                "filters": {"thread_id": thread_id, **filters},
+                "order_by": [["created_at", direction], ["id", direction]],
+                # Fetch one extra row so the service can expose honest
+                # exhaustion while preserving its newest-first, backward
+                # timestamp cursor. ``query_ordered`` caps ordinary pages at
+                # 100, so the 101-row seam requires this explicit consent;
+                # the public result remains capped below.
+                "limit": lookahead_limit,
+                "unbounded": True,
+            }
+            if after is not None:
+                query["after"] = after
+            merged.extend(
+                _row_to_message(r)
+                for r in _records(self._state.query_ordered(_NAMESPACE, query))
+            )
+        merged.sort(key=lambda m: (m.created_at, m.id), reverse=not forward)
+        return merged[:capped], len(merged) <= capped
+
+    def _peer_inbox_thread_ids(
+        self,
+        recipient_agent_id: str,
+        recipient_agent_instance_id: str,
+        recipient_agent_session_id: str,
+    ) -> list[str]:
+        """The caller's visible peer thread ids: the instance and session disjuncts, deduped."""
         # R3a (SQL-lockdown) + REL-08 UNION: two single-namespace 2-eq reads (no
         # OR in query_state), merged + deduped on thread id. Disjunct (i) = the
         # caller's current instance (legacy NULL-session rows + own); (ii) = the
@@ -263,63 +362,7 @@ class AgentMessagingRepository:
                     ),
                 )
             )
-        thread_ids = list(dict.fromkeys(thread_ids))  # dedup, order-preserving
-        if not thread_ids:
-            return [], True
-
-        # R3b (SQL-lockdown): per-thread query_ordered + Python k-way merge.
-        # SCALAR filters per thread, NOT a `thread_id = ANY(...)` list filter:
-        # = ANY lives only in the postgres provider, so a list filter is
-        # unfaithful to the in-memory query_ordered backend (Option A; see
-        # playbook §9). Peer-thread count per instance is ~1. limit=capped
-        # (<=100) per thread is k-way-merge-sufficient (any global top-capped
-        # row is in its own thread's top-capped). The `important` column (GAP-2)
-        # replaces the raw metadata->>'important' predicate. Both inbox
-        # sections are newest-first: a cursor-less read must surface pending
-        # work rather than strand it behind a historical prefix. The
-        # timestamp-only direct cursor deliberately retains its existing
-        # duplicate-``created_at`` limitation; the empty-id sentinel skips the
-        # equal-timestamp group while walking backward.
-        # query_ordered implicitly excludes is_deleted=1 (the raw SQL did not) —
-        # a no-op today (core__agent_message has no soft-delete write path,
-        # grep-confirmed), matching the R2 thread-read reconciliation. STILL a
-        # no-op after GAU-06 (2026-08-19) added the ONLY delete path this table
-        # has: rotation self-notice retention hard-deletes (soft_delete=False),
-        # so it removes rows outright rather than parking them behind the flag
-        # this filter would have to skip. See the table's own description in
-        # schema.py for the scope of that exception. The
-        # migration smoke pins this exclusion so a future message-soft-delete
-        # path can't silently drop peer-inbox rows undetected.
-        filters: dict[str, object] = {"role": MessageRole.ORIGINATOR.value}
-        if silent_only:
-            filters["important"] = False
-        after: list[object] | None = (
-            [after_created_at, ""]
-            if after_created_at is not None
-            else None
-        )
-        merged: list[AgentMessageRow] = []
-        for thread_id in thread_ids:
-            query: dict[str, object] = {
-                "table": TABLE_AGENT_MESSAGE,
-                "filters": {"thread_id": thread_id, **filters},
-                "order_by": [["created_at", "desc"], ["id", "desc"]],
-                # Fetch one extra row so the service can expose honest
-                # exhaustion while preserving its newest-first, backward
-                # timestamp cursor. ``query_ordered`` caps ordinary pages at
-                # 100, so the 101-row seam requires this explicit consent;
-                # the public result remains capped below.
-                "limit": lookahead_limit,
-                "unbounded": True,
-            }
-            if after is not None:
-                query["after"] = after
-            merged.extend(
-                _row_to_message(r)
-                for r in _records(self._state.query_ordered(_NAMESPACE, query))
-            )
-        merged.sort(key=lambda m: (m.created_at, m.id), reverse=True)
-        return merged[:capped], len(merged) <= capped
+        return list(dict.fromkeys(thread_ids))  # dedup, order-preserving
 
     # ------------------------------------------------------------------
     # Thread writes

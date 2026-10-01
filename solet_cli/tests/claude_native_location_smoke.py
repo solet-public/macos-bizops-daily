@@ -189,6 +189,9 @@ def _leg_bootstrap_absent(root: Path) -> None:
         _check(bootstrap_protocol.resolve_executable(probe.runtime(root), "claude") is None, "the bootstrap adapter resolves nothing when claude is nowhere")
         route = _create_route(_BootstrapProbe(host).runtime(root))
     _check(route["checkpoint_status"] == "pending" and _planned_ids(route) == ["claude.install_homebrew_package"], f"no claude anywhere still plans the cask install: {route['checkpoint_status']} {_planned_ids(route)}")
+    action = route["planned_actions"][0]  # type: ignore[index]
+    _check(action["title"] == "Install claude-code with Homebrew", f"the cask install action's title is the sentence, not the target: {action['title']!r}")
+    _check(str(action["target"]).endswith(":claude-code") and action["condition_or_evidence_ref"] == "claude_missing", f"its target is brew:package and its evidence ref names the missing tool: {action['target']!r} {action['condition_or_evidence_ref']!r}")
 
 
 def _leg_bootstrap_path_wins(root: Path) -> None:

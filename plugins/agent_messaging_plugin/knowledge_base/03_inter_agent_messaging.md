@@ -352,15 +352,22 @@ different answers and the verb keeps them different.
 The response carries two sections with two independent cursors, and mixing
 them is the mistake this section exists to prevent:
 
-- `entries` + `next_after_created_at` + `instance_exhausted` — messages
-  addressed to this instance, oldest-first and paged by `after` (an ISO-8601
-  timestamp). Stop paging only when `instance_exhausted` is true. It means
-  exhausted under this legacy timestamp-only cursor, not that equal-timestamp
-  durable rows were globally observed.
+- `entries` + `next_after_created_at` + `next_since_created_at` +
+  `instance_exhausted` — messages addressed to this instance. Two ISO-8601
+  timestamp cursors run in opposite directions and cannot be combined (both
+  named is refused). With neither, the page is the newest messages,
+  newest-first. `after` walks backward: messages older than the timestamp,
+  newest-first; echo `next_after_created_at`. `since` reads forward: messages
+  strictly newer than the timestamp, oldest-first; echo `next_since_created_at`
+  (a true high-water mark). To ask "what is new since T", pass `since`, never
+  `after`. A page carries only the cursor for its own direction. Stop paging
+  only when `instance_exhausted` is true. It means exhausted under that
+  timestamp-only cursor, not that equal-timestamp durable rows were globally
+  observed.
 - `role_entries` + `next_role_cursor` — messages addressed to any role this
   session holds, merged across roles, paged by `role_after` (an opaque token).
 
-Passing `after` does nothing to the role section. `role_section_status` is a
+Passing `after` or `since` does nothing to the role section. `role_section_status` is a
 fault-domain flag, not a progress flag: `"ok"` means that section was computed
 without error and says nothing about whether it is drained. **The role section
 is exhausted only when `next_role_cursor` is null**; `"error"` means it failed

@@ -37,6 +37,7 @@ from .export_root_validation import BUSINESS_CONNECTOR_PLUGINS, CONFIG_KEY_EXPOR
 from .setup_adapter_contract import REPAIR_LIMIT, AdapterRequest, JsonObject, JsonValue, evidence, planned_action, result
 from .setup_adapter_runtime import CommandOutcome, Runtime, describe_outcome, executable_fallback_directories, resolve_executable
 from .setup_plugin_operations import _claude_receipt_is_current, _manifest_has_absolute_python, _patch_hook_manifest, _publish_claude_receipt, plugin_list_rows, plugin_row_visible, run_plugin_list
+from .target_reconciliation import PLIST_PARSE_ERRORS
 
 STRUCTURED_OUTPUT_LIMIT = 64 * 1024
 _LEGACY_ENV = re.compile(r"^HOMUNCULUS_")
@@ -54,6 +55,10 @@ REPAIR_CLAUDE_CLI = (
 
 
 # --- existing::migration.solet_rename --------------------------------------------
+
+
+class PlistChangedError(RuntimeError):
+    """A plist the probe parsed can no longer be parsed when the rename is applied."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +83,13 @@ class RenamePlan:
 
 
 def migration_solet_rename(request: AdapterRequest, runtime: Runtime) -> JsonObject:
+    try:
+        return _solet_rename(request, runtime)
+    except PlistChangedError as exc:
+        return blocked(request, "probe_drift", f"{exc}, so nothing was rewritten. Preview again.")
+
+
+def _solet_rename(request: AdapterRequest, runtime: Runtime) -> JsonObject:
     plan = _rename_plan(request, runtime)
     items = [facts_evidence("migration.solet_rename", {"plists": len(plan.plists), "zshrc": plan.zshrc_count, "root_manifest": plan.manifest_stale, "claude_json": len(plan.claude_json_servers)}, verified=plan.empty)]
     if request.phase == "probe":
@@ -156,7 +168,7 @@ def _plan_plist(path: Path, request: AdapterRequest, runtime: Runtime) -> PlistR
 def _load_plist(path: Path) -> dict[str, object] | None:
     try:
         payload = plistlib.loads(path.read_bytes())
-    except (OSError, plistlib.InvalidFileException, ValueError):
+    except PLIST_PARSE_ERRORS:
         return None
     return cast(dict[str, object], payload) if isinstance(payload, dict) else None
 
@@ -177,8 +189,8 @@ def _needs_rename(label: str, arguments: list[str], payload: dict[str, object]) 
 
 
 def _apply_plist_renames(runtime: Runtime, plan: RenamePlan) -> None:
-    for item in plan.plists:
-        payload = _renamed_payload(cast(dict[str, object], plistlib.loads(item.old_path.read_bytes())), item.new_label)
+    payloads = [_renamed_payload(_reloaded_plist(item), item.new_label) for item in plan.plists]
+    for item, payload in zip(plan.plists, payloads, strict=True):
         if item.loaded:
             runtime.run(("/bin/launchctl", "bootout", f"gui/{os.getuid()}/{item.old_label}"), timeout_seconds=30)
         runtime.atomic_write(item.new_path, plistlib.dumps(payload).decode("utf-8"), mode=file_mode(item.old_path, 0o644))
@@ -186,6 +198,14 @@ def _apply_plist_renames(runtime: Runtime, plan: RenamePlan) -> None:
             item.old_path.unlink()
         if item.loaded:
             runtime.run(("/bin/launchctl", "bootstrap", f"gui/{os.getuid()}", str(item.new_path)), timeout_seconds=30)
+
+
+def _reloaded_plist(item: PlistRename) -> dict[str, object]:
+    """The plist as it reads now; every plist is re-read before the first is rewritten, so one that changed since the probe stops the rename with nothing written."""
+    payload = _load_plist(item.old_path)
+    if payload is None:
+        raise PlistChangedError(f"the LaunchAgent plist {item.old_path} no longer parses as it did at the probe")
+    return payload
 
 
 def _renamed_payload(payload: dict[str, object], new_label: str) -> dict[str, object]:
@@ -480,11 +500,30 @@ def blocked(request: AdapterRequest, error_kind: str, repair: str) -> JsonObject
     return result(request, status="blocked", error_kind=error_kind, retry_safe=True, exit_code=None, repair=repair)
 
 
+class NotTextError(ValueError):
+    """A file this adapter reads as UTF-8 text holds other bytes, as a binary plist does; it is never read as absent or rewritten."""
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(f"{path} is not UTF-8 text")
+        self.path = path
+
+
 def read_text(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return None
+    except UnicodeDecodeError as exc:
+        raise NotTextError(path) from exc
+
+
+def not_text_blocked(request: AdapterRequest, exc: NotTextError) -> JsonObject:
+    """The one blocked result for a managed file that is not text: its origin cannot be told, so it is left alone and the repair says how to make it text."""
+    return blocked(
+        request,
+        "managed_block_unknown_origin",
+        f"{exc.path} is not UTF-8 text, so the update will not read or rewrite it. For a binary plist run `plutil -convert xml1` on it, otherwise convert it to UTF-8 text or replace it by hand, then preview again.",
+    )
 
 
 def read_json(path: Path) -> JsonObject | None:
@@ -504,11 +543,13 @@ def file_mode(path: Path, default: int) -> int:
 
 __all__ = [
     "STRUCTURED_OUTPUT_LIMIT",
+    "NotTextError",
     "blocked",
     "facts_evidence",
     "file_mode",
     "migration_export_root_containment",
     "migration_solet_rename",
+    "not_text_blocked",
     "plugin_cache_refresh",
     "read_json",
     "read_text",

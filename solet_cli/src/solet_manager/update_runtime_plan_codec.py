@@ -173,6 +173,12 @@ def plan_from_json(raw: dict[str, JsonValue]) -> RuntimePlan:
     )
 
 
+def _blocked_rows(plan: RuntimePlan) -> list[JsonValue]:
+    """Each blocked subject with its reason code and, for a probed operation, the adapter's own repair text (``None`` when it gave none)."""
+    repairs = {item.operation_id: item.blocked_repair for item in plan.operations}
+    return [{"subject": subject, "reason": reason, "repair": repairs.get(subject)} for subject, reason in plan.blocked]
+
+
 def plan_preview_data(plan: RuntimePlan, context: PlanContext, journal_status: str) -> dict[str, JsonValue]:
     """The closed ``update_preview`` result data for a runtime preview (section 8.2)."""
     record = context.record
@@ -218,7 +224,7 @@ def plan_preview_data(plan: RuntimePlan, context: PlanContext, journal_status: s
             "forward_only_boundary": plan.forward_only_boundary,
             "router_previous_is_code_only": True,
         },
-        "blocked": [{"subject": subject, "reason": reason} for subject, reason in plan.blocked],
+        "blocked": _blocked_rows(plan),
         "knowledge_removed_articles": [{"knowledge_base": kb, "path": path, "title": title} for kb, path, title in plan.knowledge_removed_articles],
         # Step 6 D4: disclosed Manager actions after the runtime stages; read-only or
         # Manager-state-only, so they are not part of the approval preimage.

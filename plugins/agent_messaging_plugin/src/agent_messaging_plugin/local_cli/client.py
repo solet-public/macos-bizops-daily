@@ -490,11 +490,13 @@ class BridgeClient:
     ) -> dict[str, Any]:
         """Read this registered identity's durable inbox (catch-up on start).
 
-        The two cursors are INDEPENDENT and run in OPPOSITE directions — see
-        ``_drain_inbox``, which is the only caller that pages. ``after`` is an
-        ISO-8601 timestamp advancing FORWARD through the instance section;
-        ``role_after`` is an opaque token walking BACKWARD through the role
-        section. Passing one does nothing to the other's section.
+        The two cursors are INDEPENDENT sections: ``after`` is an ISO-8601
+        timestamp walking BACKWARD (newest-first) through the instance section
+        and ``role_after`` is an opaque token walking BACKWARD through the role
+        section — see ``_drain_instance_section`` / ``_drain_role_section``,
+        the only callers that page. Passing one does nothing to the other's
+        section. The instance section's forward ``since`` cursor is not used
+        by the watcher drain, which only ever walks back to its mark.
         """
         bridge_id = self._require_bridge()
         query = [

@@ -31,6 +31,63 @@ fields. A selector receipt records the required score, billing objective,
 selected runtime/model/effort, policy version, and applied floors. Managed
 spawn replays an enforced receipt for the exact tuple.
 
+`select_dispatch_tier` also takes an optional `runtime` (`claude_code` or
+`codex`). A coordinator that has chosen the runtime passes it so the cheapest
+cell of the other runtime cannot dominate its choice out: the catalog is
+filtered to that runtime before domination and selection, and the selector
+stays cheapest-within-runtime with no runtime preference of its own. The
+receipt carries the value as `runtime_constraint` (null when absent), replay
+re-applies it, and a receipt without that key is refused; re-select to get one.
+
+A flat-rate subscription pool (the Claude plan) starts `unknown` in the shipped
+usage profile, and an unknown quota never excludes a cell: Claude cells are
+selectable with no reading recorded. Only a known `exhausted` status excludes
+one. An optional `record_allowance_pool_reading` (a percent of the window, the
+instant it was read, when it expires, its source and recorder) lays a current
+reading over the static profile; a reading showing no percent remaining makes
+the pool exhausted until it expires, and a pool is exhausted even when another
+pool it shares a cell with is unknown. A reading past its expiry no longer
+counts and is named in any refusal, and nothing is ever inferred.
+`read_allowance_pool_readings` lists them and `retract_allowance_pool_reading`
+removes one.
+
+## Flat-rate ranking: dispatch weights (iss_eef0812b)
+
+Under a flat-rate plan the plan, not the API meter, is what is charged, yet
+`relative` cost is only metered dollars divided by one catalog-wide constant, so
+it ranks exactly as `metered_usd` does. A flat-rate profile may therefore declare
+`dispatch_weights`: a `by_model_prefix` table, a mandatory `default_weight`, a
+`basis` (`operator_policy` with a `ruling_id`, or `measured` with an
+`evidence_ref`) and `declared_at`. The longest matching prefix wins. A weight is
+an operator-declared dispatch preference, never a token or allowance conversion,
+and the provider publishes none. The shipped Max 20x profile declares
+`claude-sonnet` at 0.5 under `rul_29449a0b-3b9e-4251-bf87-4d295269a409`
+(decision `dec_838f872f-af5f-46a5-abcd-7b8619d6e4d2`), default 1.0. The value is
+a policy choice that counts Sonnet's lower list price twice on purpose; whether
+Sonnet usage also draws the all-model pool is an unverified assumption.
+
+The objective `allowance_weighted` ranks by `relative_cost_multiplier * weight`.
+It is the default only when `runtime` is passed, a current flat-rate plan covers
+it and that plan declares weights. It is plan-scoped: an explicit
+`allowance_weighted` without such a runtime is `parameter_invalid`, and
+unconstrained or Codex selections are never weighted, so allowance units are not
+compared with dollars. A covering plan with no table keeps the metered-dollar
+ranking and the answer carries a `warnings` line, which is not a refusal. The
+answer's `cost_basis` names the plan, the table and the weight applied, and
+`frontier`, `dominated` and `ladder` are in weighted units. The receipt keeps its
+keys; `billing_objective` records the ranking, and replay recomputes it from the
+profile, so editing a weight makes an in-flight receipt mismatch until the
+dispatcher re-selects. Capability floors and a known-exhausted pool still
+exclude cells before ranking.
+
+Two refusals belong to the weighted path. With a runtime constraint the profile
+is loaded before quota is read, so an unloadable or malformed profile (a bad
+`dispatch_weights` table included) refuses `usage_economics_invalid`; an
+unconstrained selection still refuses `quota_state_unknown` for the same fault.
+And when two current flat-rate plans cover the same runtime the weights would be
+ambiguous, so the selection also refuses `usage_economics_invalid` rather than
+choosing one.
+
 ## Schema scope provenance
 
 `scope_tags: ["state_schema"]` records that a dispatch touches state schema.

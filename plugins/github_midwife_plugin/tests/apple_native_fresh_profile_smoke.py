@@ -84,8 +84,8 @@ def _check_declared(profile_name: str, inference_plugin: str | None) -> tuple[li
              f"{profile_name}: Core AI Genesis override is missing")
     _require(coreai_override.get("asset_root") == "${SOLET_APP_HOME}/data/model-assets",
              f"{profile_name}: Core AI asset_root must be target-local")
-    _require(coreai_override.get("compute_preference") == "gpu",
-             f"{profile_name}: Core AI compute_preference must be gpu")
+    _require(coreai_override.get("compute_preference") == "cpu",
+             f"{profile_name}: Core AI compute_preference must be cpu (iss_f3e65e52)")
     _require(("default_inference_plugin" in selected) == (inference_plugin == "default_inference_plugin"),
              f"{profile_name}: existing inference roster changed")
     _require(("macos_inference_plugin" in selected) == (inference_plugin == "macos_inference_plugin"),
@@ -178,11 +178,11 @@ def _check_coreai(profile_name: str, config: Path,
         return [f"{profile_name}: Core AI asset_root is not absolute"]
     if settings["asset_root"] != str(expected_asset_root):
         return [f"{profile_name}: Core AI asset_root is not the exact target-local root"]
-    if settings.get("compute_preference") != "gpu":
-        return [f"{profile_name}: Core AI compute_preference is not gpu"]
+    if settings.get("compute_preference") != "cpu":
+        return [f"{profile_name}: Core AI compute_preference is not cpu"]
     print(
         f"{profile_name}: Genesis Core AI config PASS "
-        f"asset_root={settings['asset_root']} compute_preference=gpu"
+        f"asset_root={settings['asset_root']} compute_preference=cpu"
     )
     return []
 

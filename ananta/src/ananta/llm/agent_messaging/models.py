@@ -276,6 +276,10 @@ class PeerInboxRequest:
     # Default "" → session disjunct skipped (legacy instance-only visibility).
     recipient_agent_session_id: str = ""
     after_created_at: datetime | None = None
+    # The FORWARD instance cursor: rows strictly NEWER than this timestamp,
+    # oldest-first. ``after_created_at`` walks BACKWARD (rows older than it,
+    # newest-first), so naming both is a contradiction the service refuses.
+    since_created_at: datetime | None = None
     limit: int = 50
     include_important: bool = True
     # v10 Control #1a: the opaque, scope-bound cursor for the role-inbox
@@ -361,6 +365,13 @@ class PeerInbox:
     timestamp-only cursor deliberately retains its pre-existing
     duplicate-``created_at`` skip at a page boundary.
 
+    A request that names ``since_created_at`` instead reads the instance
+    section FORWARD: ``entries`` are oldest-first, ``next_since_created_at``
+    is the last returned row's timestamp (the request's own ``since`` when the
+    page is empty), ``next_after_created_at`` is ``None``, and
+    ``instance_exhausted`` means no newer row remains. Every other request
+    leaves ``next_since_created_at`` ``None``.
+
     v10 adds the role section ADDITIVELY:
     ``role_entries`` is the global ``(created_at, id)`` k-way merge across
     the holder's roles, paged by the opaque ``next_role_cursor`` (fed back
@@ -406,6 +417,7 @@ class PeerInbox:
     role_byte_ceiling: int | None = None
     role_read_page_token: str | None = None
     role_read_page_status: str = "disabled"
+    next_since_created_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

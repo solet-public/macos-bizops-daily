@@ -27,6 +27,7 @@ from ananta.interfaces.state_management_interface import StateManagementInterfac
 from ananta.services.state_service.ordered_query import normalize_sort_value
 
 from .models import (
+    AgentMessageRow,
     AgentThreadMessagesPage,
     AgentThreadRow,
     AgentThreadsPage,
@@ -516,14 +517,15 @@ class AgentMessagingService:
         Caller passes the previous page's ``next_after_created_at``
         back on the next call. Both direct and role sections return
         newest-first pages and walk toward older rows.
+
+        ``since_created_at`` is the opposite, forward cursor for the instance
+        section only: rows strictly newer than it, oldest-first, continued by
+        echoing ``next_since_created_at``. The role section is unaffected (its
+        own opaque ``role_after`` cursor). Naming both instance cursors is a
+        contradiction and is refused rather than resolved by guessing.
         """
         self._require_enabled()
-        if not request.recipient_agent_id:
-            raise AgentRequestInvalidError("recipient_agent_id is required")
-        if not request.recipient_agent_instance_id:
-            raise AgentRequestInvalidError(
-                "recipient_agent_instance_id is required",
-            )
+        self._validate_peer_inbox_request(request)
         rows, instance_exhausted = self._repo.list_peer_messages_for(
             recipient_agent_id=request.recipient_agent_id,
             recipient_agent_instance_id=(
@@ -531,6 +533,7 @@ class AgentMessagingService:
             ),
             recipient_agent_session_id=request.recipient_agent_session_id,
             after_created_at=request.after_created_at,
+            since_created_at=request.since_created_at,
             limit=request.limit,
             silent_only=not request.include_important,
         )
@@ -550,7 +553,7 @@ class AgentMessagingService:
             )
             for message in rows
         )
-        next_at = rows[-1].created_at if rows else request.after_created_at
+        next_at, next_since = self._instance_cursors(request, rows)
         # v10 Control #1a: the role section is ADDITIVE — the instance section
         # above (entries + next_after_created_at + its raw-SQL read) is
         # untouched, so existing peer messaging is byte-for-byte unaffected.
@@ -601,7 +604,34 @@ class AgentMessagingService:
             role_byte_ceiling=role_byte_ceiling,
             role_read_page_token=role_read_page_token,
             role_read_page_status=role_read_page_status,
+            next_since_created_at=next_since,
         )
+
+    @staticmethod
+    def _validate_peer_inbox_request(request: PeerInboxRequest) -> None:
+        if not request.recipient_agent_id:
+            raise AgentRequestInvalidError("recipient_agent_id is required")
+        if not request.recipient_agent_instance_id:
+            raise AgentRequestInvalidError(
+                "recipient_agent_instance_id is required",
+            )
+        if (
+            request.after_created_at is not None
+            and request.since_created_at is not None
+        ):
+            raise AgentRequestInvalidError(
+                "after (backward, newest-first) and since (forward, "
+                "oldest-first) are opposite cursors; send one",
+            )
+
+    @staticmethod
+    def _instance_cursors(
+        request: PeerInboxRequest, rows: list[AgentMessageRow],
+    ) -> tuple[datetime | None, datetime | None]:
+        """``(next_after, next_since)``: only the request's own direction is set."""
+        if request.since_created_at is not None:
+            return None, rows[-1].created_at if rows else request.since_created_at
+        return rows[-1].created_at if rows else request.after_created_at, None
 
     def _role_read_page_outcome(
         self, *, request: PeerInboxRequest, role_status: RoleSectionStatus,

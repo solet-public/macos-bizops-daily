@@ -21,6 +21,7 @@ import re
 from dataclasses import dataclass, replace
 from typing import Literal, cast
 
+from .apple_setup_adapter import coreai_config_matches
 from .profile_identity import PROFILE_TEMPLATE_BY_BUNDLE
 from .setup_adapter_contract import JsonObject, JsonValue
 
@@ -44,6 +45,7 @@ __all__ = [
 SCHEMA = "solet.plugin_transitions.v1"
 CONFIG_RENDERERS = frozenset({"coreai_embeddings", "apple_inference"})
 READINESS_KINDS = frozenset({"coreai_embedding", "import"})
+_COREAI_PLUGIN = "coreai_embeddings_plugin"
 _KINDS = frozenset({"replace", "add", "retire"})
 _MATCHES = frozenset({"exact", "fields"})
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{1,127}$")
@@ -379,7 +381,9 @@ def _target_config_refusal(target: TargetPlugin, observation: Observation, rende
     config = observation.configs.get(target.plugin)
     if config is None or not config.present:
         return None
-    if config.value is None or config.value != json.loads(rendered):
+    release = json.loads(rendered)
+    matches = coreai_config_matches(config.value, release) if target.plugin == _COREAI_PLUGIN else config.value == release
+    if config.value is None or not matches:
         return f"{target.plugin}.json exists and differs from the release config"
     return None
 

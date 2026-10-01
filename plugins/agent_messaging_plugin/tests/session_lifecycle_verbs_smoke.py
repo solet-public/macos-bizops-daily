@@ -948,8 +948,11 @@ def test_retire_composes_terminate_no_double_delivery() -> None:
 
         result = retire_session(state, agent_instance_id="agi-dying-2", directed_by="operator:none")
         _check(
-            result == {"already_retired": False, "dependencies_fired": 1},
-            f"retire_session reports exactly 1 edge fired via composition (got {result})",
+            result["already_retired"] is False
+            and result["dependencies_fired"] == 1
+            and result["host_action"] == "none_available",
+            f"retire_session reports exactly 1 edge fired via composition, and that the "
+            f"operator-hosted process was not stopped (got {result})",
         )
         _check(
             len(driver.channel.sent) == 1,

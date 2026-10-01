@@ -20,6 +20,7 @@ class ErrorCode(StrEnum):
     ASSET_MISSING = "coreai_embeddings.asset_missing"
     ASSET_CORRUPT = "coreai_embeddings.asset_corrupt"
     UNAVAILABLE = "coreai_embeddings.unavailable"
+    TIMEOUT = "coreai_embeddings.operation_timeout"
     INVALID_OUTPUT = "coreai_embeddings.invalid_output"
     INFERENCE_FAILED = "coreai_embeddings.inference_failed"
 

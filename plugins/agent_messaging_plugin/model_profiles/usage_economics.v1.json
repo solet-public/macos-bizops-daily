@@ -198,6 +198,14 @@
           "telemetry_authority": "Claude Settings > Usage account telemetry; provider identifies this as the Sonnet-model weekly limit"
         }
       ],
+      "dispatch_weights": {
+        "basis": "operator_policy",
+        "ruling_id": "rul_29449a0b-3b9e-4251-bf87-4d295269a409",
+        "declared_at": "2026-10-01T03:26:00+00:00",
+        "default_weight": 1.0,
+        "by_model_prefix": {"claude-sonnet": 0.5},
+        "note": "Operator preference (dec_838f872f-af5f-46a5-abcd-7b8619d6e4d2): Sonnet counts as half its relative cost. Not a measured conversion; whether Sonnet draws weekly-all-model is unverified."
+      },
       "overage": {
         "strategy_profile_id": "anthropic-metered-sonnet-5-2026-08-22",
         "enabled": false

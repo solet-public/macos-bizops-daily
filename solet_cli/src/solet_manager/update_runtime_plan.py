@@ -604,7 +604,7 @@ def _selected_plugins(path: Path) -> tuple[str, ...]:
     """Read the operator's roster; the manifest is a preserved surface, read and never written."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         raise UpdateBlockedError("profile_manifest_unreadable", f"the target's plugin roster is unreadable: {exc}", repair="Restore profile/config/manifest.yaml, then preview again.") from exc
     plugins: list[str] = []
     in_plugins = False
@@ -794,6 +794,7 @@ def _operation_from_probe(
         tuple(action.target for action in result.planned_actions),
         inputs,
         operation.requires_confirmation,
+        blocked_repair=result.repair if now in {"blocked", "failed"} else None,
     )
     return row, states
 

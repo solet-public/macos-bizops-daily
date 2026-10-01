@@ -8,7 +8,7 @@ Article Role: operations_runbook
 
 Article Tags: planning-stage:solet-lifecycle, evidence-category:operations-runbook, domain:local-solet, domain:client-deployment, consumer_profile:both
 
-Embedding Description: Agent-facing runbook for applying a newer seed release to an ALREADY-LIVE seed-born solet without losing its state, now led by the Solet Manager path — install the Manager from its Homebrew tap, classify the clone with `solet-manager inspect`, enroll it once with `solet-manager import`, then for every release run `solet-manager update --dry-run` to read the preview (which lists the genesis-written files and untracked genesis paths it will preserve, the exact fast-forward, the dependency, migration, hydration and lifecycle operations it will perform) and `--yes --approval-fingerprint` to apply it through the final doctor and promotion, with `solet-manager doctor` as the read-only oracle and `solet-manager reconcile` as the one answer to a terminal update — including the exact refusal vocabulary (`history_diverged`, `tracked_overlap_present`, `staged_changes_present`, `tracked_shape_changed`, `executed_code_modified`, `git_metadata_present`, `host_requirement_missing`, `claude_cli_missing`, `source_identity_unproven`, and, after `source_advanced`, `source_transition_incomplete` with its per-path sub-cases) and what each exit code means, the six steps that stay manual and why (the target `AGENTS.md`/`CLAUDE.md` hydration block and launchers, the first-time export-root answer, quitting Claude Code before the rename migration can rewrite `~/.claude.json`, relaunching open clients and re-arming watchers, adding a release-added plugin to the profile manifest, connector three-read and feedback-item checks), how an adopter learns a new re-mint exists (the formula upgrade plus the GitHub release subscription, re-pointed when the seed moves homes), and the legacy manual procedure retained verbatim as recovery for clones the Manager classifies as not importable (diverged history, development checkout) or for an instance the operator chooses to repair by hand.
+Embedding Description: Agent-facing runbook for applying a newer seed release to an ALREADY-LIVE seed-born solet without losing its state, now led by the Solet Manager path — install the Manager from its Homebrew tap, classify the clone with `solet-manager inspect`, enroll it once with `solet-manager import`, then for every release run `solet-manager update --dry-run` to read the preview (which lists the genesis-written files and untracked genesis paths it will preserve, the exact fast-forward, the dependency, migration, hydration and lifecycle operations it will perform) and `--yes --approval-fingerprint` to apply it through the final doctor and promotion, with `solet-manager doctor` as the read-only oracle and `solet-manager reconcile` as the one answer to a terminal update — including the exact refusal vocabulary (`history_diverged`, `tracked_overlap_present`, `staged_changes_present`, `tracked_shape_changed`, `executed_code_modified`, `git_metadata_present`, `host_requirement_missing`, `claude_cli_missing`, `source_identity_unproven`, and, after `source_advanced`, `source_transition_incomplete` with its per-path sub-cases and its named identity facts) and what each exit code means, the six steps that stay manual and why (the target `AGENTS.md`/`CLAUDE.md` hydration block and launchers, the first-time export-root answer, quitting Claude Code before the rename migration can rewrite `~/.claude.json`, relaunching open clients and re-arming watchers, adding a release-added plugin to the profile manifest, connector three-read and feedback-item checks), how an adopter learns a new re-mint exists (the formula upgrade plus the GitHub release subscription, re-pointed when the seed moves homes), and the legacy manual procedure retained verbatim as recovery for clones the Manager classifies as not importable (diverged history, development checkout) or for an instance the operator chooses to repair by hand.
 
 > **Status (2026-09-19, existing-solet import/update Step 7):** the Manager
 > path (Part A) is the update procedure. The manual procedure this document
@@ -154,7 +154,7 @@ the `solet-manager` command. `solet inspect` is a different, active probe.
 **A pre-Manager plain clone (a `git clone` of the seed, not `solet create`), r64.**
 The Manager proves a plain clone only at a seed commit it lists: the
 channel's own release, or a stable seed in its reviewed anchor table (every
-`supported_predecessors` row, r43 `8207c151` through r63 `a5732c9f`).
+`supported_predecessors` row, r43 `8207c151` through r64 `92321d42`).
 `git -C <clone> rev-parse HEAD` tells you which case you have:
 
 1. HEAD is a listed seed commit: run the six commands below unchanged.
@@ -270,6 +270,7 @@ added inside or outside the block, or a mode change, is still
 | `claude_cli_missing` | the Claude Code CLI is not on the Manager's `PATH` or in `/opt/homebrew/bin`, `/usr/local/bin` or `$HOME/.local/bin` (Claude Code's native install directory; `data.host` row `claude_cli_present`), and the refusal names each directory searched. The runtime stage's plugin-cache refresh needs it, and the update never installs it | `brew install --cask claude-code` (a native install in `$HOME/.local/bin` already counts), check that `command -v claude` prints a path in the shell you run `solet-manager` from, then preview again |
 | `instance_imported` | `solet status`, `start`, `doctor`, `attest` or a `reconcile-*` verb was given the name of an imported solet; those verbs read only `solet create` records (r65, `iss_33637918`). Nothing is written | `solet-manager doctor <name>` (`solet-manager update <name> --dry-run` for updates). The Manager has no start verb: start an imported solet through launchd, `launchctl kickstart -k gui/$(id -u)/local.solet.<name>`, then `<name> health` |
 | `source_transition_incomplete` (changed local state; an `error_kind` with exit 3 on a re-entry after `source_advanced`, not a row of `data.topology.reasons`) | a file you put back or changed after approving the source stage no longer matches the local state the Manager fingerprinted then. The message lists every such path with its sub-case and the repair gives one line per path | per path, then preview again: an *untracked local-only file* leaves the checkout again (`mv <path> <scratch>`); a path *now tracked at the new HEAD* is restored from HEAD (move your copy aside, then `git -C <clone> restore -- <path>`); a *preserved local edit that changed again* gets the recorded bytes put back (never `git restore`, which discards the edit); a path *now missing* is put back where it was; a path *changed since approval* is put back as approved. The check is strict on purpose: a file restored to its pre-approval state is still refused. If a line names a path you did not touch, stop and report it |
+| `source_transition_incomplete` (target not at the exact candidate release identity; the same `error_kind` and exit 3, after `source_advanced` or on a re-entry) | HEAD, the sealed identity, the branch or the `origin` remote no longer matches the approved candidate. The message begins `target is not at the exact candidate release identity:` and then names each failed fact with its measured and expected value: `head_commit`, `head_tree`, `identity_status`, `anchor_kind`, `detached`, `branch` or `origins`. A value that could hold a credential or secret-shaped text is printed redacted | one repair sentence per failed fact, after `Do not reset`: `head_commit` / `head_tree` inspect HEAD with `git -C <clone> log -1` and resume once it matches the approved candidate; `identity_status` / `anchor_kind` read which check failed with `solet-manager doctor <name>`; `detached` / `branch` switch to the branch the update started on once HEAD is at the approved commit (a detached HEAD gets that one sentence, not a second for the branch; when the recorded branch name cannot be printed, or the update recorded none, no switch command is printed and the repair says to inspect HEAD with `git -C <clone> status`); `origins` read `git -C <clone> remote -v` and leave exactly one origin naming the canonical repository. Never reset the clone |
 
 **The runtime preview registers a missing coordination-hooks marketplace and
 installs the plugin the way `solet create` does** (r64, `iss_c9a7b626`,
@@ -341,11 +342,19 @@ quotes the exit code (or the timeout) and the CLI's stderr, secret-shaped text
 and solet keg paths removed, and capped at 200 characters; run the named command yourself, fix what
 it reports, then preview again.
 
+Every text the seed adapter reports (a repair, evidence, a planned action, the stderr diagnostic in a
+command failure's `reason`) is held to the Manager's text rules before it leaves the adapter: secret-shaped
+text reads `[REDACTED]` (the stderr diagnostic in `reason` keeps a redacted value's label and reads `label [redacted]`) and a Homebrew keg path reads `[keg path]`, so one such text can no longer make the Manager refuse
+the whole result. A repair longer than 512 characters, and an evidence or planned-action text over its field's limit,
+is cut in the middle behind `[... <length> characters, middle cut ...]`: it keeps its beginning and the remedy it ends with,
+so a long path or CLI message cannot hide the command you are told to run.
+
 A known consequence, not fixed in r64: a later release that edits `hooks.json`
 refuses as `tracked_overlap_present` on these solets, as it already does on
 hydrated ones (`iss_c1a7df20`). Follow the pinned-manifest repair in the table
 above. The runtime preview refuses (`runtime_plan_blocked`, the reason under
-`data.blocked`) instead of overwriting anything or writing outside the clone in
+`data.blocked`, each row `{subject, reason, repair}` with the seed's own repair text, or `null` when it gave none)
+instead of overwriting anything or writing outside the clone in
 these cases:
 
 | Reason | Meaning | Repair |
@@ -497,7 +506,14 @@ the healthy state, not an error.
   a setting you tuned by hand, such as a narrower or wider `PATH`, is replaced
   by the render's, so note it and re-apply it after the update has promoted if you need it.
   The Manager backs the file up before it writes, and a plist edited between the
-  preview and the apply is refused as `probe_drift` with nothing written. A plist
+  preview and the apply is refused as `probe_drift` with nothing written: the
+  digest of the bytes the stage found is checked against the approved one, and
+  the digest of the bytes it backed up is checked again before the render is
+  written. A plist that cannot be read as UTF-8 text, such as a binary plist
+  from `plutil -convert binary1`, and one that does not parse (truncated or
+  mismatched XML, a bad `<integer>` or `<date>`) stop the update with
+  `managed_block_unknown_origin` instead of failing the preview, and the seed's
+  repair for it is in the `repair` field of that row of `data.blocked`. A plist
   with another label or a materialized-supervisor plist (`releases/current` in its
   launch; `iss_5c2598a7`) still stops the update with `managed_block_unknown_origin`
   (or `managed_file_locally_modified` when it carries a stamp); Part C Step 5,
@@ -1104,6 +1120,11 @@ directly. The r65 Manager does steps 2 to 5 itself for a plist it adopts. With `
    - `plutil -p` prints an error or no `ProgramArguments`: `plutil -lint <plist>`
      names what is damaged. The file is yours to replace: go on to step 2, and
      the backup in step 4 keeps the damaged bytes.
+   - `plutil -p` prints the plist but `file <plist>` says `Apple binary property list`
+     (it was written by `plutil -convert binary1`): the seed's `autostart.reconcile`
+     adapter, which the Manager runs, reads the file as UTF-8 text and stops with
+     `managed_block_unknown_origin`, and the row's repair names this command. Convert it with `plutil -convert xml1 <plist>`, then preview
+     again; it is adopted like any other plist of your own launch.
 2. Render the release's plist to a scratch file, from the clone's own template:
    `cd <clone> && .venv/bin/python3 -c 'import sys; from pathlib import Path; from github_midwife_plugin.autostart import render_launchagent_plist; sys.stdout.buffer.write(render_launchagent_plist(sys.argv[1], Path(sys.argv[2]), Path.home(), template_text=None, stamp=None, stamped=True))' <name> <clone> > "$TMPDIR/local.solet.<name>.plist.render"`.
 3. Read every difference: `diff -u <plist> "$TMPDIR/local.solet.<name>.plist.render"`.

@@ -261,10 +261,19 @@ from .model_capability_verbs import (
     read_model_capability_catalog as catalog_read,
 )
 from .model_capability_verbs import (
+    read_pool_readings_view as pool_reading_read,
+)
+from .model_capability_verbs import (
     record_model_capability_cell as catalog_record_cell,
 )
 from .model_capability_verbs import (
+    record_pool_reading as pool_reading_record,
+)
+from .model_capability_verbs import (
     refresh_model_capability_catalog as catalog_refresh,
+)
+from .model_capability_verbs import (
+    retract_pool_reading as pool_reading_retract,
 )
 from .model_capability_verbs import (
     seed_model_capability_catalog as catalog_seed,
@@ -283,7 +292,11 @@ from .peer_dispatch import (
     dispatch_peer_send,
     dispatch_role_send,
 )
-from .peer_inbox_view import serialize_peer_inbox_page
+from .peer_inbox_view import (
+    InvalidInboxCursorError,
+    parse_since_cursor,
+    serialize_peer_inbox_page,
+)
 from .peer_list_view import serialize_peer_list
 from .peer_registry import (
     PeerAmbiguousError,
@@ -344,6 +357,7 @@ from .session_claude_mapping_store import (
 )
 from .session_context_status_store import GAUGE_HISTORY_RETENTION
 from .session_inference_provider import SessionInferenceProvider
+from .session_lifecycle_control import describe_retire_gaps
 from .session_lifecycle_store import format_directed_by
 from .session_lifecycle_store import resolve_lane_charter as lifecycle_resolve_lane_charter
 from .session_lifecycle_verbs import (
@@ -1019,6 +1033,22 @@ def _run_counted_leg(
     legs.append(f"{label}={summarise(count)}")
     if count:
         on_finding(count)
+
+
+_ALLOWANCE_READING_PROPERTIES: dict[str, ParameterMetadata] = {
+    "profile_id": ParameterMetadata(type=ParameterType.STRING),
+    "pool_id": ParameterMetadata(type=ParameterType.STRING),
+    "consumed": ParameterMetadata(type=ParameterType.FLOAT, description="Percent of the window consumed."),
+    "remaining": ParameterMetadata(type=ParameterType.FLOAT, description="Percent of the window remaining."),
+    "as_of": ParameterMetadata(type=ParameterType.STRING, description="When the reading was taken, ISO-8601 UTC."),
+    "next_reset_at": ParameterMetadata(type=ParameterType.STRING, description="Window reset instant; null when only expires_at was given."),
+    "expires_at": ParameterMetadata(type=ParameterType.STRING, description="Explicit expiry; null when only next_reset_at was given."),
+    "effective_expiry": ParameterMetadata(type=ParameterType.STRING, description="The earlier of next_reset_at and expires_at; the reading stops counting then."),
+    "state": ParameterMetadata(type=ParameterType.STRING, description="current or expired, judged at call time."),
+    "source": ParameterMetadata(type=ParameterType.STRING),
+    "recorded_by": ParameterMetadata(type=ParameterType.STRING),
+    "recorded_at": ParameterMetadata(type=ParameterType.STRING),
+}
 
 
 class AgentMessagingPlugin(
@@ -2412,6 +2442,30 @@ class AgentMessagingPlugin(
             # already landed would record the same reading twice as two runs.
             "record_model_capability_cell": EdgeProcessDefinition(
                 name="record_model_capability_cell",
+                result_processor_template_customizations=MergeResultProcessorCustomizations(),
+                error_processor_template_customizations=MergeErrorProcessorCustomizations(
+                    retryable=False,
+                ),
+            ),
+            # iss_c6fbf9ae allowance-pool readings. Record upserts one row per
+            # pool and retract deletes it, so neither is retried after a
+            # transient fault; the read is retry-safe.
+            "record_allowance_pool_reading": EdgeProcessDefinition(
+                name="record_allowance_pool_reading",
+                result_processor_template_customizations=MergeResultProcessorCustomizations(),
+                error_processor_template_customizations=MergeErrorProcessorCustomizations(
+                    retryable=False,
+                ),
+            ),
+            "read_allowance_pool_readings": EdgeProcessDefinition(
+                name="read_allowance_pool_readings",
+                result_processor_template_customizations=MergeResultProcessorCustomizations(),
+                error_processor_template_customizations=MergeErrorProcessorCustomizations(
+                    retryable=True,
+                ),
+            ),
+            "retract_allowance_pool_reading": EdgeProcessDefinition(
+                name="retract_allowance_pool_reading",
                 result_processor_template_customizations=MergeResultProcessorCustomizations(),
                 error_processor_template_customizations=MergeErrorProcessorCustomizations(
                     retryable=False,
@@ -5259,6 +5313,19 @@ class AgentMessagingPlugin(
                 "already_terminal": ParameterMetadata(type=ParameterType.BOOLEAN),
                 "lifecycle_state": ParameterMetadata(type=ParameterType.STRING),
                 "session_terminal_edges_fired": ParameterMetadata(type=ParameterType.INTEGER),
+                "host": ParameterMetadata(type=ParameterType.STRING),
+                "host_action": ParameterMetadata(
+                    type=ParameterType.STRING,
+                    description=(
+                        "What this call did to the host process: terminated "
+                        "(the driver ended it), none_available (a degenerate "
+                        "driver such as 'operator' cannot stop a process it did "
+                        "not spawn: only the ledger moved, the process is "
+                        "still running) or not_attempted (the row was already "
+                        "terminal)."
+                    ),
+                ),
+                "host_remedy": ParameterMetadata(type=ParameterType.STRING),
             },
         ),
     )
@@ -5310,6 +5377,34 @@ class AgentMessagingPlugin(
             properties={
                 "already_retired": ParameterMetadata(type=ParameterType.BOOLEAN),
                 "dependencies_fired": ParameterMetadata(type=ParameterType.INTEGER),
+                "host": ParameterMetadata(type=ParameterType.STRING),
+                "host_action": ParameterMetadata(
+                    type=ParameterType.STRING,
+                    description=(
+                        "terminated | none_available | not_attempted — what "
+                        "this call did to the host process; none_available "
+                        "means the process is still running."
+                    ),
+                ),
+                "host_remedy": ParameterMetadata(type=ParameterType.STRING),
+                "peer_registration": ParameterMetadata(
+                    type=ParameterType.OBJECT,
+                    description=(
+                        "{bridge_id, parent_pid} of the live peer binding still "
+                        "held by this instance after the retire, else null."
+                    ),
+                ),
+                "not_done": ParameterMetadata(
+                    type=ParameterType.LIST,
+                    description=(
+                        "What THIS retire left undone, one sentence each (host "
+                        "process not stopped, peer registration still "
+                        "listed). Empty means it left nothing undone, including "
+                        "a retire of a row an earlier terminate already tore "
+                        "down; 'completed' alone only means the ledger row is "
+                        "retired."
+                    ),
+                ),
             },
         ),
     )
@@ -5324,14 +5419,29 @@ class AgentMessagingPlugin(
                 code="state_service_unavailable",
                 message="state_service is not bound on this solet.",
             )
+        agent_instance_id = str(raw.get("agent_instance_id", ""))
         try:
             result = lifecycle_retire_session(
                 state_service,
-                agent_instance_id=str(raw.get("agent_instance_id", "")),
+                agent_instance_id=agent_instance_id,
                 directed_by=format_directed_by(state.get("call_context")),
             )
         except VerbError as exc:
             return _failure_result(code=exc.code, message=exc.message)
+        # The ledger says "retired"; the registry says whether the lane is still
+        # listed. Read it AFTER the retire so the answer is the post-state.
+        registry = getattr(self, "_peer_registry", None)
+        registration = (
+            registry.resolve_by_agent_instance_id(agent_instance_id) if registry is not None else None
+        )
+        result["peer_registration"] = (
+            {"bridge_id": registration.bridge_id, "parent_pid": registration.parent_pid}
+            if registration is not None
+            else None
+        )
+        result["not_done"] = describe_retire_gaps(
+            result, registration, registry_checked=registry is not None,
+        )
         return _success_result(data=result)
 
     @platform_process(
@@ -7156,13 +7266,18 @@ class AgentMessagingPlugin(
                 type=ParameterType.LIST,
             ),
             "billing_objective": ParameterMetadata(
-                description="metered_usd (real dollars) or relative (cost over the cheapest cell, the flat-rate quota proxy). Default: relative when usage_economics declares a current flat-rate plan, else metered_usd.",
+                description="metered_usd (real dollars), relative (cost over the cheapest cell, the flat-rate quota proxy) or allowance_weighted (relative cost times the plan's declared dispatch weight; needs a runtime covered by a current flat-rate plan that declares dispatch_weights). Default: allowance_weighted for such a runtime constraint; otherwise relative when usage_economics declares a current flat-rate plan, else metered_usd.",
                 required=False,
                 type=ParameterType.STRING,
             ),
             "score_margin": ParameterMetadata(description="Headroom added to required_score. Default 0.", required=False, type=ParameterType.FLOAT),
             "cost_tolerance": ParameterMetadata(description="Near-tie band within which the lower effort wins. Default 0.05.", required=False, type=ParameterType.FLOAT),
             "max_staleness_hours": ParameterMetadata(description="Tightens (never loosens) the stored staleness window.", required=False, type=ParameterType.INTEGER),
+            "runtime": ParameterMetadata(
+                description="Optional runtime (claude_code or codex). Pass it when the coordinator has chosen the runtime, so a cheaper cell of the other runtime cannot dominate it out; cheapest-clearing is then chosen within that runtime only and the selection_receipt carries it as runtime_constraint. Absent: all runtimes compete.",
+                required=False,
+                type=ParameterType.STRING,
+            ),
         },
         output_type="object",
         output_description=(
@@ -7176,18 +7291,21 @@ class AgentMessagingPlugin(
             type=ParameterType.OBJECT,
             description="select_dispatch_tier outcome",
             properties={
-                "selected": ParameterMetadata(type=ParameterType.OBJECT, description="runtime, model, effort, capability_score, cost_per_task_usd, relative_cost_multiplier, measured_at, acceptance."),
+                "selected": ParameterMetadata(type=ParameterType.OBJECT, description="runtime, model, effort, capability_score, cost_per_task_usd, relative_cost_multiplier, measured_at, acceptance; plus plan_weight when the objective is allowance_weighted."),
                 "billing_objective": ParameterMetadata(type=ParameterType.STRING),
                 "required_score": ParameterMetadata(type=ParameterType.FLOAT),
                 "effective_required_score": ParameterMetadata(type=ParameterType.FLOAT, description="required_score + score_margin."),
                 "frontier": ParameterMetadata(type=ParameterType.LIST, description="Feasible cells no other beats on both axes, cheapest first."),
                 "dominated": ParameterMetadata(type=ParameterType.LIST, description="{weaker, stronger} pairs where another model's cell wins on both axes."),
                 "ladder": ParameterMetadata(type=ParameterType.LIST, description="The selected model's effort steps with score_gain, cost_delta, points_per_cost_unit."),
-                "excluded": ParameterMetadata(type=ParameterType.OBJECT, description="Counts: not_accepted, stale, capability_floor_disallowed, quota_exhausted, quota_unknown, unpriced, below_threshold."),
+                "excluded": ParameterMetadata(type=ParameterType.OBJECT, description="Counts: not_accepted, stale, capability_floor_disallowed, quota_exhausted, unpriced, below_threshold."),
                 "catalog_run_id": ParameterMetadata(type=ParameterType.STRING, description="Newest refresh run among the accepted cells; null when none."),
                 "policy_version": ParameterMetadata(type=ParameterType.STRING, description="model_dispatch_policy version consulted; null when neither dispatch_kind nor scope_tags was given."),
                 "capability_floors": ParameterMetadata(type=ParameterType.LIST, description="Capability floors applied from scope_tags (tag, source, detail); empty when none."),
                 "unscored_cells": ParameterMetadata(type=ParameterType.INTEGER, description="Stored rows with no capability score, dropped before selection."),
+                "expired_allowance_readings": ParameterMetadata(type=ParameterType.LIST, description="Recorded allowance-pool readings past their expiry; they no longer count, and a pool with no current reading excludes nothing."),
+                "cost_basis": ParameterMetadata(type=ParameterType.OBJECT, description="Present only for allowance_weighted: the plan, its dispatch_weights table (basis, ruling_id or evidence_ref, default and per-prefix weights) and selected_weight."),
+                "warnings": ParameterMetadata(type=ParameterType.LIST, description="Present only when non-empty: a covering flat-rate plan declares no dispatch_weights, so the default ranking equals metered dollars."),
                 "selection_receipt": ParameterMetadata(type=ParameterType.OBJECT, description="Exact input/result receipt required by spawn_session to replay this selection."),
             },
         ),
@@ -7328,6 +7446,126 @@ class AgentMessagingPlugin(
             return _failure_result(code="state_service_unavailable", message="state_service is not bound on this solet.")
         try:
             result = catalog_record_cell(state_service, dict(raw))
+        except CatalogError as exc:
+            return _failure_result(code=exc.code, message=exc.message)
+        return _success_result(data=result)
+
+    @platform_process(
+        name="record_allowance_pool_reading",
+        processor_policy_category=ProcessorPolicyCategory.EDGE,
+        parameters={
+            "profile_id": ParameterMetadata(description="The flat-rate quota profile_id, e.g. anthropic-max-20x-2026-08-22.", required=True, type=ParameterType.STRING),
+            "pool_id": ParameterMetadata(description="The allowance pool within that profile, e.g. rolling-five-hour, weekly-all-model or weekly-model-family.", required=True, type=ParameterType.STRING),
+            "consumed": ParameterMetadata(description="Percent of the pool's window already used, 0-100, as the provider's usage page reports it. Give consumed or remaining.", required=False, type=ParameterType.FLOAT),
+            "remaining": ParameterMetadata(description="Percent of the pool's window still available, 0-100. Give consumed or remaining; both must sum to 100.", required=False, type=ParameterType.FLOAT),
+            "as_of": ParameterMetadata(description="ISO-8601 instant with timezone at which the reading was taken; not in the future.", required=True, type=ParameterType.STRING),
+            "next_reset_at": ParameterMetadata(description="ISO-8601 instant the window resets. Give this or expires_at; the reading stops counting at the earlier one.", required=False, type=ParameterType.STRING),
+            "expires_at": ParameterMetadata(description="ISO-8601 instant after which the reading is no longer trusted. Give this or next_reset_at.", required=False, type=ParameterType.STRING),
+            "source": ParameterMetadata(description="Where the reading came from: an operator reading or a ruling id such as rul_1edbcfc7-c2a4-4176-96ae-c51c90df3a21. Required.", required=True, type=ParameterType.STRING),
+            "recorded_by": ParameterMetadata(description="The actor recording it, e.g. a role name or session label. Required.", required=True, type=ParameterType.STRING),
+        },
+        output_type="object",
+        output_description=(
+            "iss_c6fbf9ae -- records one explicit current reading of a flat-rate "
+            "allowance pool, replacing any earlier reading of that pool. A "
+            "recorded, unexpired reading that shows the pool exhausted excludes "
+            "its cells; an absent or expired one excludes nothing, and nothing "
+            "infers one."
+        ),
+        return_value_schema=ReturnValueSchema(
+            type=ParameterType.OBJECT,
+            description="record_allowance_pool_reading outcome",
+            properties=_ALLOWANCE_READING_PROPERTIES,
+        ),
+    )
+    def record_allowance_pool_reading(
+        self,
+        params: dict[str, Any],
+        state: dict[str, Any],  # noqa: ARG002
+    ) -> dict[str, Any]:
+        """iss_c6fbf9ae -- record one explicit allowance-pool reading."""
+        raw = params.get("parameters", params)
+        state_service = self._get_state_service()
+        if state_service is None:
+            return _failure_result(code="state_service_unavailable", message="state_service is not bound on this solet.")
+        try:
+            result = pool_reading_record(state_service, dict(raw))
+        except CatalogError as exc:
+            return _failure_result(code=exc.code, message=exc.message)
+        return _success_result(data=result)
+
+    @platform_process(
+        name="read_allowance_pool_readings",
+        processor_policy_category=ProcessorPolicyCategory.EDGE,
+        parameters={
+            "profile_id": ParameterMetadata(description="Only readings of this flat-rate profile. Default: all.", required=False, type=ParameterType.STRING),
+        },
+        output_type="object",
+        output_description=(
+            "iss_c6fbf9ae -- the recorded allowance-pool readings, each marked "
+            "current or expired against now, so a coordinator can see which "
+            "readings the selector will still apply."
+        ),
+        return_value_schema=ReturnValueSchema(
+            type=ParameterType.OBJECT,
+            description="read_allowance_pool_readings outcome",
+            properties={
+                "readings": ParameterMetadata(type=ParameterType.LIST, description="Recorded readings, each with state current or expired."),
+                "current_readings": ParameterMetadata(type=ParameterType.INTEGER, description="How many are current right now."),
+                "as_of": ParameterMetadata(type=ParameterType.STRING, description="The instant states were judged, ISO-8601."),
+            },
+        ),
+    )
+    def read_allowance_pool_readings(
+        self,
+        params: dict[str, Any],
+        state: dict[str, Any],  # noqa: ARG002
+    ) -> dict[str, Any]:
+        """iss_c6fbf9ae -- read recorded allowance-pool readings."""
+        raw = params.get("parameters", params)
+        state_service = self._get_state_service()
+        if state_service is None:
+            return _failure_result(code="state_service_unavailable", message="state_service is not bound on this solet.")
+        try:
+            result = pool_reading_read(state_service, dict(raw))
+        except CatalogError as exc:
+            return _failure_result(code=exc.code, message=exc.message)
+        return _success_result(data=result)
+
+    @platform_process(
+        name="retract_allowance_pool_reading",
+        processor_policy_category=ProcessorPolicyCategory.EDGE,
+        parameters={
+            "profile_id": ParameterMetadata(description="The flat-rate quota profile_id of the reading to remove.", required=True, type=ParameterType.STRING),
+            "pool_id": ParameterMetadata(description="The allowance pool whose reading to remove.", required=True, type=ParameterType.STRING),
+        },
+        output_type="object",
+        output_description=(
+            "iss_c6fbf9ae -- deletes the recorded reading of one allowance pool "
+            "so that pool reads unknown again, which excludes nothing."
+        ),
+        return_value_schema=ReturnValueSchema(
+            type=ParameterType.OBJECT,
+            description="retract_allowance_pool_reading outcome",
+            properties={
+                "profile_id": ParameterMetadata(type=ParameterType.STRING),
+                "pool_id": ParameterMetadata(type=ParameterType.STRING),
+                "retracted": ParameterMetadata(type=ParameterType.INTEGER, description="Rows deleted; a missing reading is the reading_not_found error."),
+            },
+        ),
+    )
+    def retract_allowance_pool_reading(
+        self,
+        params: dict[str, Any],
+        state: dict[str, Any],  # noqa: ARG002
+    ) -> dict[str, Any]:
+        """iss_c6fbf9ae -- delete one recorded allowance-pool reading."""
+        raw = params.get("parameters", params)
+        state_service = self._get_state_service()
+        if state_service is None:
+            return _failure_result(code="state_service_unavailable", message="state_service is not bound on this solet.")
+        try:
+            result = pool_reading_retract(state_service, dict(raw))
         except CatalogError as exc:
             return _failure_result(code=exc.code, message=exc.message)
         return _success_result(data=result)
@@ -7818,9 +8056,25 @@ class AgentMessagingPlugin(
             ),
             "after": ParameterMetadata(
                 description=(
-                    "Instance-section cursor ONLY: an ISO-8601 timestamp, echo "
-                    "back the previous page's next_after_created_at. It does "
-                    "NOT page the role section — that is 'role_after'."
+                    "Instance-section BACKWARD cursor ONLY: an ISO-8601 "
+                    "timestamp. Returns the messages OLDER than it, "
+                    "newest-first; echo back the previous page's "
+                    "next_after_created_at to walk toward older history. It "
+                    "is not 'since T': for messages newer than a time use "
+                    "'since'. It does NOT page the role section — that is "
+                    "'role_after'."
+                ),
+                required=False,
+                type=ParameterType.STRING,
+            ),
+            "since": ParameterMetadata(
+                description=(
+                    "Instance-section FORWARD cursor ONLY: an ISO-8601 "
+                    "timestamp. Returns the messages strictly NEWER than it, "
+                    "oldest-first; echo back the page's next_since_created_at "
+                    "to continue and stop when instance_exhausted is true. Use "
+                    "it to poll 'what is new since T'. Cannot be combined "
+                    "with 'after' (the opposite, backward direction)."
                 ),
                 required=False,
                 type=ParameterType.STRING,
@@ -7882,11 +8136,20 @@ class AgentMessagingPlugin(
                 "next_after_created_at": ParameterMetadata(
                     type=ParameterType.STRING,
                 ),
+                "next_since_created_at": ParameterMetadata(
+                    type=ParameterType.STRING,
+                    description=(
+                        "The forward cursor to echo as 'since' on the next "
+                        "call; null unless the request used 'since'."
+                    ),
+                ),
                 "instance_exhausted": ParameterMetadata(
                     type=ParameterType.BOOLEAN,
                     description=(
-                        "Whether the newest-first instance section is exhausted "
-                        "under its backward timestamp cursor."
+                        "Whether the instance section is exhausted under the "
+                        "cursor the request used: no older row remains for "
+                        "'after' (newest-first), no newer row for 'since' "
+                        "(oldest-first)."
                     ),
                 ),
                 "role_entries": ParameterMetadata(type=ParameterType.LIST),
@@ -7987,8 +8250,8 @@ class AgentMessagingPlugin(
             )
         try:
             request = _build_peer_inbox_request(raw, binding)
-        except ValueError as exc:
-            return _failure_result(code="invalid_after", message=str(exc))
+        except InvalidInboxCursorError as exc:
+            return _failure_result(code=exc.code, message=str(exc))
         try:
             page = self._require_service().peer_inbox(request)
         except AgentMessagingError as exc:
@@ -11583,9 +11846,10 @@ def _build_peer_inbox_request(
     The recipient triple comes from ``binding`` and never from ``raw`` — a
     caller names only its own session, and the identity it reads with is the one
     the registry holds for that session. The two cursors are read independently
-    and neither ever feeds the other. Raises ``ValueError`` for a malformed
-    ``after``: a broken cursor means the caller's paging is wrong, and silently
-    restarting from page one would turn that into an unbounded re-read.
+    and neither ever feeds the other. Raises ``InvalidInboxCursorError`` for a
+    malformed ``after`` or ``since``: a broken cursor means the caller's paging
+    is wrong, and silently restarting from page one would turn that into an
+    unbounded re-read.
     """
     after_raw = raw.get("after")
     try:
@@ -11597,13 +11861,14 @@ def _build_peer_inbox_request(
             f"'after' must be an ISO-8601 datetime (the previous newest-first page's "
             f"next_after_created_at): {exc}"
         )
-        raise ValueError(message) from exc
+        raise InvalidInboxCursorError("after", message) from exc
     role_after_raw = raw.get("role_after")
     return PeerInboxRequest(
         recipient_agent_id=binding.agent_id,
         recipient_agent_instance_id=binding.agent_instance_id,
         recipient_agent_session_id=binding.agent_session_id,
         after_created_at=after_created_at,
+        since_created_at=parse_since_cursor(raw.get("since")),
         limit=_clamp_peer_inbox_limit(raw.get("limit")),
         # A4 (2026-08-04): the silent/important split at send time is
         # retired, so the catch-up view is the only meaningful one — never

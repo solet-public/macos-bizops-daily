@@ -29,7 +29,7 @@ from datetime import datetime, timedelta
 from typing import Final, Literal
 
 EFFORT_ORDER: Final[tuple[str, ...]] = ("non_reasoning", "none", "low", "medium", "high", "xhigh", "max")
-BillingObjective = Literal["metered_usd", "relative"]
+BillingObjective = Literal["metered_usd", "relative", "allowance_weighted"]
 _DEFAULT_COST_TOLERANCE: Final[float] = 0.05
 
 
@@ -54,6 +54,7 @@ class CapabilityCell:
     relative_cost_multiplier: float | None
     measured_at: datetime
     acceptance: str
+    plan_weight: float = 1.0
 
     @property
     def pair(self) -> tuple[str, str]:
@@ -64,7 +65,12 @@ class CapabilityCell:
         return EFFORT_ORDER.index(self.effort)
 
     def cost(self, objective: BillingObjective) -> float | None:
-        return self.cost_per_task_usd if objective == "metered_usd" else self.relative_cost_multiplier
+        if objective == "metered_usd":
+            return self.cost_per_task_usd
+        if objective == "allowance_weighted":
+            relative = self.relative_cost_multiplier
+            return None if relative is None else relative * self.plan_weight
+        return self.relative_cost_multiplier
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +112,7 @@ def _feasible_cells(
 ) -> tuple[list[CapabilityCell], dict[str, int]]:
     excluded = {
         "not_accepted": 0, "stale": 0, "capability_floor_disallowed": 0,
-        "quota_exhausted": 0, "quota_unknown": 0, "unpriced": 0, "below_threshold": 0,
+        "quota_exhausted": 0, "unpriced": 0, "below_threshold": 0,
     }
     feasible: list[CapabilityCell] = []
     for cell in catalog:
@@ -119,8 +125,6 @@ def _feasible_cells(
             excluded["capability_floor_disallowed"] += 1
         elif quota_status_by_pair.get(cell.pair) == "exhausted":
             excluded["quota_exhausted"] += 1
-        elif quota_status_by_pair.get(cell.pair) != "available":
-            excluded["quota_unknown"] += 1
         elif cell.cost(objective) is None:
             excluded["unpriced"] += 1
         elif cell.capability_score < threshold:
@@ -194,8 +198,9 @@ def select_tier(
     quota_status_by_pair: Mapping[tuple[str, str], str] | None = None,
     score_margin: float = 0.0, cost_tolerance: float = _DEFAULT_COST_TOLERANCE,
 ) -> TierSelection:
-    """Cheapest fresh, quota-available cell clearing ``required_score + score_margin``.
+    """Cheapest fresh cell clearing ``required_score + score_margin`` whose quota is not known exhausted.
 
+    An unknown quota never excludes a cell; only a status of ``exhausted`` does.
     Refuses rather than guessing: an empty catalog, a catalog with nothing
     fresh, or a threshold nothing clears each raise a distinct code so the
     caller can tell a stale store from an impossible ask.
@@ -212,10 +217,7 @@ def select_tier(
     )
     if not feasible:
         usable = len(catalog) - excluded["not_accepted"] - excluded["stale"]
-        selectable = (
-            usable - excluded["capability_floor_disallowed"] - excluded["quota_exhausted"] - excluded["quota_unknown"]
-        )
-        code = "catalog_stale" if usable == 0 else "quota_state_unknown" if selectable == 0 and excluded["quota_unknown"] else "no_cell_clears_threshold"
+        code = "catalog_stale" if usable == 0 else "no_cell_clears_threshold"
         raise TierSelectionError(code, f"no feasible cell for required_score={threshold}: {excluded}.")
     selected = _pick_cheapest(feasible, objective=objective, cost_tolerance=cost_tolerance)
     frontier = _frontier(feasible, objective)

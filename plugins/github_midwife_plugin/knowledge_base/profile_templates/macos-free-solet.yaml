@@ -59,7 +59,7 @@ plugin_config_overrides:
   # the models setup stage installs and verifies assets in the same directory.
   coreai_embeddings_plugin:
     asset_root: ${SOLET_APP_HOME}/data/model-assets
-    compute_preference: gpu
+    compute_preference: cpu
   # Per-solet role isolation (operator override): the newborn's
   # postgres_state_management_plugin must connect as its OWN non-superuser role
   # (== the solet name), never the retired shared `ananta`.

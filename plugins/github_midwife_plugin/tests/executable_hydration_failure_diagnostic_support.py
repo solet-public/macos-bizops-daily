@@ -67,15 +67,15 @@ def run_genesis_diagnostic_regression(
         all(
             expected in str(reason["stderr_diagnostic"])
             for expected in (
-                "client_secret=<redacted>",
-                "access_token: <redacted>",
-                "Authorization: Bearer <redacted>",
-                "password=<redacted>",
-                "api-key: <redacted>",
-                "credential=<redacted>",
+                "client_secret [redacted]",
+                "access_token [redacted]",
+                "Authorization [redacted]",
+                "password [redacted]",
+                "api-key [redacted]",
+                "credential [redacted]",
             )
         ),
-        "marker-less genesis failure preserves labels while redacting values",
+        "marker-less genesis failure preserves labels while redacting values and their separators",
     )
     check(
         "stale macOS Keychain vault state" in str(reason["stderr_diagnostic"]),

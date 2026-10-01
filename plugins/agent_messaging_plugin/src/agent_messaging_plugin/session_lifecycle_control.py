@@ -66,6 +66,7 @@ if TYPE_CHECKING:
     from ananta.interfaces.state_management_interface import StateManagementInterface
 
     from .bridge_sessions import BridgeSessionManager
+    from .models import BridgeBinding
     from .peer_registry import PeerRegistry
     from .session_hosts import DriverChannel, HostDriver
 
@@ -822,6 +823,14 @@ def drive_session(
 
 DEFAULT_TERMINATE_GRACE_SECONDS = 30
 
+# What a terminate/retire call did to the HOST process, reported so a
+# ``completed`` result can never read as "the process is gone" when it is not
+# (iss_7ee6fb98: 20 hand-launched lanes were retired in the ledger, returned
+# ``completed``, and kept running and registered).
+HOST_ACTION_TERMINATED = "terminated"
+HOST_ACTION_NONE_AVAILABLE = "none_available"
+HOST_ACTION_NOT_ATTEMPTED = "not_attempted"
+
 
 def _resolve_termination_driver(
     row: Mapping[str, object],
@@ -852,16 +861,21 @@ def _terminate_host(
     grace_seconds: int,
     agent_instance_id: str,
     host: str,
-) -> None:
+) -> str | None:
+    """End the host process; ``None`` when the driver did, else the driver's
+    own remedy text for a degenerate driver that cannot (the ledger-only path).
+    """
     try:
         driver.terminate(host_ref, grace_seconds)
-    except HostCannotSpawnError:
+    except HostCannotSpawnError as exc:
         logger.info(
             "terminate_session %s: host %r driver is degenerate (no spawn, "
             "no kill) — proceeding with the ledger-only transition.",
             agent_instance_id,
             host,
         )
+        return exc.remedy
+    return None
 
 
 def terminate_session(
@@ -902,7 +916,16 @@ def terminate_session(
     died — an orphan the success path, which only runs once per
     ``... -> terminated`` transition, could never reach). The predicated
     ``fired_at IS NULL`` guard makes both paths idempotent and mutually
-    safe to call any number of times."""
+    safe to call any number of times.
+
+    The result says what happened to the HOST process: ``host`` (the row's
+    host), ``host_action`` (``terminated`` — the driver ended it;
+    ``none_available`` — a degenerate driver, e.g. ``operator``, cannot stop a
+    process it did not spawn, so ONLY the ledger moved and the process is
+    still running; ``not_attempted`` — the row was already terminal, so this
+    call touched no host) and ``host_remedy`` (the driver's own text for
+    ``none_available``, else ``None``). ``none_available`` is not a failure
+    (the ledger transition still lands, by design) but it must never be silent."""
     try:
         row = read_managed_session(state, agent_instance_id)
     except SessionNotFoundError as exc:
@@ -918,9 +941,12 @@ def terminate_session(
             "already_terminal": True,
             "lifecycle_state": current,
             "session_terminal_edges_fired": fired,
+            "host": str(row.get("host") or ""),
+            "host_action": HOST_ACTION_NOT_ATTEMPTED,
+            "host_remedy": None,
         }
     driver, host = _resolve_termination_driver(row, agent_instance_id)
-    _terminate_host(
+    host_remedy = _terminate_host(
         driver,
         host_ref=str(row.get("host_ref") or ""),
         grace_seconds=grace_seconds,
@@ -949,6 +975,11 @@ def terminate_session(
         "already_terminal": False,
         "lifecycle_state": LIFECYCLE_TERMINATED,
         "session_terminal_edges_fired": fired,
+        "host": host,
+        "host_action": (
+            HOST_ACTION_TERMINATED if host_remedy is None else HOST_ACTION_NONE_AVAILABLE
+        ),
+        "host_remedy": host_remedy,
     }
 
 
@@ -1048,7 +1079,10 @@ def retire_session(
     initial_row = read_managed_session(state, agent_instance_id)
     initial_state = str(initial_row.get("lifecycle_state") or "")
     if initial_state == LIFECYCLE_RETIRED:
-        return {"already_retired": True, "dependencies_fired": 0}
+        return _retire_outcome(
+            already_retired=True, fired=0,
+            terminate_result={"host": str(initial_row.get("host") or "")},
+        )
     if initial_state != LIFECYCLE_TERMINATED:
         spawn_lifecycle._adjudicate_retire_lane_worktree(initial_row)  # noqa: SLF001
 
@@ -1066,7 +1100,7 @@ def retire_session(
     terminated_row = read_managed_session(state, agent_instance_id)
     current = str(terminated_row.get("lifecycle_state") or "")
     if current == LIFECYCLE_RETIRED:
-        return {"already_retired": True, "dependencies_fired": fired}
+        return _retire_outcome(already_retired=True, fired=fired, terminate_result=terminate_result)
     worktree_disposition = spawn_lifecycle._retire_lane_worktree(terminated_row)  # noqa: SLF001
     try:
         transition_lifecycle_state(
@@ -1080,7 +1114,51 @@ def retire_session(
         )
     except StaleLifecycleStateError as exc:
         raise VerbError("stale_lifecycle_state", str(exc)) from exc
-    return {"already_retired": False, "dependencies_fired": fired}
+    return _retire_outcome(already_retired=False, fired=fired, terminate_result=terminate_result)
+
+
+def _retire_outcome(
+    *, already_retired: bool, fired: int, terminate_result: Mapping[str, Any],
+) -> dict[str, Any]:
+    """The retire result: the two original keys plus what happened to the host.
+
+    Without a ``host_action`` from this call's terminate step the call touched
+    no host, so it reports ``not_attempted`` rather than inheriting a claim.
+    """
+    return {
+        "already_retired": already_retired,
+        "dependencies_fired": fired,
+        "host": str(terminate_result.get("host") or ""),
+        "host_action": str(terminate_result.get("host_action") or HOST_ACTION_NOT_ATTEMPTED),
+        "host_remedy": terminate_result.get("host_remedy"),
+    }
+
+
+def describe_retire_gaps(
+    result: Mapping[str, Any], registration: BridgeBinding | None, *, registry_checked: bool,
+) -> list[str]:
+    """What a retire left undone, one sentence each; ``[]`` means a clean teardown.
+
+    ``completed`` only says the ledger row is retired. The host process and the
+    peer registration are separate facts, so they are reported separately
+    rather than inferred from the ledger transition. Only things this retire
+    genuinely left undone are listed: ``not_attempted`` (the row was already
+    torn down by an earlier terminate or the sweep) lists nothing, because this
+    call left nothing undone, and a lane that is still registered is reported
+    by its own registration check, not by the host action.
+    """
+    gaps: list[str] = []
+    action = result.get("host_action")
+    if action == HOST_ACTION_NONE_AVAILABLE:
+        gaps.append(f"host {result.get('host')!r} process was not stopped: {result.get('host_remedy')}")
+    if not registry_checked:
+        gaps.append("peer registration was not checked: the agent messaging bridge is not active")
+    elif registration is not None:
+        gaps.append(
+            f"still registered in peer_list: bridge {registration.bridge_id}, "
+            f"parent_pid {registration.parent_pid}",
+        )
+    return gaps
 
 
 _VALID_CONDITION_KINDS = frozenset(

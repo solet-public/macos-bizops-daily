@@ -1096,6 +1096,7 @@ class Forwarder:
         self,
         *,
         after: str | None = None,
+        since: str | None = None,
         limit: int | None = None,
         include_important: bool = True,
         role_after: str | None = None,
@@ -1104,6 +1105,8 @@ class Forwarder:
         params: dict[str, str] = {}
         if after is not None:
             params["after"] = after
+        if since is not None:
+            params["since"] = since
         if limit is not None:
             params["limit"] = str(limit)
         if not include_important:

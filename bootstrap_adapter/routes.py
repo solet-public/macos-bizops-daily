@@ -44,6 +44,7 @@ from .protocol import (
     Request,
     command_failure_result,
     evidence,
+    planned_action,
     protocol_error_result,
     resolve_brew_executable,
     resolve_executable,
@@ -518,14 +519,13 @@ def _coding_tool_route(request: Request, runtime: AdapterRuntime) -> dict[str, A
     brew = resolve_brew_executable(runtime)
     if request["phase"] == "probe":
         planned_actions = [
-            {
-                "id": f"{executable_name}.install_homebrew_package",
-                "title": f"Install {package} with Homebrew",
-                "mutation_kind": "package_install",
-                "target": f"{brew or 'unresolved'}:{package}",
-                "requires_confirmation": True,
-                "condition_or_evidence_ref": f"{executable_name}_missing",
-            },
+            planned_action(
+                action_id=f"{executable_name}.install_homebrew_package",
+                title=f"Install {package} with Homebrew",
+                mutation_kind="package_install",
+                target=f"{brew or 'unresolved'}:{package}",
+                evidence_ref=f"{executable_name}_missing",
+            ),
         ]
         return result(
             request,

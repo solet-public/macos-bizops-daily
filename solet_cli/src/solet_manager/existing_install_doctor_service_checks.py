@@ -10,7 +10,6 @@ never because a probe was unavailable.
 from __future__ import annotations
 
 import json
-import plistlib
 import subprocess
 import time
 from pathlib import Path
@@ -21,7 +20,7 @@ from .errors import AdapterError, AdapterProtocolError, ManagerError, StateConfl
 from .existing_install_adapters import ATTEST_PROCESS_KEY, KNOWLEDGE_SEARCH_PROCESS_KEY
 from .existing_install_doctor_probe import DoctorProbe, artifact_check, artifact_facts, check, not_applicable, operation_by_ref, probe_status, unbound_reason, unknown, verdict
 from .existing_solet_diagnostics import DiagnosticCheck, DiagnosticStatus
-from .launch_topology import LEGACY_DIRECT, MATERIALIZED_SUPERVISOR, launchagent_plist_path
+from .launch_topology import LEGACY_DIRECT, MATERIALIZED_SUPERVISOR, launchagent_plist_path, parse_plist
 from .models import DoctorContractKind, JsonValue
 from .update_runtime_plan import AttestationObservation, knowledge_removed_articles, roster_plugins
 
@@ -257,10 +256,10 @@ def _target_launch_vector(probe: DoctorProbe, label: str, interpreter: Path, app
     expected = [str(interpreter), "-m", "ananta.cli", "--app-home", str(app_home)]
     plist_path = launchagent_plist_path(probe.seams.home, label)
     try:
-        plist = plistlib.loads(plist_path.read_bytes())
-    except (OSError, ValueError, plistlib.InvalidFileException):
+        plist = parse_plist(plist_path.read_bytes())
+    except OSError:
         return False
-    return isinstance(plist, dict) and plist.get("Label") == label and plist.get("ProgramArguments") == expected
+    return plist is not None and plist.get("Label") == label and plist.get("ProgramArguments") == expected
 
 
 def _target_process_command(command: str, interpreter: Path, app_home: Path) -> bool:

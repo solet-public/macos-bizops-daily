@@ -20,8 +20,10 @@ from .setup_adapter_contract import (
     AdapterRequest,
     JsonObject,
     evidence,
+    neutralized,
     planned_action,
     public_string,
+    public_text,
     result,
 )
 from .setup_adapter_runtime import (
@@ -1007,19 +1009,22 @@ def command_failure_reason(outcome: CommandOutcome) -> JsonObject:
 
 
 def _public_stderr_diagnostic(outcome: CommandOutcome) -> tuple[str, bool]:
-    """Bound and redact one failed command's stderr for the public reason."""
+    """Bound and redact one failed command's stderr for the public reason.
+
+    A redacted value keeps its label but not its separator: ``password=<redacted>`` is still secret-shaped to the Manager's ``public_string``, which then
+    refuses the whole envelope (iss_67472e3f).
+    """
 
     encoded = outcome.stderr.encode("utf-8")
     captured = encoded[:_FAILURE_STDERR_DIAGNOSTIC_LIMIT]
     diagnostic = captured.decode("utf-8", errors="ignore")
+    redacted = _CREDENTIAL_VALUE.sub(
+        r"\g<label> [redacted]",
+        _AUTHORIZATION_BEARER_VALUE.sub(r"\g<label> [redacted]", diagnostic),
+    )
     return (
-        _CREDENTIAL_VALUE.sub(
-            r"\g<label>\g<separator><redacted>",
-            _AUTHORIZATION_BEARER_VALUE.sub(
-                r"\g<label>\g<separator><redacted>", diagnostic
-            ),
-        ),
-        outcome.stderr_truncated or len(encoded) > len(captured),
+        public_text(redacted, _FAILURE_STDERR_DIAGNOSTIC_LIMIT),
+        outcome.stderr_truncated or len(encoded) > len(captured) or len(neutralized(redacted)) > _FAILURE_STDERR_DIAGNOSTIC_LIMIT,
     )
 
 

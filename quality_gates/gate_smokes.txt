@@ -700,6 +700,36 @@ plugins/agent_messaging_plugin/tests/model_dispatch_policy_smoke.py
 # no database, network, or model turn.
 plugins/agent_messaging_plugin/tests/dispatch_tier_selection_smoke.py
 
+# Dispatch runtime constraint: select_dispatch_tier(runtime=...) filters the
+# catalog to one runtime before domination, so a Codex cell cannot dominate a
+# chosen Claude cell out. Proves the unconstrained selection is unchanged, the
+# receipt carries runtime_constraint and verify replays it, a stripped, changed
+# or missing constraint is refused, and no-clearing / unknown runtime refuse
+# loudly. PURE UNIT, offline: real-shape state fake, no database, network, or
+# model turn.
+plugins/agent_messaging_plugin/tests/dispatch_runtime_constraint_smoke.py
+
+# iss_c6fbf9ae / iss_3ff06701: allowance-pool readings are optional. Against the
+# unmodified shipped usage profile, proves a claude_code cell is selectable with
+# no reading recorded (an unknown quota never excludes) and its receipt
+# verifies; a current reading showing a pool exhausted excludes the cells it
+# covers, even beside an unknown pool; an expired, retracted or never-recorded
+# pool excludes nothing and is never inferred from another pool; invalid records
+# are refused and write nothing. PURE UNIT, offline: real-shape state fake, no
+# database, network, or model turn.
+plugins/agent_messaging_plugin/tests/allowance_pool_reading_smoke.py
+
+# iss_eef0812b: the allowance-weighted dispatch objective. Against the SHIPPED
+# usage profile and a fixed catalog, proves the declared dispatch weights
+# reproduce the design's before/after table for required scores 40-56; a table
+# fails loud on every malformed field and never reads as a conversion; Codex,
+# unconstrained and explicitly-requested selections are byte-identical with and
+# without the table; a plan with no table keeps today's ranking and warns; the
+# receipt keeps its keys, pins the ranking and refuses a stripped constraint or
+# an edited weight; an exhausted pool still excludes a weighted cell. PURE UNIT,
+# offline: real-shape state fake, no database, network, or model turn.
+plugins/agent_messaging_plugin/tests/allowance_weighted_dispatch_smoke.py
+
 # iss_48ea8171 / unt_4a6526fd: the model capability catalog store + verbs
 # (schema 1.11.0). Proves a seed writes pending_crosscheck cells and never
 # accepts; select_dispatch_tier refuses catalog_stale until cells are
@@ -3284,10 +3314,35 @@ plugins/default_scheduling_plugin/tests/action_executor_deferred_fire_smoke.py
 plugins/agent_messaging_plugin/tests/peer_inbox_process_smoke.py
 plugins/agent_messaging_plugin/tests/role_read_page_delivery_smoke.py
 
-# Instance-section exhaustion is an additive signal over the legacy oldest-first
-# timestamp cursor. Pins default and forward paging, empty, and exact 100/101
-# lookahead behavior with the real bounded ordered-query fake. Hermetic.
+# Instance-section exhaustion is an additive signal over the newest-first
+# backward timestamp cursor (`after`). Pins default and backward paging, empty,
+# and exact 100/101 lookahead behavior with the real bounded ordered-query fake.
+# Hermetic.
 plugins/agent_messaging_plugin/tests/peer_inbox_instance_exhaustion_smoke.py
+
+# The forward `since` cursor (iss_17aefd54): `after` is the backward cursor and
+# the tool text called it a forward one, so "what is new since T" had no
+# honest call. Pins since = strictly newer, oldest-first, advancing cursor,
+# truthful exhaustion, offset-bearing times as the same instant, `after`
+# unchanged, both-cursors refusal, and the malformed-since failure. Hermetic.
+plugins/agent_messaging_plugin/tests/peer_inbox_since_cursor_smoke.py
+
+# Every surface that serves a peer_inbox page parses its own arguments: the
+# localhost /peer/inbox route, the Streamable-HTTP MCP tool and the stdio MCP
+# bridge tool. Drives `since` through each against the real service and rows,
+# and checks the advertised tool text against the behavior it describes
+# (iss_17aefd54). Hermetic.
+plugins/agent_messaging_plugin/tests/peer_inbox_since_surfaces_smoke.py
+
+# retire_session / terminate_session report what they did to the HOST process
+# (iss_7ee6fb98): a hand-launched `operator`-hosted lane is retired in the
+# ledger only (the operator driver cannot stop a process it did not spawn), and
+# the verb used to return `completed` with no sign the process was still running
+# and still listed by peer_list. Pins host_action (terminated / none_available /
+# not_attempted) with the driver's remedy, the plugin verb's not_done list and
+# live peer_registration, and that the ledger transition and the
+# unsupported-host refusal are unchanged. Hermetic.
+plugins/agent_messaging_plugin/tests/retire_session_honest_status_smoke.py
 
 # Peer-enumeration asymmetry close (WS-1a follow-on, operator-prompted
 # 2026-08-02): peer_inbox let a no-MCP session read its OWN mail; peer_list
@@ -5096,6 +5151,19 @@ plugins/coreai_embeddings_plugin/tests/boot_order_readiness_smoke.py
 # scratch HOME and cache root, fake canary child. Never touches a host cache.
 plugins/coreai_embeddings_plugin/tests/cache_canary_smoke.py
 
+# r67, iss_a457a147: one Core AI native call over 120 s (a 16-chunk ledger
+# embed batch on CPU) poisoned the runtime and left every embedding consumer
+# failing until a reload. A batch longer than the bound completes, because
+# each input is its own bounded operation, and an over-long input anywhere in
+# a batch is refused before any embedding; a call that really hangs, in an
+# embed or a token count, is reported, the plugin prepares a new runtime once
+# and logs it; a preparation that itself times out leaves the plugin
+# unavailable and no later call prepares again; a failed, unavailable or
+# invalid native call stays loud with no preparation; nothing on the worker
+# re-enters the runtime lock.
+# Offline; the bound is scaled to one second, fake native model.
+plugins/coreai_embeddings_plugin/tests/timeout_recovery_smoke.py
+
 # Apple wave 44 D2 (iss_3aa20e42): macOS Foundation Models provider typed
 # unavailable warnings, plugin contract, and provider isolation. Offline SDK
 # fakes; installed_resources_smoke.py is excluded (needs an installed dist).
@@ -5174,6 +5242,7 @@ plugins/macos_inference_plugin/tests/provider_isolation_smoke.py
 # not shipped: solet_cli/tests/doctor_promoted_seed_identity_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_hydration_block_carry_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it imports create_origin_update_path_smoke, whose fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: solet_cli/tests/update_plist_adopt_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
+# not shipped: solet_cli/tests/update_plist_robustness_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; its fixture builder _step7_support imports the seed factory, which is in no capability bundle (fixture_build_tooling)
 # not shipped: quality_gates/tests/smoke_contract_lint_gate_smoke.py requires plugins/seed_factory_plugin/src/seed_factory_plugin; it calls checkout_only_consistency_violations directly to prove the repo-level contract-lint gate, which is in no capability bundle (fixture_build_tooling)
 # not shipped: ananta/tests/core/orchestration/selected_inference_startup_smoke.py requires plugins/macos_inference_plugin/src/macos_inference_plugin; absent from macos_free_minimal and macos_samantha, which ship default_inference_plugin instead (iss_76ae2d4d, cross_bundle_transition)
 # not shipped: ananta/tests/core/orchestration/selected_inference_legacy_startup_smoke.py requires plugins/default_inference_plugin/src/default_inference_plugin beside plugins/macos_inference_plugin; no capability bundle ships both inference plugins (cross_bundle_transition)
@@ -5332,6 +5401,7 @@ solet_cli/tests/existing_install_router_failure_sweep_applies_2_smoke.py
 solet_cli/tests/existing_install_classification_coverage_smoke.py
 solet_cli/tests/update_topology_local_state_smoke.py
 solet_cli/tests/update_local_state_drift_report_smoke.py
+solet_cli/tests/update_release_identity_refusal_smoke.py
 
 # Release-identity comparator (publish_release design section 7.4, chg_4e7e460a,
 # closes iss_670801d4 + the consumption half of iss_da99a951, 2026-09-19): the
@@ -5592,3 +5662,37 @@ solet_cli/tests/claude_native_location_smoke.py
 # the stamped render; a supervisor plist and another label still block with the repair naming the runbook step; the diff is bounded to 80 lines
 # of 200 characters and redacts secret-named values; plist-shaped bytes in a non-plist artifact are never adopted. RED on master 7ddbdfe0b.
 plugins/github_midwife_plugin/tests/existing_install_plist_adopt_smoke.py
+# iss_92735a39 (r66): every plist reader the Manager and the seed own treats an unparseable plist (truncated or mismatched XML, a bad integer, real or
+# date, a key with no value, an unknown encoding, deep nesting, a non-dict root, binary garbage) as "not a plist" and never raises: launch_topology,
+# the LM Studio login check, the doctor's launch-vector check; the Manager's PLIST_PARSE_ERRORS equals the seed's; and an AST guard fails any
+# plistlib read in the Manager, the seed's migrations or migrate_to_solet.py that is not inside a handler catching them. RED on master f3df38abc.
+solet_cli/tests/launch_topology_plist_robustness_smoke.py
+# iss_92735a39 and iss_68bc97bb (r66): the seed's rename migration leaves every unparseable plist alone and stops as probe_drift when a plist stops
+# parsing between probe and apply, with nothing written; a binary1 plist, a non-UTF-8 .zshrc and a non-UTF-8 root_manifest.yaml block the probe and the
+# apply with managed_block_unknown_origin and a repair naming the file (never read as absent, never rewritten); every new repair passes the Manager's
+# real public_string and the same text with a keg path is refused raw. RED on master f3df38abc.
+plugins/github_midwife_plugin/tests/existing_install_plist_robustness_smoke.py
+# iss_92735a39, iss_68bc97bb, iss_285b99b1 and iss_c97969cb (r66): on a created solet, a truncated or mismatched XML plist and a binary1 plist stop the
+# runtime preview with awaiting_user (it does not raise), each blocked row carries the seed's repair text, and a plist that changes between the stage's
+# pre-apply probe and write_backup is refused as probe_drift with nothing written; Dax's hand-made plist still previews and applies. RED on master f3df38abc.
+# iss_67472e3f, iss_49f37c32 (r66): no seed text producer can emit text the Manager's public_string refuses, and a long repair is cut visibly. Every
+# producer of envelope text (result repair, evidence status/summary/source/observed/expected, planned_action, the describe_outcome repair, the
+# command_failure_reason stderr diagnostic, the model-doctor candidate, and the bootstrap_adapter twins) is driven with a hostile corpus (keg path,
+# secret-shaped and uppercase secret text, oversize, empty) through the Manager's REAL OperationResult.from_dict, each text refused raw as a control;
+# the bootstrap twin agrees with the plugin helper; a census of the seed sources requires every producer that builds an envelope field itself to use
+# public_text; a repair over REPAIR_LIMIT is cut in the middle behind a marker that keeps its head and the remedy it ends with, proven for every
+# statically resolvable repair template and for REPAIR_CLAUDE_CLI, claude_plugin_list_failed and the marketplace refusals. RED on master f3df38abc.
+plugins/github_midwife_plugin/tests/seed_public_text_gate_smoke.py
+
+# r66 (2026-10-01, lane R66-Remote-Control-Guard-20261001, operator ruling rul_4beb0d0a) --
+# .claude/hooks/remote_control_guard.py, the SessionStart net under every Claude session
+# not started by a launcher that passes --remote-control. Pins: flag present (and --rc, and
+# the =value form) is silent; flag absent warns naming /remote-control and the session's own
+# name; a full-path claude binary is recognised the same as the bare name in both directions;
+# --remote-control-session-name-prefix is a different flag and does not count; a non-Claude
+# parent, a vanished process, a print-mode claude and a cyclic process table are silent;
+# main() exits 0 even when ps cannot run (and says so on stderr); real processes named
+# claude (bare and full path) behave like the scripted table; setup_clone.sh wires the hook
+# into SessionStart exactly once and names a file that exists. Like the other hook smokes,
+# this lives under .claude/hooks/ -- the gate scope regex misses that directory, so the
+# static gates are hand-run over the hook and the smoke.
